@@ -6,6 +6,7 @@ const SYNC_KEY = 'solemiSleep:sync:v1'
 
 export type SyncConnection = {
   familyId: string
+  familyName: string
   deviceId: string
   deviceToken: string
   revision: number
@@ -39,10 +40,10 @@ function readStore(): SyncStore {
     if (!raw) return defaultStore()
     const parsed = JSON.parse(raw) as SyncStore
     if (!parsed || typeof parsed !== 'object') return defaultStore()
-    return {
-      connection: parsed.connection && typeof parsed.connection.deviceToken === 'string' ? parsed.connection : null,
-      pending: Array.isArray(parsed.pending) ? parsed.pending : []
-    }
+    const connection = parsed.connection && typeof parsed.connection.deviceToken === 'string'
+      ? { ...parsed.connection, familyName: typeof parsed.connection.familyName === 'string' ? parsed.connection.familyName : '' }
+      : null
+    return { connection, pending: Array.isArray(parsed.pending) ? parsed.pending : [] }
   } catch {
     return defaultStore()
   }
@@ -99,11 +100,11 @@ function writeRemoteData(data: AppData) {
 export function getSyncStore() { return readStore() }
 export function isFamilyConnected() { return Boolean(readStore().connection) }
 
-export async function createFamily(deviceName: string) {
-  const created = await request<{ familyId: string; device: { id: string; name: string | null }; deviceToken: string; revision: number }>('/v1/families', {
-    method: 'POST', body: JSON.stringify({ deviceName })
+export async function createFamily(familyName: string, deviceName: string) {
+  const created = await request<{ familyId: string; familyName: string; device: { id: string; name: string | null }; deviceToken: string; revision: number }>('/v1/families', {
+    method: 'POST', body: JSON.stringify({ familyName: familyName.trim(), deviceName })
   })
-  const connection: SyncConnection = { familyId: created.familyId, deviceId: created.device.id, deviceToken: created.deviceToken, revision: created.revision }
+  const connection: SyncConnection = { familyId: created.familyId, familyName: created.familyName, deviceId: created.device.id, deviceToken: created.deviceToken, revision: created.revision }
   writeStore({ connection, pending: [] })
   const local = loadData()
   writeRemoteData({ ...local, sessions: [] })
@@ -111,13 +112,24 @@ export async function createFamily(deviceName: string) {
 }
 
 export async function joinFamily(code: string, deviceName: string) {
-  const joined = await request<{ familyId: string; device: { id: string; name: string | null }; deviceToken: string; revision: number }>('/v1/join', {
+  const joined = await request<{ familyId: string; familyName: string; device: { id: string; name: string | null }; deviceToken: string; revision: number }>('/v1/join', {
     method: 'POST', body: JSON.stringify({ code: code.trim().toUpperCase(), deviceName })
   })
-  const connection: SyncConnection = { familyId: joined.familyId, deviceId: joined.device.id, deviceToken: joined.deviceToken, revision: 0 }
+  const connection: SyncConnection = { familyId: joined.familyId, familyName: joined.familyName, deviceId: joined.device.id, deviceToken: joined.deviceToken, revision: 0 }
   writeStore({ connection, pending: [] })
-  const synced = await pullRemote(true)
-  return synced
+  return pullRemote(true)
+}
+
+export async function refreshFamilyInfo() {
+  const store = readStore()
+  if (!store.connection) return null
+  const info = await request<{ id: string; name: string | null; familyId: string; familyName: string; revision: number }>('/v1/device', {}, store.connection.deviceToken)
+  const fresh = readStore()
+  if (!fresh.connection) return null
+  fresh.connection.familyName = info.familyName || fresh.connection.familyName
+  fresh.connection.revision = Math.max(fresh.connection.revision, info.revision)
+  writeStore(fresh)
+  return info
 }
 
 export async function createInvite() {
@@ -230,7 +242,7 @@ export async function pullRemote(forceFromZero = false) {
   const fresh = readStore()
   if (!fresh.connection) return false
   const after = forceFromZero ? 0 : fresh.connection.revision
-  const result = await request<{ revision: number; sessions: RemoteSession[] }>(`/v1/sync?after=${after}`, {}, fresh.connection.deviceToken)
+  const result = await request<{ revision: number; familyName?: string; sessions: RemoteSession[] }>(`/v1/sync?after=${after}`, {}, fresh.connection.deviceToken)
   const latest = readStore()
   if (!latest.connection) return false
   const current = loadData()
@@ -238,6 +250,7 @@ export async function pullRemote(forceFromZero = false) {
   const changed = JSON.stringify(merged.sessions) !== JSON.stringify(current.sessions)
   if (changed) writeRemoteData(merged)
   latest.connection.revision = result.revision
+  if (result.familyName) latest.connection.familyName = result.familyName
   writeStore(latest)
   return changed
 }
