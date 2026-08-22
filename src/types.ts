@@ -21,7 +21,7 @@ export type AppData = {
 }
 
 export type SleepBackupV3 = {
-  format: 'baby-sleep-backup'
+  format: 'solemi-sleep-backup'
   version: 3
   exportedAt: string
   data: AppData
