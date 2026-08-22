@@ -6,6 +6,19 @@ import { awakeSince, durationOf, formatDateHeader, formatDuration, formatTime, f
 
 const pad = (value: number) => String(value).padStart(2, '0')
 
+function Icon({ name, size = 18 }: { name: 'moon' | 'sun' | 'settings' | 'home' | 'history' | 'stats' | 'edit' | 'plus' | 'close'; size?: number }) {
+  const common = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true }
+  if (name === 'moon') return <svg {...common}><path d="M20.2 15.2A8.6 8.6 0 0 1 8.8 3.8 8.7 8.7 0 1 0 20.2 15.2Z" /></svg>
+  if (name === 'sun') return <svg {...common}><circle cx="12" cy="12" r="3.6" /><path d="M12 2v2.2M12 19.8V22M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M2 12h2.2M19.8 12H22M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6" /></svg>
+  if (name === 'settings') return <svg {...common}><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.8 1.8 0 0 0 .36 2l.05.05-2.76 2.76-.05-.05a1.8 1.8 0 0 0-2-.36 1.8 1.8 0 0 0-1.1 1.64V21h-3.8v-.07A1.8 1.8 0 0 0 9 19.3a1.8 1.8 0 0 0-2 .36l-.05.05-2.76-2.76.05-.05a1.8 1.8 0 0 0 .36-2A1.8 1.8 0 0 0 2.96 13H3v-3.8h-.04A1.8 1.8 0 0 0 4.6 8.1a1.8 1.8 0 0 0-.36-2l-.05-.05 2.76-2.76.05.05a1.8 1.8 0 0 0 2 .36A1.8 1.8 0 0 0 10.1 2.06V2h3.8v.06A1.8 1.8 0 0 0 15 3.7a1.8 1.8 0 0 0 2-.36l.05-.05 2.76 2.76-.05.05a1.8 1.8 0 0 0-.36 2A1.8 1.8 0 0 0 21.04 9.2H21V13h.04A1.8 1.8 0 0 0 19.4 15Z" /></svg>
+  if (name === 'home') return <svg {...common}><path d="M4 10.5 12 4l8 6.5V20h-6v-5h-4v5H4Z" /></svg>
+  if (name === 'history') return <svg {...common}><path d="M4 5v5h5" /><path d="M5.2 16.5A8 8 0 1 0 4 10" /><path d="M12 8v4l2.6 1.5" /></svg>
+  if (name === 'stats') return <svg {...common}><path d="M5 20V11M10 20V5M15 20v-8M20 20V8" /></svg>
+  if (name === 'edit') return <svg {...common}><path d="m4 20 4.3-1 9.8-9.8-3.3-3.3L5 15.7 4 20Z" /><path d="m13.8 6.9 3.3 3.3" /></svg>
+  if (name === 'plus') return <svg {...common}><path d="M12 5v14M5 12h14" /></svg>
+  return <svg {...common}><path d="M6 6l12 12M18 6 6 18" /></svg>
+}
+
 function toLocalParts(iso?: string | null) {
   const date = iso ? new Date(iso) : new Date()
   return {
@@ -29,7 +42,7 @@ function dateOptions() {
   const result: Array<{ value: string; label: string }> = []
   const now = new Date()
   now.setHours(0, 0, 0, 0)
-  for (let index = 14; index >= 0; index -= 1) {
+  for (let index = 10; index >= 0; index -= 1) {
     const date = new Date(now)
     date.setDate(date.getDate() - index)
     const value = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
@@ -105,44 +118,46 @@ function TodayPage({ data, now, current, onStart, onEnd, onOpenEditor, onSetting
   return (
     <section className="screen today-screen">
       <header className="compact-header">
-        <div>
+        <div className="header-copy">
           <div className="date-label">{formatDateHeader(new Date(now))}</div>
           <div className="daily-summary">Ma eddig <strong>{formatDuration(total)}</strong> alvás</div>
         </div>
-        <button className="icon-button" aria-label="Beállítások" onClick={onSettings}>⚙︎</button>
+        <button className="icon-button" aria-label="Beállítások" onClick={onSettings}><Icon name="settings" size={16} /></button>
       </header>
 
-      <div className={`status-orb ${current ? 'sleeping' : ''}`}>
-        <div className="orb-progress" />
+      <div className={`status-orb ${current ? 'sleeping' : 'awake'}`}>
         <div className="orb-content">
-          <div className="orb-icon">{current ? '☾' : '☾✦'}</div>
+          <div className="orb-icon"><Icon name="moon" size={17} /></div>
           <div className="orb-status">{current ? 'ALSZIK' : 'ÉBREN'}</div>
           <div className="orb-time">{current ? formatTimer(elapsed) : formatDuration(elapsed)}</div>
           {current && <div className="orb-sub">Elaludt {formatTime(current.startTime)}</div>}
         </div>
       </div>
 
-      <button className="primary-action" onClick={current ? onEnd : onStart}>{current ? '☀︎  Felébredt' : '☾  Elaludt'}</button>
+      <button className="primary-action" onClick={current ? onEnd : onStart}>
+        <Icon name={current ? 'sun' : 'moon'} size={15} />
+        <span>{current ? 'Felébredt' : 'Elaludt'}</span>
+      </button>
       <button className="text-action" onClick={() => onOpenEditor(current ?? 'new')}>Részletek</button>
 
       <div className="today-card">
         <div className="section-head"><h2>Mai alvások</h2><span>•••</span></div>
         <div className="sleep-list scroll-list">
           {todays.length === 0 && <div className="empty">Még nincs mai alvás.</div>}
-          {todays.map((session) => <SleepRow key={session.id} session={session} now={now} onClick={() => onOpenEditor(session)} />)}
+          {todays.map((session) => <SleepRow key={session.id} session={session} now={now} onClick={() => onOpenEditor(session)} compact />)}
         </div>
       </div>
     </section>
   )
 }
 
-function SleepRow({ session, now, onClick }: { session: SleepSession; now: number; onClick?: () => void }) {
+function SleepRow({ session, now, onClick, compact = false }: { session: SleepSession; now: number; onClick?: () => void; compact?: boolean }) {
   return (
-    <button className="sleep-row" onClick={onClick}>
-      <span className="sleep-row-icon">☾</span>
+    <button className={`sleep-row ${compact ? 'compact' : ''}`} onClick={onClick}>
+      <span className="sleep-row-icon"><Icon name="moon" size={13} /></span>
       <span className="sleep-row-time">{formatTime(session.startTime)} – {session.endTime ? formatTime(session.endTime) : 'most'}</span>
       <span className="sleep-row-duration">{formatDuration(durationOf(session, now))}</span>
-      <span className="sleep-row-edit">✎</span>
+      {!compact && <span className="sleep-row-edit"><Icon name="edit" size={12} /></span>}
     </button>
   )
 }
@@ -159,7 +174,7 @@ function HistoryPage({ sessions, onEdit, onNew }: { sessions: SleepSession[]; on
 
   return (
     <section className="screen history-screen">
-      <header className="page-header centered-header"><h1>Előzmények</h1><button className="add-button" onClick={onNew}>＋</button></header>
+      <header className="page-header centered-header"><h1>Előzmények</h1><button className="add-button" onClick={onNew}><Icon name="plus" size={17} /></button></header>
       <div className="history-wrap">
         {grouped.length === 0 && <div className="empty-card">Még nincs rögzített alvás.</div>}
         {grouped.map(([date, items], index) => (
@@ -208,11 +223,11 @@ function StatsPage({ sessions, now }: { sessions: SleepSession[]; now: number })
         <h2>Alvás időtartama</h2>
         <div className="bar-chart">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chart} margin={{ top: 8, right: 2, bottom: 0, left: -24 }}>
+            <BarChart data={chart} margin={{ top: 8, right: 2, bottom: 0, left: -26 }}>
               <XAxis dataKey="label" tickLine={false} axisLine={false} />
               <YAxis domain={[0, 14]} tickLine={false} axisLine={false} />
-              <Tooltip contentStyle={{ background: '#0d1a2b', border: '1px solid #1c3352', borderRadius: 12 }} formatter={(value) => [`${value} ó`, 'Alvás']} />
-              <Bar dataKey="hours" fill="#579dff" radius={[5, 5, 2, 2]} maxBarSize={18} />
+              <Tooltip contentStyle={{ background: '#0d1a2b', border: '1px solid #1c3352', borderRadius: 10 }} formatter={(value) => [`${value} ó`, 'Alvás']} />
+              <Bar dataKey="hours" fill="#579dff" radius={[4, 4, 1, 1]} maxBarSize={17} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -220,19 +235,22 @@ function StatsPage({ sessions, now }: { sessions: SleepSession[]; now: number })
 
       <h2 className="overview-title">24 órás áttekintés</h2>
       <div className="overview-grid">
-        <div className="radial compact-radial"><div className="radial-inner"><span>0</span><strong>☾</strong><span className="sun-mark">☀︎</span></div></div>
+        <div className="radial compact-radial">
+          <div className="clock-mark mark-0">0</div><div className="clock-mark mark-6">6</div><div className="clock-mark mark-12">12</div><div className="clock-mark mark-18">18</div>
+          <div className="radial-inner"><Icon name="moon" size={14} /><Icon name="sun" size={14} /></div>
+        </div>
         <div className="stats-stack">
           <StatCard label="Átlag" value={formatDuration(sums.total / divisor)} suffix="/ nap" />
-          <StatCard label="Nappali" value={formatDuration(sums.day / divisor)} icon="☀︎" />
-          <StatCard label="Éjszakai" value={formatDuration(sums.night / divisor)} icon="☾" />
+          <StatCard label="Nappali" value={formatDuration(sums.day / divisor)} icon="sun" />
+          <StatCard label="Éjszakai" value={formatDuration(sums.night / divisor)} icon="moon" />
         </div>
       </div>
     </section>
   )
 }
 
-function StatCard({ label, value, suffix, icon }: { label: string; value: string; suffix?: string; icon?: string }) {
-  return <div className="stat-card"><div><span>{label}</span><strong>{value}</strong>{suffix && <small>{suffix}</small>}</div>{icon && <b>{icon}</b>}</div>
+function StatCard({ label, value, suffix, icon }: { label: string; value: string; suffix?: string; icon?: 'moon' | 'sun' }) {
+  return <div className="stat-card"><div><span>{label}</span><strong>{value}</strong>{suffix && <small>{suffix}</small>}</div>{icon && <b><Icon name={icon} size={14} /></b>}</div>
 }
 
 function SettingsPage({ data, setData, onBack }: { data: AppData; setData: (data: AppData) => void; onBack: () => void }) {
@@ -257,7 +275,7 @@ function SettingsPage({ data, setData, onBack }: { data: AppData; setData: (data
 
   return (
     <section className="screen settings-screen">
-      <header className="page-header"><button className="back-button" onClick={onBack}>‹</button><h1>Beállítások</h1></header>
+      <header className="page-header"><button className="back-button" onClick={onBack}>‹</button><h1>Beállítások</h1><span className="header-spacer" /></header>
       <div className="settings-card"><label>Baba neve<input value={data.settings.childName} onChange={changeName} placeholder="Botond" /></label></div>
       <div className="settings-card action-stack">
         <button onClick={() => exportData(data)}>Adatok exportálása</button>
@@ -269,14 +287,14 @@ function SettingsPage({ data, setData, onBack }: { data: AppData; setData: (data
   )
 }
 
-function DateTimeWheel({ label, icon, value, disabled, onChange }: { label: string; icon: string; value: string; disabled?: boolean; onChange: (value: string) => void }) {
+function DateTimeWheel({ label, icon, value, disabled, onChange }: { label: string; icon: 'moon' | 'sun'; value: string; disabled?: boolean; onChange: (value: string) => void }) {
   const parts = toLocalParts(value)
   const dates = dateOptions()
   const update = (dateValue = parts.date, hour = parts.hour, minute = parts.minute) => onChange(partsToIso(dateValue, hour, minute))
 
   return (
     <div className={`wheel-block ${disabled ? 'disabled' : ''}`}>
-      <div className="wheel-label">{icon} {label}</div>
+      <div className="wheel-label"><Icon name={icon} size={14} /> <span>{label}</span></div>
       <div className="wheel-columns">
         <select size={5} value={parts.date} disabled={disabled} onChange={(event) => update(event.target.value)}>
           {dates.map((date) => <option key={date.value} value={date.value}>{date.label}</option>)}
@@ -317,11 +335,11 @@ function SleepEditor({ session, currentExists, onClose, onSave, onDelete }: {
   return (
     <div className="editor-overlay">
       <div className="editor-screen">
-        <header className="editor-header"><button onClick={onClose}>✕</button><h1>{session ? 'Részletek' : 'Alvás rögzítése'}</h1><span /></header>
+        <header className="editor-header"><button onClick={onClose}><Icon name="close" size={16} /></button><h1>{session ? 'Részletek' : 'Alvás rögzítése'}</h1><span /></header>
         <div className="editor-body">
-          <DateTimeWheel label="Elaludt" icon="☾" value={start} onChange={setStart} />
-          <DateTimeWheel label="Felébredt" icon="☀︎" value={end} disabled={stillSleeping} onChange={setEnd} />
-          <label className="toggle-row"><span>▥  Még alszik</span><input type="checkbox" checked={stillSleeping} onChange={(event) => setStillSleeping(event.target.checked)} /></label>
+          <DateTimeWheel label="Elaludt" icon="moon" value={start} onChange={setStart} />
+          <DateTimeWheel label="Felébredt" icon="sun" value={end} disabled={stillSleeping} onChange={setEnd} />
+          <label className="toggle-row"><span className="toggle-label"><Icon name="moon" size={14} /> Még alszik</span><input type="checkbox" checked={stillSleeping} onChange={(event) => setStillSleeping(event.target.checked)} /></label>
           {session && <label className="note-field">Megjegyzés<textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Opcionális megjegyzés" /></label>}
         </div>
         <div className="editor-actions">
@@ -334,6 +352,6 @@ function SleepEditor({ session, currentExists, onClose, onSave, onDelete }: {
 }
 
 function BottomNav({ page, onChange }: { page: Page; onChange: (page: Page) => void }) {
-  const items: Array<[Page, string, string]> = [['today', '⌂', 'Ma'], ['history', '▱', 'Előzmények'], ['stats', '▥', 'Statisztika']]
-  return <nav className="bottom-nav">{items.map(([key, icon, label]) => <button key={key} className={page === key ? 'active' : ''} onClick={() => onChange(key)}><span>{icon}</span><small>{label}</small></button>)}</nav>
+  const items: Array<[Page, 'home' | 'history' | 'stats', string]> = [['today', 'home', 'Ma'], ['history', 'history', 'Előzmények'], ['stats', 'stats', 'Statisztika']]
+  return <nav className="bottom-nav">{items.map(([key, icon, label]) => <button key={key} className={page === key ? 'active' : ''} onClick={() => onChange(key)}><span><Icon name={icon} size={16} /></span><small>{label}</small></button>)}</nav>
 }
