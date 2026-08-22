@@ -1,0 +1,241 @@
+:root {
+  --screen-pad: 20px;
+  --orb-size: 224px;
+  --cta-width: min(82vw, 320px);
+  --tab-height: 68px;
+}
+
+.app-shell,
+.bottom-nav,
+.editor-screen {
+  width: min(100%, 430px);
+}
+
+.screen {
+  padding-left: var(--screen-pad);
+  padding-right: var(--screen-pad);
+}
+
+.today-screen {
+  padding-top: calc(18px + env(safe-area-inset-top));
+}
+
+.compact-header {
+  min-height: 58px;
+  margin-bottom: 8px;
+}
+
+.date-label {
+  font-size: 17px;
+}
+
+.daily-summary {
+  margin-top: 5px;
+  font-size: 13px;
+}
+
+.icon-button,
+.add-button,
+.back-button {
+  width: 42px;
+  height: 42px;
+  flex-basis: 42px;
+}
+
+.status-orb {
+  margin-top: 18px;
+  margin-bottom: 20px;
+}
+
+.orb-status {
+  font-size: 28px;
+}
+
+.orb-time {
+  margin-top: 10px;
+  font-size: 21px;
+}
+
+.orb-sub {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.primary-action {
+  height: 50px;
+  border-radius: 20px;
+  font-size: 16px;
+}
+
+.text-action {
+  padding-top: 10px;
+  padding-bottom: 14px;
+  font-size: 13px;
+}
+
+.today-card {
+  min-height: 158px;
+  padding: 13px 14px 10px;
+  border-radius: 18px;
+}
+
+.section-head {
+  min-height: 26px;
+  margin-bottom: 7px;
+}
+
+.section-head h2 {
+  font-size: 14px;
+}
+
+.section-head span {
+  font-size: 11px;
+}
+
+.scroll-list {
+  max-height: 126px;
+}
+
+.sleep-row {
+  min-height: 41px;
+}
+
+.empty,
+.empty-card {
+  padding: 30px 12px;
+  font-size: 13px;
+}
+
+.bottom-nav {
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+.bottom-nav button {
+  border-radius: 16px;
+}
+
+.bottom-nav button small {
+  font-size: 10px;
+}
+
+/* The editor should use the screen instead of looking compressed. */
+.editor-screen {
+  padding-left: 22px;
+  padding-right: 22px;
+  padding-top: calc(18px + env(safe-area-inset-top));
+}
+
+.editor-header {
+  min-height: 52px;
+}
+
+.editor-header h1 {
+  font-size: 19px;
+}
+
+.editor-body {
+  gap: 14px;
+  padding-top: 18px;
+}
+
+.wheel-block {
+  padding-top: 12px;
+  padding-bottom: 14px;
+}
+
+.wheel-label {
+  margin-bottom: 9px;
+  font-size: 13px;
+}
+
+.wheel-columns,
+.wheel-columns select {
+  height: 152px;
+}
+
+.wheel-focus {
+  top: 60px;
+  height: 32px;
+}
+
+.toggle-row {
+  min-height: 58px;
+  font-size: 13px;
+}
+
+.note-field {
+  font-size: 12px;
+}
+
+.note-field textarea {
+  min-height: 84px;
+}
+
+.editor-actions {
+  gap: 12px;
+  padding-top: 16px;
+}
+
+.save-button {
+  min-height: 50px;
+  font-size: 14px;
+}
+
+.delete-button {
+  min-width: 88px;
+  font-size: 12px;
+}
+
+@media (min-height: 820px) {
+  .status-orb {
+    margin-top: 24px;
+    margin-bottom: 22px;
+  }
+
+  .today-card {
+    margin-top: 4px;
+  }
+
+  .editor-body {
+    padding-top: 24px;
+  }
+}
+
+@media (max-width: 374px) {
+  :root {
+    --screen-pad: 16px;
+    --orb-size: 202px;
+    --cta-width: 86vw;
+  }
+}
+
+@media (max-height: 730px) {
+  :root {
+    --orb-size: 188px;
+    --tab-height: 58px;
+  }
+
+  .status-orb {
+    margin-top: 8px;
+    margin-bottom: 10px;
+  }
+
+  .primary-action {
+    height: 42px;
+  }
+
+  .today-card {
+    min-height: 132px;
+  }
+
+  .wheel-columns,
+  .wheel-columns select {
+    height: 118px;
+  }
+
+  .wheel-focus {
+    top: 45px;
+    height: 28px;
+  }
+}
