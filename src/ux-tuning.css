@@ -1,12 +1,13 @@
 :root {
   --screen-pad: clamp(18px, 4.8vw, 24px);
   --cta-width: min(95%, 430px);
+  --orb-size: clamp(210px, 55vw, 260px);
 }
 
 /* Today: use the available space for the important information. */
 .compact-header {
   min-height: 72px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 .date-label {
   font-size: clamp(21px, 5.3vw, 25px);
@@ -20,6 +21,10 @@
   font-size: 1.08em;
   color: #b8dcff;
 }
+.status-orb {
+  margin-top: clamp(14px, 2.5vh, 22px);
+  margin-bottom: 18px;
+}
 .primary-action {
   width: var(--cta-width);
   height: clamp(68px, 8.2vh, 76px);
@@ -29,8 +34,20 @@
 }
 .text-action {
   font-size: clamp(15px, 3.8vw, 17px);
-  padding-top: 14px;
-  padding-bottom: 16px;
+  padding-top: 12px;
+  padding-bottom: 13px;
+}
+.sleep-cards-stack {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+}
+.sleep-cards-stack .today-card {
+  margin-top: 0;
+  min-height: 190px;
+}
+.yesterday-card {
+  margin-bottom: calc(var(--tab-height) + env(safe-area-inset-bottom) + 14px);
 }
 
 /* Real touch-scroll wheel picker. */
@@ -159,6 +176,7 @@
 }
 
 @media (max-width: 370px) {
+  :root { --orb-size: 198px; }
   .wheel-columns.custom-wheel,
   .wheel-column { height: 166px; }
   .wheel-column { padding: 60px 0; }
