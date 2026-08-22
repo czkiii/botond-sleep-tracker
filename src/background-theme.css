@@ -26,6 +26,33 @@ body,
   -webkit-backdrop-filter: blur(8px);
 }
 
+/* Illustrated state-orb artwork. The artwork sits inside the existing responsive orb,
+   while the text and the original progress ring remain above it. */
+.status-orb::before {
+  inset: 8px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  border: 1px solid rgba(157, 206, 255, 0.08);
+  box-shadow: inset 0 0 42px rgba(1, 9, 23, 0.30), 0 0 24px rgba(77, 151, 255, 0.08);
+}
+
+.status-orb.awake::before {
+  background-image:
+    linear-gradient(rgba(4, 15, 34, 0.20), rgba(4, 15, 34, 0.30)),
+    url('/botond-sleep-tracker/assets/ui/orbs/awake-orb-day.png');
+}
+
+.status-orb.sleeping::before {
+  background-image:
+    linear-gradient(rgba(2, 10, 26, 0.18), rgba(2, 10, 26, 0.28)),
+    url('/botond-sleep-tracker/assets/ui/orbs/asleep-orb-night.png');
+}
+
+.status-orb .orb-content {
+  text-shadow: 0 2px 14px rgba(0, 5, 18, 0.85);
+}
+
 /* Recharts adds a light rectangular hover/touch cursor behind the active bar by default.
    Keep the tooltip, but make that cursor fully transparent so the chart stays on-theme. */
 .recharts-tooltip-cursor {
