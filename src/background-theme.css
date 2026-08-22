@@ -135,6 +135,24 @@ body,
   transition: none;
 }
 
+/* Language selector uses the same glassy midnight treatment as the existing fields. */
+.settings-fields {
+  display: grid;
+  gap: 16px;
+}
+
+.settings-card .language-select {
+  width: 100%;
+  min-height: 50px;
+  border: 1px solid rgba(127, 175, 228, .12);
+  border-radius: 15px;
+  outline: 0;
+  background: #07131f;
+  color: #fff;
+  padding: 12px 14px;
+  appearance: auto;
+}
+
 /* Recharts adds a light rectangular hover/touch cursor behind the active bar by default.
    Keep the tooltip, but make that cursor fully transparent so the chart stays on-theme. */
 .recharts-tooltip-cursor {
