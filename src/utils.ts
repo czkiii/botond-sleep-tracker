@@ -1,3 +1,5 @@
+import type { Locale } from './i18n'
+import { localeTag } from './i18n'
 import type { SleepSession } from './types'
 
 export const msToParts = (ms: number) => {
@@ -7,8 +9,16 @@ export const msToParts = (ms: number) => {
   return { hours, minutes }
 }
 
-export const formatDuration = (ms: number) => {
+export const formatDuration = (ms: number, locale: Locale = 'hu') => {
   const { hours, minutes } = msToParts(ms)
+  if (locale === 'de') {
+    if (!hours) return `${minutes} Min.`
+    return `${hours} Std. ${minutes} Min.`
+  }
+  if (locale === 'en') {
+    if (!hours) return `${minutes} min`
+    return `${hours} hr ${minutes} min`
+  }
   if (!hours) return `${minutes} p`
   return `${hours} ó ${minutes} p`
 }
@@ -21,13 +31,13 @@ export const formatTimer = (ms: number) => {
   return [h, m, s].map(v => String(v).padStart(2, '0')).join(':')
 }
 
-export const formatTime = (iso: string) => new Intl.DateTimeFormat('hu-HU', {
+export const formatTime = (iso: string, locale: Locale = 'hu') => new Intl.DateTimeFormat(localeTag(locale), {
   hour: '2-digit', minute: '2-digit'
 }).format(new Date(iso))
 
-export const formatDateHeader = (date = new Date()) => new Intl.DateTimeFormat('hu-HU', {
+export const formatDateHeader = (date = new Date(), locale: Locale = 'hu') => new Intl.DateTimeFormat(localeTag(locale), {
   month: 'short', day: 'numeric', weekday: 'long'
-}).format(date).replace('.', '.')
+}).format(date)
 
 export function durationOf(session: SleepSession, now = Date.now()) {
   const start = new Date(session.startTime).getTime()
@@ -46,7 +56,7 @@ export function todaySessions(sessions: SleepSession[], date = new Date()) {
 
 export function totalToday(sessions: SleepSession[], now = new Date()) {
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-  const endOfDay = startOfDay + 86400000
+  const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime()
   return sessions.reduce((sum, session) => {
     const start = new Date(session.startTime).getTime()
     const end = session.endTime ? new Date(session.endTime).getTime() : now.getTime()
