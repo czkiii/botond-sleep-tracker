@@ -6,6 +6,7 @@ import './styles.css'
 import './ux-tuning.css'
 import './today-fit.css'
 import './copy-overrides.css'
+import './background-theme.css'
 
 registerSW({ immediate: true })
 
