@@ -9,14 +9,19 @@ export type SleepSession = {
 
 export type Settings = {
   childName: string
-  dayStart: string
-  nightStart: string
 }
 
 export type AppData = {
-  version: 1
+  version: 2
   settings: Settings
   sessions: SleepSession[]
+}
+
+export type SleepBackupV2 = {
+  format: 'botond-sleep-backup'
+  version: 2
+  exportedAt: string
+  data: AppData
 }
 
 export type Page = 'today' | 'history' | 'stats' | 'settings'
