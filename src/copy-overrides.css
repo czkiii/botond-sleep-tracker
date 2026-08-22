@@ -1,4 +1,4 @@
-/* Final copy + first-tab icon overrides before visual design pass. */
+/* Final copy + icon overrides before visual design pass. */
 
 /* Main secondary action: keep behavior, show clearer copy. */
 .today-screen .text-action {
@@ -9,6 +9,19 @@
   font-size: clamp(14px, 3.6vw, 16px);
   font-weight: 660;
   letter-spacing: -.01em;
+}
+
+/* Awake status uses a sun; sleeping keeps the moon SVG. */
+.status-orb.awake .orb-icon svg {
+  display: none;
+}
+.status-orb.awake .orb-icon::after {
+  content: '☀︎';
+  display: block;
+  color: #72b8ff;
+  font-size: 23px;
+  line-height: 1;
+  transform: translateY(-1px);
 }
 
 /* First bottom tab: Alvások + combined sun/moon icon. */
