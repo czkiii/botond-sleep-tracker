@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { AppData } from './types'
 import type { Locale } from './i18n'
 import { loadData } from './storage'
@@ -13,7 +14,8 @@ const copy = {
     codePlaceholder: 'Meghívókód', joinButton: 'Csatlakozás', cancel: 'Mégse', close: 'Bezárás',
     inviteTitle: 'Meghívókód', inviteHelp: 'Ezt a kódot írd be a másik telefonon. 30 percig érvényes.',
     newInvite: 'Új meghívókód', copyCode: 'Kód másolása', copied: 'Másolva ✓', leave: 'Eszköz leválasztása',
-    leaveConfirm: 'Leválasztod ezt a telefont a családi szinkronról?', syncing: 'Szinkronizálás…', offline: 'Offline – a változások később szinkronizálódnak.', error: 'Nem sikerült a szinkronizálás.'
+    leaveConfirm: 'Leválasztod ezt a telefont a családi szinkronról?', syncing: 'Szinkronizálás…', offline: 'Offline – a változások később szinkronizálódnak.', error: 'Nem sikerült a szinkronizálás.',
+    settingsHintConnected: 'A család eszközei ugyanazokat az alvásadatokat látják.', settingsHintDisconnected: 'Párosíts egy másik telefont meghívókóddal.', familyConnected: 'Család összekapcsolva'
   },
   en: {
     title: 'Family Sync', connected: 'Sync active', disconnected: 'Not connected',
@@ -21,7 +23,8 @@ const copy = {
     codePlaceholder: 'Invite code', joinButton: 'Join', cancel: 'Cancel', close: 'Close',
     inviteTitle: 'Invite code', inviteHelp: 'Enter this code on the other phone. It is valid for 30 minutes.',
     newInvite: 'New invite code', copyCode: 'Copy code', copied: 'Copied ✓', leave: 'Disconnect this device',
-    leaveConfirm: 'Disconnect this phone from Family Sync?', syncing: 'Syncing…', offline: 'Offline – changes will sync later.', error: 'Sync failed.'
+    leaveConfirm: 'Disconnect this phone from Family Sync?', syncing: 'Syncing…', offline: 'Offline – changes will sync later.', error: 'Sync failed.',
+    settingsHintConnected: 'Family devices see the same sleep data.', settingsHintDisconnected: 'Pair another phone with an invite code.', familyConnected: 'Family connected'
   },
   de: {
     title: 'Familien-Sync', connected: 'Sync aktiv', disconnected: 'Nicht verbunden',
@@ -29,7 +32,8 @@ const copy = {
     codePlaceholder: 'Einladungscode', joinButton: 'Beitreten', cancel: 'Abbrechen', close: 'Schließen',
     inviteTitle: 'Einladungscode', inviteHelp: 'Gib diesen Code auf dem anderen Telefon ein. Er ist 30 Minuten gültig.',
     newInvite: 'Neuer Einladungscode', copyCode: 'Code kopieren', copied: 'Kopiert ✓', leave: 'Dieses Gerät trennen',
-    leaveConfirm: 'Dieses Telefon vom Familien-Sync trennen?', syncing: 'Synchronisieren…', offline: 'Offline – Änderungen werden später synchronisiert.', error: 'Synchronisierung fehlgeschlagen.'
+    leaveConfirm: 'Dieses Telefon vom Familien-Sync trennen?', syncing: 'Synchronisieren…', offline: 'Offline – Änderungen werden später synchronisiert.', error: 'Synchronisierung fehlgeschlagen.',
+    settingsHintConnected: 'Familiengeräte sehen dieselben Schlafdaten.', settingsHintDisconnected: 'Verbinde ein weiteres Telefon per Einladungscode.', familyConnected: 'Familie verbunden'
   }
 } as const
 
@@ -49,9 +53,18 @@ export default function FamilySyncLayer() {
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState('')
   const [connected, setConnected] = useState(() => Boolean(getSyncStore().connection))
+  const [settingsTarget, setSettingsTarget] = useState<Element | null>(() => document.querySelector('.settings-screen'))
   const locale = loadData().settings.locale as Locale
   const text = copy[locale]
   const pending = getSyncStore().pending.length
+
+  useEffect(() => {
+    const refreshTarget = () => setSettingsTarget(document.querySelector('.settings-screen'))
+    refreshTarget()
+    const observer = new MutationObserver(refreshTarget)
+    observer.observe(document.getElementById('root') ?? document.body, { childList: true, subtree: true })
+    return () => observer.disconnect()
+  }, [])
 
   useEffect(() => {
     if (inviteCode) {
@@ -158,10 +171,23 @@ export default function FamilySyncLayer() {
 
   const openPanel = () => { setOpen(true); setMode(inviteCode ? 'invite' : 'home'); setError('') }
 
+  const settingsEntry = settingsTarget ? createPortal(
+    <div className="settings-card family-sync-settings-card">
+      <button className="family-sync-settings-button" onClick={openPanel} aria-label={text.title}>
+        <span className={`family-sync-settings-icon ${connected ? 'connected' : ''}`}>☁</span>
+        <span className="family-sync-settings-copy">
+          <strong>{text.title}</strong>
+          <small>{connected ? text.settingsHintConnected : text.settingsHintDisconnected}</small>
+        </span>
+        <span className={`family-sync-settings-state ${connected ? 'connected' : ''}`}>{status}</span>
+        <span className="family-sync-settings-chevron">›</span>
+      </button>
+    </div>,
+    settingsTarget
+  ) : null
+
   return <>
-    <button className={`family-sync-pill ${connected ? 'connected' : ''}`} onClick={openPanel} aria-label={text.title}>
-      <span className="family-sync-cloud">☁</span><span>{connected ? 'Sync' : text.title}</span><i />
-    </button>
+    {settingsEntry}
     {open && <div className="family-sync-overlay" onClick={() => !busy && setOpen(false)}>
       <section className="family-sync-sheet" onClick={(event) => event.stopPropagation()}>
         <div className="family-sync-handle" />
@@ -178,7 +204,7 @@ export default function FamilySyncLayer() {
           <button className="family-sync-link" onClick={() => setMode('home')} disabled={busy}>{text.cancel}</button>
         </div>}
         {mode === 'home' && connected && <div className="family-sync-content">
-          <div className="family-sync-status-card"><span>✓</span><div><strong>{text.connected}</strong><small>{getSyncStore().connection?.familyId.slice(0, 12)}…</small></div></div>
+          <div className="family-sync-status-card"><span>✓</span><div><strong>{text.connected}</strong><small>{text.familyConnected}</small></div></div>
           <button className="family-sync-primary" onClick={handleInvite} disabled={busy}>{busy ? text.syncing : text.newInvite}</button>
           <button className="family-sync-link danger" onClick={handleLeave} disabled={busy}>{text.leave}</button>
         </div>}
