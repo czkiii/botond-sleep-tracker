@@ -255,8 +255,10 @@
 }
 .timeline-segment.selected { stroke: #8ac4ff; stroke-width: 13; }
 .timeline-hit {
-  stroke: transparent;
+  stroke: #000;
   stroke-width: 24;
+  opacity: 0;
+  filter: none;
   pointer-events: stroke;
   cursor: pointer;
 }
