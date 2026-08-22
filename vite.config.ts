@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: [],
+      includeAssets: ['sleep-icon.svg'],
       manifest: {
         name: 'Botond alváskövető',
         short_name: 'Alvás',
@@ -17,7 +17,15 @@ export default defineConfig({
         background_color: '#07111f',
         display: 'standalone',
         orientation: 'portrait',
-        start_url: '/botond-sleep-tracker/'
+        start_url: '/botond-sleep-tracker/',
+        icons: [
+          {
+            src: '/botond-sleep-tracker/sleep-icon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+            purpose: 'any maskable'
+          }
+        ]
       }
     })
   ]
