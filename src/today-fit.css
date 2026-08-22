@@ -1,0 +1,46 @@
+/* Today screen fit rules.
+   Keep the important controls at their intended size; only the two sleep cards
+   share the remaining vertical space and scroll internally. */
+
+.today-screen > .compact-header,
+.today-screen > .status-orb,
+.today-screen > .primary-action,
+.today-screen > .text-action {
+  flex-shrink: 0;
+}
+
+.today-screen > .sleep-cards-stack {
+  flex: 1 1 auto;
+  min-height: 0;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  overflow: hidden;
+}
+
+.today-screen .sleep-cards-stack .today-card {
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.today-screen .sleep-cards-stack .sleep-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+}
+
+.today-screen .primary-action {
+  min-height: clamp(68px, 8.2vh, 76px);
+}
+
+@media (max-height: 860px) {
+  .today-screen .primary-action {
+    min-height: 62px;
+  }
+}
+
+@media (max-height: 760px) {
+  .today-screen .primary-action {
+    min-height: 56px;
+  }
+}
