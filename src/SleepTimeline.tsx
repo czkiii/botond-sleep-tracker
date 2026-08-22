@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { SleepSession } from './types'
-import { durationOf, formatDuration, formatTime } from './utils'
+import { formatDuration, formatTime } from './utils'
 
 type Segment = {
   id: string
@@ -9,6 +9,29 @@ type Segment = {
   durationMinutes: number
   clippedStart: number
   clippedEnd: number
+}
+
+const CENTER = 60
+const RADIUS = 48
+
+function polarPoint(minute: number) {
+  const angle = (minute / 1440) * Math.PI * 2 - Math.PI / 2
+  return {
+    x: CENTER + RADIUS * Math.cos(angle),
+    y: CENTER + RADIUS * Math.sin(angle)
+  }
+}
+
+function arcPath(startMinute: number, durationMinutes: number) {
+  const clampedDuration = Math.max(0, Math.min(durationMinutes, 1440))
+  if (clampedDuration >= 1439.999) return null
+
+  const endMinute = startMinute + clampedDuration
+  const start = polarPoint(startMinute)
+  const end = polarPoint(endMinute)
+  const largeArc = clampedDuration > 720 ? 1 : 0
+
+  return `M ${start.x.toFixed(3)} ${start.y.toFixed(3)} A ${RADIUS} ${RADIUS} 0 ${largeArc} 1 ${end.x.toFixed(3)} ${end.y.toFixed(3)}`
 }
 
 export default function SleepTimeline({ sessions, now, day }: { sessions: SleepSession[]; now: number; day?: string | null }) {
@@ -51,32 +74,27 @@ export default function SleepTimeline({ sessions, now, day }: { sessions: SleepS
     <div className="sleep-timeline-block">
       <div className="sleep-timeline-wrap">
         <svg className="sleep-timeline" viewBox="0 0 120 120" aria-label="24 órás alvási idővonal">
-          <circle className="timeline-track" cx="60" cy="60" r="48" pathLength="1440" />
-          {segments.map((segment, index) => (
-            <g key={`${segment.id}-${index}`}>
-              <circle
-                className={`timeline-segment ${selectedId === segment.id ? 'selected' : ''}`}
-                cx="60"
-                cy="60"
-                r="48"
-                pathLength="1440"
-                strokeDasharray={`${Math.max(segment.durationMinutes, 2)} ${1440 - Math.max(segment.durationMinutes, 2)}`}
-                strokeDashoffset={-segment.startMinute}
-                transform="rotate(-90 60 60)"
-              />
-              <circle
-                className="timeline-hit"
-                cx="60"
-                cy="60"
-                r="48"
-                pathLength="1440"
-                strokeDasharray={`${Math.max(segment.durationMinutes, 6)} ${1440 - Math.max(segment.durationMinutes, 6)}`}
-                strokeDashoffset={-segment.startMinute}
-                transform="rotate(-90 60 60)"
-                onClick={() => setSelectedId(segment.id)}
-              />
-            </g>
-          ))}
+          <circle className="timeline-track" cx={CENTER} cy={CENTER} r={RADIUS} />
+          {segments.map((segment, index) => {
+            const d = arcPath(segment.startMinute, segment.durationMinutes)
+            const selectedClass = selectedId === segment.id ? ' selected' : ''
+
+            if (!d) {
+              return (
+                <g key={`${segment.id}-${index}`}>
+                  <circle className={`timeline-segment${selectedClass}`} cx={CENTER} cy={CENTER} r={RADIUS} />
+                  <circle className="timeline-hit" cx={CENTER} cy={CENTER} r={RADIUS} onClick={() => setSelectedId(segment.id)} />
+                </g>
+              )
+            }
+
+            return (
+              <g key={`${segment.id}-${index}`}>
+                <path className={`timeline-segment${selectedClass}`} d={d} />
+                <path className="timeline-hit" d={d} onClick={() => setSelectedId(segment.id)} />
+              </g>
+            )
+          })}
         </svg>
         <span className="timeline-mark mark-0">0</span>
         <span className="timeline-mark mark-6">6</span>
