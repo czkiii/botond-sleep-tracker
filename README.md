@@ -1,6 +1,6 @@
-# Baby Sleep Tracker
+# Solemi Sleep
 
-Mobile-first baby sleep tracking PWA. The product name is still a working placeholder while the public brand is being selected.
+Mobile-first baby sleep tracking PWA for families.
 
 ## Current foundation
 
@@ -44,14 +44,14 @@ npm run build
 
 ## Data storage
 
-Current clean product data key: `babySleepTracker:v3`.
+Current product data key: `solemiSleep:v3`.
 
-Backup format: `baby-sleep-backup`, version 3.
+Backup format: `solemi-sleep-backup`, version 3.
 
-The baby name is user data and is no longer hard-coded into the product model.
+The baby name is user data and is not hard-coded into the product model.
 
 Cloudflare-based family sync is planned as the next storage/sync layer. JSON export/import remains useful as a manual backup path.
 
 ## GitHub Pages path
 
-The repository and GitHub Pages base path still use `/botond-sleep-tracker/` temporarily so the existing test URL and installed PWA do not break before the final public product name is chosen.
+The repository and GitHub Pages base path still use `/botond-sleep-tracker/` temporarily so the existing test URL and installed PWA do not break. This route can be migrated separately when the public hosting/repository URL is intentionally changed.
