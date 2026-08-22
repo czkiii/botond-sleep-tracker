@@ -1,3 +1,5 @@
+import type { Locale } from './i18n'
+
 export type SleepSession = {
   id: string
   startTime: string
@@ -9,17 +11,18 @@ export type SleepSession = {
 
 export type Settings = {
   childName: string
+  locale: Locale
 }
 
 export type AppData = {
-  version: 2
+  version: 3
   settings: Settings
   sessions: SleepSession[]
 }
 
-export type SleepBackupV2 = {
-  format: 'botond-sleep-backup'
-  version: 2
+export type SleepBackupV3 = {
+  format: 'baby-sleep-backup'
+  version: 3
   exportedAt: string
   data: AppData
 }
