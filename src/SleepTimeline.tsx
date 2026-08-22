@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import type { Locale } from './i18n'
+import { t } from './i18n'
 import type { SleepSession } from './types'
 import { formatDuration, formatTime } from './utils'
 
@@ -34,7 +36,7 @@ function arcPath(startMinute: number, durationMinutes: number) {
   return `M ${start.x.toFixed(3)} ${start.y.toFixed(3)} A ${RADIUS} ${RADIUS} 0 ${largeArc} 1 ${end.x.toFixed(3)} ${end.y.toFixed(3)}`
 }
 
-export default function SleepTimeline({ sessions, now, day }: { sessions: SleepSession[]; now: number; day?: string | null }) {
+export default function SleepTimeline({ sessions, now, day, locale }: { sessions: SleepSession[]; now: number; day?: string | null; locale: Locale }) {
   const segments = useMemo<Segment[]>(() => {
     const dayStart = day
       ? (() => {
@@ -73,7 +75,7 @@ export default function SleepTimeline({ sessions, now, day }: { sessions: SleepS
   return (
     <div className="sleep-timeline-block">
       <div className="sleep-timeline-wrap">
-        <svg className="sleep-timeline" viewBox="0 0 120 120" aria-label="24 órás alvási idővonal">
+        <svg className="sleep-timeline" viewBox="0 0 120 120" aria-label={t(locale, 'timelineAria')}>
           <circle className="timeline-track" cx={CENTER} cy={CENTER} r={RADIUS} />
           {segments.map((segment, index) => {
             const d = arcPath(segment.startMinute, segment.durationMinutes)
@@ -107,11 +109,11 @@ export default function SleepTimeline({ sessions, now, day }: { sessions: SleepS
         {selected ? (
           <>
             <span className="timeline-info-icon">☾</span>
-            <strong>{formatTime(new Date(selected.clippedStart).toISOString())}–{formatTime(new Date(selected.clippedEnd).toISOString())}</strong>
-            <span>{formatDuration(selected.clippedEnd - selected.clippedStart)}</span>
+            <strong>{formatTime(new Date(selected.clippedStart).toISOString(), locale)}–{formatTime(new Date(selected.clippedEnd).toISOString(), locale)}</strong>
+            <span>{formatDuration(selected.clippedEnd - selected.clippedStart, locale)}</span>
           </>
         ) : (
-          <span>Érints meg egy alvási szakaszt a részletekhez</span>
+          <span>{t(locale, 'touchSegment')}</span>
         )}
       </div>
     </div>
