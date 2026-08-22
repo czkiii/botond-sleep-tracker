@@ -12,7 +12,7 @@
     {
       "binding": "DB",
       "database_name": "solemi-sleep-db",
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID"
+      "database_id": "8ace71f6-9c2d-445f-8788-a76bedcdd7bc"
     }
   ]
 }
