@@ -3,6 +3,7 @@ import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recha
 import type { AppData, Page, SleepSession } from './types'
 import { createSession, defaultData, exportData, importData, loadData, saveData } from './storage'
 import { awakeSince, durationOf, formatDateHeader, formatDuration, formatTime, formatTimer, splitDayNight, todaySessions, totalToday } from './utils'
+import SleepTimeline from './SleepTimeline'
 
 const pad = (value: number) => String(value).padStart(2, '0')
 
@@ -135,7 +136,7 @@ function StatsPage({ sessions, now }: { sessions: SleepSession[]; now: number })
     <div className="segmented"><button className={range === 'day' ? 'active' : ''} onClick={() => setRange('day')}>Nap</button><button className={range === 'week' ? 'active' : ''} onClick={() => setRange('week')}>Hét</button><button className={range === 'month' ? 'active' : ''} onClick={() => setRange('month')}>Hónap</button></div>
     <div className="chart-card compact-chart-card"><h2>Alvás időtartama</h2><div className="bar-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={chart} margin={{ top: 8, right: 2, bottom: 0, left: -26 }}><XAxis dataKey="label" tickLine={false} axisLine={false} /><YAxis domain={[0, 14]} tickLine={false} axisLine={false} /><Tooltip contentStyle={{ background: '#0d1a2b', border: '1px solid #1c3352', borderRadius: 10 }} formatter={(value) => [`${value} ó`, 'Alvás']} /><Bar dataKey="hours" fill="#579dff" radius={[4, 4, 1, 1]} maxBarSize={17} /></BarChart></ResponsiveContainer></div></div>
     <h2 className="overview-title">24 órás áttekintés</h2>
-    <div className="overview-compact"><div className="radial compact-radial"><div className="clock-mark mark-0">0</div><div className="clock-mark mark-6">6</div><div className="clock-mark mark-12">12</div><div className="clock-mark mark-18">18</div><div className="radial-inner"><Icon name="moon" size={16} /><Icon name="sun" size={16} /></div></div><div className="stats-row"><StatCard label="Átlag" value={formatDuration(sums.total / divisor)} suffix="/ nap" /><StatCard label="Nappali" value={formatDuration(sums.day / divisor)} icon="sun" /><StatCard label="Éjszakai" value={formatDuration(sums.night / divisor)} icon="moon" /></div></div>
+    <div className="overview-compact"><SleepTimeline sessions={sessions} now={now} /><div className="stats-row"><StatCard label="Átlag" value={formatDuration(sums.total / divisor)} suffix="/ nap" /><StatCard label="Nappali" value={formatDuration(sums.day / divisor)} icon="sun" /><StatCard label="Éjszakai" value={formatDuration(sums.night / divisor)} icon="moon" /></div></div>
   </section>
 }
 
