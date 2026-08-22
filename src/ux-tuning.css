@@ -50,6 +50,51 @@
   margin-bottom: calc(var(--tab-height) + env(safe-area-inset-bottom) + 14px);
 }
 
+/* Today screen never scrolls as a page. Only the two sleep lists may scroll. */
+.app-main:has(.today-screen) {
+  height: 100dvh;
+  padding-bottom: 0;
+  overflow: hidden;
+}
+.today-screen {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  padding-bottom: calc(var(--tab-height) + env(safe-area-inset-bottom) + 10px);
+}
+.today-screen .scroll-list {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Fit the full Today layout to shorter displays instead of introducing page scroll. */
+@media (max-height: 860px) {
+  :root { --orb-size: clamp(188px, 50vw, 228px); }
+  .compact-header { min-height: 62px; margin-bottom: 2px; }
+  .status-orb { margin-top: 8px; margin-bottom: 10px; }
+  .primary-action { height: 62px; }
+  .text-action { padding-top: 8px; padding-bottom: 9px; }
+  .sleep-cards-stack { gap: 8px; }
+  .sleep-cards-stack .today-card { min-height: 154px; padding-top: 12px; padding-bottom: 10px; }
+  .scroll-list { max-height: 112px; }
+  .sleep-row { min-height: 42px; }
+}
+
+@media (max-height: 760px) {
+  :root { --orb-size: clamp(166px, 45vw, 202px); }
+  .compact-header { min-height: 54px; }
+  .date-label { font-size: clamp(18px, 4.8vw, 22px); }
+  .daily-summary { margin-top: 4px; font-size: clamp(14px, 3.7vw, 17px); }
+  .status-orb { margin-top: 4px; margin-bottom: 7px; }
+  .primary-action { height: 56px; font-size: clamp(18px, 4.7vw, 21px); }
+  .text-action { padding-top: 6px; padding-bottom: 7px; }
+  .sleep-cards-stack .today-card { min-height: 134px; padding: 10px 12px 8px; border-radius: 18px; }
+  .section-head { min-height: 24px; margin-bottom: 5px; }
+  .scroll-list { max-height: 92px; }
+  .sleep-row { min-height: 38px; padding-top: 4px; padding-bottom: 4px; }
+}
+
 /* Real touch-scroll wheel picker. */
 .editor-body {
   gap: 18px;
