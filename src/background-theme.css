@@ -1,0 +1,27 @@
+/* Midnight illustrated app background — loaded after the core layout CSS. */
+html,
+body,
+#root {
+  background: #030b16;
+}
+
+.app-shell {
+  background-image:
+    linear-gradient(180deg, rgba(3, 10, 23, 0.24) 0%, rgba(3, 10, 23, 0.34) 52%, rgba(3, 10, 23, 0.48) 100%),
+    url('/botond-sleep-tracker/app-background.png');
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+}
+
+/* Keep information surfaces readable while letting the artwork show through. */
+.today-card,
+.history-list,
+.segmented,
+.stat-card,
+.timeline-selection,
+.editor-panel,
+.editor-field {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
