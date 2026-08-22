@@ -56,7 +56,11 @@ export function loadData(): AppData {
 }
 
 export function saveData(data: AppData) {
+  const previous = loadData()
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+  if (typeof window !== 'undefined' && JSON.stringify(previous.sessions) !== JSON.stringify(data.sessions)) {
+    window.dispatchEvent(new CustomEvent('solemi-data-saved', { detail: { previous, next: data } }))
+  }
 }
 
 export function createSession(startTime: string, endTime: string | null = null): SleepSession {
