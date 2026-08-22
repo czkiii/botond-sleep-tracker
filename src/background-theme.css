@@ -12,6 +12,18 @@ body,
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Text entry fields still need normal editing/selection behaviour. */
+.app-shell input,
+.app-shell textarea,
+.app-shell select {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
 }
 
 /* Keep information surfaces readable while letting the artwork show through. */
