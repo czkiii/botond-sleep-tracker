@@ -53,6 +53,12 @@ body,
   text-shadow: 0 2px 14px rgba(0, 5, 18, 0.85);
 }
 
+/* The orb artwork already carries the day/night motif, so the old tiny icon above
+   ÉBREN / ALSZIK is redundant. CTA icons elsewhere remain untouched. */
+.status-orb .orb-icon {
+  display: none;
+}
+
 /* Recharts adds a light rectangular hover/touch cursor behind the active bar by default.
    Keep the tooltip, but make that cursor fully transparent so the chart stays on-theme. */
 .recharts-tooltip-cursor {
