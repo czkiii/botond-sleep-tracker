@@ -99,7 +99,7 @@ body,
 .swipe-history-actions button {
   border: 0;
   border-radius: 0;
-  color: #eef7ff;
+  color: #fff;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -112,12 +112,12 @@ body,
 
 .swipe-history-actions .swipe-edit {
   background: linear-gradient(180deg, #29496b 0%, #213b59 100%);
-  color: #d9edff;
+  color: #fff;
 }
 
 .swipe-history-actions .swipe-delete {
-  background: linear-gradient(180deg, #7a3344 0%, #642a39 100%);
-  color: #ffe8ee;
+  background: linear-gradient(180deg, #173657 0%, #102943 100%);
+  color: #fff;
 }
 
 .swipe-history-content {
