@@ -2,7 +2,7 @@ import { detectLocale, t } from './i18n'
 import type { Locale } from './i18n'
 import type { AppData, SleepBackupV3, SleepSession } from './types'
 
-export const STORAGE_KEY = 'babySleepTracker:v3'
+export const STORAGE_KEY = 'solemiSleep:v3'
 
 export const createDefaultData = (locale: Locale = detectLocale()): AppData => ({
   version: 3,
@@ -75,7 +75,7 @@ export function exportData(data: AppData) {
   const now = new Date()
   const date = now.toISOString().slice(0, 10)
   const backup: SleepBackupV3 = {
-    format: 'baby-sleep-backup',
+    format: 'solemi-sleep-backup',
     version: 3,
     exportedAt: now.toISOString(),
     data
@@ -84,7 +84,7 @@ export function exportData(data: AppData) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `baby-sleep-backup-v3-${date}.json`
+  a.download = `solemi-sleep-backup-v3-${date}.json`
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -101,7 +101,7 @@ export async function importData(file: File, locale: Locale): Promise<AppData> {
 
   if (!parsed || typeof parsed !== 'object') throw new Error(t(locale, 'invalidBackup'))
   const backup = parsed as Partial<SleepBackupV3>
-  if (backup.format !== 'baby-sleep-backup' || backup.version !== 3 || !isValidDate(backup.exportedAt)) {
+  if (backup.format !== 'solemi-sleep-backup' || backup.version !== 3 || !isValidDate(backup.exportedAt)) {
     throw new Error(t(locale, 'wrongBackup'))
   }
 
