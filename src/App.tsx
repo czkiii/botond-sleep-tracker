@@ -96,7 +96,7 @@ function TodayPage({ data, now, current, onStart, onEnd, onOpenEditor, onSetting
   const elapsed = current ? durationOf(current, now) : awakeSince(data.sessions, now)
   return <section className="screen today-screen">
     <header className="compact-header"><div className="header-copy"><div className="date-label">{formatDateHeader(new Date(now))}</div><div className="daily-summary">Ma eddig <strong>{formatDuration(total)}</strong> alvás</div></div><button className="icon-button" aria-label="Beállítások" onClick={onSettings}><Icon name="settings" size={18} /></button></header>
-    <div className={`status-orb ${current ? 'sleeping' : 'awake'}`}><div className="orb-content"><div className="orb-icon"><Icon name="moon" size={19} /></div><div className="orb-status">{current ? 'ALSZIK' : 'ÉBREN'}</div><div className="orb-time">{current ? formatTimer(elapsed) : formatDuration(elapsed)}</div>{current && <div className="orb-sub">Elaludt {formatTime(current.startTime)}</div>}</div></div>
+    <div className={`status-orb ${current ? 'sleeping' : 'awake'}`}><div className="orb-content"><div className="orb-status">{current ? 'ALSZIK' : 'ÉBREN'}</div><div className="orb-time">{current ? formatTimer(elapsed) : formatDuration(elapsed)}</div>{current && <div className="orb-sub">Elaludt {formatTime(current.startTime)}</div>}</div></div>
     <button className="primary-action" onClick={current ? onEnd : onStart}><Icon name={current ? 'sun' : 'moon'} size={20} /><span>{current ? 'Felébredt' : 'Elaludt'}</span></button>
     <button className="text-action" onClick={() => onOpenEditor(current ?? 'new')}>Részletek</button>
     <div className="sleep-cards-stack">
@@ -124,19 +124,53 @@ function HistoryPage({ sessions, onEdit, onNew }: { sessions: SleepSession[]; on
 
 function StatsPage({ sessions, now }: { sessions: SleepSession[]; now: number }) {
   const [range, setRange] = useState<'day' | 'week' | 'month'>('week')
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const days = range === 'day' ? 1 : range === 'week' ? 7 : 30
+  const today = new Date(now)
+
   const chart = useMemo(() => Array.from({ length: days }, (_, index) => {
-    const date = new Date(now); date.setHours(0, 0, 0, 0); date.setDate(date.getDate() - (days - 1 - index))
-    return { label: new Intl.DateTimeFormat('hu-HU', { day: 'numeric' }).format(date), hours: +(totalToday(sessions, date) / 3600000).toFixed(2) }
+    const date = new Date(now)
+    date.setHours(0, 0, 0, 0)
+    date.setDate(date.getDate() - (days - 1 - index))
+    const dateKey = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+    const totalDate = date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth() && date.getDate() === today.getDate() ? new Date(now) : date
+    return { dateKey, label: new Intl.DateTimeFormat('hu-HU', { day: 'numeric' }).format(date), hours: +(totalToday(sessions, totalDate) / 3600000).toFixed(2) }
   }), [sessions, now, days])
+
   const recent = sessions.filter((session) => new Date(session.startTime).getTime() >= now - days * 86400000)
   const sums = recent.reduce((acc, session) => { const parts = splitDayNight(session, now); acc.total += durationOf(session, now); acc.day += parts.day; acc.night += parts.night; return acc }, { total: 0, day: 0, night: 0 })
   const divisor = Math.max(1, days)
+
+  const selectedStats = useMemo(() => {
+    if (!selectedDate) return null
+    const [year, month, day] = selectedDate.split('-').map(Number)
+    const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0).getTime()
+    const endOfDay = new Date(year, month - 1, day + 1, 0, 0, 0, 0).getTime()
+    let total = 0, daytime = 0, nighttime = 0
+    sessions.forEach((session) => {
+      const start = new Date(session.startTime).getTime()
+      const end = session.endTime ? new Date(session.endTime).getTime() : now
+      const overlapStart = Math.max(start, startOfDay)
+      const overlapEnd = Math.min(end, endOfDay)
+      if (overlapEnd <= overlapStart) return
+      const clipped: SleepSession = { ...session, startTime: new Date(overlapStart).toISOString(), endTime: new Date(overlapEnd).toISOString() }
+      const parts = splitDayNight(clipped, now)
+      total += overlapEnd - overlapStart
+      daytime += parts.day
+      nighttime += parts.night
+    })
+    const date = new Date(year, month - 1, day)
+    return { total, day: daytime, night: nighttime, label: new Intl.DateTimeFormat('hu-HU', { month: 'short', day: 'numeric' }).format(date) }
+  }, [sessions, now, selectedDate])
+
+  const changeRange = (next: 'day' | 'week' | 'month') => { setRange(next); setSelectedDate(null) }
+  const display = selectedStats ?? { total: sums.total / divisor, day: sums.day / divisor, night: sums.night / divisor, label: 'Átlag' }
+
   return <section className="screen stats-screen"><header className="page-header centered-header"><h1>Statisztika</h1></header>
-    <div className="segmented"><button className={range === 'day' ? 'active' : ''} onClick={() => setRange('day')}>Nap</button><button className={range === 'week' ? 'active' : ''} onClick={() => setRange('week')}>Hét</button><button className={range === 'month' ? 'active' : ''} onClick={() => setRange('month')}>Hónap</button></div>
-    <div className="chart-card compact-chart-card"><h2>Alvás időtartama</h2><div className="bar-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={chart} margin={{ top: 8, right: 2, bottom: 0, left: -26 }}><XAxis dataKey="label" tickLine={false} axisLine={false} /><YAxis domain={[0, 14]} tickLine={false} axisLine={false} /><Tooltip contentStyle={{ background: '#0d1a2b', border: '1px solid #1c3352', borderRadius: 10 }} formatter={(value) => [`${value} ó`, 'Alvás']} /><Bar dataKey="hours" fill="#579dff" radius={[4, 4, 1, 1]} maxBarSize={17} /></BarChart></ResponsiveContainer></div></div>
+    <div className="segmented"><button className={range === 'day' ? 'active' : ''} onClick={() => changeRange('day')}>Nap</button><button className={range === 'week' ? 'active' : ''} onClick={() => changeRange('week')}>Hét</button><button className={range === 'month' ? 'active' : ''} onClick={() => changeRange('month')}>Hónap</button></div>
+    <div className="chart-card compact-chart-card"><h2>Alvás időtartama</h2><div className="bar-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={chart} margin={{ top: 8, right: 2, bottom: 0, left: -26 }}><XAxis dataKey="label" tickLine={false} axisLine={false} /><YAxis domain={[0, 14]} tickLine={false} axisLine={false} /><Tooltip contentStyle={{ background: '#0d1a2b', border: '1px solid #1c3352', borderRadius: 10 }} formatter={(value) => [`${value} ó`, 'Alvás']} /><Bar dataKey="hours" fill="#579dff" radius={[4, 4, 1, 1]} maxBarSize={17} onClick={(entry: any) => setSelectedDate(entry?.payload?.dateKey ?? null)} /></BarChart></ResponsiveContainer></div></div>
     <h2 className="overview-title">24 órás áttekintés</h2>
-    <div className="overview-compact"><SleepTimeline sessions={sessions} now={now} /><div className="stats-row"><StatCard label="Átlag" value={formatDuration(sums.total / divisor)} suffix="/ nap" /><StatCard label="Nappali" value={formatDuration(sums.day / divisor)} icon="sun" /><StatCard label="Éjszakai" value={formatDuration(sums.night / divisor)} icon="moon" /></div></div>
+    <div className="overview-compact"><SleepTimeline sessions={sessions} now={now} /><div className="stats-row"><StatCard label={display.label} value={formatDuration(display.total)} suffix={selectedStats ? undefined : '/ nap'} /><StatCard label="Nappali" value={formatDuration(display.day)} icon="sun" /><StatCard label="Éjszakai" value={formatDuration(display.night)} icon="moon" /></div></div>
   </section>
 }
 
