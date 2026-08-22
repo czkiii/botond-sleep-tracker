@@ -94,10 +94,14 @@ function TodayPage({ data, now, current, onStart, onEnd, onOpenEditor, onSetting
     .filter((session) => { const start = new Date(session.startTime).getTime(); return start >= yesterdayStart.getTime() && start < yesterdayEnd.getTime() })
     .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
   const total = totalToday(data.sessions, new Date(now))
+  const lastCompleted = data.sessions
+    .filter((session) => session.endTime)
+    .sort((a, b) => new Date(b.endTime!).getTime() - new Date(a.endTime!).getTime())[0] ?? null
   const elapsed = current ? durationOf(current, now) : awakeSince(data.sessions, now)
+
   return <section className="screen today-screen">
     <header className="compact-header"><div className="header-copy"><div className="date-label">{formatDateHeader(new Date(now))}</div><div className="daily-summary">Ma eddig <strong>{formatDuration(total)}</strong> alvás</div></div><button className="icon-button" aria-label="Beállítások" onClick={onSettings}><Icon name="settings" size={18} /></button></header>
-    <div className={`status-orb ${current ? 'sleeping' : 'awake'}`}><div className="orb-content"><div className="orb-status">{current ? 'ALSZIK' : 'ÉBREN'}</div><div className="orb-time">{current ? formatTimer(elapsed) : formatDuration(elapsed)}</div>{current && <div className="orb-sub">Elaludt {formatTime(current.startTime)}</div>}</div></div>
+    <div className={`status-orb ${current ? 'sleeping' : 'awake'}`}><div className="orb-content"><div className="orb-status">{current ? 'ALSZIK' : 'ÉBREN'}</div><div className="orb-time">{formatTimer(elapsed)}</div><div className="orb-sub">{current ? `Elaludt ${formatTime(current.startTime)}` : lastCompleted ? `Felébredt ${formatTime(lastCompleted.endTime!)}` : 'Nincs korábbi ébredés'}</div></div></div>
     <button className="primary-action" onClick={current ? onEnd : onStart}><Icon name={current ? 'sun' : 'moon'} size={20} /><span>{current ? 'Felébredt' : 'Elaludt'}</span></button>
     <button className="text-action" onClick={() => onOpenEditor(current ?? 'new')}>Részletek</button>
     <div className="sleep-cards-stack">
@@ -166,12 +170,13 @@ function StatsPage({ sessions, now }: { sessions: SleepSession[]; now: number })
 
   const changeRange = (next: 'day' | 'week' | 'month') => { setRange(next); setSelectedDate(null) }
   const display = selectedStats ?? { total: sums.total / divisor, day: sums.day / divisor, night: sums.night / divisor, label: 'Átlag' }
+  const timelineDate = range === 'day' || !selectedDate ? undefined : selectedDate
 
   return <section className="screen stats-screen"><header className="page-header centered-header"><h1>Statisztika</h1></header>
     <div className="segmented"><button className={range === 'day' ? 'active' : ''} onClick={() => changeRange('day')}>Nap</button><button className={range === 'week' ? 'active' : ''} onClick={() => changeRange('week')}>Hét</button><button className={range === 'month' ? 'active' : ''} onClick={() => changeRange('month')}>Hónap</button></div>
     <div className="chart-card compact-chart-card"><h2>Alvás időtartama</h2><div className="bar-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={chart} margin={{ top: 8, right: 2, bottom: 0, left: -26 }}><XAxis dataKey="label" tickLine={false} axisLine={false} /><YAxis domain={[0, 14]} tickLine={false} axisLine={false} /><Tooltip contentStyle={{ background: '#0d1a2b', border: '1px solid #1c3352', borderRadius: 10 }} formatter={(value) => [`${value} ó`, 'Alvás']} /><Bar dataKey="hours" fill="#579dff" radius={[4, 4, 1, 1]} maxBarSize={17} onClick={(entry: any) => setSelectedDate(entry?.payload?.dateKey ?? null)} /></BarChart></ResponsiveContainer></div></div>
     <h2 className="overview-title">24 órás áttekintés</h2>
-    <div className="overview-compact"><SleepTimeline sessions={sessions} now={now} day={range === 'day' ? null : selectedDate} /><div className="stats-row"><StatCard label={display.label} value={formatDuration(display.total)} suffix={selectedStats ? undefined : '/ nap'} /><StatCard label="Nappali" value={formatDuration(display.day)} icon="sun" /><StatCard label="Éjszakai" value={formatDuration(display.night)} icon="moon" /></div></div>
+    <div className="overview-compact"><SleepTimeline sessions={sessions} now={now} dateKey={timelineDate} /><div className="stats-row"><StatCard label={display.label} value={formatDuration(display.total)} suffix={selectedStats ? undefined : '/ nap'} /><StatCard label="Nappali" value={formatDuration(display.day)} icon="sun" /><StatCard label="Éjszakai" value={formatDuration(display.night)} icon="moon" /></div></div>
   </section>
 }
 
