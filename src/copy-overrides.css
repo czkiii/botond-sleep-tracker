@@ -1,0 +1,49 @@
+/* Final copy + first-tab icon overrides before visual design pass. */
+
+/* Main secondary action: keep behavior, show clearer copy. */
+.today-screen .text-action {
+  font-size: 0;
+}
+.today-screen .text-action::after {
+  content: 'Egyedi alvási idő rögzítése';
+  font-size: clamp(14px, 3.6vw, 16px);
+  font-weight: 660;
+  letter-spacing: -.01em;
+}
+
+/* First bottom tab: Alvások + combined sun/moon icon. */
+.bottom-nav button:first-child > span svg {
+  display: none;
+}
+.bottom-nav button:first-child > span {
+  position: relative;
+  width: 24px;
+  height: 20px;
+  display: block;
+}
+.bottom-nav button:first-child > span::before,
+.bottom-nav button:first-child > span::after {
+  position: absolute;
+  line-height: 1;
+  color: currentColor;
+}
+.bottom-nav button:first-child > span::before {
+  content: '☾';
+  left: 1px;
+  bottom: 0;
+  font-size: 17px;
+}
+.bottom-nav button:first-child > span::after {
+  content: '☀︎';
+  right: 0;
+  top: -1px;
+  font-size: 11px;
+}
+.bottom-nav button:first-child small {
+  font-size: 0;
+}
+.bottom-nav button:first-child small::after {
+  content: 'Alvások';
+  font-size: 11px;
+  font-weight: inherit;
+}
