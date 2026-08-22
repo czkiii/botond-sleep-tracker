@@ -1,20 +1,23 @@
-# Botond Sleep Tracker
+# Baby Sleep Tracker
 
-Egyszerű, mobil-first baba alváskövető PWA. Az adatok kizárólag a készülék böngészőjének `localStorage` tárhelyén maradnak.
+Mobile-first baby sleep tracking PWA. The product name is still a working placeholder while the public brand is being selected.
 
-## V1 funkciók
+## Current foundation
 
-- Elaludt / Felébredt gyors rögzítés
-- Futó alvás időzítése
-- Manuális kezdés és befejezés szerkesztése
-- Egyetlen, másnapra átnyúló session támogatása
-- Mai alvások belső scrollos listában
-- Előzmények napi csoportosítással
-- Nap / hét / hónap statisztika
-- Nappali (06:00–19:00) és éjszakai bontás
+- Quick Fell asleep / Woke up tracking
+- Live sleep and awake timers
+- Manual start/end editing
+- Cross-midnight sessions
+- Today / yesterday sleep lists
+- Swipe actions in history
+- Day / week / month statistics
+- Interactive 24-hour sleep timeline
+- Daytime / nighttime breakdown
 - JSON export / import
-- Törlés megerősítéssel
-- PWA / iPhone kezdőképernyős használat
+- PWA / iPhone home-screen usage
+- HU / EN / DE interface foundation
+- Device-language detection on first clean start
+- Manual language selection in Settings
 
 ## Stack
 
@@ -23,25 +26,32 @@ Egyszerű, mobil-first baba alváskövető PWA. Az adatok kizárólag a készül
 - TypeScript
 - Recharts
 - vite-plugin-pwa
-- localStorage
+- localStorage (temporary local-first storage layer)
 
-## Fejlesztés
+## Development
 
 ```bash
 npm install
 npm run dev
 ```
 
-## Build
+## Checks
 
 ```bash
+npm run typecheck
 npm run build
 ```
 
-## Adattárolás
+## Data storage
 
-Kulcs: `sleepTracker:v1`
+Current clean product data key: `babySleepTracker:v3`.
 
-Alapértelmezett baba név: `Botond`, amely a Beállításokban átírható.
+Backup format: `baby-sleep-backup`, version 3.
 
-> Fontos: a localStorage törlése az alvásadatokat is törli, ezért időnként érdemes JSON mentést exportálni.
+The baby name is user data and is no longer hard-coded into the product model.
+
+Cloudflare-based family sync is planned as the next storage/sync layer. JSON export/import remains useful as a manual backup path.
+
+## GitHub Pages path
+
+The repository and GitHub Pages base path still use `/botond-sleep-tracker/` temporarily so the existing test URL and installed PWA do not break before the final public product name is chosen.
