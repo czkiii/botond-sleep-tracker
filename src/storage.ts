@@ -1,17 +1,20 @@
-import type { AppData, SleepBackupV2, SleepSession } from './types'
+import { detectLocale, t } from './i18n'
+import type { Locale } from './i18n'
+import type { AppData, SleepBackupV3, SleepSession } from './types'
 
-export const STORAGE_KEY = 'sleepTracker:v2'
-const LEGACY_STORAGE_KEY = 'sleepTracker:v1'
+export const STORAGE_KEY = 'babySleepTracker:v3'
 
-export const defaultData: AppData = {
-  version: 2,
+export const createDefaultData = (locale: Locale = detectLocale()): AppData => ({
+  version: 3,
   settings: {
-    childName: 'Botond'
+    childName: '',
+    locale
   },
   sessions: []
-}
+})
 
 const isValidDate = (value: unknown): value is string => typeof value === 'string' && Number.isFinite(Date.parse(value))
+const isLocale = (value: unknown): value is Locale => value === 'hu' || value === 'en' || value === 'de'
 
 function isValidSession(value: unknown): value is SleepSession {
   if (!value || typeof value !== 'object') return false
@@ -28,29 +31,27 @@ function isValidSession(value: unknown): value is SleepSession {
 function normalizeAppData(value: unknown): AppData | null {
   if (!value || typeof value !== 'object') return null
   const data = value as Partial<AppData>
-  if (data.version !== 2 || !Array.isArray(data.sessions)) return null
+  if (data.version !== 3 || !Array.isArray(data.sessions)) return null
   if (!data.sessions.every(isValidSession)) return null
 
   return {
-    version: 2,
+    version: 3,
     settings: {
-      childName: typeof data.settings?.childName === 'string' ? data.settings.childName : 'Botond'
+      childName: typeof data.settings?.childName === 'string' ? data.settings.childName : '',
+      locale: isLocale(data.settings?.locale) ? data.settings.locale : detectLocale()
     },
     sessions: data.sessions
   }
 }
 
 export function loadData(): AppData {
-  // V2 is an intentional clean start. Remove the old test-era V1 data once.
-  localStorage.removeItem(LEGACY_STORAGE_KEY)
-
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return defaultData
+    if (!raw) return createDefaultData()
     const parsed = normalizeAppData(JSON.parse(raw))
-    return parsed ?? defaultData
+    return parsed ?? createDefaultData()
   } catch {
-    return defaultData
+    return createDefaultData()
   }
 }
 
@@ -73,9 +74,9 @@ export function createSession(startTime: string, endTime: string | null = null):
 export function exportData(data: AppData) {
   const now = new Date()
   const date = now.toISOString().slice(0, 10)
-  const backup: SleepBackupV2 = {
-    format: 'botond-sleep-backup',
-    version: 2,
+  const backup: SleepBackupV3 = {
+    format: 'baby-sleep-backup',
+    version: 3,
     exportedAt: now.toISOString(),
     data
   }
@@ -83,28 +84,28 @@ export function exportData(data: AppData) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `botond-sleep-backup-v2-${date}.json`
+  a.download = `baby-sleep-backup-v3-${date}.json`
   a.click()
   URL.revokeObjectURL(url)
 }
 
-export async function importData(file: File): Promise<AppData> {
+export async function importData(file: File, locale: Locale): Promise<AppData> {
   const text = await file.text()
   let parsed: unknown
 
   try {
     parsed = JSON.parse(text)
   } catch {
-    throw new Error('A fájl nem érvényes JSON mentés.')
+    throw new Error(t(locale, 'invalidJson'))
   }
 
-  if (!parsed || typeof parsed !== 'object') throw new Error('Érvénytelen mentés.')
-  const backup = parsed as Partial<SleepBackupV2>
-  if (backup.format !== 'botond-sleep-backup' || backup.version !== 2 || !isValidDate(backup.exportedAt)) {
-    throw new Error('Ez nem V2 Botond alváskövető mentés.')
+  if (!parsed || typeof parsed !== 'object') throw new Error(t(locale, 'invalidBackup'))
+  const backup = parsed as Partial<SleepBackupV3>
+  if (backup.format !== 'baby-sleep-backup' || backup.version !== 3 || !isValidDate(backup.exportedAt)) {
+    throw new Error(t(locale, 'wrongBackup'))
   }
 
   const data = normalizeAppData(backup.data)
-  if (!data) throw new Error('A mentés sérült vagy hiányos alvásadatot tartalmaz.')
+  if (!data) throw new Error(t(locale, 'corruptBackup'))
   return data
 }
