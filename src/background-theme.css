@@ -25,3 +25,10 @@ body,
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
+
+/* Recharts adds a light rectangular hover/touch cursor behind the active bar by default.
+   Keep the tooltip, but make that cursor fully transparent so the chart stays on-theme. */
+.recharts-tooltip-cursor {
+  fill: transparent !important;
+  stroke: transparent !important;
+}
