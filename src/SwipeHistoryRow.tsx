@@ -1,4 +1,5 @@
-import { TouchEvent, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
+import type { TouchEvent } from 'react'
 import type { SleepSession } from './types'
 import { durationOf, formatDuration, formatTime } from './utils'
 
