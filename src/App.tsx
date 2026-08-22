@@ -4,6 +4,7 @@ import type { AppData, Page, SleepSession } from './types'
 import { createSession, defaultData, exportData, importData, loadData, saveData } from './storage'
 import { awakeSince, durationOf, formatDateHeader, formatDuration, formatTime, formatTimer, splitDayNight, todaySessions, totalToday } from './utils'
 import SleepTimeline from './SleepTimeline'
+import SwipeHistoryRow from './SwipeHistoryRow'
 
 const pad = (value: number) => String(value).padStart(2, '0')
 
@@ -76,7 +77,7 @@ export default function App() {
   return <div className="app-shell">
     <main className="app-main">
       {page === 'today' && <TodayPage data={data} now={now} current={current} onStart={startNow} onEnd={endNow} onOpenEditor={setEditor} onSettings={() => setPage('settings')} />}
-      {page === 'history' && <HistoryPage sessions={data.sessions} onEdit={setEditor} onNew={() => setEditor('new')} />}
+      {page === 'history' && <HistoryPage sessions={data.sessions} onEdit={setEditor} onDelete={deleteSession} onNew={() => setEditor('new')} />}
       {page === 'stats' && <StatsPage sessions={data.sessions} now={now} />}
       {page === 'settings' && <SettingsPage data={data} setData={setData} onBack={() => setPage('today')} />}
     </main>
@@ -110,7 +111,7 @@ function SleepRow({ session, now, onClick, compact = false }: { session: SleepSe
   return <button className={`sleep-row ${compact ? 'compact' : ''}`} onClick={onClick}><span className="sleep-row-icon"><Icon name="moon" size={13} /></span><span className="sleep-row-time">{formatTime(session.startTime)} – {session.endTime ? formatTime(session.endTime) : 'most'}</span><span className="sleep-row-duration">{formatDuration(durationOf(session, now))}</span>{!compact && <span className="sleep-row-edit"><Icon name="edit" size={12} /></span>}</button>
 }
 
-function HistoryPage({ sessions, onEdit, onNew }: { sessions: SleepSession[]; onEdit: (session: SleepSession) => void; onNew: () => void }) {
+function HistoryPage({ sessions, onEdit, onDelete, onNew }: { sessions: SleepSession[]; onEdit: (session: SleepSession) => void; onDelete: (id: string) => void; onNew: () => void }) {
   const grouped = useMemo(() => {
     const map = new Map<string, SleepSession[]>()
     sessions.slice().sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()).forEach((session) => {
@@ -119,7 +120,7 @@ function HistoryPage({ sessions, onEdit, onNew }: { sessions: SleepSession[]; on
     })
     return Array.from(map.entries())
   }, [sessions])
-  return <section className="screen history-screen"><header className="page-header centered-header"><h1>Előzmények</h1><button className="add-button" onClick={onNew}><Icon name="plus" size={19} /></button></header><div className="history-wrap">{grouped.length === 0 && <div className="empty-card">Még nincs rögzített alvás.</div>}{grouped.map(([date, items], index) => <div className="history-group" key={date}><h3>{index === 0 ? `Ma – ${date}` : index === 1 ? `Tegnap – ${date}` : date}</h3><div className="sleep-list history-list">{items.map((session) => <SleepRow key={session.id} session={session} now={Date.now()} onClick={() => onEdit(session)} />)}</div></div>)}</div></section>
+  return <section className="screen history-screen"><header className="page-header centered-header"><h1>Előzmények</h1><button className="add-button" onClick={onNew}><Icon name="plus" size={19} /></button></header><div className="history-wrap">{grouped.length === 0 && <div className="empty-card">Még nincs rögzített alvás.</div>}{grouped.map(([date, items], index) => <div className="history-group" key={date}><h3>{index === 0 ? `Ma – ${date}` : index === 1 ? `Tegnap – ${date}` : date}</h3><div className="sleep-list history-list">{items.map((session) => <SwipeHistoryRow key={session.id} session={session} now={Date.now()} onEdit={() => onEdit(session)} onDelete={() => onDelete(session.id)} />)}</div></div>)}</div></section>
 }
 
 function StatsPage({ sessions, now }: { sessions: SleepSession[]; now: number }) {
