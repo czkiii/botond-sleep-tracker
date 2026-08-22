@@ -5,6 +5,7 @@ import App from './App'
 import './styles.css'
 import './ux-tuning.css'
 import './today-fit.css'
+import './copy-overrides.css'
 
 registerSW({ immediate: true })
 
