@@ -65,10 +65,69 @@ body,
   text-shadow: 0 2px 14px rgba(0, 5, 18, 0.85);
 }
 
+/* Make the small sleeping-start label readable over the illustrated night orb. */
+.status-orb.sleeping .orb-sub {
+  color: #c3d7ec;
+  font-weight: 570;
+  text-shadow: 0 2px 12px rgba(0, 5, 18, 0.95);
+}
+
 /* The orb artwork already carries the day/night motif, so the old tiny icon above
    ÉBREN / ALSZIK is redundant. CTA icons elsewhere remain untouched. */
 .status-orb .orb-icon {
   display: none;
+}
+
+/* Native-feeling swipe actions in History. */
+.swipe-history-row {
+  position: relative;
+  overflow: hidden;
+  min-height: 52px;
+  background: #d94b58;
+  touch-action: pan-y;
+}
+
+.swipe-history-actions {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 152px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.swipe-history-actions button {
+  border: 0;
+  border-radius: 0;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 0 6px;
+  font-size: 10px;
+  font-weight: 680;
+}
+
+.swipe-history-actions .swipe-edit {
+  background: #46556a;
+}
+
+.swipe-history-actions .swipe-delete {
+  background: #d94b58;
+}
+
+.swipe-history-content {
+  position: relative;
+  z-index: 2;
+  min-height: 52px;
+  background: #0a1929;
+  transition: transform 180ms cubic-bezier(.2,.8,.2,1);
+  will-change: transform;
+}
+
+.swipe-history-row:active .swipe-history-content {
+  transition: none;
 }
 
 /* Recharts adds a light rectangular hover/touch cursor behind the active bar by default.
