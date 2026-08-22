@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { SleepSession } from './types'
 import { durationOf, formatDuration, formatTime } from './utils'
 
@@ -7,14 +7,21 @@ type Segment = {
   session: SleepSession
   startMinute: number
   durationMinutes: number
+  clippedStart: number
+  clippedEnd: number
 }
 
-export default function SleepTimeline({ sessions, now }: { sessions: SleepSession[]; now: number }) {
+export default function SleepTimeline({ sessions, now, day }: { sessions: SleepSession[]; now: number; day?: string | null }) {
   const segments = useMemo<Segment[]>(() => {
-    const dayStart = new Date(now)
+    const dayStart = day
+      ? (() => {
+          const [year, month, date] = day.split('-').map(Number)
+          return new Date(year, month - 1, date, 0, 0, 0, 0)
+        })()
+      : new Date(now)
     dayStart.setHours(0, 0, 0, 0)
     const dayStartMs = dayStart.getTime()
-    const dayEndMs = dayStartMs + 24 * 60 * 60 * 1000
+    const dayEndMs = new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate() + 1, 0, 0, 0, 0).getTime()
 
     return sessions
       .map((session) => {
@@ -28,13 +35,16 @@ export default function SleepTimeline({ sessions, now }: { sessions: SleepSessio
           id: session.id,
           session,
           startMinute: (clippedStart - dayStartMs) / 60000,
-          durationMinutes: (clippedEnd - clippedStart) / 60000
+          durationMinutes: (clippedEnd - clippedStart) / 60000,
+          clippedStart,
+          clippedEnd
         }
       })
       .filter((segment): segment is Segment => Boolean(segment))
-  }, [sessions, now])
+  }, [sessions, now, day])
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  useEffect(() => setSelectedId(null), [day])
   const selected = segments.find((segment) => segment.id === selectedId) ?? null
 
   return (
@@ -79,8 +89,8 @@ export default function SleepTimeline({ sessions, now }: { sessions: SleepSessio
         {selected ? (
           <>
             <span className="timeline-info-icon">☾</span>
-            <strong>{formatTime(selected.session.startTime)}–{selected.session.endTime ? formatTime(selected.session.endTime) : 'most'}</strong>
-            <span>{formatDuration(durationOf(selected.session, now))}</span>
+            <strong>{formatTime(new Date(selected.clippedStart).toISOString())}–{formatTime(new Date(selected.clippedEnd).toISOString())}</strong>
+            <span>{formatDuration(selected.clippedEnd - selected.clippedStart)}</span>
           </>
         ) : (
           <span>Érints meg egy alvási szakaszt a részletekhez</span>
