@@ -1,0 +1,20 @@
+{
+  "name": "solemi-sleep-sync",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "types": "wrangler types",
+    "db:create": "wrangler d1 create solemi-sleep-db",
+    "db:apply:local": "wrangler d1 execute solemi-sleep-db --local --file=./schema.sql",
+    "db:apply:remote": "wrangler d1 execute solemi-sleep-db --remote --file=./schema.sql"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260813.0",
+    "typescript": "^5.9.2",
+    "wrangler": "^4.30.0"
+  }
+}
