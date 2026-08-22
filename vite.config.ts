@@ -9,6 +9,11 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['sleep-icon.svg'],
+      workbox: {
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true
+      },
       manifest: {
         name: 'Botond alváskövető',
         short_name: 'Alvás',
