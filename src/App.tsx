@@ -86,6 +86,11 @@ export default function App() {
 
 function TodayPage({ data, now, current, onStart, onEnd, onOpenEditor, onSettings }: { data: AppData; now: number; current: SleepSession | null; onStart: () => void; onEnd: () => void; onOpenEditor: (value: SleepSession | 'new') => void; onSettings: () => void }) {
   const todays = todaySessions(data.sessions).sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
+  const yesterdayStart = new Date(now); yesterdayStart.setHours(0, 0, 0, 0); yesterdayStart.setDate(yesterdayStart.getDate() - 1)
+  const yesterdayEnd = new Date(yesterdayStart); yesterdayEnd.setDate(yesterdayEnd.getDate() + 1)
+  const yesterdays = data.sessions
+    .filter((session) => { const start = new Date(session.startTime).getTime(); return start >= yesterdayStart.getTime() && start < yesterdayEnd.getTime() })
+    .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
   const total = totalToday(data.sessions, new Date(now))
   const elapsed = current ? durationOf(current, now) : awakeSince(data.sessions, now)
   return <section className="screen today-screen">
@@ -93,7 +98,10 @@ function TodayPage({ data, now, current, onStart, onEnd, onOpenEditor, onSetting
     <div className={`status-orb ${current ? 'sleeping' : 'awake'}`}><div className="orb-content"><div className="orb-icon"><Icon name="moon" size={19} /></div><div className="orb-status">{current ? 'ALSZIK' : 'ÉBREN'}</div><div className="orb-time">{current ? formatTimer(elapsed) : formatDuration(elapsed)}</div>{current && <div className="orb-sub">Elaludt {formatTime(current.startTime)}</div>}</div></div>
     <button className="primary-action" onClick={current ? onEnd : onStart}><Icon name={current ? 'sun' : 'moon'} size={20} /><span>{current ? 'Felébredt' : 'Elaludt'}</span></button>
     <button className="text-action" onClick={() => onOpenEditor(current ?? 'new')}>Részletek</button>
-    <div className="today-card"><div className="section-head"><h2>Mai alvások</h2><span>•••</span></div><div className="sleep-list scroll-list">{todays.length === 0 && <div className="empty">Még nincs mai alvás.</div>}{todays.map((session) => <SleepRow key={session.id} session={session} now={now} onClick={() => onOpenEditor(session)} compact />)}</div></div>
+    <div className="sleep-cards-stack">
+      <div className="today-card"><div className="section-head"><h2>Mai alvások</h2><span>•••</span></div><div className="sleep-list scroll-list">{todays.length === 0 && <div className="empty">Még nincs mai alvás.</div>}{todays.map((session) => <SleepRow key={session.id} session={session} now={now} onClick={() => onOpenEditor(session)} compact />)}</div></div>
+      <div className="today-card yesterday-card"><div className="section-head"><h2>Tegnapi alvások</h2><span>•••</span></div><div className="sleep-list scroll-list">{yesterdays.length === 0 && <div className="empty">Nem volt tegnap rögzített alvás.</div>}{yesterdays.map((session) => <SleepRow key={session.id} session={session} now={now} onClick={() => onOpenEditor(session)} compact />)}</div></div>
+    </div>
   </section>
 }
 
