@@ -28,7 +28,7 @@ const translations = {
     details: 'Részletek', recordSleep: 'Alvás rögzítése', stillSleeping: 'Még alszik', note: 'Megjegyzés', optionalNote: 'Opcionális megjegyzés', save: 'Mentés',
     futureNotAllowed: 'Jövőbeli időpont nem menthető.', wakeAfterSleep: 'A felébredésnek később kell lennie, mint az elalvásnak.', activeExists: 'Már van egy futó alvás.',
     sleeps: 'Alvások', touchSegment: 'Érints meg egy alvási szakaszt a részletekhez', timelineAria: '24 órás alvási idővonal',
-    invalidJson: 'A fájl nem érvényes JSON mentés.', invalidBackup: 'Érvénytelen mentés.', wrongBackup: 'Ez nem támogatott Baby Sleep Tracker mentés.', corruptBackup: 'A mentés sérült vagy hiányos alvásadatot tartalmaz.'
+    invalidJson: 'A fájl nem érvényes JSON mentés.', invalidBackup: 'Érvénytelen mentés.', wrongBackup: 'Ez nem támogatott Solemi Sleep mentés.', corruptBackup: 'A mentés sérült vagy hiányos alvásadatot tartalmaz.'
   },
   en: {
     settings: 'Settings', todaySoFar: 'Today so far', sleepNoun: 'sleep', sleeping: 'ASLEEP', awake: 'AWAKE',
@@ -41,7 +41,7 @@ const translations = {
     details: 'Details', recordSleep: 'Record sleep', stillSleeping: 'Still sleeping', note: 'Note', optionalNote: 'Optional note', save: 'Save',
     futureNotAllowed: 'A future time cannot be saved.', wakeAfterSleep: 'Wake time must be later than sleep time.', activeExists: 'There is already an active sleep.',
     sleeps: 'Sleep', touchSegment: 'Tap a sleep segment for details', timelineAria: '24-hour sleep timeline',
-    invalidJson: 'The file is not a valid JSON backup.', invalidBackup: 'Invalid backup.', wrongBackup: 'This is not a supported Baby Sleep Tracker backup.', corruptBackup: 'The backup contains damaged or incomplete sleep data.'
+    invalidJson: 'The file is not a valid JSON backup.', invalidBackup: 'Invalid backup.', wrongBackup: 'This is not a supported Solemi Sleep backup.', corruptBackup: 'The backup contains damaged or incomplete sleep data.'
   },
   de: {
     settings: 'Einstellungen', todaySoFar: 'Heute bisher', sleepNoun: 'Schlaf', sleeping: 'SCHLÄFT', awake: 'WACH',
@@ -54,7 +54,7 @@ const translations = {
     details: 'Details', recordSleep: 'Schlaf eintragen', stillSleeping: 'Schläft noch', note: 'Notiz', optionalNote: 'Optionale Notiz', save: 'Speichern',
     futureNotAllowed: 'Eine zukünftige Uhrzeit kann nicht gespeichert werden.', wakeAfterSleep: 'Die Aufwachzeit muss nach der Einschlafzeit liegen.', activeExists: 'Es gibt bereits einen laufenden Schlaf.',
     sleeps: 'Schlaf', touchSegment: 'Tippe auf einen Schlafabschnitt für Details', timelineAria: '24-Stunden-Schlafzeitleiste',
-    invalidJson: 'Die Datei ist kein gültiges JSON-Backup.', invalidBackup: 'Ungültiges Backup.', wrongBackup: 'Dies ist kein unterstütztes Baby Sleep Tracker Backup.', corruptBackup: 'Das Backup enthält beschädigte oder unvollständige Schlafdaten.'
+    invalidJson: 'Die Datei ist kein gültiges JSON-Backup.', invalidBackup: 'Ungültiges Backup.', wrongBackup: 'Dies ist kein unterstütztes Solemi Sleep Backup.', corruptBackup: 'Das Backup enthält beschädigte oder unvollständige Schlafdaten.'
   }
 } as const
 
