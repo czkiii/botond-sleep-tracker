@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['sleep-icon.svg'],
+      includeAssets: ['app-icon.png'],
       workbox: {
         cleanupOutdatedCaches: true,
         clientsClaim: true,
@@ -25,9 +25,9 @@ export default defineConfig({
         start_url: '/botond-sleep-tracker/',
         icons: [
           {
-            src: '/botond-sleep-tracker/sleep-icon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
+            src: '/botond-sleep-tracker/app-icon.png',
+            sizes: '1024x1024',
+            type: 'image/png',
             purpose: 'any maskable'
           }
         ]
