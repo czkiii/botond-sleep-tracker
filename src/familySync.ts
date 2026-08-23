@@ -156,7 +156,8 @@ export async function refreshFamilyInfo() {
   const fresh = readStore()
   if (!fresh.connection) return null
   fresh.connection.familyName = info.familyName || fresh.connection.familyName
-  fresh.connection.revision = Math.max(fresh.connection.revision, info.revision)
+  // Do not advance the sync cursor here. Only /v1/sync may move revision,
+  // otherwise changes from another device can be skipped permanently.
   writeStore(fresh)
   return info
 }
@@ -239,7 +240,8 @@ export async function flushPending() {
 
       store = readStore()
       if (!store.connection) return changedLocal
-      store.connection.revision = Math.max(store.connection.revision, Number(result?.revision || 0))
+      // Mutation responses can have a newer family revision than this device has pulled.
+      // Advancing the cursor here would skip intervening changes from another phone.
       store.pending = store.pending.filter((item) => item.id !== operation.id)
       writeStore(store)
     } catch (error) {
@@ -249,7 +251,6 @@ export async function flushPending() {
         changedLocal = true
         store = readStore()
         store.pending = store.pending.filter((item) => item.id !== operation.id)
-        if (store.connection && apiError.data?.revision) store.connection.revision = Math.max(store.connection.revision, Number(apiError.data.revision))
         writeStore(store)
         await pullRemote(true)
         continue
@@ -280,6 +281,7 @@ export async function pullRemote(forceFromZero = false) {
   const merged = forceFromZero ? replaceWithRemote(current, result.sessions) : mergeRemote(current, result.sessions)
   const changed = JSON.stringify(merged.sessions) !== JSON.stringify(current.sessions)
   if (changed) writeRemoteData(merged)
+  // /v1/sync is the only authoritative place allowed to advance the cursor.
   latest.connection.revision = result.revision
   if (result.familyName) latest.connection.familyName = result.familyName
   writeStore(latest)
