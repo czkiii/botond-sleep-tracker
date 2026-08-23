@@ -30,6 +30,11 @@ type RemoteSession = SleepSession & {
   revision: number
 }
 
+type MutationResult = {
+  revision?: number
+  session?: RemoteSession | null
+}
+
 type ApiEnvelope<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string }; data?: any }
 
 const defaultStore = (): SyncStore => ({ connection: null, pending: [] })
@@ -93,8 +98,27 @@ function mergeRemote(data: AppData, sessions: RemoteSession[]) {
   return { ...data, sessions: Array.from(map.values()).sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()) }
 }
 
+function replaceWithRemote(data: AppData, sessions: RemoteSession[]) {
+  return {
+    ...data,
+    sessions: sessions
+      .filter((session) => !session.deletedAt)
+      .map(toRemoteLocal)
+      .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
+  }
+}
+
 function writeRemoteData(data: AppData) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+}
+
+function applyAuthoritativeSession(session?: RemoteSession | null) {
+  if (!session) return false
+  const current = loadData()
+  const merged = mergeRemote(current, [session])
+  const changed = JSON.stringify(merged.sessions) !== JSON.stringify(current.sessions)
+  if (changed) writeRemoteData(merged)
+  return changed
 }
 
 export function getSyncStore() { return readStore() }
@@ -117,6 +141,11 @@ export async function joinFamily(code: string, deviceName: string) {
   })
   const connection: SyncConnection = { familyId: joined.familyId, familyName: joined.familyName, deviceId: joined.device.id, deviceToken: joined.deviceToken, revision: 0 }
   writeStore({ connection, pending: [] })
+
+  // A newly joined device must adopt the cloud family as its canonical dataset.
+  // Keeping unrelated pre-pairing local sessions here can create duplicate sleeps later.
+  const local = loadData()
+  writeRemoteData({ ...local, sessions: [] })
   return pullRemote(true)
 }
 
@@ -205,7 +234,9 @@ export async function flushPending() {
   while (store.connection && store.pending.length) {
     const operation = store.pending[0]
     try {
-      const result = await request<{ revision?: number }>(operation.path, { method: operation.method, body: JSON.stringify(operation.body) }, store.connection.deviceToken)
+      const result = await request<MutationResult>(operation.path, { method: operation.method, body: JSON.stringify(operation.body) }, store.connection.deviceToken)
+      if (applyAuthoritativeSession(result?.session)) changedLocal = true
+
       store = readStore()
       if (!store.connection) return changedLocal
       store.connection.revision = Math.max(store.connection.revision, Number(result?.revision || 0))
@@ -246,7 +277,7 @@ export async function pullRemote(forceFromZero = false) {
   const latest = readStore()
   if (!latest.connection) return false
   const current = loadData()
-  const merged = mergeRemote(current, result.sessions)
+  const merged = forceFromZero ? replaceWithRemote(current, result.sessions) : mergeRemote(current, result.sessions)
   const changed = JSON.stringify(merged.sessions) !== JSON.stringify(current.sessions)
   if (changed) writeRemoteData(merged)
   latest.connection.revision = result.revision
