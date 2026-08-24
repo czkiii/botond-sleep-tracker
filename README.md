@@ -52,6 +52,12 @@ The baby name is user data and is not hard-coded into the product model.
 
 Cloudflare-based family sync is planned as the next storage/sync layer. JSON export/import remains useful as a manual backup path.
 
+## Architecture documents
+
+- `FEATURE_ENTITLEMENT_MATRIX.md` — locked Free / Family / Family+ product split.
+- `ACCOUNT_ENTITLEMENT_ARCHITECTURE.md` — final pre-implementation D1 account, Google auth, membership, subscription, entitlement and migration design.
+- `TECHNICAL_COLLISION_AUDIT.md` — known technical collisions and implementation guardrails.
+
 ## GitHub Pages path
 
 The repository and GitHub Pages base path still use `/botond-sleep-tracker/` temporarily so the existing test URL and installed PWA do not break. This route can be migrated separately when the public hosting/repository URL is intentionally changed.

@@ -1,399 +1,580 @@
-# Solemi Sleep — Account & Entitlement Architecture
+# Solemi Sleep — végleges account, membership, subscription és entitlement D1 architektúra
 
-Status: **DESIGN IN PROGRESS — architecture pass, no production code yet**  
-Date: 2026-08-24
+Státusz: **ARCHITEKTÚRA LEZÁRVA — implementáció előtt**
 
-This document turns the latest product decisions into a technical model before implementation. It intentionally separates identity, local sleep storage, Family Sync and paid feature visibility so that subscription logic does not contaminate the core sleep-data model.
+Dátum: 2026-08-24
+Ellenőrzött GitHub-alap: `main` / `37d1728` (`Lock Free Family Family+ feature matrix`)
 
-## 1. Locked product direction
+Ez a dokumentum a következő backend-implementáció normatív terve. Nem migráció és nem módosítja a live Cloudflare D1-et vagy Workert. A jelenlegi prototípus `worker/schema.sql` és `worker/src/index.ts` fájljait a célarchitektúrára való átálláskor, külön ellenőrzött migrációkkal kell módosítani.
 
-### Plans
+Kapcsolódó lezárt döntések: `FEATURE_ENTITLEMENT_MATRIX.md`, `PRODUCT_DESIGN_LOCK.md`, `TECHNICAL_COLLISION_AUDIT.md`.
 
-Working commercial structure:
+## 1. Lezárt termékszabályok
 
-- **Free**
-- **Family**
-- **Family+**
+- V1-ben kizárólag Google-belépés van. A Google csak identitásszolgáltató, nem alvásadat-tároló.
+- Egy embernek egy Solemi accountja van; egy accountnak legfeljebb 2 aktív eszköze lehet.
+- Egy account egyszerre legfeljebb 1 aktív Family tagja lehet. A korábbi tagságok historyként megmaradnak.
+- A Family létrehozója automatikusan admin. Több admin lehet.
+- Bármely aktív Family-tag készíthet meghívót.
+- A rövid, egyszer használható invite kód beváltása után a belépő automatikusan tag lesz; nincs admin-jóváhagyás.
+- Mindenki kiléphet saját maga. Más tagot csak admin távolíthat el.
+- Az utolsó admin nem léphet ki és nem távolítható el. Előbb másik aktív tagot adminná kell tenni.
+- A harmadik eszköz belépése nem dob ki automatikusan senkit: a user választ egy régi aktív eszközt, azt visszavonja, majd regisztrálja az újat.
+- A Family végleges törlését csak admin indíthatja, friss újraazonosítás és erős megerősítés után.
+- Family Sync akkor aktív, ha legalább egy aktív tag rendelkezik érvényes Family vagy Family+ eredetű `FAMILY_SYNC` entitlementtel.
+- Ha az utolsó fizető tag kilép vagy az entitlementje lejár, a sync azonnal szünetel. A cloud adat és a Family-kapcsolat megmarad.
+- Family+ Insights account-szintű, személyes jogosultság. Nem öröklődik a többi családtagra.
+- Trial: 7 nap Family+. Offline entitlement cache: legfeljebb 30 nap, de soha nem nyúlhat túl a szerver által engedélyezett hozzáférési időn.
+- A Free account alvásadata local-first. Az account önmagában nem jelent automatikus cloud backupot.
 
-The names are now the preferred direction. Exact pricing remains a later business decision.
-
-### Identity
-
-- V1 login provider: **Google only**.
-- Login/account access itself is free and is not a paid feature.
-- Every user has their own account.
-- A family is shared by multiple accounts through a common `familyId` / membership model.
-- One account may have at most **2 active devices** in the current product decision.
-- Family-wide architecture must not hard-code a total family device limit; the per-account limit and family membership are separate concepts.
-- A new phone can log into the same account and recover identity, entitlement and Family membership.
-
-Google is an identity provider only. Solemi does not use Google as sleep-data storage.
-
-## 2. Core architectural separation
-
-The system must treat these as different layers:
+## 2. Biztonsági és adattárolási határok
 
 ```text
-Google identity
-      ↓
-Solemi account
-      ↓
-Entitlements / Family membership
-      ↓
-Feature gates
+Google ID token
+  -> Solemi account
+  -> account device + session
+  -> egyetlen aktív family membership
 
-Sleep data storage is separate:
-Free      -> local-first/local sleep history
-Family    -> local-first + shared cloud synchronization
-Family+   -> same shared raw data + advanced derived features
+Billing provider event
+  -> subscription (billing truth)
+  -> account entitlement grants
+     -> személyes feature gate
+     -> aktív membershipen keresztül Family Sync hozzájárulás
+
+Sleep data
+  Free: local-first
+  aktív Family Sync: family-szintű kanonikus D1-adat
 ```
 
-Important rule:
+Az account, eszköz, tagság, billing és feature-jogosultság külön fogalom. A nyers child/session séma minden csomagban azonos; a csomagok funkciót, nem adattípust kapcsolnak be.
 
-> **Account != cloud sleep backup.**
+## 3. D1 konvenciók
 
-A user can have an account while their Free sleep history remains local-first.
+- Minden ID szerver által generált, nem kitalálható `TEXT` ID, típusprefixszel (`acc_`, `dev_`, `fam_`, `mem_`, `sub_`, `ent_`).
+- Minden időpont `INTEGER`, Unix epoch milliszekundum UTC-ben. Időzóna csak megjelenítési adat.
+- Boolean érték `INTEGER NOT NULL CHECK (... IN (0,1))`.
+- Minden Worker request elején `PRAGMA foreign_keys = ON` elvárás; minden migration ugyanezt használja.
+- Titkos tokenből csak legalább SHA-256/HMAC hash kerül D1-be, környezeti pepperrel. Nyers Google token, session token, device credential, invite kód és provider receipt nem tárolható.
+- E-mail nem identitáskulcs. A stabil kulcs a Google issuer + `sub`.
+- D1 constraint az utolsó védelmi vonal; role-, entitlement- és tulajdonosi ellenőrzés a Workerben is kötelező.
+- Provider webhook és kliens write idempotens. A provider eseményazonosítója és a kliens `operationId` egyedi.
 
-This preserves the current low-cost, offline-friendly architecture instead of uploading every Free user's raw sleep history merely because they logged in.
+## 4. Cél D1 séma
 
-## 3. Proposed account records
+Az alábbi SQL a célállapot specifikációja. Külön, sorszámozott migration fájlokra kell bontani; **nem futtatható egyben a jelenlegi live adatbázison**.
 
-Conceptual backend model:
+```sql
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE accounts (
+  id                 TEXT PRIMARY KEY,
+  email              TEXT,
+  display_name       TEXT,
+  avatar_url         TEXT,
+  locale             TEXT,
+  status             TEXT NOT NULL DEFAULT 'ACTIVE'
+                     CHECK (status IN ('ACTIVE', 'DELETION_PENDING', 'DELETED')),
+  created_at         INTEGER NOT NULL,
+  updated_at         INTEGER NOT NULL,
+  last_login_at      INTEGER NOT NULL,
+  deleted_at         INTEGER,
+  CHECK ((status = 'DELETED') = (deleted_at IS NOT NULL))
+);
+
+CREATE TABLE account_identities (
+  id                 TEXT PRIMARY KEY,
+  account_id         TEXT NOT NULL,
+  provider           TEXT NOT NULL CHECK (provider = 'GOOGLE'),
+  issuer             TEXT NOT NULL,
+  subject            TEXT NOT NULL,
+  email_at_login     TEXT,
+  email_verified     INTEGER NOT NULL CHECK (email_verified IN (0, 1)),
+  created_at         INTEGER NOT NULL,
+  last_verified_at   INTEGER NOT NULL,
+  FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+  UNIQUE (provider, issuer, subject)
+);
+
+CREATE UNIQUE INDEX idx_one_google_identity_per_account
+ON account_identities(account_id)
+WHERE provider = 'GOOGLE';
+
+CREATE TABLE account_devices (
+  id                 TEXT PRIMARY KEY,
+  account_id         TEXT NOT NULL,
+  installation_hash  TEXT NOT NULL UNIQUE,
+  credential_hash    TEXT NOT NULL UNIQUE,
+  name               TEXT,
+  platform           TEXT CHECK (platform IN ('WEB', 'IOS', 'ANDROID', 'OTHER')),
+  created_at         INTEGER NOT NULL,
+  last_seen_at       INTEGER NOT NULL,
+  revoked_at         INTEGER,
+  revoke_reason      TEXT CHECK (revoke_reason IS NULL OR revoke_reason IN
+                     ('USER_REPLACED', 'USER_REVOKED', 'SECURITY', 'ACCOUNT_DELETED')),
+  FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+  CHECK ((revoked_at IS NULL) = (revoke_reason IS NULL))
+);
+
+CREATE INDEX idx_account_devices_active
+ON account_devices(account_id, last_seen_at DESC)
+WHERE revoked_at IS NULL;
+
+CREATE TRIGGER account_devices_max_two_insert
+BEFORE INSERT ON account_devices
+WHEN NEW.revoked_at IS NULL AND
+     (SELECT COUNT(*) FROM account_devices
+      WHERE account_id = NEW.account_id AND revoked_at IS NULL) >= 2
+BEGIN
+  SELECT RAISE(ABORT, 'ACCOUNT_DEVICE_LIMIT');
+END;
+
+CREATE TRIGGER account_devices_max_two_reactivate
+BEFORE UPDATE OF revoked_at ON account_devices
+WHEN OLD.revoked_at IS NOT NULL AND NEW.revoked_at IS NULL AND
+     (SELECT COUNT(*) FROM account_devices
+      WHERE account_id = NEW.account_id AND revoked_at IS NULL) >= 2
+BEGIN
+  SELECT RAISE(ABORT, 'ACCOUNT_DEVICE_LIMIT');
+END;
+
+CREATE TABLE account_sessions (
+  id                 TEXT PRIMARY KEY,
+  account_id         TEXT NOT NULL,
+  device_id          TEXT NOT NULL,
+  refresh_hash       TEXT NOT NULL UNIQUE,
+  created_at         INTEGER NOT NULL,
+  last_used_at       INTEGER NOT NULL,
+  expires_at         INTEGER NOT NULL,
+  revoked_at         INTEGER,
+  rotation_counter   INTEGER NOT NULL DEFAULT 0 CHECK (rotation_counter >= 0),
+  FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+  FOREIGN KEY (device_id) REFERENCES account_devices(id) ON DELETE CASCADE,
+  CHECK (expires_at > created_at)
+);
+
+CREATE INDEX idx_account_sessions_device_active
+ON account_sessions(device_id, expires_at)
+WHERE revoked_at IS NULL;
+
+CREATE TABLE families (
+  id                 TEXT PRIMARY KEY,
+  name               TEXT NOT NULL CHECK (length(trim(name)) BETWEEN 1 AND 80),
+  revision           INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0),
+  status             TEXT NOT NULL DEFAULT 'ACTIVE'
+                     CHECK (status IN ('ACTIVE', 'DELETING')),
+  created_by_account_id TEXT NOT NULL,
+  created_at         INTEGER NOT NULL,
+  updated_at         INTEGER NOT NULL,
+  delete_requested_at INTEGER,
+  FOREIGN KEY (created_by_account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
+  CHECK ((status = 'DELETING') = (delete_requested_at IS NOT NULL))
+);
+
+CREATE TABLE family_memberships (
+  id                 TEXT PRIMARY KEY,
+  family_id          TEXT NOT NULL,
+  account_id         TEXT NOT NULL,
+  role               TEXT NOT NULL CHECK (role IN ('ADMIN', 'MEMBER')),
+  status             TEXT NOT NULL DEFAULT 'ACTIVE'
+                     CHECK (status IN ('ACTIVE', 'LEFT', 'REMOVED')),
+  joined_at          INTEGER NOT NULL,
+  ended_at           INTEGER,
+  ended_by_account_id TEXT,
+  end_reason         TEXT CHECK (end_reason IS NULL OR end_reason IN
+                     ('SELF_LEFT', 'ADMIN_REMOVED', 'FAMILY_DELETED')),
+  FOREIGN KEY (family_id) REFERENCES families(id) ON DELETE CASCADE,
+  FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+  FOREIGN KEY (ended_by_account_id) REFERENCES accounts(id) ON DELETE SET NULL,
+  CHECK ((status = 'ACTIVE') = (ended_at IS NULL)),
+  CHECK ((status = 'ACTIVE') = (end_reason IS NULL)),
+  CHECK (status != 'LEFT' OR ended_by_account_id = account_id)
+);
+
+CREATE UNIQUE INDEX idx_one_active_family_per_account
+ON family_memberships(account_id)
+WHERE status = 'ACTIVE';
+
+CREATE UNIQUE INDEX idx_no_duplicate_active_membership
+ON family_memberships(family_id, account_id)
+WHERE status = 'ACTIVE';
+
+CREATE INDEX idx_family_memberships_active
+ON family_memberships(family_id, role, joined_at)
+WHERE status = 'ACTIVE';
+
+CREATE TRIGGER family_keep_last_admin_on_end
+BEFORE UPDATE OF status ON family_memberships
+WHEN OLD.status = 'ACTIVE'
+ AND OLD.role = 'ADMIN'
+ AND NEW.status != 'ACTIVE'
+ AND (SELECT status FROM families WHERE id = OLD.family_id) = 'ACTIVE'
+ AND NOT EXISTS (
+   SELECT 1 FROM family_memberships
+   WHERE family_id = OLD.family_id
+     AND status = 'ACTIVE'
+     AND role = 'ADMIN'
+     AND id != OLD.id
+ )
+BEGIN
+  SELECT RAISE(ABORT, 'FAMILY_REQUIRES_ADMIN');
+END;
+
+CREATE TRIGGER family_keep_last_admin_on_demote
+BEFORE UPDATE OF role ON family_memberships
+WHEN OLD.status = 'ACTIVE'
+ AND OLD.role = 'ADMIN'
+ AND NEW.role != 'ADMIN'
+ AND (SELECT status FROM families WHERE id = OLD.family_id) = 'ACTIVE'
+ AND NOT EXISTS (
+   SELECT 1 FROM family_memberships
+   WHERE family_id = OLD.family_id
+     AND status = 'ACTIVE'
+     AND role = 'ADMIN'
+     AND id != OLD.id
+ )
+BEGIN
+  SELECT RAISE(ABORT, 'FAMILY_REQUIRES_ADMIN');
+END;
+
+CREATE TABLE family_invites (
+  id                 TEXT PRIMARY KEY,
+  family_id          TEXT NOT NULL,
+  code_hash          TEXT NOT NULL UNIQUE,
+  created_by_membership_id TEXT NOT NULL,
+  created_at         INTEGER NOT NULL,
+  expires_at         INTEGER NOT NULL,
+  redeemed_at        INTEGER,
+  redeemed_by_account_id TEXT,
+  revoked_at         INTEGER,
+  FOREIGN KEY (family_id) REFERENCES families(id) ON DELETE CASCADE,
+  FOREIGN KEY (created_by_membership_id) REFERENCES family_memberships(id) ON DELETE CASCADE,
+  FOREIGN KEY (redeemed_by_account_id) REFERENCES accounts(id) ON DELETE SET NULL,
+  CHECK (expires_at > created_at),
+  CHECK ((redeemed_at IS NULL) = (redeemed_by_account_id IS NULL)),
+  CHECK (NOT (redeemed_at IS NOT NULL AND revoked_at IS NOT NULL))
+);
+
+CREATE INDEX idx_family_invites_open
+ON family_invites(family_id, expires_at)
+WHERE redeemed_at IS NULL AND revoked_at IS NULL;
+
+CREATE TABLE subscriptions (
+  id                 TEXT PRIMARY KEY,
+  account_id         TEXT NOT NULL,
+  provider           TEXT NOT NULL CHECK (provider IN ('APPLE', 'GOOGLE_PLAY', 'STRIPE', 'MANUAL')),
+  provider_subscription_id TEXT NOT NULL,
+  product            TEXT NOT NULL CHECK (product IN ('FAMILY', 'FAMILY_PLUS')),
+  status             TEXT NOT NULL CHECK (status IN
+                     ('TRIALING', 'ACTIVE', 'GRACE_PERIOD', 'PAST_DUE', 'CANCELED', 'EXPIRED', 'REVOKED')),
+  auto_renews        INTEGER NOT NULL CHECK (auto_renews IN (0, 1)),
+  trial_ends_at      INTEGER,
+  current_period_ends_at INTEGER NOT NULL,
+  access_until       INTEGER NOT NULL,
+  created_at         INTEGER NOT NULL,
+  updated_at         INTEGER NOT NULL,
+  canceled_at        INTEGER,
+  FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
+  UNIQUE (provider, provider_subscription_id),
+  CHECK (access_until >= created_at),
+  CHECK (trial_ends_at IS NULL OR trial_ends_at > created_at)
+);
+
+CREATE INDEX idx_subscriptions_account_access
+ON subscriptions(account_id, access_until DESC);
+
+CREATE TABLE subscription_events (
+  id                 TEXT PRIMARY KEY,
+  provider           TEXT NOT NULL CHECK (provider IN ('APPLE', 'GOOGLE_PLAY', 'STRIPE', 'MANUAL')),
+  provider_event_id  TEXT NOT NULL,
+  subscription_id    TEXT,
+  event_type         TEXT NOT NULL,
+  occurred_at        INTEGER NOT NULL,
+  received_at        INTEGER NOT NULL,
+  payload_hash       TEXT NOT NULL,
+  processed_at       INTEGER,
+  processing_error   TEXT,
+  FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE SET NULL,
+  UNIQUE (provider, provider_event_id)
+);
+
+CREATE TABLE account_entitlements (
+  id                 TEXT PRIMARY KEY,
+  account_id         TEXT NOT NULL,
+  feature_key        TEXT NOT NULL CHECK (feature_key IN
+                     ('FAMILY_SYNC', 'PDF_EXPORT', 'FAMILY_PLUS_INSIGHTS')),
+  source_type        TEXT NOT NULL CHECK (source_type IN ('SUBSCRIPTION', 'PROMO', 'ADMIN')),
+  source_id          TEXT NOT NULL,
+  valid_from         INTEGER NOT NULL,
+  valid_until        INTEGER NOT NULL,
+  revoked_at         INTEGER,
+  created_at         INTEGER NOT NULL,
+  updated_at         INTEGER NOT NULL,
+  FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+  CHECK (valid_until > valid_from),
+  UNIQUE (account_id, feature_key, source_type, source_id)
+);
+
+CREATE INDEX idx_account_entitlements_active
+ON account_entitlements(account_id, feature_key, valid_until)
+WHERE revoked_at IS NULL;
+```
+
+### Miért nincs `family_entitlements` tábla?
+
+A Family Sync jogosultság derivált állapot. Az account entitlement a fizető személyhez tartozik, a sync-hozzájárulás pedig csak az account egyetlen aktív membershipjén keresztül érvényes. Így a fizető kilépésekor nincs késve frissülő family cache: a következő szerverellenőrzés azonnal `false` eredményt ad.
+
+Normatív lekérdezés:
+
+```sql
+SELECT EXISTS (
+  SELECT 1
+  FROM family_memberships m
+  JOIN account_entitlements e ON e.account_id = m.account_id
+  WHERE m.family_id = ?1
+    AND m.status = 'ACTIVE'
+    AND e.feature_key = 'FAMILY_SYNC'
+    AND e.revoked_at IS NULL
+    AND e.valid_from <= ?2
+    AND e.valid_until > ?2
+) AS can_sync;
+```
+
+Egy subscription azért csak egy Familyre hat, mert az account egyszerre csak egy aktív Family tagja lehet. Ha nincs aktív membershipje, az account személyes entitlementje megmarad, de egyetlen Family syncjét sem aktiválja.
+
+## 5. Google-only auth modell
+
+### Tokenellenőrzés
+
+1. A kliens Google Sign-Innel ID tokent kér.
+2. A Worker kizárólag szerveroldalon ellenőrzi az aláírást a Google JWKS kulcsaival, a támogatott `iss` értéket, a Solemi OAuth clienthez tartozó `aud` értéket, valamint az `exp`, `iat`, `sub` és `email_verified` claimet.
+3. Account lookup kulcsa: `(provider='GOOGLE', issuer, subject)`. Az e-mail változhat, ezért csak profiladat.
+4. Első sikeres belépéskor a Worker egy tranzakcióban létrehozza az `accounts` és `account_identities` sort.
+5. A Google ID token nem válik Solemi API bearer tokenné és nem kerül D1-be. A Worker rövid access tokent és forgatott, hashként tárolt refresh tokent ad ki a regisztrált eszközhöz.
+6. A refresh token újrahasználatának észlelésekor az adott eszköz összes sessionje visszavonandó.
+7. E-mail alapján automatikus account-összevonás tilos. V1-ben nincs más provider és nincs password/email recovery.
+
+### Eszközregisztráció és a 2-es limit
+
+- A kliens telepítésenként generál egy erős, stabil installation secretet; D1-be ennek hash-e kerül.
+- Az ismert, nem visszavont eszköz új sessiont kaphat.
+- Ismeretlen harmadik eszköznél a Worker `409 DEVICE_LIMIT_REACHED` választ ad a két aktív eszköz `id`, `name`, `platform`, `last_seen_at` mezőivel és egy rövid életű, kizárólag device-managementre használható enrollment ticketet ad.
+- A user kiválaszt egy régi eszközt. A Worker ugyanabban a tranzakcióban visszavonja annak sessionjeit és device credentialjét, majd regisztrálja az újat.
+- Automatikus „legrégebbi eszköz kidobása” nincs. Visszavont eszköz bearer credentialje minden family és sync végponton elutasítandó.
+
+## 6. Family membership és admin szabályok
+
+### Family létrehozás
+
+Az endpoint csak Google-authenticated accounttal hívható. Egy tranzakció:
+
+1. ellenőrzi, hogy nincs aktív membership;
+2. létrehozza a Familyt;
+3. létrehozza a létrehozó `ADMIN` / `ACTIVE` membershipjét;
+4. nem törli a helyi alvásadatot;
+5. entitlement esetén külön bootstrap folyamatot indít.
+
+### Invite
+
+- Bármely aktív `ADMIN` vagy `MEMBER` készíthet rövid kódot.
+- A kód legalább 128 bit entrópiából származzon; a rövid emberi forma miatt kötelező rate limit, rövid TTL, egyszer használhatóság és csak hash tárolása.
+- Ajánlott V1 TTL: 15 perc. Maximum 5 nyitott invite / membership; további kérés a legrégebbit visszavonja vagy 429-et ad.
+- Redemption előtt Google login kötelező.
+- A beváltás atomi: nyitott/nem lejárt kód feltételes update-je és az `ACTIVE` membership insertje egy tranzakcióban történik.
+- Ha az accountnak már van más aktív Familyje, `409 ACTIVE_FAMILY_EXISTS`. Ha ugyanennek a Familynek aktív tagja, idempotens siker. Korábbi `LEFT`/`REMOVED` membership után új history sor készül.
+- Jóváhagyás nincs. Ha a Family sync szünetel, a tagság létrejön, de raw snapshot nem tölthető le reaktiválásig.
+
+### Role és eltávolítás
+
+- Aktív admin bármely aktív membert adminná tehet.
+- Admin más tagot eltávolíthat; saját magát a self-leave flow-val lépteti ki.
+- Nem-admin csak saját magát léptetheti ki.
+- Az utolsó admin kilépését/demote-ját a Worker és a trigger is blokkolja `409 FAMILY_REQUIRES_ADMIN` hibával.
+- Kilépés/eltávolítás azonnal visszavonja az érintett account Family-adathoz kötött hozzáférését; az account eszközeit nem törli.
+- A membership history nem törlendő normál kilépéskor.
+
+### Family végleges törlése
+
+- Csak aktív admin indíthatja.
+- Kötelező 5 percen belüli Google reauthentication és erős megerősítés (a Family nevének begépelése vagy platformszintű ekvivalens).
+- Első tranzakció: `families.status='DELETING'`, új invite/sync/write tiltása, minden invite visszavonása.
+- Ezután a Worker törli a Familyhez tartozó cloud child/session/tombstone/operation adatokat, majd a Family sort. `ON DELETE CASCADE` eltávolítja a membershipet és invite-okat.
+- Subscription és account nem törlődik. A fizető account entitlementje megmarad, és új Familyben használható.
+- A törlés nem visszavonható; előtte export felajánlása kötelező. A minimális billing/security audit rekord személyes alvásadat nélkül a jogi retention szabály szerint maradhat.
+
+## 7. Subscription és entitlement szabályok
+
+### Billing truth
+
+- A `subscriptions` a provider által igazolt billing állapot. A kliens által küldött „paid=true” soha nem authority.
+- A `subscription_events` biztosítja a webhook idempotenciát és auditot; teljes provider payload helyett hash és szükséges normalizált mezők tárolandók.
+- `CANCELED` azt jelenti, hogy az auto-renew kikapcsolt; hozzáférés az `access_until` időpontig még lehet aktív.
+- `PAST_DUE` önmagában nem ad hozzáférést. `GRACE_PERIOD` csak akkor ad, ha a provider igazolt `access_until` értéke még jövőbeli.
+- Refund/revoke esemény az entitlement `revoked_at` mezőjét azonnal beállítja.
+- 7 napos trial egy `FAMILY_PLUS` subscription `TRIALING` állapottal. A trial vége explicit, nem a kliens órájából számítandó.
+
+### Grant mapping
+
+| Product | Létrehozott account entitlementek |
+|---|---|
+| `FAMILY` | `FAMILY_SYNC`, `PDF_EXPORT` |
+| `FAMILY_PLUS` | `FAMILY_SYNC`, `PDF_EXPORT`, `FAMILY_PLUS_INSIGHTS` |
+
+Provider update után a Worker egy tranzakcióban upserteli a subscriptiont, rögzíti az eseményt és pontosan ehhez az `access_until` intervallumhoz igazítja a grantokat. A `PROMO` és `ADMIN` source támogatott, de csak szerveroldali adminfolyamat írhatja.
+
+### Feature evaluation
 
 ```text
-accounts
-- id
-- google_subject        unique stable Google identity key
-- email                 informational / display, not primary identity key
-- display_name          optional
-- created_at
-- last_login_at
-- deleted_at
+accountCanUse(accountId, featureKey, now)
+  = van nem visszavont account_entitlement,
+    ahol valid_from <= now < valid_until
 
-account_devices
-- id
-- account_id
-- device_key/token hash
-- created_at
-- last_seen_at
-- revoked_at
-
-family_memberships
-- family_id
-- account_id
-- role/status
-- joined_at
-- left_at
-
-subscriptions
-- id
-- account_id
-- product
-- status
-- trial_end
-- current_period_end
-- provider
-- provider_reference
-- updated_at
-
-entitlements
-- account_id
-- feature_key
-- active_until / status
-- source
-- updated_at
+familyCanSync(familyId, now)
+  = van aktív membershipű account,
+    amelyre accountCanUse(FAMILY_SYNC) igaz
 ```
 
-Exact schema will be finalized only after store/payment architecture is chosen.
+- Family+ Insights mindig a bejelentkezett account saját `FAMILY_PLUS_INSIGHTS` grantját ellenőrzi.
+- Egy Free account aktív syncű Family tagjaként megkaphatja a kanonikus raw adatot, de PDF-et és Family+ view-kat csak saját entitlementtel használhat.
+- A sync API minden read és write kérésnél szerveroldalon számolja a `familyCanSync` értéket. A kliens UI cache nem jogosít szerverírásra.
 
-## 4. Device tokens vs account identity
+### 30 napos offline cache
 
-The existing Family Sync device token should not become the account identity.
+A Worker aláírt entitlement snapshotot ad:
 
-Recommended hierarchy:
+```json
+{
+  "accountId": "acc_…",
+  "features": ["FAMILY_SYNC", "PDF_EXPORT"],
+  "validatedAt": 0,
+  "serverAccessUntil": 0,
+  "offlineUntil": 0,
+  "version": 1
+}
+```
+
+`offlineUntil = min(validatedAt + 30 nap, serverAccessUntil)`. A kliens nem hosszabbíthatja meg. A snapshot account- és eszközkötött, szerver által aláírt. A kliens tárolja a legnagyobb már látott szerveridőt és monotonic elapsed időt használ; jelentős visszaállított óra vagy snapshot-integritási hiba online újraellenőrzést kér. Szerveres sync, invite, role és delete művelet mindig aktuális szerverállapotot ellenőriz.
+
+## 8. Sync entitlement életciklus
+
+### Első Family bootstrap
+
+1. Google account, aktív membership és `familyCanSync=true` ellenőrzése.
+2. Automatikus, visszaállítható helyi export készítése.
+3. A helyi adat változatlan marad; a kliens `bootstrapId` + idempotens operation batch segítségével feltölti a child/session rekordokat.
+4. A szerver a létrehozó datasetjét teszi kezdeti kanonikus állapottá.
+5. A kliens teljes snapshotot visszaolvas és hash/count/revision ellenőrzést végez.
+6. Csak sikeres ellenőrzés után állítja a helyi family sync állapotot aktívra.
+
+Meghívott eszköz nem merge-eli automatikusan saját, független helyi adatbázisát; a Family snapshotját veszi át. Későbbi import csak külön, deduplikáló feature lehet.
+
+### Utolsó entitlement lejárata vagy fizető kilépése
+
+- A következő sync read/write azonnal `403 FAMILY_SYNC_PAUSED` választ ad, benne `familyId`, `pausedAt` és aktuális szerverrevision, de raw delta nélkül.
+- Cloud child/session adat, tombstone, membership és Family rekord megmarad.
+- Minden eszköz folytathat local-first trackinget, és helyi pending operation logot vezet.
+- Family-admin, membership- és subscription-kezelés elérhető marad; ez nem raw sleep sync.
+- Nincs 7 napos türelmi idő, kivéve ha a billing provider hitelesített `GRACE_PERIOD` hozzáférést adott.
+
+### Reaktiválás
+
+1. A Worker újra érvényes entitlementet lát, de a normál push előtt `RECONCILIATION_REQUIRED` állapotot ad.
+2. Minden eszköz elküldi a pause kezdete óta gyűlt operation manifestet (`operationId`, entity ID, base revision, updated time, tombstone flag), nem vak teljes felülírást.
+3. A szerver idempotensen alkalmazza a nem konfliktusos műveleteket. Ugyanazon entity több ágon történt módosítását explicit conflictként adja vissza; törlés nem éledhet fel stale update-ből.
+4. A kliens konfliktust old vagy elfogadja a kanonikus rekordot, majd teljes verification snapshotot kér.
+5. Csak egyező revision/hash után tér vissza a normál incremental sync.
+
+A részletes conflict policy külön sync-protokoll specifikáció tárgya, de a migráció nem vezethet be silent last-write-wins felülírást.
+
+## 9. Jelenlegi prototípus és célmodell közötti eltérés
+
+A jelenlegi Worker:
+
+- auth nélküli `POST /v1/families` és `POST /v1/join` végpontot használ;
+- a `devices` rekordot közvetlenül Familyhez köti, account nélkül;
+- minden device-tag készíthet invite-ot;
+- nincs account, membership role/history, device/account limit, subscription vagy entitlement;
+- a bearer device token önmagában Family-hozzáférést ad;
+- a syncet nem gate-eli fizetési jogosultság.
+
+Ezek prototípus-szabályok, nem vihetők változtatás nélkül productionbe. A jelenlegi revision, operation idempotency, tombstone és egy-aktív-alvás constraint megtartandó; az identitás és hozzáférési modell köréjük épül.
+
+## 10. Migrációs sorrend
+
+Minden lépés külön migration fájl, staging D1 próba, backup/export és rollback/runbook mellett történjen. Production deploy csak kompatibilis Workerrel együtt.
+
+1. **Leltár és mentés.** D1 export, sor- és FK-számlák, aktív eszközök/familyk/revisionök rögzítése. A jelenlegi API változatlan.
+2. **Additív identity séma.** `accounts`, `account_identities`, `account_devices`, `account_sessions` és index/trigger létrehozása. Még nincs auth-kényszer a régi végpontokon.
+3. **Additív membership séma.** Új `families_v2`, `family_memberships`, `family_invites` célstruktúra létrehozása. A meglévő Family sorok adatvesztés nélkül másolódnak `LEGACY_UNCLAIMED` átmeneti állapotú staging mappinggel; a végleges `families` CHECK csak claim után aktiválható.
+4. **Billing és entitlement séma.** `subscriptions`, `subscription_events`, `account_entitlements` létrehozása. Minden új account alapértelmezése Free; nincs automatikusan adott paid grant.
+5. **Google auth + account/device dual mode.** Az új Worker Google tokent ellenőriz, account sessiont és account device-ot kezel. A régi device bearer ideiglenesen csak legacy claimre és read-only export/snapshotra használható.
+6. **Legacy Family claim.** A régi, érvényes device credential + friss Google login együttes bizonyítása hozzárendeli az accountot. Az első claimelő account admin lesz. További régi device csak saját Google accounttal válhat memberré; egy account 2-device constraintje már él. Claim audit és support recovery szükséges.
+7. **Invite cutover.** Új invite-ok kizárólag `family_invites` táblába, account membershipből készülnek. Régi kódok rövid grace idő után lejárnak; nem másolandók nyers formában.
+8. **Sleep FK cutover.** Stagingben ellenőrzött rebuilddel a child/session/operation FK-k az új Family táblára kerülnek. Revisionök, tombstone-ok és operation ID-k változatlanul megmaradnak. D1-ben constraint módosításhoz table rebuild kell; `foreign_key_check` kötelező.
+9. **Entitlement enforcement audit módban.** A Worker kiszámolja és naplózza a `familyCanSync` eredményt, de rövid megfigyelési szakaszban még nem blokkol. Hamis negatívok, provider eventek és claim nélküli legacy Familyk javítása.
+10. **Enforcement bekapcsolása.** Új sync read/write szerveroldali entitlement gate-et kap. Legacy bearer többé nem ér el raw adatot; csak időkorlátos recovery út marad.
+11. **Régi táblák eltávolítása.** Csak export, count/hash/revision összevetés és legalább egy stabil release után törölhető a régi `devices` és `invite_codes` struktúra. Ez külön, visszafordíthatatlan migration.
+12. **Utóellenőrzés.** `PRAGMA foreign_key_check`, unique/partial index tesztek, utolsó-admin, harmadik-device, dupla invite redemption, webhook replay, payer-leave és entitlement-expiry integrációs tesztek.
+
+Migration naming javaslat:
 
 ```text
-Google login proves account identity
-        ↓
-backend issues/recognizes account session
-        ↓
-registered device receives its device credential
-        ↓
-Family Sync requests still identify the concrete device
+002_accounts_and_sessions.sql
+003_memberships_and_invites.sql
+004_subscriptions_and_entitlements.sql
+005_legacy_claim_bridge.sql
+006_family_data_rebuild.sql
+007_enforcement_cutover.sql
+008_drop_legacy_access.sql
 ```
 
-Why keep both:
-
-- account identity survives phone replacement;
-- device credentials can be revoked independently;
-- the 2-device-per-account rule can be enforced cleanly;
-- Family Sync's existing device-aware idempotency/security model can be retained.
-
-## 5. Free storage behavior
-
-Current preferred direction:
-
-- Free user is logged in.
-- Sleep data remains local-first.
-- No automatic full cloud sleep backup is required for Free.
-- Export/backup remains available.
-- Optional cloud backup may be considered later, but it must not be required by the V1 account architecture.
-
-Consequence:
-
-If a Free user loses the only device without an export/backup, the account alone does not magically reconstruct local sleep history.
-
-This is acceptable only if the UI never falsely promises cloud backup for Free.
-
-## 6. Upgrade to Family — safe bootstrap
-
-When a Free/local user activates Family:
-
-1. Validate account + active entitlement.
-2. Create or attach the Family.
-3. **Create an automatic local safety backup before migration.**
-4. Preserve the local dataset untouched until cloud bootstrap succeeds.
-5. Upload the canonical child profile(s) and sleep sessions.
-6. Server acknowledges canonical Family state.
-7. Client performs a verification sync.
-8. Only then mark Family bootstrap complete.
-
-If any step fails, local history remains available and bootstrap can be retried.
-
-This replaces the current prototype behavior where Family creation clears local sessions.
-
-## 7. Joining an existing Family
-
-The already-locked collision rule remains:
-
-- the Family creator's dataset is the initial canonical dataset;
-- an invited phone does **not** blindly merge an unrelated local sleep database into the Family;
-- the joining device adopts the Family cloud snapshot.
-
-If we later want an explicit import/merge workflow, it must be a separate reviewed feature with duplicate detection. It must never happen silently.
-
-## 8. Entitlement must gate features, not raw data formats
-
-Raw child/session records use the same schema regardless of plan.
-
-Do not create:
-
-```text
-FreeSleepSession
-FamilySleepSession
-FamilyPlusSleepSession
-```
-
-Instead:
-
-```text
-canonical raw data
-        +
-entitlement evaluator
-        ↓
-visible/usable features
-```
-
-This allows a non-paying family member to hold synchronized canonical data while their UI exposes only features available to their account.
-
-Feature checks must be real application gates, not CSS-only hiding.
-
-## 9. Current tier intent
-
-### Free
-
-Must remain genuinely usable:
-
-- sleep start/stop/manual entry
-- History
-- basic statistics
-- child profiles/basic multi-child local behavior if multi-child is considered a core data model capability
-- account/login
-- backup/export basics
-
-### Family
-
-Current intended primary value:
-
-- Family Sync / multi-device shared family data
-- shared child profiles and raw sleep history
-- family membership/device workflow
-- likely selected convenience features
-
-### Family+
-
-Current intended primary value:
-
-- advanced Insights
-- Wake Window personal analytics
-- age-reference comparison where birth date exists
-- next-sleep prediction range/confidence
-- patterns/routines
-- advanced trends
-- similar-day analysis
-- other high-value derived intelligence selected later
-
-Exact feature allocation can still be refined before launch, but the architecture must support these three levels without data migration.
-
-## 10. Important entitlement asymmetry — intentional
-
-Latest product direction allows this scenario:
-
-```text
-Parent A: Family or Family+
-Parent B: Free
-```
-
-Parent B may still receive the synchronized Family raw data after accepting the invitation, while their own UI remains restricted to their personal entitlement level.
-
-Therefore **Family synchronization capability cannot be modeled only as `currentUser.plan >= Family` on every device**.
-
-It needs two concepts:
-
-1. **family sync entitlement** — whether this Family is currently allowed to operate shared sync;
-2. **account feature entitlement** — which premium views/functions the current account may use.
-
-Recommended rule:
-
-```text
-family.syncEnabled = true
-if at least one active family member supplies an entitlement that enables Family Sync
-```
-
-while:
-
-```text
-account canUseAdvancedInsights
-= current account has Family+ entitlement
-```
-
-This cleanly implements the idea that one paying family member can make shared data available, without automatically gifting all Family+ analytics to every invited account.
-
-## 11. Subscription lapse — collision discovered
-
-A previous decision said synchronization should continue after subscription expiry so that data remains available if the user resubscribes.
-
-That conflicts with the newer tier design where **Family Sync is the main paid value of the Family tier**.
-
-If full ongoing sync remained forever after one payment/trial, a user could activate Family once, cancel immediately and retain the core paid feature indefinitely.
-
-The user's actual data-preservation goal does **not** require ongoing sync.
-
-Recommended replacement behavior:
-
-```text
-No active Family/Family+ entitlement in the family
-→ retain cloud canonical data
-→ do not delete history
-→ preserve Family membership
-→ pause new cross-device synchronization
-→ local tracking can continue on devices
-→ on reactivation, reconcile/upload safely and resume sync
-```
-
-If another family member still has an active Family/Family+ entitlement, sync continues for the family.
-
-This keeps historical data safe without destroying the business boundary.
-
-**This is the most important remaining entitlement decision to lock.**
-
-## 12. Offline entitlement
-
-Locked direction:
-
-- server-authoritative entitlement;
-- client caches last validated entitlement for **30 days**;
-- paid functionality therefore does not disappear simply because the user temporarily has no internet.
-
-The cached state must include an expiry and must not be extendable by merely changing the device clock.
-
-For high-value server actions, the backend may still verify current entitlement independently.
-
-## 13. Trial/payment behavior already selected
-
-- 7-day trial.
-- Payment method is provided at trial activation where the store/provider flow supports that model.
-- Trial converts to paid automatically unless cancelled.
-- Monthly + annual subscription options.
-- Annual target discount roughly equivalent to ~2 months free.
-- No lifetime plan.
-- Paywall appears in Settings and when the user intentionally enters a locked feature; no random disruptive startup paywall.
-- Locked feature cards explain the feature rather than showing fabricated demo results or obscured pseudo-personal data.
-
-Store-specific subscription mechanics remain subject to App Store / Play billing requirements at implementation time.
-
-## 14. Account recovery behavior
-
-Selected direction: login on a replacement phone should recover the account-level state without requiring the original phone.
-
-Recoverable from the backend:
-
-- account identity;
-- subscription/entitlements;
-- Family membership;
-- registered device management;
-- cloud Family canonical dataset when Family Sync is active/retained.
-
-Not inherently recoverable for Free local-only history:
-
-- sleep sessions never uploaded to cloud;
-- local-only profile photo assets;
-- other device-only preferences unless explicitly synced.
-
-The product copy must reflect this distinction.
-
-## 15. Profile photos
-
-Current decision:
-
-- real profile photo is supported;
-- target size: 256×256;
-- square crop, displayed circularly in UI;
-- photo is device-local;
-- photo does not Family-sync in V1;
-- use IndexedDB/local app asset storage rather than stuffing image bytes into the main JSON/localStorage dataset.
-
-A child profile therefore syncs identity/name/birth-date metadata, while each device may independently have or not have a local photo asset for that child.
-
-This avoids cloud object-storage cost in V1.
-
-## 16. Child delete semantics
-
-Latest decision supersedes the earlier archive-first proposal:
-
-- permanent delete is supported;
-- deleting a child deletes that profile and its sleep sessions from active devices/cloud;
-- no normal archived-child browsing flow is required;
-- export/backup before destructive deletion should be offered or strongly encouraged;
-- deletion needs explicit destructive confirmation and server tombstones long enough to propagate deletion to all paired devices.
-
-A tombstone used for sync propagation is an implementation detail and is **not** a user-visible archive.
-
-## 17. Cost-control principle
-
-Architecture goal:
-
-> **Near-zero fixed backend cost at small scale; infrastructure cost should grow mainly with actual usage/revenue.**
-
-Cost-conscious consequences:
-
-- Google identity instead of running password reset/email infrastructure in V1;
-- Free sleep history not automatically uploaded merely because the user has an account;
-- derived Insights calculated locally where possible;
-- profile photos remain local in V1;
-- reuse Cloudflare Worker + D1 rather than introducing unnecessary services;
-- avoid storing derived analytics snapshots in the backend.
-
-Zero cost forever cannot be guaranteed at scale, but the architecture should avoid unnecessary per-user storage and third-party SaaS costs.
-
-## 18. Next architecture steps
-
-Before V4 implementation:
-
-1. Lock subscription-lapse Family Sync behavior.
-2. Define Google login/session protocol and account-device registration.
-3. Define `family_memberships` and who may invite/remove members.
-4. Define Family entitlement aggregation (`at least one active subscriber` vs another rule).
-5. Define safe resumption/reconciliation after Family entitlement was inactive.
-6. Merge these decisions back into the main Product Design Lock / Technical Collision Audit.
-7. Only then finalize D1 migration/API contracts.
+A tényleges sorszámokat a deploykor meglévő D1 migration history alapján kell kiosztani; a fájlnevek itt tervet jelentenek.
+
+## 11. Kötelező API-határ és hibakódok
+
+Az új account/family végpontok mind Solemi account sessiont használnak. A device credential az eszközt azonosítja, de a jogosultságot account + membership + entitlement együtt adja.
+
+Minimum stabil hibakódok:
+
+| HTTP | Kód | Jelentés |
+|---:|---|---|
+| 401 | `GOOGLE_TOKEN_INVALID` | Google assertion nem fogadható el |
+| 401 | `SESSION_INVALID` | Solemi session lejárt/visszavont |
+| 403 | `DEVICE_REVOKED` | az eszköz vissza lett vonva |
+| 403 | `FAMILY_SYNC_PAUSED` | nincs aktív Family Sync hozzájáruló |
+| 403 | `ADMIN_REQUIRED` | a művelethez admin kell |
+| 409 | `DEVICE_LIMIT_REACHED` | már 2 aktív eszköz van; user választása kell |
+| 409 | `ACTIVE_FAMILY_EXISTS` | az account már másik aktív Family tagja |
+| 409 | `FAMILY_REQUIRES_ADMIN` | az utolsó admin nem léphet ki/demote-olható |
+| 409 | `INVITE_ALREADY_USED` | a kódot más már beváltotta |
+| 410 | `INVITE_EXPIRED` | a kód lejárt |
+| 409 | `RECONCILIATION_REQUIRED` | pause utáni biztonságos egyeztetés kell |
+
+## 12. Elfogadási tesztek az implementáció előtt
+
+- Ugyanaz a Google `sub` más e-maillel ugyanazt az accountot adja; azonos e-mail más `sub`-bal nem olvad össze.
+- Harmadik device insert és reactivation DB-szinten is hibázik; explicit revoke + register sikerül.
+- Egy account nem lehet két aktív Family tagja, de korábbi membership historyja megmarad.
+- Két adminból az egyik kiléphet; az utolsó admin nem.
+- Member invite-ot készíthet és a kód admin-jóváhagyás nélkül, pontosan egyszer váltható be.
+- Nem-admin más tagot nem távolíthat el; admin igen; mindenki saját magát kiléptetheti.
+- Family végleges törlés admin + friss reauth nélkül tiltott, és nem törli az accountot/subscriptiont.
+- Family subscriber + Free member esetén mindkettő szinkronizálhat, de a Free member PDF/Insights gate-je zárt.
+- Family+ subscriber mellett csak a subscriber account kap `FAMILY_PLUS_INSIGHTS` hozzáférést.
+- Az utolsó entitlement lejárata és a fizető kilépése azonnal pause-olja a syncet, adat- és membership-törlés nélkül.
+- Másik aktív fizető tag mellett az első fizető kilépése nem állítja le a syncet.
+- Trial pontosan a provider által igazolt végéig aktív; cancellation a `access_until` végéig nem vesz el hozzáférést; revoke azonnal igen.
+- Offline snapshot legfeljebb 30 napig és legfeljebb `serverAccessUntil`-ig működik; módosított snapshot elutasítandó.
+- Reactivation nem ír felül csendben pause alatt divergens rekordot, és tombstone-t stale update nem támaszt fel.
+- Migration után row count, family revision, session ID, tombstone és FK-integritás egyezik az előzetes leltárral.
+
+## 13. Nem része ennek a változtatásnak
+
+- Live D1 migration futtatása.
+- Worker endpoint vagy auth implementáció módosítása.
+- Google OAuth client, JWKS cache, StoreKit/Play Billing/Stripe konfigurálása.
+- Provider-specifikus receipt/webhook contract véglegesítése.
+- Pause utáni conflict UI részletes termékterve.
+- Free raw sleep history cloud backupja.
+- Child profile photo cloud syncje.
+
+Ezek csak a fenti séma és szabályok elfogadása után következhetnek.
