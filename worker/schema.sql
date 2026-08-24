@@ -34,24 +34,44 @@ CREATE TABLE IF NOT EXISTS invite_codes (
 CREATE INDEX IF NOT EXISTS idx_invites_family ON invite_codes(family_id);
 CREATE INDEX IF NOT EXISTS idx_invites_expires ON invite_codes(expires_at);
 
-CREATE TABLE IF NOT EXISTS sleep_sessions (
+CREATE TABLE IF NOT EXISTS children (
   id TEXT PRIMARY KEY,
   family_id TEXT NOT NULL,
-  start_time TEXT NOT NULL,
-  end_time TEXT,
-  note TEXT NOT NULL DEFAULT '',
+  name TEXT NOT NULL DEFAULT '',
+  birth_date TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   deleted_at TEXT,
   revision INTEGER NOT NULL,
-  FOREIGN KEY (family_id) REFERENCES families(id)
+  FOREIGN KEY (family_id) REFERENCES families(id),
+  UNIQUE (family_id, id),
+  CHECK (birth_date IS NULL OR birth_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]')
+);
+
+CREATE INDEX IF NOT EXISTS idx_children_family_revision ON children(family_id, revision);
+CREATE INDEX IF NOT EXISTS idx_children_family_active ON children(family_id, deleted_at);
+
+CREATE TABLE IF NOT EXISTS sleep_sessions (
+  id TEXT PRIMARY KEY,
+  family_id TEXT NOT NULL,
+  child_id TEXT NOT NULL,
+  start_time TEXT NOT NULL,
+  end_time TEXT,
+  note TEXT NOT NULL DEFAULT '',
+  day_night_override TEXT CHECK (day_night_override IS NULL OR day_night_override IN ('day', 'night')),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  deleted_at TEXT,
+  revision INTEGER NOT NULL,
+  FOREIGN KEY (family_id) REFERENCES families(id),
+  FOREIGN KEY (family_id, child_id) REFERENCES children(family_id, id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_sessions_family_revision ON sleep_sessions(family_id, revision);
-CREATE INDEX IF NOT EXISTS idx_sessions_family_start ON sleep_sessions(family_id, start_time);
+CREATE INDEX IF NOT EXISTS idx_sessions_family_child_start ON sleep_sessions(family_id, child_id, start_time);
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_one_active_sleep_per_family
-ON sleep_sessions(family_id)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_one_active_sleep_per_child
+ON sleep_sessions(family_id, child_id)
 WHERE end_time IS NULL AND deleted_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS operations (

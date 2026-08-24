@@ -2,8 +2,8 @@ import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { languageOptions, localeTag, t } from './i18n'
 import type { Locale } from './i18n'
-import type { AppData, Page, SleepSession } from './types'
-import { createDefaultData, createSession, exportData, importData, loadData, saveData } from './storage'
+import type { AppData, ChildProfile, Page, SleepSession } from './types'
+import { createChild, createSession, exportData, importData, loadData, saveData } from './storage'
 import { awakeSince, durationOf, formatDateHeader, formatDuration, formatTime, formatTimer, splitDayNight, todaySessions, totalToday } from './utils'
 import SleepTimeline from './SleepTimeline'
 import SwipeHistoryRow from './SwipeHistoryRow'
@@ -55,14 +55,16 @@ export default function App() {
   const [now, setNow] = useState(Date.now())
   const [editor, setEditor] = useState<SleepSession | 'new' | null>(null)
   const locale = data.settings.locale
+  const activeChild = data.children.find((child) => child.id === data.settings.activeChildId) ?? data.children[0]
+  const activeSessions = useMemo(() => data.sessions.filter((session) => session.childId === activeChild.id), [data.sessions, activeChild.id])
 
   useEffect(() => saveData(data), [data])
   useEffect(() => { document.documentElement.lang = locale }, [locale])
   useEffect(() => { const id = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(id) }, [])
 
-  const current = useMemo(() => data.sessions.find((session) => !session.endTime) ?? null, [data.sessions])
+  const current = useMemo(() => activeSessions.find((session) => !session.endTime) ?? null, [activeSessions])
   const updateSessions = (sessions: SleepSession[]) => setData((previous) => ({ ...previous, sessions }))
-  const startNow = () => { if (!current) updateSessions([createSession(new Date().toISOString()), ...data.sessions]) }
+  const startNow = () => { if (!current) updateSessions([createSession(activeChild.id, new Date().toISOString()), ...data.sessions]) }
   const endNow = () => {
     if (!current) return
     const endTime = new Date().toISOString()
@@ -80,29 +82,29 @@ export default function App() {
 
   return <div className="app-shell">
     <main className="app-main">
-      {page === 'today' && <TodayPage data={data} now={now} locale={locale} current={current} onStart={startNow} onEnd={endNow} onOpenEditor={setEditor} onSettings={() => setPage('settings')} />}
-      {page === 'history' && <HistoryPage sessions={data.sessions} locale={locale} onEdit={setEditor} onDelete={deleteSession} onNew={() => setEditor('new')} />}
-      {page === 'stats' && <StatsPage sessions={data.sessions} now={now} locale={locale} />}
+      {page === 'today' && <TodayPage data={data} child={activeChild} sessions={activeSessions} now={now} locale={locale} current={current} onSelectChild={(childId) => setData((previous) => ({ ...previous, settings: { ...previous.settings, activeChildId: childId } }))} onStart={startNow} onEnd={endNow} onOpenEditor={setEditor} onSettings={() => setPage('settings')} />}
+      {page === 'history' && <HistoryPage sessions={activeSessions} locale={locale} onEdit={setEditor} onDelete={deleteSession} onNew={() => setEditor('new')} />}
+      {page === 'stats' && <StatsPage sessions={activeSessions} now={now} locale={locale} />}
       {page === 'settings' && <SettingsPage data={data} setData={setData} onBack={() => setPage('today')} />}
     </main>
     {page !== 'settings' && <BottomNav page={page} locale={locale} onChange={setPage} />}
-    {editor && <SleepEditor session={editor === 'new' ? null : editor} locale={locale} currentExists={Boolean(current)} onClose={() => setEditor(null)} onSave={saveEditor} onDelete={deleteSession} />}
+    {editor && <SleepEditor childId={activeChild.id} session={editor === 'new' ? null : editor} locale={locale} currentExists={Boolean(current)} onClose={() => setEditor(null)} onSave={saveEditor} onDelete={deleteSession} />}
   </div>
 }
 
-function TodayPage({ data, now, locale, current, onStart, onEnd, onOpenEditor, onSettings }: { data: AppData; now: number; locale: Locale; current: SleepSession | null; onStart: () => void; onEnd: () => void; onOpenEditor: (value: SleepSession | 'new') => void; onSettings: () => void }) {
-  const todays = todaySessions(data.sessions).sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
+function TodayPage({ data, child, sessions, now, locale, current, onSelectChild, onStart, onEnd, onOpenEditor, onSettings }: { data: AppData; child: ChildProfile; sessions: SleepSession[]; now: number; locale: Locale; current: SleepSession | null; onSelectChild: (childId: string) => void; onStart: () => void; onEnd: () => void; onOpenEditor: (value: SleepSession | 'new') => void; onSettings: () => void }) {
+  const todays = todaySessions(sessions).sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
   const yesterdayStart = new Date(now); yesterdayStart.setHours(0, 0, 0, 0); yesterdayStart.setDate(yesterdayStart.getDate() - 1)
   const yesterdayEnd = new Date(yesterdayStart); yesterdayEnd.setDate(yesterdayEnd.getDate() + 1)
-  const yesterdays = data.sessions
+  const yesterdays = sessions
     .filter((session) => { const start = new Date(session.startTime).getTime(); return start >= yesterdayStart.getTime() && start < yesterdayEnd.getTime() })
     .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
-  const total = totalToday(data.sessions, new Date(now))
-  const lastCompleted = data.sessions.filter((session) => session.endTime).sort((a, b) => new Date(b.endTime!).getTime() - new Date(a.endTime!).getTime())[0] ?? null
-  const elapsed = current ? durationOf(current, now) : awakeSince(data.sessions, now)
+  const total = totalToday(sessions, new Date(now))
+  const lastCompleted = sessions.filter((session) => session.endTime).sort((a, b) => new Date(b.endTime!).getTime() - new Date(a.endTime!).getTime())[0] ?? null
+  const elapsed = current ? durationOf(current, now) : awakeSince(sessions, now)
 
   return <section className="screen today-screen">
-    <header className="compact-header"><div className="header-copy"><div className="date-label">{formatDateHeader(new Date(now), locale)}</div><div className="daily-summary">{t(locale, 'todaySoFar')} <strong>{formatDuration(total, locale)}</strong> {t(locale, 'sleepNoun')}</div></div><button className="icon-button" aria-label={t(locale, 'settings')} onClick={onSettings}><Icon name="settings" size={18} /></button></header>
+    <header className="compact-header"><div className="header-copy"><div className="child-header-line"><span className="child-avatar">{(child.name.trim()[0] || '•').toUpperCase()}</span>{data.children.length > 1 ? <select aria-label={t(locale, 'chooseChild')} className="child-switcher" value={child.id} onChange={(event) => onSelectChild(event.target.value)}>{data.children.map((item) => <option key={item.id} value={item.id}>{item.name || t(locale, 'unnamedChild')}</option>)}</select> : <strong className="single-child-name">{child.name || t(locale, 'unnamedChild')}</strong>}</div><div className="date-label">{formatDateHeader(new Date(now), locale)}</div><div className="daily-summary">{t(locale, 'todaySoFar')} <strong>{formatDuration(total, locale)}</strong> {t(locale, 'sleepNoun')}</div></div><button className="icon-button" aria-label={t(locale, 'settings')} onClick={onSettings}><Icon name="settings" size={18} /></button></header>
     <div className={`status-orb ${current ? 'sleeping' : 'awake'}`}><div className="orb-content"><div className="orb-status">{current ? t(locale, 'sleeping') : t(locale, 'awake')}</div><div className="orb-time">{formatTimer(elapsed)}</div><div className="orb-sub">{current ? `${t(locale, 'fellAsleep')} ${formatTime(current.startTime, locale)}` : lastCompleted ? `${t(locale, 'wokeUp')} ${formatTime(lastCompleted.endTime!, locale)}` : t(locale, 'noPreviousWake')}</div></div></div>
     <button className="primary-action" onClick={current ? onEnd : onStart}><Icon name={current ? 'sun' : 'moon'} size={20} /><span>{current ? t(locale, 'wokeUp') : t(locale, 'fellAsleep')}</span></button>
     <button className="text-action" onClick={() => onOpenEditor(current ?? 'new')}>{t(locale, 'manualEntry')}</button>
@@ -189,7 +191,7 @@ function StatCard({ label, value, suffix, icon }: { label: string; value: string
 
 function SettingsPage({ data, setData, onBack }: { data: AppData; setData: (data: AppData) => void; onBack: () => void }) {
   const locale = data.settings.locale
-  const changeName = (event: ChangeEvent<HTMLInputElement>) => setData({ ...data, settings: { ...data.settings, childName: event.target.value } })
+  const [editingChild, setEditingChild] = useState<ChildProfile | 'new' | null>(null)
   const changeLocale = (event: ChangeEvent<HTMLSelectElement>) => setData({ ...data, settings: { ...data.settings, locale: event.target.value as Locale } })
   const handleImport = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -206,15 +208,36 @@ function SettingsPage({ data, setData, onBack }: { data: AppData; setData: (data
   }
   const clear = () => {
     if (!window.confirm(t(locale, 'clearConfirm'))) return
-    const clean = createDefaultData(locale)
-    setData({ ...clean, settings: { childName: data.settings.childName, locale } })
+    setData({ ...data, sessions: [] })
   }
-  return <section className="screen settings-screen"><header className="page-header"><button className="back-button" onClick={onBack}>‹</button><h1>{t(locale, 'settings')}</h1><span className="header-spacer" /></header>
+  return <><section className="screen settings-screen"><header className="page-header"><button className="back-button" onClick={onBack}>‹</button><h1>{t(locale, 'settings')}</h1><span className="header-spacer" /></header>
     <div className="settings-card settings-fields">
-      <label>{t(locale, 'babyName')}<input value={data.settings.childName} onChange={changeName} placeholder={t(locale, 'babyNamePlaceholder')} /></label>
       <label>{t(locale, 'language')}<select className="language-select" value={locale} onChange={changeLocale}>{languageOptions.map((language) => <option key={language.value} value={language.value}>{language.flag} {language.label}</option>)}</select></label>
     </div>
+    <div className="settings-section-head"><div><h2>{t(locale, 'children')}</h2><p>{t(locale, 'childrenHint')}</p></div><button className="mini-add-button" onClick={() => setEditingChild('new')}><Icon name="plus" size={17} />{t(locale, 'addChild')}</button></div>
+    <div className="settings-card child-list">{data.children.map((child) => {
+      const count = data.sessions.filter((session) => session.childId === child.id).length
+      const active = child.id === data.settings.activeChildId
+      return <button key={child.id} className={`child-list-row ${active ? 'active' : ''}`} onClick={() => setData({ ...data, settings: { ...data.settings, activeChildId: child.id } })}><span className="child-list-avatar">{(child.name.trim()[0] || '•').toUpperCase()}</span><span><strong>{child.name || t(locale, 'unnamedChild')}</strong><small>{child.birthDate || t(locale, 'birthDateMissing')} · {t(locale, 'sleepEntries', { count })}</small></span>{active && <b>{t(locale, 'active')}</b>}<span className="child-edit-button" role="button" tabIndex={0} aria-label={t(locale, 'editChild')} onClick={(event) => { event.stopPropagation(); setEditingChild(child) }}><Icon name="edit" size={15} /></span></button>
+    })}</div>
     <div className="settings-card action-stack"><button onClick={() => exportData(data)}>{t(locale, 'exportData')}</button><label className="file-button">{t(locale, 'importData')}<input type="file" accept="application/json" onChange={handleImport} /></label><button className="danger" onClick={clear}>{t(locale, 'clearAll')}</button></div><p className="muted">{t(locale, 'localOnly')}</p></section>
+    {editingChild && <ChildEditor child={editingChild === 'new' ? null : editingChild as ChildProfile} locale={locale} onClose={() => setEditingChild(null)} onSave={(next) => {
+      if (editingChild === 'new') setData({ ...data, children: [...data.children, next], settings: { ...data.settings, activeChildId: next.id } })
+      else setData({ ...data, children: data.children.map((child) => child.id === next.id ? next : child) })
+      setEditingChild(null)
+    }} />}</>
+}
+
+function ChildEditor({ child, locale, onClose, onSave }: { child: ChildProfile | null; locale: Locale; onClose: () => void; onSave: (child: ChildProfile) => void }) {
+  const [name, setName] = useState(child?.name ?? '')
+  const [birthDate, setBirthDate] = useState(child?.birthDate ?? '')
+  const submit = () => {
+    if (!name.trim()) return window.alert(t(locale, 'childNameRequired'))
+    if (birthDate && new Date(`${birthDate}T00:00:00`).getTime() > Date.now()) return window.alert(t(locale, 'birthDateFuture'))
+    const now = new Date().toISOString()
+    onSave(child ? { ...child, name: name.trim(), birthDate: birthDate || null, updatedAt: now } : createChild(name, birthDate || null))
+  }
+  return <div className="editor-overlay"><div className="editor-screen child-editor-screen"><header className="editor-header"><button onClick={onClose}><Icon name="close" size={18} /></button><h1>{child ? t(locale, 'editChild') : t(locale, 'addChild')}</h1><span /></header><div className="editor-body child-editor-body"><div className="profile-preview"><span>{(name.trim()[0] || '•').toUpperCase()}</span><strong>{name || t(locale, 'unnamedChild')}</strong></div><label>{t(locale, 'childName')}<input value={name} maxLength={60} onChange={(event) => setName(event.target.value)} placeholder={t(locale, 'childNamePlaceholder')} /></label><label>{t(locale, 'birthDate')} <small>{t(locale, 'optional')}</small><input type="date" value={birthDate} max={new Date().toISOString().slice(0, 10)} onChange={(event) => setBirthDate(event.target.value)} /></label>{birthDate && <p className="profile-info-note">{t(locale, 'birthDateAnalyticsHint')}</p>}</div><div className="editor-actions centered-actions single-action"><button className="save-button" onClick={submit}>{t(locale, 'save')}</button></div></div></div>
 }
 
 type WheelItem = { value: string; label: string }
@@ -242,7 +265,7 @@ function DateTimeWheel({ label, icon, value, locale, disabled, onChange }: { lab
   return <div className={`wheel-block ${disabled ? 'disabled' : ''}`}><div className="wheel-label"><Icon name={icon} size={16} /><span>{label}</span></div><div className="wheel-columns custom-wheel"><WheelColumn items={dates} value={parts.date} disabled={disabled} onChange={(next) => update(next)} /><WheelColumn items={hours} value={String(parts.hour)} disabled={disabled} onChange={(next) => update(parts.date, Number(next), parts.minute)} /><WheelColumn items={minutes} value={String(parts.minute)} disabled={disabled} onChange={(next) => update(parts.date, parts.hour, Number(next))} /><div className="wheel-focus" /></div></div>
 }
 
-function SleepEditor({ session, locale, currentExists, onClose, onSave, onDelete }: { session: SleepSession | null; locale: Locale; currentExists: boolean; onClose: () => void; onSave: (session: SleepSession) => void; onDelete: (id: string) => void }) {
+function SleepEditor({ childId, session, locale, currentExists, onClose, onSave, onDelete }: { childId: string; session: SleepSession | null; locale: Locale; currentExists: boolean; onClose: () => void; onSave: (session: SleepSession) => void; onDelete: (id: string) => void }) {
   const [start, setStart] = useState(session?.startTime ?? new Date().toISOString())
   const [end, setEnd] = useState(session?.endTime ?? new Date().toISOString())
   const [stillSleeping, setStillSleeping] = useState(session ? !session.endTime : false)
@@ -253,7 +276,7 @@ function SleepEditor({ session, locale, currentExists, onClose, onSave, onDelete
     if (endIso && new Date(endIso) <= new Date(start)) return window.alert(t(locale, 'wakeAfterSleep'))
     if (stillSleeping && currentExists && !session) return window.alert(t(locale, 'activeExists'))
     const nowIso = new Date().toISOString()
-    onSave(session ? { ...session, startTime: start, endTime: endIso, note, updatedAt: nowIso } : { ...createSession(start, endIso), note })
+    onSave(session ? { ...session, startTime: start, endTime: endIso, note, updatedAt: nowIso } : { ...createSession(childId, start, endIso), note })
   }
   return <div className="editor-overlay"><div className="editor-screen"><header className="editor-header"><button onClick={onClose}><Icon name="close" size={18} /></button><h1>{session ? t(locale, 'details') : t(locale, 'recordSleep')}</h1><span /></header><div className="editor-body"><DateTimeWheel label={t(locale, 'fellAsleep')} icon="moon" value={start} locale={locale} onChange={setStart} /><DateTimeWheel label={t(locale, 'wokeUp')} icon="sun" value={end} locale={locale} disabled={stillSleeping} onChange={setEnd} /><label className="toggle-row"><span className="toggle-label"><Icon name="moon" size={16} /> {t(locale, 'stillSleeping')}</span><input type="checkbox" checked={stillSleeping} onChange={(event) => setStillSleeping(event.target.checked)} /></label>{session && <label className="note-field">{t(locale, 'note')}<textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder={t(locale, 'optionalNote')} /></label>}</div><div className="editor-actions centered-actions">{session && <button className="delete-button" onClick={() => onDelete(session.id)}>{t(locale, 'delete')}</button>}<button className="save-button" onClick={submit}>{t(locale, 'save')}</button></div></div></div>
 }
