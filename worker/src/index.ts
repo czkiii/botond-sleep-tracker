@@ -188,6 +188,8 @@ async function authenticate(request: Request, env: Env): Promise<DeviceAuth> {
   if (!row) throw new ApiError(401, 'INVALID_DEVICE_TOKEN', 'Invalid device token.')
   if (row.revoked_at) throw new ApiError(403, 'DEVICE_REVOKED', 'This device has been revoked.')
 
+  await env.DB.prepare('UPDATE devices SET last_seen_at = ? WHERE id = ?').bind(nowIso(), row.device_id).run()
+
   return {
     deviceId: row.device_id,
     familyId: row.family_id,
