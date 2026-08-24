@@ -1,7 +1,7 @@
 import type { AppData, SleepSession } from './types'
 import { STORAGE_KEY, loadData } from './storage'
 
-const API_BASE = 'https://solemi-sleep-sync.czki-adam.workers.dev'
+const API_BASE = (import.meta.env.VITE_SYNC_API_BASE || 'https://solemi-sleep-sync.czki-adam.workers.dev').replace(/\/$/, '')
 const SYNC_KEY = 'solemiSleep:sync:v1'
 
 export type SyncConnection = {

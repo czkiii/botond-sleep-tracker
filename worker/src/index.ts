@@ -7,6 +7,7 @@ interface Env {
 type DeviceAuth = {
   deviceId: string
   familyId: string
+  familyName: string
   deviceName: string | null
   familyRevision: number
 }
@@ -171,13 +172,14 @@ async function authenticate(request: Request, env: Env): Promise<DeviceAuth> {
   const tokenHash = await hashSecret(token, env.TOKEN_PEPPER)
 
   const row = await env.DB.prepare(
-    `SELECT d.id AS device_id, d.family_id, d.name, d.revoked_at, f.revision
+    `SELECT d.id AS device_id, d.family_id, d.name, d.revoked_at, f.name AS family_name, f.revision
      FROM devices d
      JOIN families f ON f.id = d.family_id
      WHERE d.token_hash = ?`
   ).bind(tokenHash).first<{
     device_id: string
     family_id: string
+    family_name: string
     name: string | null
     revoked_at: string | null
     revision: number
@@ -186,9 +188,12 @@ async function authenticate(request: Request, env: Env): Promise<DeviceAuth> {
   if (!row) throw new ApiError(401, 'INVALID_DEVICE_TOKEN', 'Invalid device token.')
   if (row.revoked_at) throw new ApiError(403, 'DEVICE_REVOKED', 'This device has been revoked.')
 
+  await env.DB.prepare('UPDATE devices SET last_seen_at = ? WHERE id = ?').bind(nowIso(), row.device_id).run()
+
   return {
     deviceId: row.device_id,
     familyId: row.family_id,
+    familyName: row.family_name,
     deviceName: row.name,
     familyRevision: row.revision
   }
@@ -218,6 +223,7 @@ async function currentRevision(env: Env, familyId: string) {
 
 async function createFamily(request: Request, env: Env) {
   const body = await readJson(request)
+  const familyName = requireString(body.familyName, 'familyName', 60)
   const deviceName = typeof body.deviceName === 'string' ? body.deviceName.trim().slice(0, 80) : null
   const familyId = newId('fam')
   const deviceId = newId('dev')
@@ -226,7 +232,7 @@ async function createFamily(request: Request, env: Env) {
   const createdAt = nowIso()
 
   await env.DB.batch([
-    env.DB.prepare('INSERT INTO families (id, revision, created_at) VALUES (?, 0, ?)').bind(familyId, createdAt),
+    env.DB.prepare('INSERT INTO families (id, name, revision, created_at) VALUES (?, ?, 0, ?)').bind(familyId, familyName, createdAt),
     env.DB.prepare(
       `INSERT INTO devices (id, family_id, token_hash, name, created_at, last_seen_at, revoked_at)
        VALUES (?, ?, ?, ?, ?, ?, NULL)`
@@ -235,6 +241,7 @@ async function createFamily(request: Request, env: Env) {
 
   return ok(request, env, {
     familyId,
+    familyName,
     device: { id: deviceId, name: deviceName },
     deviceToken: token,
     revision: 0
@@ -268,8 +275,11 @@ async function joinFamily(request: Request, env: Env) {
   const deviceName = typeof body.deviceName === 'string' ? body.deviceName.trim().slice(0, 80) : null
   const codeHash = await hashSecret(code, env.TOKEN_PEPPER)
   const invite = await env.DB.prepare(
-    `SELECT family_id, expires_at, used_at FROM invite_codes WHERE code_hash = ?`
-  ).bind(codeHash).first<{ family_id: string; expires_at: string; used_at: string | null }>()
+    `SELECT i.family_id, i.expires_at, i.used_at, f.name AS family_name
+     FROM invite_codes i
+     JOIN families f ON f.id = i.family_id
+     WHERE i.code_hash = ?`
+  ).bind(codeHash).first<{ family_id: string; family_name: string; expires_at: string; used_at: string | null }>()
 
   if (!invite) throw new ApiError(404, 'INVITE_NOT_FOUND', 'Invite code not found.')
   if (invite.used_at) throw new ApiError(409, 'INVITE_ALREADY_USED', 'Invite code has already been used.')
@@ -300,6 +310,7 @@ async function joinFamily(request: Request, env: Env) {
   const revision = await currentRevision(env, invite.family_id)
   return ok(request, env, {
     familyId: invite.family_id,
+    familyName: invite.family_name,
     device: { id: deviceId, name: deviceName },
     deviceToken: token,
     revision
@@ -313,7 +324,7 @@ async function sync(request: Request, env: Env, auth: DeviceAuth) {
   if (!Number.isInteger(after) || after < 0) throw new ApiError(400, 'INVALID_REQUEST', 'Invalid revision.')
 
   const [family, sessions] = await Promise.all([
-    env.DB.prepare('SELECT revision FROM families WHERE id = ?').bind(auth.familyId).first<{ revision: number }>(),
+    env.DB.prepare('SELECT name, revision FROM families WHERE id = ?').bind(auth.familyId).first<{ name: string; revision: number }>(),
     env.DB.prepare(
       `SELECT id, family_id, start_time, end_time, note, created_at, updated_at, deleted_at, revision
        FROM sleep_sessions
@@ -323,6 +334,7 @@ async function sync(request: Request, env: Env, auth: DeviceAuth) {
   ])
 
   return ok(request, env, {
+    familyName: family?.name ?? auth.familyName,
     revision: family?.revision ?? auth.familyRevision,
     sessions: sessions.results.map(sessionDto)
   })
@@ -334,6 +346,7 @@ async function getDevice(request: Request, env: Env, auth: DeviceAuth) {
     id: auth.deviceId,
     name: auth.deviceName,
     familyId: auth.familyId,
+    familyName: auth.familyName,
     revision
   })
 }
