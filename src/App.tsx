@@ -5,6 +5,7 @@ import type { Locale } from './i18n'
 import type { AppData, ChildProfile, DayNightOverride, Page, SleepSession } from './types'
 import { createChild, createSession, exportData, importData, loadData, saveData } from './storage'
 import { loadChildPhoto, saveChildPhoto } from './photoStore'
+import { buildInsightsFoundation } from './insights'
 import { DEFAULT_DAY_START_MINUTES, DEFAULT_NIGHT_START_MINUTES, LONG_SLEEP_GUARDRAIL_MS, awakeSince, durationOf, formatDateHeader, formatDuration, formatTime, formatTimer, getDataQualityWarnings, splitDayNight, todaySessions, totalToday } from './utils'
 import SleepTimeline from './SleepTimeline'
 import SwipeHistoryRow from './SwipeHistoryRow'
@@ -188,12 +189,20 @@ function StatsPage({ sessions, now, locale }: { sessions: SleepSession[]; now: n
   const display = selectedStats ?? { total: sums.total / divisor, day: sums.day / divisor, night: sums.night / divisor, label: t(locale, 'average') }
   const timelineDate = range === 'day' || !selectedDate ? undefined : selectedDate
   const chartUnit = locale === 'hu' ? 'ó' : locale === 'de' ? 'Std.' : 'hr'
+  const insights = useMemo(() => buildInsightsFoundation(sessions, now), [sessions, now])
+  const wakeWindow = insights.wakeWindow
 
   return <section className="screen stats-screen"><header className="page-header centered-header"><h1>{t(locale, 'statistics')}</h1></header>
     <div className="segmented"><button className={range === 'day' ? 'active' : ''} onClick={() => changeRange('day')}>{t(locale, 'day')}</button><button className={range === 'week' ? 'active' : ''} onClick={() => changeRange('week')}>{t(locale, 'week')}</button><button className={range === 'month' ? 'active' : ''} onClick={() => changeRange('month')}>{t(locale, 'month')}</button></div>
     <div className="chart-card compact-chart-card"><h2>{t(locale, 'sleepDuration')}</h2><div className="bar-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={chart} margin={{ top: 8, right: 2, bottom: 0, left: -26 }}><XAxis dataKey="label" tickLine={false} axisLine={false} /><YAxis domain={[0, 14]} tickLine={false} axisLine={false} /><Tooltip contentStyle={{ background: '#0d1a2b', border: '1px solid #1c3352', borderRadius: 10 }} formatter={(value) => [`${value} ${chartUnit}`, t(locale, 'sleep')]} /><Bar dataKey="hours" fill="#579dff" radius={[4, 4, 1, 1]} maxBarSize={17} onClick={(entry: any) => setSelectedDate(entry?.payload?.dateKey ?? null)} /></BarChart></ResponsiveContainer></div></div>
     <h2 className="overview-title">{t(locale, 'overview24h')}</h2>
     <div className="overview-compact"><SleepTimeline sessions={sessions} now={now} day={timelineDate} locale={locale} /><div className="stats-row"><StatCard label={display.label} value={formatDuration(display.total, locale)} suffix={selectedStats ? undefined : t(locale, 'perDay')} /><StatCard label={t(locale, 'daytime')} value={formatDuration(display.day, locale)} icon="sun" /><StatCard label={t(locale, 'nighttime')} value={formatDuration(display.night, locale)} icon="moon" /></div></div>
+    <div className="insights-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'wakeWindow')}</h2></div>{wakeWindow.confidence && <b>{t(locale, wakeWindow.confidence === 'medium' ? 'mediumConfidence' : 'lowConfidence')}</b>}</div>
+      {wakeWindow.currentMs !== null ? <><strong className="insights-primary-value">{formatDuration(wakeWindow.currentMs, locale)}</strong><p>{t(locale, 'awakeForNow')}</p></> : <p>{t(locale, 'wakeWindowUnavailable')}</p>}
+      {wakeWindow.typicalMs !== null && <div className="insights-comparison"><span>{t(locale, 'typicalWakeWindow')}</span><strong>{formatDuration(wakeWindow.typicalMs, locale)}</strong></div>}
+      <small>{wakeWindow.status === 'ready' ? t(locale, 'wakeWindowBasis', { count: wakeWindow.sampleCount }) : t(locale, 'wakeWindowCollecting', { count: wakeWindow.sampleCount })}</small>
+      {insights.quality.excludedSessionCount > 0 && <small className="insights-quality-note">{t(locale, 'insightsExcluded', { count: insights.quality.excludedSessionCount })}</small>}
+    </div>
   </section>
 }
 
