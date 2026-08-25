@@ -31,31 +31,29 @@ Az ellenőrzött release candidate kontrollált backend-migrációval, smoke tes
 ## B. Automatikus GitHub-ellenőrzés
 
 - [ ] Reprodukálható dependency lock létrehozása/ellenőrzése a frontendhez és a Workerhez.
-- [ ] PR-re és branch pushra futó GitHub Actions workflow létrehozása.
-- [ ] Frontend TypeScript typecheck futtatása.
-- [ ] Worker TypeScript typecheck futtatása.
-- [ ] Production frontend build futtatása.
-- [ ] Az Insights számítási motorhoz automatizált tesztek hozzáadása:
-  - [ ] nincs adat;
-  - [ ] kevés adat;
-  - [ ] 3+ használható wake window;
-  - [ ] medián páros és páratlan mintaszámmal;
-  - [ ] aktív alvás;
-  - [ ] átfedő session;
-  - [ ] extrém hosszú session;
-  - [ ] hibás bejegyzés nem hidalható át két tiszta session között.
+- [x] PR-re és branch pushra futó GitHub Actions workflow létrehozása.
+- [x] Frontend TypeScript typecheck hozzáadása a CI-hez.
+- [x] Worker TypeScript typecheck hozzáadása a CI-hez.
+- [x] Production frontend build hozzáadása a CI-hez.
+- [x] Az Insights számítási motorhoz automatizált tesztek hozzáadása:
+  - [x] nincs adat;
+  - [x] kevés adat;
+  - [x] 3+ használható wake window;
+  - [x] medián páros és páratlan mintaszámmal;
+  - [x] aktív alvás;
+  - [x] átfedő session;
+  - [x] extrém hosszú session;
+  - [x] hibás bejegyzés nem hidalható át két tiszta session között.
 - [ ] Kötelező zöld checkek beállítása merge előtt.
 
 **Kapu:** ugyanaz a commit minden GitHub-futásban zöld typechecket, tesztet és buildet ad.
 
-## C. Külön belső, GitHubon futó verzió
+## C. A fő app belső, GitHubról épülő verziója
 
-A jelenlegi Pages workflow kizárólag a `main` ágat publikálja. A feature ág ugyanarra a Pages site-ra történő deployja felülírná a mostani verziót, ezért előbb külön preview-célt kell választani.
+A fejlesztés ugyanabban a repóban és ugyanazon a fő alkalmazáson folytatódik. A belső preview nem külön termék és nem külön forráskód: a feature ág pontos commitjának ideiglenesen hosztolt buildje. A jelenlegi GitHub Pages workflow csak a `main` ágat publikálja, ezért a feature ág ugyanoda deployolása felülírná a mostani verziót.
 
-- [ ] Belső hosting megoldás kiválasztása:
-  - [ ] **Javasolt:** külön GitHub repository + külön GitHub Pages URL ugyanabból a release-candidate commitból;
-  - [ ] alternatíva: a meglévő Pages site elkülönített `/internal/` útvonala, csak megfelelő artifact-összefésüléssel;
-  - [ ] alternatíva: GitHub Actions build artifact, ha ideiglenesen elegendő a letölthető build és nem kell állandó URL.
+- [x] Belső hosting irány: ugyanazon GitHub-repó feature ágának preview buildje, forrásduplikáció nélkül.
+- [ ] Preview szolgáltató és hozzáférési mód véglegesítése a tényleges bekötés előtt.
 - [ ] A belső frontend környezet ne az éles Worker URL-jét használja.
 - [ ] Staging Worker + staging D1 környezet létrehozása vagy a Family Sync ideiglenes kikapcsolása a frontend-only körben.
 - [ ] A preview deploy workflow-t csak manuális indítással vagy kijelölt branchről engedélyezni.
@@ -154,7 +152,7 @@ Nem minden tervezett Insights-funkció szükséges az első belső RC-hez. Kül�
 ## Következő konkrét munkamenet
 
 1. GitHub CI és automatizált Insights-tesztek.
-2. Külön belső GitHub Pages megoldás kiválasztása és létrehozása.
+2. Ugyanebből a repóból épülő belső preview bekötése.
 3. Staging Worker/D1 vagy frontend-only tesztmód bekötése.
 4. Belső preview deploy.
 5. A D szakasz tesztmátrixának végigjárása.
