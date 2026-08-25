@@ -25,6 +25,7 @@ export type SleepSession = {
 export type Settings = {
   locale: Locale
   activeChildId: string
+  longSleepReminderEnabled: boolean
 }
 
 export type AppData = {

@@ -29,7 +29,7 @@ export const createDefaultData = (locale: Locale = detectLocale()): AppData => {
   const child = createChild()
   return {
     version: 4,
-    settings: { locale, activeChildId: child.id },
+    settings: { locale, activeChildId: child.id, longSleepReminderEnabled: false },
     children: [child],
     sessions: []
   }
@@ -78,6 +78,7 @@ export function normalizeAppData(value: unknown): AppData | null {
   if (data.version !== 4 || !Array.isArray(data.children) || !data.children.length || !Array.isArray(data.sessions)) return null
   if (!data.children.every(isValidChild) || !data.sessions.every(isValidSessionV4)) return null
   const childIds = new Set(data.children.map((child) => child.id))
+  if (childIds.size !== data.children.length) return null
   if (data.sessions.some((session) => !childIds.has(session.childId))) return null
   const requestedActive = data.settings?.activeChildId
   const activeChildId = typeof requestedActive === 'string' && childIds.has(requestedActive) ? requestedActive : data.children[0].id
@@ -85,7 +86,8 @@ export function normalizeAppData(value: unknown): AppData | null {
     version: 4,
     settings: {
       locale: isLocale(data.settings?.locale) ? data.settings.locale : detectLocale(),
-      activeChildId
+      activeChildId,
+      longSleepReminderEnabled: data.settings?.longSleepReminderEnabled === true
     },
     children: data.children,
     sessions: data.sessions
@@ -100,7 +102,7 @@ export function migrateV3(value: unknown): AppData | null {
   const child = createChild(typeof data.settings?.childName === 'string' ? data.settings.childName : '', null, migratedChildId())
   return {
     version: 4,
-    settings: { locale, activeChildId: child.id },
+    settings: { locale, activeChildId: child.id, longSleepReminderEnabled: false },
     children: [child],
     sessions: data.sessions.map((session) => ({ ...session, childId: child.id, dayNightOverride: null }))
   }

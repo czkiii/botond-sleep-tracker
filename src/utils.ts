@@ -2,6 +2,16 @@ import type { Locale } from './i18n'
 import { localeTag } from './i18n'
 import type { SleepSession } from './types'
 
+export const DEFAULT_DAY_START_MINUTES = 6 * 60
+export const DEFAULT_NIGHT_START_MINUTES = 19 * 60
+export const LONG_SLEEP_GUARDRAIL_MS = 12 * 60 * 60 * 1000
+export const EXTREME_SLEEP_DURATION_MS = 18 * 60 * 60 * 1000
+
+export type DataQualityWarning = {
+  kind: 'extreme-duration' | 'overlap'
+  sessionIds: string[]
+}
+
 export const msToParts = (ms: number) => {
   const totalMinutes = Math.max(0, Math.floor(ms / 60000))
   const hours = Math.floor(totalMinutes / 60)
@@ -74,13 +84,34 @@ export function awakeSince(sessions: SleepSession[], now = Date.now()) {
 export function splitDayNight(session: SleepSession, now = Date.now()) {
   const start = new Date(session.startTime).getTime()
   const end = session.endTime ? new Date(session.endTime).getTime() : now
+  const duration = Math.max(0, end - start)
+  if (session.dayNightOverride === 'day') return { day: duration, night: 0 }
+  if (session.dayNightOverride === 'night') return { day: 0, night: duration }
   let day = 0, night = 0
   for (let t = start; t < end; t += 60000) {
     const d = new Date(t)
     const mins = d.getHours() * 60 + d.getMinutes()
     const bucket = Math.min(60000, end - t)
-    if (mins >= 360 && mins < 1140) day += bucket
+    if (mins >= DEFAULT_DAY_START_MINUTES && mins < DEFAULT_NIGHT_START_MINUTES) day += bucket
     else night += bucket
   }
   return { day, night }
+}
+
+export function getDataQualityWarnings(sessions: SleepSession[], now = Date.now()): DataQualityWarning[] {
+  const warnings: DataQualityWarning[] = []
+  const completed = sessions.filter((session) => session.endTime)
+  for (const session of completed) {
+    if (durationOf(session, now) >= EXTREME_SLEEP_DURATION_MS) warnings.push({ kind: 'extreme-duration', sessionIds: [session.id] })
+  }
+
+  const sorted = sessions.slice().sort((a, b) => Date.parse(a.startTime) - Date.parse(b.startTime))
+  for (let index = 0; index < sorted.length; index += 1) {
+    const currentEnd = sorted[index].endTime ? Date.parse(sorted[index].endTime!) : now
+    for (let nextIndex = index + 1; nextIndex < sorted.length; nextIndex += 1) {
+      if (Date.parse(sorted[nextIndex].startTime) >= currentEnd) break
+      warnings.push({ kind: 'overlap', sessionIds: [sorted[index].id, sorted[nextIndex].id] })
+    }
+  }
+  return warnings
 }
