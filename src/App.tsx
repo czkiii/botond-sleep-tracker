@@ -5,6 +5,7 @@ import type { Locale } from './i18n'
 import type { AppData, ChildProfile, DayNightOverride, Page, SleepSession } from './types'
 import type { DataQualityIssueKind } from './utils'
 import { createChild, createSession, exportData, importData, loadData, saveData } from './storage'
+import type { ImportDiagnostic } from './storage'
 import { loadChildPhoto, saveChildPhoto } from './photoStore'
 import { buildInsightsFoundation } from './insights'
 import { DEFAULT_DAY_START_MINUTES, DEFAULT_NIGHT_START_MINUTES, LONG_SLEEP_GUARDRAIL_MS, awakeSince, durationOf, formatDateHeader, formatDuration, formatTime, formatTimer, getDataQualityWarnings, splitDayNight, todaySessions, totalToday } from './utils'
@@ -237,8 +238,11 @@ function SettingsPage({ data, setData, onBack }: { data: AppData; setData: (data
     const file = event.target.files?.[0]
     if (!file) return
     try {
-      const next = await importData(file, locale)
-      if (!window.confirm(t(locale, 'importFound', { count: next.sessions.length }))) return
+      const inspection = await importData(file, locale)
+      const next = inspection.data
+      const diagnosticText = inspection.diagnostics.map((diagnostic) => `• ${importDiagnosticText(locale, diagnostic)}`).join('\n')
+      const summary = t(locale, 'importFound', { count: next.sessions.length, children: next.children.length })
+      if (!window.confirm(diagnosticText ? `${summary}\n\n${diagnosticText}\n\n${t(locale, 'importReplaceQuestion')}` : `${summary}\n\n${t(locale, 'importReplaceQuestion')}`)) return
       exportData(data)
       setData({ ...next, settings: { ...next.settings, locale } })
     } catch (error) {
@@ -267,6 +271,17 @@ function SettingsPage({ data, setData, onBack }: { data: AppData; setData: (data
       else setData({ ...data, children: data.children.map((child) => child.id === next.id ? next : child) })
       setEditingChild(null)
     }} />}</>
+}
+
+function importDiagnosticText(locale: Locale, diagnostic: ImportDiagnostic) {
+  const keys = {
+    'migrated-v3': 'importMigratedV3',
+    'active-child-reset': 'importActiveChildReset',
+    'identical-children-removed': 'importDuplicateChildrenRemoved',
+    'identical-sessions-removed': 'importDuplicateSessionsRemoved',
+    'local-photos-not-included': 'importPhotosLocal'
+  } as const
+  return t(locale, keys[diagnostic.kind], { count: diagnostic.count })
 }
 
 function ChildAvatar({ child, className, previewUrl }: { child: ChildProfile; className: string; previewUrl?: string | null }) {

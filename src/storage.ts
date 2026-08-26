@@ -2,6 +2,23 @@ import { detectLocale, t } from './i18n'
 import type { Locale } from './i18n'
 import type { AppData, ChildProfile, DayNightOverride, LegacyAppDataV3, SleepBackupV3, SleepBackupV4, SleepSession } from './types'
 
+export type ImportDiagnostic = {
+  kind: 'migrated-v3' | 'active-child-reset' | 'identical-children-removed' | 'identical-sessions-removed' | 'local-photos-not-included'
+  count: number
+}
+
+export type ImportInspection = {
+  data: AppData
+  sourceVersion: 3 | 4
+  diagnostics: ImportDiagnostic[]
+}
+
+export class ImportValidationError extends Error {
+  constructor(public code: 'invalid-envelope' | 'unsupported-version' | 'invalid-children' | 'invalid-sessions' | 'duplicate-child-conflict' | 'duplicate-session-conflict' | 'orphan-sessions', public count = 0) {
+    super(code)
+  }
+}
+
 export const STORAGE_KEY = 'solemiSleep:v4'
 export const LEGACY_STORAGE_KEY = 'solemiSleep:v3'
 
@@ -79,6 +96,8 @@ export function normalizeAppData(value: unknown): AppData | null {
   if (!data.children.every(isValidChild) || !data.sessions.every(isValidSessionV4)) return null
   const childIds = new Set(data.children.map((child) => child.id))
   if (childIds.size !== data.children.length) return null
+  const sessionIds = new Set(data.sessions.map((session) => session.id))
+  if (sessionIds.size !== data.sessions.length) return null
   if (data.sessions.some((session) => !childIds.has(session.childId))) return null
   const requestedActive = data.settings?.activeChildId
   const activeChildId = typeof requestedActive === 'string' && childIds.has(requestedActive) ? requestedActive : data.children[0].id
@@ -98,6 +117,7 @@ export function migrateV3(value: unknown): AppData | null {
   if (!value || typeof value !== 'object') return null
   const data = value as Partial<LegacyAppDataV3>
   if (data.version !== 3 || !Array.isArray(data.sessions) || !data.sessions.every(isValidLegacySession)) return null
+  if (new Set(data.sessions.map((session) => session.id)).size !== data.sessions.length) return null
   const locale = isLocale(data.settings?.locale) ? data.settings.locale : detectLocale()
   const child = createChild(typeof data.settings?.childName === 'string' ? data.settings.childName : '', null, migratedChildId())
   return {
@@ -154,14 +174,84 @@ export function exportData(data: AppData) {
   URL.revokeObjectURL(url)
 }
 
-export async function importData(file: File, locale: Locale): Promise<AppData> {
+function dedupeIdentical<T extends { id: string }>(items: T[]) {
+  const unique: T[] = []
+  const seen = new Map<string, string>()
+  let removed = 0
+  let conflicts = 0
+  items.forEach((item) => {
+    const serialized = JSON.stringify(item)
+    const previous = seen.get(item.id)
+    if (previous === undefined) {
+      seen.set(item.id, serialized)
+      unique.push(item)
+    } else if (previous === serialized) removed += 1
+    else conflicts += 1
+  })
+  return { unique, removed, conflicts }
+}
+
+export function inspectBackup(parsed: unknown): ImportInspection {
+  if (!parsed || typeof parsed !== 'object') throw new ImportValidationError('invalid-envelope')
+  const backup = parsed as Partial<SleepBackupV3 | SleepBackupV4>
+  if (backup.format !== 'solemi-sleep-backup' || !isValidDate(backup.exportedAt)) throw new ImportValidationError('invalid-envelope')
+  if (backup.version !== 3 && backup.version !== 4) throw new ImportValidationError('unsupported-version')
+
+  if (backup.version === 3) {
+    const data = migrateV3(backup.data)
+    if (!data) throw new ImportValidationError('invalid-sessions')
+    return { data, sourceVersion: 3, diagnostics: [{ kind: 'migrated-v3', count: data.sessions.length }] }
+  }
+
+  if (!backup.data || typeof backup.data !== 'object') throw new ImportValidationError('invalid-envelope')
+  const raw = backup.data as Partial<AppData>
+  if (raw.version !== 4 || !Array.isArray(raw.children) || !raw.children.length) throw new ImportValidationError('invalid-children')
+  if (!Array.isArray(raw.sessions)) throw new ImportValidationError('invalid-sessions')
+  const invalidChildren = raw.children.filter((child) => !isValidChild(child)).length
+  if (invalidChildren) throw new ImportValidationError('invalid-children', invalidChildren)
+  const invalidSessions = raw.sessions.filter((session) => !isValidSessionV4(session)).length
+  if (invalidSessions) throw new ImportValidationError('invalid-sessions', invalidSessions)
+
+  const children = dedupeIdentical(raw.children)
+  if (children.conflicts) throw new ImportValidationError('duplicate-child-conflict', children.conflicts)
+  const sessions = dedupeIdentical(raw.sessions)
+  if (sessions.conflicts) throw new ImportValidationError('duplicate-session-conflict', sessions.conflicts)
+  const childIds = new Set(children.unique.map((child) => child.id))
+  const orphanCount = sessions.unique.filter((session) => !childIds.has(session.childId)).length
+  if (orphanCount) throw new ImportValidationError('orphan-sessions', orphanCount)
+
+  const requestedActive = raw.settings?.activeChildId
+  const activeChildReset = typeof requestedActive !== 'string' || !childIds.has(requestedActive)
+  const photoCount = children.unique.filter((child) => child.photoRef).length
+  const data = normalizeAppData({ ...raw, children: children.unique, sessions: sessions.unique })
+  if (!data) throw new ImportValidationError('invalid-envelope')
+  const diagnostics: ImportDiagnostic[] = []
+  if (children.removed) diagnostics.push({ kind: 'identical-children-removed', count: children.removed })
+  if (sessions.removed) diagnostics.push({ kind: 'identical-sessions-removed', count: sessions.removed })
+  if (activeChildReset) diagnostics.push({ kind: 'active-child-reset', count: 1 })
+  if (photoCount) diagnostics.push({ kind: 'local-photos-not-included', count: photoCount })
+  return { data, sourceVersion: 4, diagnostics }
+}
+
+function importValidationMessage(error: ImportValidationError, locale: Locale) {
+  const keys = {
+    'invalid-envelope': 'invalidBackup',
+    'unsupported-version': 'wrongBackup',
+    'invalid-children': 'importInvalidChildren',
+    'invalid-sessions': 'importInvalidSessions',
+    'duplicate-child-conflict': 'importChildConflict',
+    'duplicate-session-conflict': 'importSessionConflict',
+    'orphan-sessions': 'importOrphanSessions'
+  } as const
+  return t(locale, keys[error.code], { count: error.count })
+}
+
+export async function importData(file: File, locale: Locale): Promise<ImportInspection> {
   const text = await file.text()
   let parsed: unknown
   try { parsed = JSON.parse(text) } catch { throw new Error(t(locale, 'invalidJson')) }
-  if (!parsed || typeof parsed !== 'object') throw new Error(t(locale, 'invalidBackup'))
-  const backup = parsed as Partial<SleepBackupV3 | SleepBackupV4>
-  if (backup.format !== 'solemi-sleep-backup' || !isValidDate(backup.exportedAt)) throw new Error(t(locale, 'wrongBackup'))
-  const data = backup.version === 4 ? normalizeAppData(backup.data) : backup.version === 3 ? migrateV3(backup.data) : null
-  if (!data) throw new Error(backup.version === 3 || backup.version === 4 ? t(locale, 'corruptBackup') : t(locale, 'wrongBackup'))
-  return data
+  try { return inspectBackup(parsed) } catch (error) {
+    if (error instanceof ImportValidationError) throw new Error(importValidationMessage(error, locale))
+    throw error
+  }
 }
