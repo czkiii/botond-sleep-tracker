@@ -69,8 +69,11 @@ A fejlesztés ugyanabban a repóban és ugyanazon a fő alkalmazáson folytatód
 ### Alapfunkciók
 
 - [x] Új telepítés és első indítás a Cloudflare Pages belső preview-n.
-- [ ] Alvás indítása, leállítása, manuális létrehozása és szerkesztése.
-- [ ] Reload, háttérbe küldés és visszatérés után helyes állapot.
+- [x] Alvás indítása és leállítása.
+- [ ] Manuális alvás létrehozása.
+- [x] Alvás szerkesztése az Előzményekben.
+- [x] Reload után helyes állapot és megmaradó alvásadat.
+- [ ] Háttérbe küldés és visszatérés után helyes állapot.
 - [ ] Offline rögzítés és későbbi visszatérés online állapotba.
 - [ ] Éjfél átlépő alvás.
 - [ ] Időzóna- és DST-próba.

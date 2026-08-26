@@ -293,7 +293,21 @@ svg { display: block; }
   font-size: clamp(15px, 4vw, 18px);
   font-weight: 720;
 }
-.section-head span { color: #647f9b; font-size: 13px; letter-spacing: .08em; }
+.section-more {
+  min-width: 40px;
+  min-height: 36px;
+  margin: -4px -8px -4px 0;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 12px;
+  color: #7893ad;
+  background: transparent;
+  font-size: 16px;
+  line-height: 1;
+  letter-spacing: .08em;
+  cursor: pointer;
+}
+.section-more:hover, .section-more:focus-visible { color: #a8cff7; background: rgba(87, 157, 255, .10); }
 .sleep-list { overflow: hidden; }
 .today-card .sleep-list { background: transparent; border: 0; border-radius: 0; }
 .scroll-list {
