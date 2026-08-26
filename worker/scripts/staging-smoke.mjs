@@ -174,7 +174,9 @@ await api(`/v1/children/${childB}`, {
   body: { operationId: operationId('delete_child') }
 })
 
-const afterChildDelete = (await api(`/v1/sync?after=${synced.revision}`, { token: joined.data.deviceToken })).data
+// Pull the complete authoritative state so isolation is checked as well as
+// the incremental tombstones produced by the child deletion.
+const afterChildDelete = (await api('/v1/sync?after=0', { token: joined.data.deviceToken })).data
 assert.ok(afterChildDelete.children.find((child) => child.id === childB)?.deletedAt)
 assert.ok(afterChildDelete.sessions.find((session) => session.id === sessionC)?.deletedAt)
 assert.equal(afterChildDelete.children.find((child) => child.id === childA)?.deletedAt, null)
