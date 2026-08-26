@@ -252,6 +252,13 @@ svg { display: block; }
 .similar-day-row small { color: #718ba4; font-size: 10px; line-height: 1.35; }
 .similar-day-row > span { color: #8099b2; font-size: 10px; }
 .similar-day-row > span b { color: #afd7fc; font-size: 11px; }
+.prediction-card { display: grid; gap: 8px; }
+.prediction-window { color: #d7ecff; font-size: 27px; letter-spacing: -.5px; }
+.prediction-state { width: fit-content; margin: 0 !important; padding: 5px 9px; border-radius: 999px; font-size: 10px !important; }
+.prediction-state.upcoming { color: #9ac8f5 !important; background: rgba(76, 144, 208, .13); }
+.prediction-state.likely-now { color: #9fe3c1 !important; background: rgba(54, 170, 116, .13); }
+.prediction-state.passed { color: #f0bd91 !important; background: rgba(205, 125, 57, .13); }
+.prediction-disclaimer { color: #566f88 !important; }
 .text-action {
   align-self: center;
   border: 0;

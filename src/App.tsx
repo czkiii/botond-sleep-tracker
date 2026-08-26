@@ -9,6 +9,7 @@ import type { ImportDiagnostic } from './storage'
 import { loadChildPhoto, saveChildPhoto } from './photoStore'
 import { buildInsightsFoundation } from './insights'
 import { buildSimilarDaysInsight } from './similarDays'
+import { buildPredictionLite } from './prediction'
 import { DEFAULT_DAY_START_MINUTES, DEFAULT_NIGHT_START_MINUTES, LONG_SLEEP_GUARDRAIL_MS, awakeSince, durationOf, formatDateHeader, formatDuration, formatTime, formatTimer, getDataQualityWarnings, splitDayNight, todaySessions, totalToday } from './utils'
 import SleepTimeline from './SleepTimeline'
 import SwipeHistoryRow from './SwipeHistoryRow'
@@ -209,6 +210,7 @@ function StatsPage({ sessions, now, locale }: { sessions: SleepSession[]; now: n
   const chartUnit = locale === 'hu' ? 'ó' : locale === 'de' ? 'Std.' : 'hr'
   const insights = useMemo(() => buildInsightsFoundation(sessions, now, { lookbackDays: insightsRange }), [sessions, now, insightsRange])
   const similarDays = useMemo(() => buildSimilarDaysInsight(sessions, now, insightsRange), [sessions, now, insightsRange])
+  const prediction = useMemo(() => buildPredictionLite(sessions, now, insightsRange), [sessions, now, insightsRange])
   const wakeWindow = insights.wakeWindow
   const routine = insights.routine
 
@@ -238,6 +240,11 @@ function StatsPage({ sessions, now, locale }: { sessions: SleepSession[]; now: n
       {similarDays.status === 'collecting' && <p className="routine-empty">{t(locale, 'similarDaysCollecting', { count: similarDays.candidateCount })}</p>}
       {similarDays.matches.map((match) => <div className="similar-day-row" key={match.dateKey}><div><strong>{formatDateKey(match.dateKey, locale)}</strong><small>{t(locale, 'similarDayEvidence', { naps: match.snapshot.daytimeSleepCount, sleep: formatDuration(match.snapshot.totalSleepMs, locale), awake: formatDuration(match.snapshot.awakeMs ?? 0, locale) })}</small></div>{match.nextSleep ? <span>{t(locale, 'thenSleptAt')} <b>{formatTime(match.nextSleep.startTime, locale)}</b></span> : <span>{t(locale, 'noLaterSleep')}</span>}</div>)}
       {similarDays.status === 'ready' && <small>{t(locale, 'similarDaysExplanation')}</small>}
+    </div>
+    <div className="insights-card prediction-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'nextSleepEstimate')}</h2></div>{prediction.confidence && <b>{t(locale, prediction.confidence === 'medium' ? 'mediumConfidence' : 'lowConfidence')}</b>}</div>
+      {prediction.status === 'unavailable' && <p className="routine-empty">{t(locale, 'predictionUnavailable')}</p>}
+      {prediction.status === 'collecting' && <p className="routine-empty">{t(locale, 'predictionCollecting', { count: prediction.sampleCount })}</p>}
+      {prediction.status === 'ready' && prediction.windowStart !== null && prediction.windowEnd !== null && <><strong className="prediction-window">{formatTime(new Date(prediction.windowStart).toISOString(), locale)}–{formatTime(new Date(prediction.windowEnd).toISOString(), locale)}</strong><p className={`prediction-state ${prediction.windowState}`}>{t(locale, prediction.windowState === 'upcoming' ? 'predictionUpcoming' : prediction.windowState === 'likely-now' ? 'predictionLikelyNow' : 'predictionPassed')}</p><small>{t(locale, 'predictionBasis', { count: prediction.sampleCount, order: t(locale, prediction.bucket === 'day-1' ? 'firstNap' : prediction.bucket === 'day-2' ? 'secondNap' : prediction.bucket === 'day-3-plus' ? 'laterNap' : 'nightSleep') })}</small><small className="prediction-disclaimer">{t(locale, 'predictionDisclaimer')}</small></>}
     </div>
   </section>
 }
