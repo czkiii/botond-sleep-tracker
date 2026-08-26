@@ -1,4 +1,4 @@
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { ChangeEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { languageOptions, localeTag, t } from './i18n'
 import type { Locale } from './i18n'
@@ -6,7 +6,8 @@ import type { AppData, ChildProfile, DayNightOverride, Page, SleepSession } from
 import type { DataQualityIssueKind } from './utils'
 import { createChild, createSession, exportData, importData, loadData, saveData } from './storage'
 import type { ImportDiagnostic } from './storage'
-import { loadChildPhoto, saveChildPhoto } from './photoStore'
+import { loadChildPhoto, prepareChildPhoto, saveChildPhoto } from './photoStore'
+import type { AvatarCrop } from './photoStore'
 import { buildInsightsFoundation } from './insights'
 import { buildSimilarDaysInsight } from './similarDays'
 import { buildPredictionLite } from './prediction'
@@ -342,21 +343,90 @@ function ChildAvatar({ child, className, previewUrl }: { child: ChildProfile; cl
   return <span className={className}>{photoUrl ? <img src={photoUrl} alt="" /> : (child.name.trim()[0] || '•').toUpperCase()}</span>
 }
 
+type CropCandidate = {
+  file: File
+  url: string
+  width: number
+  height: number
+}
+
+const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(high, value))
+
+function PhotoCropper({ candidate, locale, onCancel, onDone }: { candidate: CropCandidate; locale: Locale; onCancel: () => void; onDone: (blob: Blob) => void }) {
+  const viewportSize = Math.min(300, Math.max(240, window.innerWidth - 64))
+  const [zoom, setZoom] = useState(1)
+  const [offset, setOffset] = useState({ x: 0, y: 0 })
+  const [processing, setProcessing] = useState(false)
+  const drag = useRef<{ pointerId: number; startX: number; startY: number; x: number; y: number } | null>(null)
+  const baseScale = Math.max(viewportSize / candidate.width, viewportSize / candidate.height)
+  const imageScale = baseScale * zoom
+  const imageWidth = candidate.width * imageScale
+  const imageHeight = candidate.height * imageScale
+  const limitX = Math.max(0, (imageWidth - viewportSize) / 2)
+  const limitY = Math.max(0, (imageHeight - viewportSize) / 2)
+  const constrain = (x: number, y: number) => ({ x: clamp(x, -limitX, limitX), y: clamp(y, -limitY, limitY) })
+  const changeZoom = (nextZoom: number) => {
+    const nextScale = baseScale * nextZoom
+    const nextLimitX = Math.max(0, (candidate.width * nextScale - viewportSize) / 2)
+    const nextLimitY = Math.max(0, (candidate.height * nextScale - viewportSize) / 2)
+    setZoom(nextZoom)
+    setOffset((previous) => ({ x: clamp(previous.x, -nextLimitX, nextLimitX), y: clamp(previous.y, -nextLimitY, nextLimitY) }))
+  }
+  const pointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId)
+    drag.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, x: offset.x, y: offset.y }
+  }
+  const pointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!drag.current || drag.current.pointerId !== event.pointerId) return
+    setOffset(constrain(drag.current.x + event.clientX - drag.current.startX, drag.current.y + event.clientY - drag.current.startY))
+  }
+  const pointerEnd = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (drag.current?.pointerId === event.pointerId) drag.current = null
+  }
+  const confirm = async () => {
+    setProcessing(true)
+    try {
+      const size = viewportSize / imageScale
+      const crop: AvatarCrop = {
+        x: (candidate.width - size) / 2 - offset.x / imageScale,
+        y: (candidate.height - size) / 2 - offset.y / imageScale,
+        size
+      }
+      onDone(await prepareChildPhoto(candidate.file, crop))
+    } catch {
+      setProcessing(false)
+      window.alert(t(locale, 'photoSaveError'))
+    }
+  }
+
+  return <div className="photo-crop-overlay"><div className="photo-crop-screen">
+    <header className="photo-crop-header"><button type="button" onClick={onCancel} disabled={processing}><Icon name="close" size={20} /></button><h2>{t(locale, 'positionPhoto')}</h2><button type="button" className="crop-done" onClick={confirm} disabled={processing}>{processing ? t(locale, 'saving') : t(locale, 'done')}</button></header>
+    <div className="photo-crop-body"><p>{t(locale, 'positionPhotoHint')}</p><div className="photo-crop-stage" style={{ width: viewportSize, height: viewportSize }} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd} onPointerCancel={pointerEnd}>
+      <img src={candidate.url} alt="" draggable={false} style={{ width: imageWidth, height: imageHeight, transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px))` }} />
+      <span className="photo-crop-ring" />
+    </div><label className="photo-zoom"><span>{t(locale, 'zoomPhoto')}</span><input type="range" min="1" max="3" step="0.01" value={zoom} onChange={(event) => changeZoom(Number(event.target.value))} /></label></div>
+  </div></div>
+}
+
 function ChildEditor({ child, locale, onClose, onSave }: { child: ChildProfile | null; locale: Locale; onClose: () => void; onSave: (child: ChildProfile) => void }) {
   const draft = useRef(child ?? createChild()).current
   const [name, setName] = useState(child?.name ?? '')
   const [birthDate, setBirthDate] = useState(child?.birthDate ?? '')
   const [photoRef, setPhotoRef] = useState(child?.photoRef ?? null)
-  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoFile, setPhotoFile] = useState<Blob | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null | undefined>(undefined)
+  const [cropCandidate, setCropCandidate] = useState<CropCandidate | null>(null)
   const [saving, setSaving] = useState(false)
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl) }, [previewUrl])
   const choosePhoto = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
     if (!file.type.startsWith('image/') || file.size > 12 * 1024 * 1024) return window.alert(t(locale, 'photoInvalid'))
-    setPhotoFile(file)
-    setPreviewUrl(URL.createObjectURL(file))
+    const url = URL.createObjectURL(file)
+    const image = new Image()
+    image.onload = () => setCropCandidate({ file, url, width: image.naturalWidth, height: image.naturalHeight })
+    image.onerror = () => { URL.revokeObjectURL(url); window.alert(t(locale, 'photoInvalid')) }
+    image.src = url
     event.target.value = ''
   }
   const submit = async () => {
@@ -372,7 +442,7 @@ function ChildEditor({ child, locale, onClose, onSave }: { child: ChildProfile |
     }
   }
   const previewChild = { ...draft, name, photoRef }
-  return <div className="editor-overlay"><div className="editor-screen child-editor-screen"><header className="editor-header"><button onClick={onClose} disabled={saving}><Icon name="close" size={18} /></button><h1>{child ? t(locale, 'editChild') : t(locale, 'addChild')}</h1><span /></header><div className="editor-body child-editor-body"><div className="profile-preview"><ChildAvatar child={previewChild} className="profile-preview-avatar" previewUrl={previewUrl} /><strong>{name || t(locale, 'unnamedChild')}</strong><div className="photo-actions"><label className="photo-button">{photoRef || photoFile ? t(locale, 'changePhoto') : t(locale, 'addPhoto')}<input type="file" accept="image/*" onChange={choosePhoto} /></label>{(photoRef || photoFile) && <button type="button" onClick={() => { setPhotoFile(null); setPreviewUrl(null); setPhotoRef(null) }}>{t(locale, 'removePhoto')}</button>}</div><small>{t(locale, 'photoLocalHint')}</small></div><label>{t(locale, 'childName')}<input value={name} maxLength={60} onChange={(event) => setName(event.target.value)} placeholder={t(locale, 'childNamePlaceholder')} /></label><label>{t(locale, 'birthDate')} <small>{t(locale, 'optional')}</small><input type="date" value={birthDate} max={new Date().toISOString().slice(0, 10)} onChange={(event) => setBirthDate(event.target.value)} /></label>{birthDate && <p className="profile-info-note">{t(locale, 'birthDateAnalyticsHint')}</p>}</div><div className="editor-actions centered-actions single-action"><button className="save-button" onClick={submit} disabled={saving}>{saving ? t(locale, 'saving') : t(locale, 'save')}</button></div></div></div>
+  return <div className="editor-overlay"><div className="editor-screen child-editor-screen"><header className="editor-header"><button onClick={onClose} disabled={saving}><Icon name="close" size={18} /></button><h1>{child ? t(locale, 'editChild') : t(locale, 'addChild')}</h1><span /></header><div className="editor-body child-editor-body"><div className="profile-preview"><ChildAvatar child={previewChild} className="profile-preview-avatar" previewUrl={previewUrl} /><strong>{name || t(locale, 'unnamedChild')}</strong><div className="photo-actions"><label className="photo-button">{photoRef || photoFile ? t(locale, 'changePhoto') : t(locale, 'addPhoto')}<input type="file" accept="image/*" onChange={choosePhoto} /></label>{(photoRef || photoFile) && <button type="button" onClick={() => { setPhotoFile(null); setPreviewUrl(null); setPhotoRef(null) }}>{t(locale, 'removePhoto')}</button>}</div><small>{t(locale, 'photoLocalHint')}</small></div><label>{t(locale, 'childName')}<input value={name} maxLength={60} onChange={(event) => setName(event.target.value)} placeholder={t(locale, 'childNamePlaceholder')} /></label><label>{t(locale, 'birthDate')} <small>{t(locale, 'optional')}</small><input type="date" value={birthDate} max={new Date().toISOString().slice(0, 10)} onChange={(event) => setBirthDate(event.target.value)} /></label>{birthDate && <p className="profile-info-note">{t(locale, 'birthDateAnalyticsHint')}</p>}</div><div className="editor-actions centered-actions single-action"><button className="save-button" onClick={submit} disabled={saving}>{saving ? t(locale, 'saving') : t(locale, 'save')}</button></div></div>{cropCandidate && <PhotoCropper candidate={cropCandidate} locale={locale} onCancel={() => { URL.revokeObjectURL(cropCandidate.url); setCropCandidate(null) }} onDone={(blob) => { URL.revokeObjectURL(cropCandidate.url); setPhotoFile(blob); setPreviewUrl((previous) => { if (previous) URL.revokeObjectURL(previous); return URL.createObjectURL(blob) }); setCropCandidate(null) }} />}</div>
 }
 
 type WheelItem = { value: string; label: string }

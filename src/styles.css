@@ -548,6 +548,46 @@ svg { display: block; }
 .profile-info-note { margin: -5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
 .editor-actions.single-action { grid-template-columns: 1fr; }
 
+.photo-crop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  background: rgba(2, 8, 15, .96);
+}
+.photo-crop-screen {
+  width: 100%;
+  max-width: 480px;
+  height: 100dvh;
+  padding: calc(14px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #071422, #050e19);
+}
+.photo-crop-header { min-height: 54px; display: grid; grid-template-columns: 52px 1fr 72px; align-items: center; gap: 8px; }
+.photo-crop-header h2 { margin: 0; font-size: 19px; text-align: center; }
+.photo-crop-header button { min-height: 44px; padding: 0 10px; border: 0; border-radius: 14px; color: #d6e8f9; background: rgba(64, 105, 148, .13); display: grid; place-items: center; }
+.photo-crop-header .crop-done { color: #eaf6ff; background: #2f77c9; font-size: 13px; font-weight: 760; }
+.photo-crop-body { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; }
+.photo-crop-body > p { max-width: 310px; margin: 0; color: #8aa1b9; font-size: 13px; line-height: 1.45; text-align: center; }
+.photo-crop-stage {
+  position: relative;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #020812;
+  box-shadow: 0 0 0 999px rgba(0, 0, 0, .28), 0 14px 40px rgba(0, 0, 0, .38);
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+.photo-crop-stage:active { cursor: grabbing; }
+.photo-crop-stage img { position: absolute; top: 50%; left: 50%; max-width: none; max-height: none; object-fit: fill; pointer-events: none; -webkit-user-drag: none; }
+.photo-crop-ring { position: absolute; inset: 0; border: 3px solid rgba(218, 239, 255, .88); border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(20, 51, 82, .45); pointer-events: none; }
+.photo-zoom { width: min(300px, 100%); display: grid; gap: 9px; color: #9bb2c9; font-size: 12px; font-weight: 680; text-align: center; }
+.photo-zoom input { width: 100%; accent-color: #579dff; touch-action: pan-x; }
+
 /* Editor */
 .editor-overlay {
   position: fixed;
