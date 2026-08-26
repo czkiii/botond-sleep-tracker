@@ -1,6 +1,6 @@
 # Solemi Sleep — belső verziótól a kiadásig
 
-Utolsó frissítés: 2026-08-25
+Utolsó frissítés: 2026-08-26
 
 Ez az operatív lista a `SOLEMI_EXECUTION_PLAN.md` és a `SOLEMI_MASTER_ROADMAP.md` kiadási pontjait rendezi végrehajtási sorrendbe.
 
@@ -23,8 +23,8 @@ Az ellenőrzött release candidate kontrollált backend-migrációval, smoke tes
 - [x] Profilkép, gyors időkorrekció, alvástípus-felülírás és alap adatminőségi jelzések elkészültek.
 - [x] Wake window Insights-alap első szelete elkészült.
 - [ ] A roadmap és execution plan kész státuszainak frissítése.
-- [ ] A PR leírásának frissítése az Insights változással és az aktuális ellenőrzési eredményekkel.
-- [ ] Eldönteni, hogy a Child Profile és az Insights ugyanabban a PR-ban marad-e. Javaslat: a release candidate-ig maradjon együtt, de új nagy Insights-funkció már külön PR-ba kerüljön.
+- [x] A PR leírásának frissítése az Insights változással és az aktuális ellenőrzési eredményekkel.
+- [x] A Child Profile és az alap Insights ugyanabban a draft PR-ban marad a belső release candidate-ig.
 
 **Kapu:** a PR scope-ja érthető, a dokumentáció nem állít elavult állapotot.
 
@@ -100,6 +100,7 @@ A fejlesztés ugyanabban a repóban és ugyanazon a fő alkalmazáson folytatód
 - [ ] Kevés adatnál nincs túlzott bizonyosság.
 - [ ] Átfedő és extrém session kimarad a számításból, és erről jelzés jelenik meg.
 - [ ] HU / EN / DE szövegek és mobil layout ellenőrzése.
+- [ ] Hasonló napok: a három találat és a későbbi elalvás kézi ellenőrzése ismert tesztadatokkal.
 
 **Kapu:** nincs ismert P0/P1 adatvesztési, migrációs vagy sync hiba.
 
@@ -109,7 +110,7 @@ Nem minden tervezett Insights-funkció szükséges az első belső RC-hez. Kül�
 
 - [x] Wake window teljes V1 scope: 7/14/30 nap, medián, tipikus tartomány, megfelelő minimum minta és alvássorrend szerinti bontás.
 - [x] Rutinminták V1: tipikus esti elalvás, reggeli ébredés, ±30 perces konzisztencia és nappali alvásszám legalább 3 tiszta megfigyelt napból.
-- [ ] Hasonló napok V1 vagy későbbi kiadásra halasztás.
+- [x] Hasonló napok V1: 7/14/30 napos saját, tiszta napok összevetése nappali alvásszám, addigi összalvás és aktuális ébrenléti idő alapján; legalább 3 összehasonlítható nap és legfeljebb 3 magyarázható találat.
 - [ ] Prediction Lite V1 vagy későbbi kiadásra halasztás.
 - [ ] Részletes adatminőségi motor:
   - [x] hibás és jövőbeli időpontok;
@@ -159,7 +160,7 @@ Nem minden tervezett Insights-funkció szükséges az első belső RC-hez. Kül�
 
 ## Következő konkrét munkamenet
 
-1. GitHub CI és automatizált Insights-tesztek.
+1. Prediction Lite V1 megtervezése és automatizált tesztekkel történő megvalósítása.
 2. Ugyanebből a repóból épülő belső preview bekötése.
 3. Staging Worker/D1 vagy frontend-only tesztmód bekötése.
 4. Belső preview deploy.
