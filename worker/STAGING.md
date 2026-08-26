@@ -4,9 +4,8 @@ This environment connects only to `https://solemi-sleep-internal.pages.dev`. It 
 
 ## One-time setup
 
-1. Create a D1 database named `solemi-sleep-db-staging`.
-2. Replace `REPLACE_WITH_STAGING_D1_DATABASE_ID` in `wrangler.staging.jsonc` with its database ID.
-3. From the `worker` directory, apply the complete current schema to the empty staging database:
+1. Create an EU-jurisdiction D1 database named `solemi-sleep-db-staging` and bind its ID in `wrangler.staging.jsonc`.
+2. From the `worker` directory, apply the complete current schema to the empty staging database:
 
    ```sh
    npm run db:apply:staging
@@ -14,25 +13,25 @@ This environment connects only to `https://solemi-sleep-internal.pages.dev`. It 
 
    Use `schema.sql` for a new empty staging database. Migration `002_children_v4.sql` is reserved for rehearsing an upgrade of an existing V3 database and for the later production release.
 
-4. Deploy the staging Worker:
+3. Deploy the staging Worker:
 
    ```sh
    npm run deploy:staging
    ```
 
-5. Add a unique `TOKEN_PEPPER` secret to the staging Worker. Do not copy a production secret into staging:
+4. Add a unique `TOKEN_PEPPER` secret to the staging Worker. Do not copy a production secret into staging:
 
    ```sh
    npm run secret:staging
    ```
 
-6. In the Cloudflare Pages project `solemi-sleep-internal`, add this production build variable, using the actual staging Worker URL:
+5. In the Cloudflare Pages project `solemi-sleep-internal`, add this production build variable, using the actual staging Worker URL:
 
    ```text
    VITE_SYNC_API_BASE=https://solemi-sleep-sync-staging.<account-subdomain>.workers.dev
    ```
 
-7. Redeploy the internal Pages project. Its top banner must say `Family Sync staging`, never `Family Sync disabled`.
+6. Redeploy the internal Pages project. Its top banner must say `Family Sync staging`, never `Family Sync disabled`.
 
 ## Automated smoke test
 

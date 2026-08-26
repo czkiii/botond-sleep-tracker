@@ -93,7 +93,7 @@ A fejlesztés ugyanabban a repóban és ugyanazon a fő alkalmazáson folytatód
 - [x] Külön staging Worker-konfiguráció elkészült, production erőforrás-hivatkozás nélkül.
 - [x] Internal frontend csak explicit staging API URL esetén tölti be a Family Sync réteget.
 - [x] Automatizált staging smoke teszt elkészült két gyerekhez és két készülékhez.
-- [ ] Külön `solemi-sleep-db-staging` D1 létrehozása és a teljes `schema.sql` alkalmazása.
+- [x] Külön EU-jurisdictionös `solemi-sleep-db-staging` D1 létrehozása és a teljes `schema.sql` alkalmazása.
 - [ ] `solemi-sleep-sync-staging` Worker deploy és külön `TOKEN_PEPPER` secret beállítása.
 - [ ] Internal Pages `VITE_SYNC_API_BASE` beállítása a staging Worker URL-jére.
 - [ ] Két készülék összekapcsolása meghívókóddal.
@@ -171,8 +171,8 @@ Nem minden tervezett Insights-funkció szükséges az első belső RC-hez. Kül�
 
 ## Következő konkrét munkamenet
 
-1. Külön `solemi-sleep-db-staging` D1 létrehozása és az azonosító beírása a staging konfigurációba.
-2. A teljes staging séma alkalmazása, staging Worker deploy és automatikus smoke teszt.
+1. `solemi-sleep-sync-staging` Worker deploy és külön `TOKEN_PEPPER` secret beállítása.
+2. Az automatikus staging smoke teszt lefuttatása.
 3. Az internal Pages összekötése a staging Workerrel.
 4. A Family Sync kézi kétkészülékes tesztmátrixának végigjárása.
 5. A Cloudflare Pages preview hozzáférés-védelmének véglegesítése.
