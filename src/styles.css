@@ -309,6 +309,7 @@ svg { display: block; }
   cursor: pointer;
 }
 .section-more:hover, .section-more:focus-visible { color: #a8cff7; background: rgba(87, 157, 255, .10); }
+.section-more:active { color: #d7ebff; background: rgba(87, 157, 255, .18); }
 .sleep-list { overflow: hidden; }
 .today-card .sleep-list { background: transparent; border: 0; border-radius: 0; }
 .scroll-list {
