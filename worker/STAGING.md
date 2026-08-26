@@ -37,6 +37,8 @@ This environment connects only to `https://solemi-sleep-internal.pages.dev`. It 
 
 The smoke test refuses any URL that does not contain `staging`. It creates an isolated test family in staging and checks CORS, two children, parallel active sleeps, edit, delete tombstone, invite and second-device sync.
 
+GitHub Actions runs the same smoke script after staging Worker changes on `feat/child-profile-v4`; it can also be started manually from the Actions page.
+
 ```sh
 SOLEMI_STAGING_API_BASE=https://solemi-sleep-sync-staging.<account-subdomain>.workers.dev npm run smoke:staging
 ```
