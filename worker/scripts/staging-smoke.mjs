@@ -11,6 +11,7 @@ const childA = `child_smoke_a_${run}`
 const childB = `child_smoke_b_${run}`
 const sessionA = `sleep_smoke_a_${run}`
 const sessionB = `sleep_smoke_b_${run}`
+const sessionC = `sleep_smoke_child_delete_${run}`
 
 function operationId(label) {
   return `op_${label}_${randomUUID().replaceAll('-', '')}`
@@ -118,8 +119,33 @@ assert.equal(syncedA?.note, 'staging smoke verified')
 assert.equal(syncedA?.dayNightOverride, 'day')
 assert.ok(syncedB?.deletedAt)
 
+await api('/v1/sessions', {
+  method: 'POST', token: primaryToken,
+  body: {
+    operationId: operationId('create_before_child_delete'),
+    session: {
+      id: sessionC,
+      childId: childB,
+      startTime: new Date(now - 90 * 60_000).toISOString(),
+      endTime: new Date(now - 60 * 60_000).toISOString(),
+      note: 'removed with child',
+      dayNightOverride: 'day'
+    }
+  }
+})
+await api(`/v1/children/${childB}`, {
+  method: 'DELETE', token: primaryToken,
+  body: { operationId: operationId('delete_child') }
+})
+
+const afterChildDelete = (await api(`/v1/sync?after=${synced.revision}`, { token: joined.data.deviceToken })).data
+assert.ok(afterChildDelete.children.find((child) => child.id === childB)?.deletedAt)
+assert.ok(afterChildDelete.sessions.find((session) => session.id === sessionC)?.deletedAt)
+assert.equal(afterChildDelete.children.find((child) => child.id === childA)?.deletedAt, null)
+
 console.log('PASS: health + CORS')
 console.log('PASS: two child profiles + parallel active sleeps')
 console.log('PASS: edit + delete tombstone')
+console.log('PASS: child delete cascades to its sleep data')
 console.log('PASS: invite + second-device sync')
 console.log(`PASS: family ${created.data.familyId}, revision ${synced.revision}`)

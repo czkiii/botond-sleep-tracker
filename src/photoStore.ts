@@ -85,3 +85,14 @@ export async function loadChildPhoto(ref: string) {
   database.close()
   return record?.blob ?? null
 }
+
+export async function deleteChildPhoto(ref: string) {
+  const database = await openDatabase()
+  await new Promise<void>((resolve, reject) => {
+    const transaction = database.transaction(STORE_NAME, 'readwrite')
+    transaction.objectStore(STORE_NAME).delete(ref)
+    transaction.oncomplete = () => resolve()
+    transaction.onerror = () => reject(transaction.error)
+  })
+  database.close()
+}

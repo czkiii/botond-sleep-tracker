@@ -6,8 +6,9 @@ import type { AppData, ChildProfile, DayNightOverride, Page, SleepSession } from
 import type { DataQualityIssueKind } from './utils'
 import { createChild, createSession, exportData, importData, inspectBackup, loadData, saveData } from './storage'
 import type { ImportDiagnostic, ImportInspection } from './storage'
-import { loadChildPhoto, prepareChildPhoto, saveChildPhoto } from './photoStore'
+import { deleteChildPhoto, loadChildPhoto, prepareChildPhoto, saveChildPhoto } from './photoStore'
 import type { AvatarCrop } from './photoStore'
+import { removeChildProfile } from './childProfiles'
 import { buildInsightsFoundation } from './insights'
 import { buildSimilarDaysInsight } from './similarDays'
 import { buildPredictionLite } from './prediction'
@@ -334,6 +335,16 @@ function SettingsPage({ data, setData, onBack }: { data: AppData; setData: (data
       if (editingChild === 'new') setData({ ...data, children: [...data.children, next], settings: { ...data.settings, activeChildId: next.id } })
       else setData({ ...data, children: data.children.map((child) => child.id === next.id ? next : child) })
       setEditingChild(null)
+    }} onDelete={editingChild === 'new' ? undefined : () => {
+      const child = editingChild as ChildProfile
+      if (data.children.length <= 1) return window.alert(t(locale, 'deleteLastChild'))
+      const count = data.sessions.filter((session) => session.childId === child.id).length
+      if (!window.confirm(t(locale, 'deleteChildConfirm', { name: child.name || t(locale, 'unnamedChild'), count }))) return
+      const next = removeChildProfile(data, child.id)
+      if (!next) return
+      if (child.photoRef) void deleteChildPhoto(child.photoRef).catch(() => {})
+      setData(next)
+      setEditingChild(null)
     }} />}</>
 }
 
@@ -430,7 +441,7 @@ function PhotoCropper({ candidate, locale, onCancel, onDone }: { candidate: Crop
   </div></div>
 }
 
-function ChildEditor({ child, locale, onClose, onSave }: { child: ChildProfile | null; locale: Locale; onClose: () => void; onSave: (child: ChildProfile) => void }) {
+function ChildEditor({ child, locale, onClose, onSave, onDelete }: { child: ChildProfile | null; locale: Locale; onClose: () => void; onSave: (child: ChildProfile) => void; onDelete?: () => void }) {
   const draft = useRef(child ?? createChild()).current
   const [name, setName] = useState(child?.name ?? '')
   const [birthDate, setBirthDate] = useState(child?.birthDate ?? '')
@@ -464,7 +475,7 @@ function ChildEditor({ child, locale, onClose, onSave }: { child: ChildProfile |
     }
   }
   const previewChild = { ...draft, name, photoRef }
-  return <div className="editor-overlay"><div className="editor-screen child-editor-screen"><header className="editor-header"><button onClick={onClose} disabled={saving}><Icon name="close" size={18} /></button><h1>{child ? t(locale, 'editChild') : t(locale, 'addChild')}</h1><span /></header><div className="editor-body child-editor-body"><div className="profile-preview"><ChildAvatar child={previewChild} className="profile-preview-avatar" previewUrl={previewUrl} /><strong>{name || t(locale, 'unnamedChild')}</strong><div className="photo-actions"><label className="photo-button">{photoRef || photoFile ? t(locale, 'changePhoto') : t(locale, 'addPhoto')}<input type="file" accept="image/*" onChange={choosePhoto} /></label>{(photoRef || photoFile) && <button type="button" onClick={() => { setPhotoFile(null); setPreviewUrl(null); setPhotoRef(null) }}>{t(locale, 'removePhoto')}</button>}</div><small>{t(locale, 'photoLocalHint')}</small></div><label>{t(locale, 'childName')}<input value={name} maxLength={60} onChange={(event) => setName(event.target.value)} placeholder={t(locale, 'childNamePlaceholder')} /></label><label>{t(locale, 'birthDate')} <small>{t(locale, 'optional')}</small><input type="date" value={birthDate} max={new Date().toISOString().slice(0, 10)} onChange={(event) => setBirthDate(event.target.value)} /></label>{birthDate && <p className="profile-info-note">{t(locale, 'birthDateAnalyticsHint')}</p>}</div><div className="editor-actions centered-actions single-action"><button className="save-button" onClick={submit} disabled={saving}>{saving ? t(locale, 'saving') : t(locale, 'save')}</button></div></div>{cropCandidate && <PhotoCropper candidate={cropCandidate} locale={locale} onCancel={() => { URL.revokeObjectURL(cropCandidate.url); setCropCandidate(null) }} onDone={(blob) => { URL.revokeObjectURL(cropCandidate.url); setPhotoFile(blob); setPreviewUrl((previous) => { if (previous) URL.revokeObjectURL(previous); return URL.createObjectURL(blob) }); setCropCandidate(null) }} />}</div>
+  return <div className="editor-overlay"><div className="editor-screen child-editor-screen"><header className="editor-header"><button onClick={onClose} disabled={saving}><Icon name="close" size={18} /></button><h1>{child ? t(locale, 'editChild') : t(locale, 'addChild')}</h1><span /></header><div className="editor-body child-editor-body"><div className="profile-preview"><ChildAvatar child={previewChild} className="profile-preview-avatar" previewUrl={previewUrl} /><strong>{name || t(locale, 'unnamedChild')}</strong><div className="photo-actions"><label className="photo-button">{photoRef || photoFile ? t(locale, 'changePhoto') : t(locale, 'addPhoto')}<input type="file" accept="image/*" onChange={choosePhoto} /></label>{(photoRef || photoFile) && <button type="button" onClick={() => { setPhotoFile(null); setPreviewUrl(null); setPhotoRef(null) }}>{t(locale, 'removePhoto')}</button>}</div><small>{t(locale, 'photoLocalHint')}</small></div><label>{t(locale, 'childName')}<input value={name} maxLength={60} onChange={(event) => setName(event.target.value)} placeholder={t(locale, 'childNamePlaceholder')} /></label><label>{t(locale, 'birthDate')} <small>{t(locale, 'optional')}</small><input type="date" value={birthDate} max={new Date().toISOString().slice(0, 10)} onChange={(event) => setBirthDate(event.target.value)} /></label>{birthDate && <p className="profile-info-note">{t(locale, 'birthDateAnalyticsHint')}</p>}</div><div className={`editor-actions centered-actions ${onDelete ? '' : 'single-action'}`}>{onDelete && <button className="delete-button" onClick={onDelete} disabled={saving}>{t(locale, 'deleteChild')}</button>}<button className="save-button" onClick={submit} disabled={saving}>{saving ? t(locale, 'saving') : t(locale, 'save')}</button></div></div>{cropCandidate && <PhotoCropper candidate={cropCandidate} locale={locale} onCancel={() => { URL.revokeObjectURL(cropCandidate.url); setCropCandidate(null) }} onDone={(blob) => { URL.revokeObjectURL(cropCandidate.url); setPhotoFile(blob); setPreviewUrl((previous) => { if (previous) URL.revokeObjectURL(previous); return URL.createObjectURL(blob) }); setCropCandidate(null) }} />}</div>
 }
 
 type WheelItem = { value: string; label: string }

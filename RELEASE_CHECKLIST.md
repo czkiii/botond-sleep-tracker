@@ -84,7 +84,7 @@ A fejlesztés ugyanabban a repóban és ugyanazon a fő alkalmazáson folytatód
 - [ ] Egygyerekes felület egyszerű marad.
 - [ ] Több gyerek létrehozása és váltása.
 - [ ] History, Sleeps és Insights együtt vált gyereket.
-- [ ] Két gyereknek párhuzamos aktív alvása lehet.
+- [x] Két gyereknek párhuzamos aktív alvása lehet.
 - [ ] Profilkép eszközön marad és reload után megjelenik.
 - [ ] Export/import nem keveri össze a gyerekeket.
 
@@ -96,9 +96,14 @@ A fejlesztés ugyanabban a repóban és ugyanazon a fő alkalmazáson folytatód
 - [x] Külön EU-jurisdictionös `solemi-sleep-db-staging` D1 létrehozása és a teljes `schema.sql` alkalmazása.
 - [x] `solemi-sleep-sync-staging` Worker deploy és külön `TOKEN_PEPPER` secret beállítása.
 - [x] Internal Pages `VITE_SYNC_API_BASE` beállítása a staging Worker URL-jére.
-- [ ] Új internal Pages buildben a `Family Sync staging` jelzés és a kapcsolódási felület ellenőrzése.
-- [ ] Két készülék összekapcsolása meghívókóddal.
-- [ ] Profil create/update megjelenik mindkét készüléken.
+- [x] Új internal Pages buildben a `Family Sync staging` jelzés és a kapcsolódási felület ellenőrzése.
+- [x] Két készülék összekapcsolása meghívókóddal.
+- [x] Kétirányú aktív alvás start/stop szinkron ellenőrzése két böngészőkörnyezet között.
+- [x] Két gyerek párhuzamos aktív alvása mindkét böngészőkörnyezetben helyesen megjelenik.
+- [x] Profilnév módosítása mindkét irányban szinkronizálódik.
+- [x] Profil create/update megjelenik mindkét készüléken.
+- [ ] Gyerekprofil törlése a hozzá tartozó alvásokkal együtt mindkét készüléken eltűnik.
+- [x] Lezárt alvás szerkesztése szinkronizálódik a másik böngészőkörnyezetbe.
 - [ ] Gyerekenkénti start/stop/edit/delete szinkronizálódik.
 - [ ] Offline queue visszacsatlakozás után helyesen ürül.
 - [ ] Dupla Start, dupla Stop és szerkesztési konfliktus teszt.

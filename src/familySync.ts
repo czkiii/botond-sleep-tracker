@@ -112,17 +112,21 @@ function toLocalChild(child: RemoteChild, existing?: ChildProfile): ChildProfile
   }
 }
 
-function mergeRemote(data: AppData, sessions: RemoteSession[], children: RemoteChild[] = []) {
+export function mergeRemote(data: AppData, sessions: RemoteSession[], children: RemoteChild[] = []) {
   const childMap = new Map(data.children.map((child) => [child.id, child]))
+  const deletedChildIds = new Set<string>()
   for (const remote of children) {
-    // Child removal is not exposed in V4. A future tombstone must never silently
-    // erase device-local history, so deleted profiles are ignored for now.
-    if (!remote.deletedAt) childMap.set(remote.id, toLocalChild(remote, childMap.get(remote.id)))
+    if (remote.deletedAt) {
+      childMap.delete(remote.id)
+      deletedChildIds.add(remote.id)
+    } else {
+      childMap.set(remote.id, toLocalChild(remote, childMap.get(remote.id)))
+    }
   }
 
-  const map = new Map(data.sessions.map((session) => [session.id, session]))
+  const map = new Map(data.sessions.filter((session) => !deletedChildIds.has(session.childId)).map((session) => [session.id, session]))
   for (const remote of sessions) {
-    if (remote.deletedAt) map.delete(remote.id)
+    if (remote.deletedAt || (remote.childId && deletedChildIds.has(remote.childId))) map.delete(remote.id)
     else map.set(remote.id, toRemoteLocal(remote))
   }
   const mergedChildren = Array.from(childMap.values()).sort((a, b) => a.createdAt.localeCompare(b.createdAt))
@@ -178,7 +182,7 @@ function applyAuthoritativeChild(child?: RemoteChild | null) {
   if (!child) return false
   const current = loadData()
   const merged = mergeRemote(current, [], [child])
-  const changed = JSON.stringify(merged.children) !== JSON.stringify(current.children)
+  const changed = JSON.stringify(merged) !== JSON.stringify(current)
   if (changed) writeRemoteData(merged)
   return changed
 }
@@ -223,8 +227,10 @@ export async function leaveFamily() {
   writeStore(defaultStore())
 }
 
-function makeOperations(previous: AppData, next: AppData): PendingOperation[] {
+export function makeOperations(previous: AppData, next: AppData): PendingOperation[] {
   const beforeChildren = new Map(previous.children.map((child) => [child.id, child]))
+  const afterChildren = new Map(next.children.map((child) => [child.id, child]))
+  const removedChildIds = new Set(previous.children.filter((child) => !afterChildren.has(child.id)).map((child) => child.id))
   const before = new Map(previous.sessions.map((session) => [session.id, session]))
   const after = new Map(next.sessions.map((session) => [session.id, session]))
   const operations: PendingOperation[] = []
@@ -256,6 +262,12 @@ function makeOperations(previous: AppData, next: AppData): PendingOperation[] {
     }
   }
 
+  for (const child of previous.children) {
+    if (removedChildIds.has(child.id)) {
+      operations.push({ id: opId('op_child_delete'), method: 'DELETE', path: `/v1/children/${encodeURIComponent(child.id)}`, childId: child.id, body: { operationId: opId('mut') } })
+    }
+  }
+
   for (const session of next.sessions) {
     const old = before.get(session.id)
     if (!old) {
@@ -284,7 +296,7 @@ function makeOperations(previous: AppData, next: AppData): PendingOperation[] {
   }
 
   for (const session of previous.sessions) {
-    if (!after.has(session.id)) operations.push({ id: opId('op_delete'), method: 'DELETE', path: `/v1/sessions/${encodeURIComponent(session.id)}`, sessionId: session.id, body: { operationId: opId('mut') } })
+    if (!after.has(session.id) && !removedChildIds.has(session.childId)) operations.push({ id: opId('op_delete'), method: 'DELETE', path: `/v1/sessions/${encodeURIComponent(session.id)}`, sessionId: session.id, body: { operationId: opId('mut') } })
   }
   return operations
 }

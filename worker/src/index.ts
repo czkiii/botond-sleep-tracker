@@ -491,6 +491,45 @@ async function patchChildProfile(request: Request, env: Env, auth: DeviceAuth, c
   return ok(request, env, { revision: child.revision, child: childDto(child) })
 }
 
+async function deleteChildProfile(request: Request, env: Env, auth: DeviceAuth, childId: string) {
+  const body = await readJson(request)
+  const operationId = operationIdFrom(body)
+  const current = await getChild(env, auth.familyId, childId)
+  if (!current) throw new ApiError(404, 'CHILD_NOT_FOUND')
+  if (current.deleted_at) return ok(request, env, { revision: await currentRevision(env, auth.familyId), child: childDto(current), alreadyDeleted: true })
+
+  if (await existingOperation(env, operationId, auth, 'DELETE_CHILD')) {
+    const existing = await getChild(env, auth.familyId, childId)
+    return ok(request, env, { revision: await currentRevision(env, auth.familyId), child: existing ? childDto(existing) : null, idempotent: true })
+  }
+
+  const activeChildren = await env.DB.prepare(
+    'SELECT COUNT(*) AS count FROM children WHERE family_id = ? AND deleted_at IS NULL'
+  ).bind(auth.familyId).first<{ count: number }>()
+  if (!activeChildren || activeChildren.count <= 1) throw new ApiError(409, 'LAST_CHILD', 'The final child profile cannot be deleted.')
+
+  const at = nowIso()
+  await env.DB.batch([
+    env.DB.prepare('INSERT INTO operations (id, family_id, device_id, operation_type, created_at) VALUES (?, ?, ?, ?, ?)')
+      .bind(operationId, auth.familyId, auth.deviceId, 'DELETE_CHILD', at),
+    env.DB.prepare('UPDATE families SET revision = revision + 1 WHERE id = ?').bind(auth.familyId),
+    env.DB.prepare(
+      `UPDATE children
+       SET deleted_at = ?, updated_at = ?, revision = (SELECT revision FROM families WHERE id = ?)
+       WHERE id = ? AND family_id = ? AND deleted_at IS NULL`
+    ).bind(at, at, auth.familyId, childId, auth.familyId),
+    env.DB.prepare(
+      `UPDATE sleep_sessions
+       SET deleted_at = ?, updated_at = ?, revision = (SELECT revision FROM families WHERE id = ?)
+       WHERE child_id = ? AND family_id = ? AND deleted_at IS NULL`
+    ).bind(at, at, auth.familyId, childId, auth.familyId)
+  ])
+
+  const deleted = await getChild(env, auth.familyId, childId)
+  if (!deleted) throw new ApiError(404, 'CHILD_NOT_FOUND')
+  return ok(request, env, { revision: await currentRevision(env, auth.familyId), child: childDto(deleted) })
+}
+
 async function startSleep(request: Request, env: Env, auth: DeviceAuth) {
   const body = await readJson(request)
   const operationId = operationIdFrom(body)
@@ -735,6 +774,7 @@ async function route(request: Request, env: Env) {
 
   const childMatch = path.match(/^\/v1\/children\/([^/]+)$/)
   if (request.method === 'PATCH' && childMatch) return patchChildProfile(request, env, auth, decodeURIComponent(childMatch[1]))
+  if (request.method === 'DELETE' && childMatch) return deleteChildProfile(request, env, auth, decodeURIComponent(childMatch[1]))
 
   const sessionMatch = path.match(/^\/v1\/sessions\/([^/]+)$/)
   if (request.method === 'PATCH' && sessionMatch) return patchSleep(request, env, auth, decodeURIComponent(sessionMatch[1]))
