@@ -23,7 +23,7 @@ describe('inspectBackup', () => {
     const result = inspectBackup(demoBackup)
 
     expect(result.data.children.map((item) => item.name)).toEqual(['Boti', 'Frici'])
-    expect(result.data.sessions).toHaveLength(109)
+    expect(result.data.sessions).toHaveLength(154)
     expect(new Set(result.data.sessions.map((item) => item.childId))).toEqual(new Set(['child_demo_boti', 'child_demo_frici']))
     expect(result.diagnostics).toEqual([])
   })
