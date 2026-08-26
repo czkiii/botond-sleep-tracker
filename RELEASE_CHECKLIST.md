@@ -94,7 +94,7 @@ A fejlesztés ugyanabban a repóban és ugyanazon a fő alkalmazáson folytatód
 - [x] Internal frontend csak explicit staging API URL esetén tölti be a Family Sync réteget.
 - [x] Automatizált staging smoke teszt elkészült két gyerekhez és két készülékhez.
 - [x] Külön EU-jurisdictionös `solemi-sleep-db-staging` D1 létrehozása és a teljes `schema.sql` alkalmazása.
-- [ ] `solemi-sleep-sync-staging` Worker deploy és külön `TOKEN_PEPPER` secret beállítása.
+- [x] `solemi-sleep-sync-staging` Worker deploy és külön `TOKEN_PEPPER` secret beállítása.
 - [ ] Internal Pages `VITE_SYNC_API_BASE` beállítása a staging Worker URL-jére.
 - [ ] Két készülék összekapcsolása meghívókóddal.
 - [ ] Profil create/update megjelenik mindkét készüléken.
