@@ -4,8 +4,8 @@ import { languageOptions, localeTag, t } from './i18n'
 import type { Locale } from './i18n'
 import type { AppData, ChildProfile, DayNightOverride, Page, SleepSession } from './types'
 import type { DataQualityIssueKind } from './utils'
-import { createChild, createSession, exportData, importData, loadData, saveData } from './storage'
-import type { ImportDiagnostic } from './storage'
+import { createChild, createSession, exportData, importData, inspectBackup, loadData, saveData } from './storage'
+import type { ImportDiagnostic, ImportInspection } from './storage'
 import { loadChildPhoto, prepareChildPhoto, saveChildPhoto } from './photoStore'
 import type { AvatarCrop } from './photoStore'
 import { buildInsightsFoundation } from './insights'
@@ -275,22 +275,37 @@ function StatCard({ label, value, suffix, icon }: { label: string; value: string
 function SettingsPage({ data, setData, onBack }: { data: AppData; setData: (data: AppData) => void; onBack: () => void }) {
   const locale = data.settings.locale
   const [editingChild, setEditingChild] = useState<ChildProfile | 'new' | null>(null)
+  const [loadingDemo, setLoadingDemo] = useState(false)
   const changeLocale = (event: ChangeEvent<HTMLSelectElement>) => setData({ ...data, settings: { ...data.settings, locale: event.target.value as Locale } })
+  const applyImport = (inspection: ImportInspection) => {
+    const next = inspection.data
+    const diagnosticText = inspection.diagnostics.map((diagnostic) => `• ${importDiagnosticText(locale, diagnostic)}`).join('\n')
+    const summary = t(locale, 'importFound', { count: next.sessions.length, children: next.children.length })
+    if (!window.confirm(diagnosticText ? `${summary}\n\n${diagnosticText}\n\n${t(locale, 'importReplaceQuestion')}` : `${summary}\n\n${t(locale, 'importReplaceQuestion')}`)) return
+    exportData(data)
+    setData({ ...next, settings: { ...next.settings, locale } })
+  }
   const handleImport = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
     try {
-      const inspection = await importData(file, locale)
-      const next = inspection.data
-      const diagnosticText = inspection.diagnostics.map((diagnostic) => `• ${importDiagnosticText(locale, diagnostic)}`).join('\n')
-      const summary = t(locale, 'importFound', { count: next.sessions.length, children: next.children.length })
-      if (!window.confirm(diagnosticText ? `${summary}\n\n${diagnosticText}\n\n${t(locale, 'importReplaceQuestion')}` : `${summary}\n\n${t(locale, 'importReplaceQuestion')}`)) return
-      exportData(data)
-      setData({ ...next, settings: { ...next.settings, locale } })
+      applyImport(await importData(file, locale))
     } catch (error) {
       window.alert(error instanceof Error ? error.message : t(locale, 'importError'))
+    } finally {
+      event.target.value = ''
     }
-    event.target.value = ''
+  }
+  const loadDemoData = async () => {
+    setLoadingDemo(true)
+    try {
+      const module = await import('../test-data/solemi-demo-v4-2026-08-26.json')
+      applyImport(inspectBackup(module.default))
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : t(locale, 'importError'))
+    } finally {
+      setLoadingDemo(false)
+    }
   }
   const clear = () => {
     if (!window.confirm(t(locale, 'clearConfirm'))) return
@@ -307,7 +322,7 @@ function SettingsPage({ data, setData, onBack }: { data: AppData; setData: (data
       const active = child.id === data.settings.activeChildId
       return <button key={child.id} className={`child-list-row ${active ? 'active' : ''}`} onClick={() => setData({ ...data, settings: { ...data.settings, activeChildId: child.id } })}><ChildAvatar child={child} className="child-list-avatar" /><span><strong>{child.name || t(locale, 'unnamedChild')}</strong><small>{child.birthDate || t(locale, 'birthDateMissing')} · {t(locale, 'sleepEntries', { count })}</small></span>{active && <b>{t(locale, 'active')}</b>}<span className="child-edit-button" role="button" tabIndex={0} aria-label={t(locale, 'editChild')} onClick={(event) => { event.stopPropagation(); setEditingChild(child) }}><Icon name="edit" size={15} /></span></button>
     })}</div>
-    <div className="settings-card action-stack"><button onClick={() => exportData(data)}>{t(locale, 'exportData')}</button><label className="file-button">{t(locale, 'importData')}<input type="file" accept="application/json" onChange={handleImport} /></label><button className="danger" onClick={clear}>{t(locale, 'clearAll')}</button></div><p className="muted">{t(locale, 'localOnly')}</p></section>
+    <div className="settings-card action-stack"><button onClick={() => exportData(data)}>{t(locale, 'exportData')}</button><label className="file-button">{t(locale, 'importData')}<input type="file" accept="application/json" onChange={handleImport} /></label>{import.meta.env.VITE_INTERNAL_PREVIEW === 'true' && <button className="internal-demo-button" onClick={loadDemoData} disabled={loadingDemo}>{loadingDemo ? t(locale, 'loadingDemoData') : t(locale, 'loadDemoData')}</button>}<button className="danger" onClick={clear}>{t(locale, 'clearAll')}</button></div><p className="muted">{t(locale, 'localOnly')}</p></section>
     {editingChild && <ChildEditor child={editingChild === 'new' ? null : editingChild as ChildProfile} locale={locale} onClose={() => setEditingChild(null)} onSave={(next) => {
       if (editingChild === 'new') setData({ ...data, children: [...data.children, next], settings: { ...data.settings, activeChildId: next.id } })
       else setData({ ...data, children: data.children.map((child) => child.id === next.id ? next : child) })
