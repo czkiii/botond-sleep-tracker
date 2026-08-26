@@ -517,6 +517,7 @@ svg { display: block; }
 }
 .file-button { display: block !important; }
 .file-button input { display: none; }
+.action-stack .internal-demo-button { color: #ffd8ac; border-color: rgba(232, 143, 62, .42); background: rgba(126, 66, 18, .24); }
 .action-stack .danger { color: #ff9ba5; background: rgba(99, 27, 38, .16); }
 .muted { color: var(--muted); font-size: 12px; line-height: 1.5; }
 .settings-section-head { margin: 24px 2px -7px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
