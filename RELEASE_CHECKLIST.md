@@ -107,11 +107,17 @@ A fejlesztés ugyanabban a repóban és ugyanazon a fő alkalmazáson folytatód
 
 Nem minden tervezett Insights-funkció szükséges az első belső RC-hez. Külön döntés kell arról, mi blokkolja a nyilvános kiadást.
 
-- [ ] Wake window teljes V1 scope: 7/14/30 nap, tartomány és megfelelő minimum minta.
+- [x] Wake window teljes V1 scope: 7/14/30 nap, medián, tipikus tartomány, megfelelő minimum minta és alvássorrend szerinti bontás.
 - [ ] Rutinminták V1.
 - [ ] Hasonló napok V1 vagy későbbi kiadásra halasztás.
 - [ ] Prediction Lite V1 vagy későbbi kiadásra halasztás.
-- [ ] Részletes adatminőségi motor: duplikáció, hiányos import és javítási útvonal.
+- [ ] Részletes adatminőségi motor:
+  - [x] hibás és jövőbeli időpontok;
+  - [x] túl rövid, túl hosszú és beragadt aktív sessionök;
+  - [x] duplikációgyanú és átfedés;
+  - [x] problémás sessionök determinisztikus kizárása az Insightsból;
+  - [ ] hiányos import részletes diagnosztikája;
+  - [ ] egyértelmű javítási útvonal minden problématípushoz.
 - [ ] Végleges navigáció: `Alvások · Előzmények · Insights`.
 - [ ] Free / Family csomaghatár rögzítése legalább a kiadott funkciókra.
 
