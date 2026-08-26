@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import demoBackup from '../test-data/solemi-demo-v4-2026-08-26.json'
 import { buildInsightsFoundation } from './insights'
 import type { SleepSession } from './types'
 
@@ -69,6 +70,15 @@ describe('buildInsightsFoundation', () => {
     ]
     expect(buildInsightsFoundation(sessions, NOW, { lookbackDays: 7 }).wakeWindow.sampleCount).toBe(1)
     expect(buildInsightsFoundation(sessions, NOW, { lookbackDays: 30 }).wakeWindow.sampleCount).toBe(2)
+  })
+
+  it('shows the demo wake-window trend across 7, 14 and 30 days', () => {
+    const botiSessions = demoBackup.data.sessions.filter((item) => item.childId === 'child_demo_boti') as SleepSession[]
+    const now = Date.parse('2026-08-26T16:33:00+02:00')
+    const nightTypical = (days: 7 | 14 | 30) => buildInsightsFoundation(botiSessions, now, { lookbackDays: days }).wakeWindow.breakdown.find((item) => item.key === 'night')?.typicalMs ?? 0
+
+    expect(nightTypical(7)).toBeGreaterThan(nightTypical(14))
+    expect(nightTypical(14)).toBeGreaterThan(nightTypical(30))
   })
 
   it('shows a sleep-order breakdown only after three matching samples', () => {
