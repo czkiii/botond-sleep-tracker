@@ -101,6 +101,7 @@ A fejlesztés ugyanabban a repóban és ugyanazon a fő alkalmazáson folytatód
 - [ ] Átfedő és extrém session kimarad a számításból, és erről jelzés jelenik meg.
 - [ ] HU / EN / DE szövegek és mobil layout ellenőrzése.
 - [ ] Hasonló napok: a három találat és a későbbi elalvás kézi ellenőrzése ismert tesztadatokkal.
+- [ ] Prediction Lite: közelgő, aktuális és elmúlt tartomány kézi ellenőrzése ismert tesztadatokkal.
 
 **Kapu:** nincs ismert P0/P1 adatvesztési, migrációs vagy sync hiba.
 
@@ -111,7 +112,7 @@ Nem minden tervezett Insights-funkció szükséges az első belső RC-hez. Kül�
 - [x] Wake window teljes V1 scope: 7/14/30 nap, medián, tipikus tartomány, megfelelő minimum minta és alvássorrend szerinti bontás.
 - [x] Rutinminták V1: tipikus esti elalvás, reggeli ébredés, ±30 perces konzisztencia és nappali alvásszám legalább 3 tiszta megfigyelt napból.
 - [x] Hasonló napok V1: 7/14/30 napos saját, tiszta napok összevetése nappali alvásszám, addigi összalvás és aktuális ébrenléti idő alapján; legalább 3 összehasonlítható nap és legfeljebb 3 magyarázható találat.
-- [ ] Prediction Lite V1 vagy későbbi kiadásra halasztás.
+- [x] Prediction Lite V1: az aktuális alvássorrend legalább 3 tiszta wake-window mintájából medián és interkvartilis tartomány; látható bizonytalanság, elmúlt tartomány jelzése és orvosi állítást kizáró szöveg.
 - [ ] Részletes adatminőségi motor:
   - [x] hibás és jövőbeli időpontok;
   - [x] túl rövid, túl hosszú és beragadt aktív sessionök;
@@ -160,8 +161,8 @@ Nem minden tervezett Insights-funkció szükséges az első belső RC-hez. Kül�
 
 ## Következő konkrét munkamenet
 
-1. Prediction Lite V1 megtervezése és automatizált tesztekkel történő megvalósítása.
-2. Ugyanebből a repóból épülő belső preview bekötése.
-3. Staging Worker/D1 vagy frontend-only tesztmód bekötése.
-4. Belső preview deploy.
-5. A D szakasz tesztmátrixának végigjárása.
+1. Ugyanebből a repóból épülő belső preview bekötése.
+2. Staging Worker/D1 vagy frontend-only tesztmód bekötése.
+3. Belső preview deploy.
+4. A D szakasz tesztmátrixának végigjárása.
+5. A blokkolt importok opcionális, alkalmazáson belüli vezetett szerkesztőjének megtervezése.
