@@ -8,6 +8,7 @@ import { createChild, createSession, exportData, importData, loadData, saveData 
 import type { ImportDiagnostic } from './storage'
 import { loadChildPhoto, saveChildPhoto } from './photoStore'
 import { buildInsightsFoundation } from './insights'
+import { buildSimilarDaysInsight } from './similarDays'
 import { DEFAULT_DAY_START_MINUTES, DEFAULT_NIGHT_START_MINUTES, LONG_SLEEP_GUARDRAIL_MS, awakeSince, durationOf, formatDateHeader, formatDuration, formatTime, formatTimer, getDataQualityWarnings, splitDayNight, todaySessions, totalToday } from './utils'
 import SleepTimeline from './SleepTimeline'
 import SwipeHistoryRow from './SwipeHistoryRow'
@@ -207,6 +208,7 @@ function StatsPage({ sessions, now, locale }: { sessions: SleepSession[]; now: n
   const timelineDate = range === 'day' || !selectedDate ? undefined : selectedDate
   const chartUnit = locale === 'hu' ? 'ó' : locale === 'de' ? 'Std.' : 'hr'
   const insights = useMemo(() => buildInsightsFoundation(sessions, now, { lookbackDays: insightsRange }), [sessions, now, insightsRange])
+  const similarDays = useMemo(() => buildSimilarDaysInsight(sessions, now, insightsRange), [sessions, now, insightsRange])
   const wakeWindow = insights.wakeWindow
   const routine = insights.routine
 
@@ -231,7 +233,18 @@ function StatsPage({ sessions, now, locale }: { sessions: SleepSession[]; now: n
       {routine.daytimeSleepCount && <RoutineRow label={t(locale, 'typicalNapCount')} value={formatCount(routine.daytimeSleepCount.typicalCount, locale)} detail={t(locale, 'napCountRange', { low: formatCount(routine.daytimeSleepCount.lowCount, locale), high: formatCount(routine.daytimeSleepCount.highCount, locale) })} />}
       {routine.status === 'ready' && <small>{t(locale, 'routineOwnData')}</small>}
     </div>
+    <div className="insights-card similar-days-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'similarDays')}</h2></div>{similarDays.status === 'ready' && <b>{t(locale, 'closestDays')}</b>}</div>
+      {similarDays.status === 'unavailable' && <p className="routine-empty">{t(locale, 'similarDaysUnavailable')}</p>}
+      {similarDays.status === 'collecting' && <p className="routine-empty">{t(locale, 'similarDaysCollecting', { count: similarDays.candidateCount })}</p>}
+      {similarDays.matches.map((match) => <div className="similar-day-row" key={match.dateKey}><div><strong>{formatDateKey(match.dateKey, locale)}</strong><small>{t(locale, 'similarDayEvidence', { naps: match.snapshot.daytimeSleepCount, sleep: formatDuration(match.snapshot.totalSleepMs, locale), awake: formatDuration(match.snapshot.awakeMs ?? 0, locale) })}</small></div>{match.nextSleep ? <span>{t(locale, 'thenSleptAt')} <b>{formatTime(match.nextSleep.startTime, locale)}</b></span> : <span>{t(locale, 'noLaterSleep')}</span>}</div>)}
+      {similarDays.status === 'ready' && <small>{t(locale, 'similarDaysExplanation')}</small>}
+    </div>
   </section>
+}
+
+function formatDateKey(value: string, locale: Locale) {
+  const [year, month, day] = value.split('-').map(Number)
+  return new Intl.DateTimeFormat(localeTag(locale), { month: 'short', day: 'numeric', weekday: 'short' }).format(new Date(year, month - 1, day))
 }
 
 function RoutineRow({ label, value, detail }: { label: string; value: string; detail: string }) {
