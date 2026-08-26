@@ -55,11 +55,18 @@ function nextBucket(sessions: SleepSession[], now: number): PredictionBucket {
   const minutes = date.getHours() * 60 + date.getMinutes()
   if (minutes < DEFAULT_DAY_START_MINUTES || minutes >= DEFAULT_NIGHT_START_MINUTES) return 'night'
   const today = localDateKey(date.toISOString())
-  const daytimeCount = sessions.filter((session) => {
-    if (Date.parse(session.startTime) > now || localDateKey(session.startTime) !== today) return false
+  const daytimeByDate = new Map<string, number>()
+  sessions.forEach((session) => {
+    if (Date.parse(session.startTime) > now) return
+    const key = localDateKey(session.startTime)
     const parts = splitDayNight(session, now)
-    return parts.day > parts.night
-  }).length
+    if (parts.day <= parts.night) return
+    daytimeByDate.set(key, (daytimeByDate.get(key) ?? 0) + 1)
+  })
+  const daytimeCount = daytimeByDate.get(today) ?? 0
+  const historicalCounts = Array.from(daytimeByDate.entries()).filter(([key]) => key !== today).map(([, count]) => count)
+  const typicalDaytimeCount = historicalCounts.length >= 3 ? Math.max(1, Math.round(median(historicalCounts))) : null
+  if (typicalDaytimeCount !== null && daytimeCount >= typicalDaytimeCount) return 'night'
   return daytimeCount === 0 ? 'day-1' : daytimeCount === 1 ? 'day-2' : 'day-3-plus'
 }
 
