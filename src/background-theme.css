@@ -8,7 +8,7 @@ body,
 .app-shell {
   background-image:
     linear-gradient(180deg, rgba(3, 10, 23, 0.24) 0%, rgba(3, 10, 23, 0.34) 52%, rgba(3, 10, 23, 0.48) 100%),
-    url('/botond-sleep-tracker/app-background.png');
+    var(--solemi-app-background);
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
@@ -52,13 +52,13 @@ body,
 .status-orb.awake::before {
   background-image:
     linear-gradient(rgba(4, 15, 34, 0.20), rgba(4, 15, 34, 0.30)),
-    url('/botond-sleep-tracker/assets/ui/orbs/awake-orb-day.png');
+    var(--solemi-awake-orb);
 }
 
 .status-orb.sleeping::before {
   background-image:
     linear-gradient(rgba(2, 10, 26, 0.18), rgba(2, 10, 26, 0.28)),
-    url('/botond-sleep-tracker/assets/ui/orbs/asleep-orb-night.png');
+    var(--solemi-asleep-orb);
 }
 
 .status-orb .orb-content {

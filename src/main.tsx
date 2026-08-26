@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { registerSW } from 'virtual:pwa-register'
 import App from './App'
 import FamilySyncLayer from './FamilySyncLayer'
+import { installAssetCssVariables } from './assetPaths'
 import './styles.css'
 import './ux-tuning.css'
 import './today-fit.css'
@@ -14,6 +15,8 @@ const internalPreview = import.meta.env.VITE_INTERNAL_PREVIEW === 'true'
 const internalStagingSync = internalPreview && Boolean(import.meta.env.VITE_SYNC_API_BASE)
 const syncEnabled = !internalPreview || internalStagingSync
 const buildSha = import.meta.env.VITE_BUILD_SHA?.slice(0, 7) || 'local'
+
+installAssetCssVariables()
 
 if (!internalPreview) registerSW({ immediate: true })
 

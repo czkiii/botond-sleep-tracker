@@ -115,7 +115,7 @@ A fejlesztés ugyanabban a repóban és ugyanazon a fő alkalmazáson folytatód
 - [x] 14 napos jellemző wake window helyes mintákból számolódik.
 - [x] Kevés adatnál nincs túlzott bizonyosság.
 - [x] Átfedő és extrém session kimarad a számításból, és erről jelzés jelenik meg.
-- [ ] HU / EN / DE szövegek és mobil layout ellenőrzése.
+- [x] HU / EN / DE szövegek és mobil layout ellenőrzése.
 - [x] Hasonló napok: a három találat és a későbbi elalvás kézi ellenőrzése ismert tesztadatokkal.
 - [ ] Prediction Lite: közelgő, aktuális és elmúlt tartomány kézi ellenőrzése ismert tesztadatokkal.
 
