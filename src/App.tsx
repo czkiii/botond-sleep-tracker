@@ -214,6 +214,10 @@ function StatsPage({ sessions, now, locale }: { sessions: SleepSession[]; now: n
   const prediction = useMemo(() => buildPredictionLite(sessions, now, insightsRange), [sessions, now, insightsRange])
   const wakeWindow = insights.wakeWindow
   const routine = insights.routine
+  const relevantWakeWindow = prediction.bucket ? wakeWindow.breakdown.find((item) => item.key === prediction.bucket) ?? null : null
+  const primaryWakeMs = relevantWakeWindow?.typicalMs ?? wakeWindow.typicalMs
+  const primaryWakeRange = relevantWakeWindow ? { lowMs: relevantWakeWindow.lowMs, highMs: relevantWakeWindow.highMs } : wakeWindow.typicalRange
+  const primaryWakeLabel = relevantWakeWindow ? wakeBucketLabel(locale, relevantWakeWindow.key) : t(locale, 'typicalWakeWindow')
 
   return <section className="screen stats-screen"><header className="page-header centered-header"><h1>{t(locale, 'statistics')}</h1></header>
     <div className="segmented"><button className={range === 'day' ? 'active' : ''} onClick={() => changeRange('day')}>{t(locale, 'day')}</button><button className={range === 'week' ? 'active' : ''} onClick={() => changeRange('week')}>{t(locale, 'week')}</button><button className={range === 'month' ? 'active' : ''} onClick={() => changeRange('month')}>{t(locale, 'month')}</button></div>
@@ -222,10 +226,9 @@ function StatsPage({ sessions, now, locale }: { sessions: SleepSession[]; now: n
     <div className="overview-compact"><SleepTimeline sessions={sessions} now={now} day={timelineDate} locale={locale} /><div className="stats-row"><StatCard label={display.label} value={formatDuration(display.total, locale)} suffix={selectedStats ? undefined : t(locale, 'perDay')} /><StatCard label={t(locale, 'daytime')} value={formatDuration(display.day, locale)} icon="sun" /><StatCard label={t(locale, 'nighttime')} value={formatDuration(display.night, locale)} icon="moon" /></div></div>
     <div className="insights-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'wakeWindow')}</h2></div>{wakeWindow.confidence && <b>{t(locale, wakeWindow.confidence === 'medium' ? 'mediumConfidence' : 'lowConfidence')}</b>}</div>
       <div className="insights-range" aria-label={t(locale, 'insightsRange')}>{([7, 14, 30] as const).map((value) => <button key={value} className={insightsRange === value ? 'active' : ''} onClick={() => setInsightsRange(value)}>{value} {t(locale, 'daysShort')}</button>)}</div>
-      {wakeWindow.currentMs !== null ? <><strong className="insights-primary-value">{formatDuration(wakeWindow.currentMs, locale)}</strong><p>{t(locale, 'awakeForNow')}</p></> : <p>{t(locale, 'wakeWindowUnavailable')}</p>}
-      {wakeWindow.typicalMs !== null && <div className="insights-comparison"><span>{t(locale, 'typicalWakeWindow')}</span><strong>{formatDuration(wakeWindow.typicalMs, locale)}</strong></div>}
-      {wakeWindow.typicalRange && <div className="insights-comparison"><span>{t(locale, 'typicalRange')}</span><strong>{formatDuration(wakeWindow.typicalRange.lowMs, locale)}–{formatDuration(wakeWindow.typicalRange.highMs, locale)}</strong></div>}
-      {wakeWindow.breakdown.length > 0 && <div className="wake-breakdown"><strong>{t(locale, 'bySleepOrder')}</strong>{wakeWindow.breakdown.map((item) => <div key={item.key}><span>{t(locale, item.key === 'day-1' ? 'firstNapWindow' : item.key === 'day-2' ? 'secondNapWindow' : item.key === 'day-3-plus' ? 'laterNapWindow' : 'nightSleepWindow')}</span><b>{formatDuration(item.typicalMs, locale)}</b><small>{t(locale, 'sampleCountShort', { count: item.sampleCount })}</small></div>)}</div>}
+      {primaryWakeMs !== null ? <div className="wake-window-hero"><span>{primaryWakeLabel}</span><strong>{formatDuration(primaryWakeMs, locale)}</strong>{primaryWakeRange && <small>{t(locale, 'typicalRange')}: {formatDuration(primaryWakeRange.lowMs, locale)}–{formatDuration(primaryWakeRange.highMs, locale)} · {t(locale, 'sampleCountShort', { count: relevantWakeWindow?.sampleCount ?? wakeWindow.sampleCount })}</small>}</div> : <p>{t(locale, 'wakeWindowCollecting', { count: wakeWindow.sampleCount })}</p>}
+      {wakeWindow.currentMs !== null ? <div className="current-awake-status"><span>{t(locale, 'awakeForNow')}</span><strong>{formatDuration(wakeWindow.currentMs, locale)}</strong></div> : <p>{t(locale, 'wakeWindowUnavailable')}</p>}
+      {wakeWindow.breakdown.length > 0 && <div className="wake-breakdown"><strong>{t(locale, 'bySleepOrder')}</strong>{wakeWindow.breakdown.map((item) => <div key={item.key} className={item.key === relevantWakeWindow?.key ? 'relevant' : ''}><span>{wakeBucketLabel(locale, item.key)}</span><b>{formatDuration(item.typicalMs, locale)}</b><small>{t(locale, 'sampleCountShort', { count: item.sampleCount })}</small></div>)}</div>}
       <small>{wakeWindow.status === 'ready' ? t(locale, 'wakeWindowBasis', { count: wakeWindow.sampleCount }) : t(locale, 'wakeWindowCollecting', { count: wakeWindow.sampleCount })}</small>
       {insights.quality.excludedSessionCount > 0 && <small className="insights-quality-note">{t(locale, 'insightsExcluded', { count: insights.quality.excludedSessionCount })}</small>}
     </div>
@@ -253,6 +256,10 @@ function StatsPage({ sessions, now, locale }: { sessions: SleepSession[]; now: n
 function formatDateKey(value: string, locale: Locale) {
   const [year, month, day] = value.split('-').map(Number)
   return new Intl.DateTimeFormat(localeTag(locale), { month: 'short', day: 'numeric', weekday: 'short' }).format(new Date(year, month - 1, day))
+}
+
+function wakeBucketLabel(locale: Locale, key: 'day-1' | 'day-2' | 'day-3-plus' | 'night') {
+  return t(locale, key === 'day-1' ? 'firstNapWindow' : key === 'day-2' ? 'secondNapWindow' : key === 'day-3-plus' ? 'laterNapWindow' : 'nightSleepWindow')
 }
 
 function RoutineRow({ label, value, detail }: { label: string; value: string; detail: string }) {
