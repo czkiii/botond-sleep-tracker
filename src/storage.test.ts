@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import demoBackup from '../test-data/solemi-demo-v4-2026-08-26.json'
-import { ImportValidationError, inspectBackup } from './storage'
+import { ImportValidationError, inspectBackup, migrateV3 } from './storage'
 import type { AppData, ChildProfile, SleepSession } from './types'
 
 const child: ChildProfile = { id: 'child-1', name: 'Mira', birthDate: null, photoRef: null, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' }
@@ -34,6 +34,17 @@ describe('inspectBackup', () => {
     expect(result.diagnostics).toEqual([])
   })
 
+  it('round-trips two children without mixing their sleep data', () => {
+    const secondChild: ChildProfile = { ...child, id: 'child-2', name: 'Noel' }
+    const secondSleep: SleepSession = { ...sleep, id: 'sleep-2', childId: secondChild.id, note: 'Második gyerek' }
+    const source = backup({ children: [child, secondChild], sessions: [sleep, secondSleep] })
+    const result = inspectBackup(JSON.parse(JSON.stringify(source)))
+
+    expect(result.data.children.map((item) => item.id)).toEqual(['child-1', 'child-2'])
+    expect(result.data.sessions.filter((item) => item.childId === 'child-1').map((item) => item.id)).toEqual(['sleep-1'])
+    expect(result.data.sessions.filter((item) => item.childId === 'child-2').map((item) => item.id)).toEqual(['sleep-2'])
+  })
+
   it('removes only fully identical duplicate records', () => {
     const result = inspectBackup(backup({ children: [child, child], sessions: [sleep, sleep] }))
     expect(result.data.children).toHaveLength(1)
@@ -60,5 +71,24 @@ describe('inspectBackup', () => {
     const result = inspectBackup(backup({ settings: { locale: 'hu', activeChildId: 'missing', longSleepReminderEnabled: false } }))
     expect(result.data.settings.activeChildId).toBe(child.id)
     expect(result.diagnostics[0].kind).toBe('active-child-reset')
+  })
+})
+
+describe('migrateV3', () => {
+  it('preserves every legacy sleep field and assigns one migrated child', () => {
+    const legacySleep = {
+      id: 'legacy-sleep',
+      startTime: '2026-08-20T20:00:00.000Z',
+      endTime: '2026-08-21T06:00:00.000Z',
+      note: 'Régi megjegyzés',
+      createdAt: '2026-08-20T20:00:00.000Z',
+      updatedAt: '2026-08-21T06:00:00.000Z'
+    }
+    const migrated = migrateV3({ version: 3, settings: { childName: 'Régi profil', locale: 'hu' }, sessions: [legacySleep] })
+
+    expect(migrated?.version).toBe(4)
+    expect(migrated?.children).toHaveLength(1)
+    expect(migrated?.children[0].name).toBe('Régi profil')
+    expect(migrated?.sessions[0]).toEqual({ ...legacySleep, childId: migrated?.children[0].id, dayNightOverride: null })
   })
 })

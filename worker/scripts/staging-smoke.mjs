@@ -12,6 +12,7 @@ const childB = `child_smoke_b_${run}`
 const sessionA = `sleep_smoke_a_${run}`
 const sessionB = `sleep_smoke_b_${run}`
 const sessionC = `sleep_smoke_child_delete_${run}`
+const conflictingSession = `sleep_smoke_conflict_${run}`
 
 function operationId(label) {
   return `op_${label}_${randomUUID().replaceAll('-', '')}`
@@ -32,6 +33,22 @@ async function api(path, { method = 'GET', token, body } = {}) {
     throw new Error(`${method} ${path} failed: ${detail}`)
   }
   return { response, data: payload.data }
+}
+
+async function expectedApiError(path, expectedStatus, expectedCode, { method = 'GET', token, body } = {}) {
+  const headers = { Origin: origin }
+  if (token) headers.Authorization = `Bearer ${token}`
+  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  const response = await fetch(`${base}${path}`, {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body)
+  })
+  const payload = await response.json()
+  assert.equal(response.status, expectedStatus)
+  assert.equal(payload?.ok, false)
+  assert.equal(payload?.error?.code, expectedCode)
+  return payload
 }
 
 console.log(`Staging smoke test: ${base}`)
@@ -63,16 +80,20 @@ await api('/v1/children', {
 })
 
 const now = Date.now()
-await Promise.all([
-  api('/v1/sessions/start', {
-    method: 'POST', token: primaryToken,
-    body: { operationId: operationId('start_a'), sessionId: sessionA, childId: childA, startTime: new Date(now - 10 * 60_000).toISOString() }
-  }),
-  api('/v1/sessions/start', {
-    method: 'POST', token: primaryToken,
-    body: { operationId: operationId('start_b'), sessionId: sessionB, childId: childB, startTime: new Date(now - 8 * 60_000).toISOString() }
-  })
-])
+await api('/v1/sessions/start', {
+  method: 'POST', token: primaryToken,
+  body: { operationId: operationId('start_a'), sessionId: sessionA, childId: childA, startTime: new Date(now - 10 * 60_000).toISOString() }
+})
+const duplicateStart = await expectedApiError('/v1/sessions/start', 409, 'ACTIVE_SLEEP_EXISTS', {
+  method: 'POST', token: primaryToken,
+  body: { operationId: operationId('duplicate_start_a'), sessionId: conflictingSession, childId: childA, startTime: new Date(now - 9 * 60_000).toISOString() }
+})
+assert.equal(duplicateStart.data?.activeSession?.id, sessionA)
+
+await api('/v1/sessions/start', {
+  method: 'POST', token: primaryToken,
+  body: { operationId: operationId('start_b'), sessionId: sessionB, childId: childB, startTime: new Date(now - 8 * 60_000).toISOString() }
+})
 
 let synced = (await api('/v1/sync?after=0', { token: primaryToken })).data
 assert.equal(synced.children.filter((child) => !child.deletedAt).length, 2)
@@ -95,6 +116,12 @@ await Promise.all([
   })
 ])
 
+const doubleStop = await api(`/v1/sessions/${sessionA}/end`, {
+  method: 'POST', token: primaryToken,
+  body: { operationId: operationId('double_stop_a'), endTime }
+})
+assert.equal(doubleStop.data.alreadyEnded, true)
+
 await api(`/v1/sessions/${sessionA}`, {
   method: 'PATCH', token: primaryToken,
   body: { operationId: operationId('patch_sleep'), patch: { note: 'staging smoke verified', dayNightOverride: 'day' } }
@@ -111,11 +138,20 @@ const joined = await api('/v1/join', {
 })
 assert.ok(joined.data.deviceToken)
 
+await api(`/v1/sessions/${sessionA}`, {
+  method: 'PATCH', token: primaryToken,
+  body: { operationId: operationId('conflict_primary'), patch: { note: 'primary edit' } }
+})
+await api(`/v1/sessions/${sessionA}`, {
+  method: 'PATCH', token: joined.data.deviceToken,
+  body: { operationId: operationId('conflict_secondary'), patch: { note: 'secondary edit wins' } }
+})
+
 synced = (await api('/v1/sync?after=0', { token: joined.data.deviceToken })).data
 const syncedA = synced.sessions.find((session) => session.id === sessionA)
 const syncedB = synced.sessions.find((session) => session.id === sessionB)
 assert.equal(synced.children.find((child) => child.id === childB)?.name, 'Frici staging')
-assert.equal(syncedA?.note, 'staging smoke verified')
+assert.equal(syncedA?.note, 'secondary edit wins')
 assert.equal(syncedA?.dayNightOverride, 'day')
 assert.ok(syncedB?.deletedAt)
 
@@ -142,10 +178,15 @@ const afterChildDelete = (await api(`/v1/sync?after=${synced.revision}`, { token
 assert.ok(afterChildDelete.children.find((child) => child.id === childB)?.deletedAt)
 assert.ok(afterChildDelete.sessions.find((session) => session.id === sessionC)?.deletedAt)
 assert.equal(afterChildDelete.children.find((child) => child.id === childA)?.deletedAt, null)
+assert.equal(afterChildDelete.sessions.find((session) => session.id === sessionA)?.deletedAt, null)
+assert.equal(afterChildDelete.sessions.find((session) => session.id === sessionA)?.note, 'secondary edit wins')
 
 console.log('PASS: health + CORS')
 console.log('PASS: two child profiles + parallel active sleeps')
 console.log('PASS: edit + delete tombstone')
+console.log('PASS: duplicate start rejected + duplicate stop idempotent')
+console.log('PASS: server revision order resolves competing edits')
 console.log('PASS: child delete cascades to its sleep data')
+console.log('PASS: one child mutation leaves the other child untouched')
 console.log('PASS: invite + second-device sync')
 console.log(`PASS: family ${created.data.familyId}, revision ${synced.revision}`)
