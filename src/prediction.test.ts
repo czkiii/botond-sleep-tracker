@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import demoBackup from '../test-data/solemi-demo-v4-2026-08-26.json'
 import { buildPredictionLite } from './prediction'
 import type { SleepSession } from './types'
 
@@ -54,6 +55,15 @@ describe('buildPredictionLite', () => {
     ], NOW)
     expect(result.windowState).toBe('passed')
     expect(result.windowEnd).toBe(Date.parse('2026-08-25T07:00:00.000Z'))
+  })
+
+  it('switches to night prediction after the typical daily nap count is reached', () => {
+    const botiSessions = demoBackup.data.sessions.filter((item) => item.childId === 'child_demo_boti') as SleepSession[]
+    const result = buildPredictionLite(botiSessions, Date.parse('2026-08-26T16:09:00+02:00'), 14)
+
+    expect(result.status).toBe('ready')
+    expect(result.bucket).toBe('night')
+    expect(result.sampleCount).toBeGreaterThanOrEqual(3)
   })
 
   it('withholds a prediction when today contains a quality issue', () => {
