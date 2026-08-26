@@ -70,23 +70,23 @@ A fejlesztés ugyanabban a repóban és ugyanazon a fő alkalmazáson folytatód
 
 - [x] Új telepítés és első indítás a Cloudflare Pages belső preview-n.
 - [x] Alvás indítása és leállítása.
-- [ ] Manuális alvás létrehozása.
+- [x] Manuális alvás létrehozása.
 - [x] Alvás szerkesztése az Előzményekben.
 - [x] Reload után helyes állapot és megmaradó alvásadat.
 - [ ] Háttérbe küldés és visszatérés után helyes állapot.
 - [ ] Offline rögzítés és későbbi visszatérés online állapotba.
-- [ ] Éjfél átlépő alvás.
-- [ ] Időzóna- és DST-próba.
+- [x] Éjfél átlépő alvás automatizált határteszttel.
+- [x] Időzóna- és DST-próba 23 és 25 órás Europe/Budapest napokkal.
 
 ### Child Profile V4
 
-- [ ] Régi V3 adatok automatikus V4 migrációja adatvesztés nélkül.
-- [ ] Egygyerekes felület egyszerű marad.
-- [ ] Több gyerek létrehozása és váltása.
-- [ ] History, Sleeps és Insights együtt vált gyereket.
+- [x] Régi V3 adatok automatikus V4 migrációja adatvesztés nélkül, célzott regressziós teszttel.
+- [x] Egygyerekes felület egyszerű marad.
+- [x] Több gyerek létrehozása és váltása.
+- [x] History, Sleeps és Insights együtt vált gyereket.
 - [x] Két gyereknek párhuzamos aktív alvása lehet.
-- [ ] Profilkép eszközön marad és reload után megjelenik.
-- [ ] Export/import nem keveri össze a gyerekeket.
+- [x] Profilkép eszközön marad és reload után megjelenik.
+- [x] Export/import nem keveri össze a gyerekeket, kétprofilos round-trip regressziós teszttel.
 
 ### Family Sync staging környezetben
 
@@ -105,18 +105,18 @@ A fejlesztés ugyanabban a repóban és ugyanazon a fő alkalmazáson folytatód
 - [x] Gyerekprofil törlése a hozzá tartozó alvásokkal együtt mindkét készüléken eltűnik.
 - [x] Lezárt alvás szerkesztése szinkronizálódik a másik böngészőkörnyezetbe.
 - [x] Gyerekenkénti start/stop/edit/delete szinkronizálódik.
-- [ ] Offline queue visszacsatlakozás után helyesen ürül.
-- [ ] Dupla Start, dupla Stop és szerkesztési konfliktus teszt.
-- [ ] Egy gyerek hibája nem módosítja a másik gyerek adatait.
+- [x] Offline queue visszacsatlakozás után helyesen ürül, hálózatvesztést modellező egységteszttel.
+- [x] Dupla Start, dupla Stop és szerkesztési konfliktus teszt a staging Workeren.
+- [x] Egy gyerek hibája nem módosítja a másik gyerek adatait a teljes staging állapot ellenőrzésével.
 
 ### Insights és adatminőség
 
-- [ ] Aktuális ébrenléti idő helyes.
-- [ ] 14 napos jellemző wake window helyes mintákból számolódik.
-- [ ] Kevés adatnál nincs túlzott bizonyosság.
-- [ ] Átfedő és extrém session kimarad a számításból, és erről jelzés jelenik meg.
+- [x] Aktuális ébrenléti idő helyes.
+- [x] 14 napos jellemző wake window helyes mintákból számolódik.
+- [x] Kevés adatnál nincs túlzott bizonyosság.
+- [x] Átfedő és extrém session kimarad a számításból, és erről jelzés jelenik meg.
 - [ ] HU / EN / DE szövegek és mobil layout ellenőrzése.
-- [ ] Hasonló napok: a három találat és a későbbi elalvás kézi ellenőrzése ismert tesztadatokkal.
+- [x] Hasonló napok: a három találat és a későbbi elalvás kézi ellenőrzése ismert tesztadatokkal.
 - [ ] Prediction Lite: közelgő, aktuális és elmúlt tartomány kézi ellenőrzése ismert tesztadatokkal.
 
 **Kapu:** nincs ismert P0/P1 adatvesztési, migrációs vagy sync hiba.
@@ -177,8 +177,8 @@ Nem minden tervezett Insights-funkció szükséges az első belső RC-hez. Kül�
 
 ## Következő konkrét munkamenet
 
-1. `solemi-sleep-sync-staging` Worker deploy és külön `TOKEN_PEPPER` secret beállítása.
-2. Az automatikus staging smoke teszt lefuttatása.
-3. Az internal Pages összekötése a staging Workerrel.
-4. A Family Sync kézi kétkészülékes tesztmátrixának végigjárása.
+1. Mobil háttérbe küldés/visszatérés és teljes offline felhasználói próba az internal oldalon.
+2. HU / EN / DE mobil layout gyors ellenőrzése.
+3. Prediction Lite állapotainak kézi ellenőrzése ismert tesztadatokkal.
+4. Staging D1 backup/restore próba és rollback dokumentáció.
 5. A Cloudflare Pages preview hozzáférés-védelmének véglegesítése.
