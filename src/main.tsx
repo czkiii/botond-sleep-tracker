@@ -11,14 +11,16 @@ import './background-theme.css'
 import './family-sync.css'
 
 const internalPreview = import.meta.env.VITE_INTERNAL_PREVIEW === 'true'
+const internalStagingSync = internalPreview && Boolean(import.meta.env.VITE_SYNC_API_BASE)
+const syncEnabled = !internalPreview || internalStagingSync
 const buildSha = import.meta.env.VITE_BUILD_SHA?.slice(0, 7) || 'local'
 
 if (!internalPreview) registerSW({ immediate: true })
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    {internalPreview && <div className="internal-preview-banner">INTERNAL / TEST <span>Family Sync disabled · {buildSha}</span></div>}
+    {internalPreview && <div className="internal-preview-banner">INTERNAL / TEST <span>Family Sync {internalStagingSync ? 'staging' : 'disabled'} · {buildSha}</span></div>}
     <App />
-    {!internalPreview && <FamilySyncLayer />}
+    {syncEnabled && <FamilySyncLayer />}
   </React.StrictMode>
 )
