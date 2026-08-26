@@ -12,7 +12,7 @@
     {
       "binding": "DB",
       "database_name": "solemi-sleep-db-staging",
-      "database_id": "REPLACE_WITH_STAGING_D1_DATABASE_ID"
+      "database_id": "1fdd9f64-ea4b-4499-9b6e-636462d51d37"
     }
   ]
 }
