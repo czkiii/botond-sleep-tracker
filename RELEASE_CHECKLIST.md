@@ -53,13 +53,14 @@ Az ellenőrzött release candidate kontrollált backend-migrációval, smoke tes
 A fejlesztés ugyanabban a repóban és ugyanazon a fő alkalmazáson folytatódik. A belső preview nem külön termék és nem külön forráskód: a feature ág pontos commitjának ideiglenesen hosztolt buildje. A jelenlegi GitHub Pages workflow csak a `main` ágat publikálja, ezért a feature ág ugyanoda deployolása felülírná a mostani verziót.
 
 - [x] Belső hosting irány: ugyanazon GitHub-repó feature ágának preview buildje, forrásduplikáció nélkül.
-- [ ] Preview szolgáltató és hozzáférési mód véglegesítése a tényleges bekötés előtt.
+- [x] Preview szolgáltató: külön Cloudflare Pages projekt, ugyanebből a GitHub-repóból és feature ágból.
+- [ ] A preview hozzáférés-védelmének véglegesítése.
 - [x] A frontend-only belső build ne töltse be a Family Sync réteget, így ne használja az éles Worker URL-jét.
-- [ ] Staging Worker + staging D1 környezet létrehozása vagy a Family Sync ideiglenes kikapcsolása a frontend-only körben.
+- [x] Frontend-only tesztmódban a Family Sync kikapcsolása; staging Worker + D1 a későbbi teljes sync-teszthez szükséges.
 - [x] A belső preview build workflow csak a `main` célú PR-ekből vagy manuálisan indítható.
 - [x] A preview oldalon láthatóan jelezni: `INTERNAL / TEST`.
 - [x] A pontos commit SHA megjelenítése vagy könnyű visszakereshetősége.
-- [ ] Belső preview URL rögzítése ebben a dokumentumban.
+- [x] Belső preview URL: https://solemi-sleep-internal.pages.dev (`01905d8` első ellenőrzött deploy).
 
 **Kapu:** a feature ág egy ismert commitja külön URL-en megnyitható, az éles adatokat nem érinti.
 
@@ -67,7 +68,7 @@ A fejlesztés ugyanabban a repóban és ugyanazon a fő alkalmazáson folytatód
 
 ### Alapfunkciók
 
-- [ ] Új telepítés és első indítás.
+- [x] Új telepítés és első indítás a Cloudflare Pages belső preview-n.
 - [ ] Alvás indítása, leállítása, manuális létrehozása és szerkesztése.
 - [ ] Reload, háttérbe küldés és visszatérés után helyes állapot.
 - [ ] Offline rögzítés és későbbi visszatérés online állapotba.
@@ -161,8 +162,8 @@ Nem minden tervezett Insights-funkció szükséges az első belső RC-hez. Kül�
 
 ## Következő konkrét munkamenet
 
-1. Ugyanebből a repóból épülő belső preview bekötése.
-2. Staging Worker/D1 vagy frontend-only tesztmód bekötése.
-3. Belső preview deploy.
-4. A D szakasz tesztmátrixának végigjárása.
+1. A Cloudflare Pages preview hozzáférés-védelmének véglegesítése.
+2. A D szakasz frontend-only tesztmátrixának végigjárása.
+3. Staging Worker + staging D1 létrehozása a teljes Family Sync teszthez.
+4. A Family Sync tesztmátrixának végigjárása stagingen.
 5. A blokkolt importok opcionális, alkalmazáson belüli vezetett szerkesztőjének megtervezése.
