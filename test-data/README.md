@@ -8,3 +8,5 @@
 - All names and sleep records are synthetic test data.
 
 Import it from Settings → Import data. The app downloads the current data as a backup before replacing it.
+
+On the internal preview, the same validated fixture is available directly from Settings → Load test data.
