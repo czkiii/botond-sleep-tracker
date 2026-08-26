@@ -3,6 +3,7 @@ import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recha
 import { languageOptions, localeTag, t } from './i18n'
 import type { Locale } from './i18n'
 import type { AppData, ChildProfile, DayNightOverride, Page, SleepSession } from './types'
+import type { DataQualityIssueKind } from './utils'
 import { createChild, createSession, exportData, importData, loadData, saveData } from './storage'
 import { loadChildPhoto, saveChildPhoto } from './photoStore'
 import { buildInsightsFoundation } from './insights'
@@ -112,6 +113,7 @@ function TodayPage({ data, child, sessions, now, locale, current, onSelectChild,
   const elapsed = current ? durationOf(current, now) : awakeSince(sessions, now)
   const qualityWarnings = getDataQualityWarnings(sessions, now)
   const showLongSleepReminder = Boolean(current && data.settings.longSleepReminderEnabled && elapsed >= LONG_SLEEP_GUARDRAIL_MS)
+  const visibleQualityWarning = qualityWarnings.find((issue) => issue.kind !== 'stale-active')
 
   return <section className="screen today-screen">
     <header className="compact-header"><div className="header-copy"><div className="child-header-line"><ChildAvatar child={child} className="child-avatar" />{data.children.length > 1 ? <select aria-label={t(locale, 'chooseChild')} className="child-switcher" value={child.id} onChange={(event) => onSelectChild(event.target.value)}>{data.children.map((item) => <option key={item.id} value={item.id}>{item.name || t(locale, 'unnamedChild')}</option>)}</select> : <strong className="single-child-name">{child.name || t(locale, 'unnamedChild')}</strong>}</div><div className="date-label">{formatDateHeader(new Date(now), locale)}</div><div className="daily-summary">{t(locale, 'todaySoFar')} <strong>{formatDuration(total, locale)}</strong> {t(locale, 'sleepNoun')}</div></div><button className="icon-button" aria-label={t(locale, 'settings')} onClick={onSettings}><Icon name="settings" size={18} /></button></header>
@@ -119,13 +121,26 @@ function TodayPage({ data, child, sessions, now, locale, current, onSelectChild,
     <button className="primary-action" onClick={current ? onEnd : onStart}><Icon name={current ? 'sun' : 'moon'} size={20} /><span>{current ? t(locale, 'wokeUp') : t(locale, 'fellAsleep')}</span></button>
     {current && <div className="quick-correction"><span>{t(locale, 'startedEarlier')}</span>{[5, 10, 15].map((minutes) => <button key={minutes} onClick={() => onAdjustStart(-minutes)}>−{minutes}</button>)}<button className="custom-correction" onClick={() => onOpenEditor(current)}>{t(locale, 'customTime')}</button></div>}
     {showLongSleepReminder && <div className="sleep-warning-card"><strong>{t(locale, 'stillSleepingQuestion')}</strong><span>{t(locale, 'longSleepReminderText')}</span></div>}
-    {qualityWarnings.length > 0 && <button className="quality-warning-card" onClick={() => onOpenEditor(sessions.find((session) => qualityWarnings[0].sessionIds.includes(session.id)) ?? 'new')}><strong>{t(locale, 'checkSleepData')}</strong><span>{qualityWarnings[0].kind === 'overlap' ? t(locale, 'overlapWarning') : t(locale, 'extremeDurationWarning')}</span></button>}
+    {visibleQualityWarning && <button className="quality-warning-card" onClick={() => onOpenEditor(sessions.find((session) => visibleQualityWarning.sessionIds.includes(session.id)) ?? 'new')}><strong>{t(locale, 'checkSleepData')}</strong><span>{t(locale, qualityIssueTranslationKey(visibleQualityWarning.kind))}</span></button>}
     <button className="text-action" onClick={() => onOpenEditor(current ?? 'new')}>{t(locale, 'manualEntry')}</button>
     <div className="sleep-cards-stack">
       <div className="today-card"><div className="section-head"><h2>{t(locale, 'todaySleeps')}</h2><span>•••</span></div><div className="sleep-list scroll-list">{todays.length === 0 && <div className="empty">{t(locale, 'noSleepToday')}</div>}{todays.map((session) => <SleepRow key={session.id} session={session} now={now} locale={locale} onClick={() => onOpenEditor(session)} compact />)}</div></div>
       <div className="today-card yesterday-card"><div className="section-head"><h2>{t(locale, 'yesterdaySleeps')}</h2><span>•••</span></div><div className="sleep-list scroll-list">{yesterdays.length === 0 && <div className="empty">{t(locale, 'noSleepYesterday')}</div>}{yesterdays.map((session) => <SleepRow key={session.id} session={session} now={now} locale={locale} onClick={() => onOpenEditor(session)} compact />)}</div></div>
     </div>
   </section>
+}
+
+function qualityIssueTranslationKey(kind: DataQualityIssueKind) {
+  const keys = {
+    'invalid-time': 'invalidTimeWarning',
+    'future-time': 'futureTimeWarning',
+    'suspiciously-short': 'shortDurationWarning',
+    'stale-active': 'staleActiveWarning',
+    'extreme-duration': 'extremeDurationWarning',
+    'possible-duplicate': 'duplicateWarning',
+    overlap: 'overlapWarning'
+  } as const
+  return keys[kind]
 }
 
 function SleepRow({ session, now, locale, onClick, compact = false }: { session: SleepSession; now: number; locale: Locale; onClick?: () => void; compact?: boolean }) {

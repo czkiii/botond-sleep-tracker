@@ -6,10 +6,23 @@ export const DEFAULT_DAY_START_MINUTES = 6 * 60
 export const DEFAULT_NIGHT_START_MINUTES = 19 * 60
 export const LONG_SLEEP_GUARDRAIL_MS = 12 * 60 * 60 * 1000
 export const EXTREME_SLEEP_DURATION_MS = 18 * 60 * 60 * 1000
+export const MIN_ANALYTICS_SLEEP_MS = 2 * 60 * 1000
+export const DUPLICATE_TOLERANCE_MS = 2 * 60 * 1000
+export const FUTURE_TOLERANCE_MS = 60 * 1000
 
-export type DataQualityWarning = {
-  kind: 'extreme-duration' | 'overlap'
+export type DataQualityIssueKind = 'invalid-time' | 'future-time' | 'suspiciously-short' | 'stale-active' | 'extreme-duration' | 'possible-duplicate' | 'overlap'
+
+export type DataQualityIssue = {
+  kind: DataQualityIssueKind
+  severity: 'warning' | 'error'
   sessionIds: string[]
+  excludesFromInsights: boolean
+}
+
+export type DataQualityReport = {
+  issues: DataQualityIssue[]
+  excludedSessionIds: string[]
+  usableCompletedSessionCount: number
 }
 
 export const msToParts = (ms: number) => {
@@ -98,20 +111,58 @@ export function splitDayNight(session: SleepSession, now = Date.now()) {
   return { day, night }
 }
 
-export function getDataQualityWarnings(sessions: SleepSession[], now = Date.now()): DataQualityWarning[] {
-  const warnings: DataQualityWarning[] = []
-  const completed = sessions.filter((session) => session.endTime)
-  for (const session of completed) {
-    if (durationOf(session, now) >= EXTREME_SLEEP_DURATION_MS) warnings.push({ kind: 'extreme-duration', sessionIds: [session.id] })
+export function getDataQualityReport(sessions: SleepSession[], now = Date.now()): DataQualityReport {
+  const issues: DataQualityIssue[] = []
+  const validIntervals: Array<{ session: SleepSession; start: number; end: number }> = []
+
+  for (const session of sessions) {
+    const start = Date.parse(session.startTime)
+    const end = session.endTime ? Date.parse(session.endTime) : now
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+      issues.push({ kind: 'invalid-time', severity: 'error', sessionIds: [session.id], excludesFromInsights: true })
+      continue
+    }
+    if (start > now + FUTURE_TOLERANCE_MS || (session.endTime && end > now + FUTURE_TOLERANCE_MS)) {
+      issues.push({ kind: 'future-time', severity: 'error', sessionIds: [session.id], excludesFromInsights: true })
+      continue
+    }
+
+    const duration = end - start
+    if (!session.endTime && duration >= LONG_SLEEP_GUARDRAIL_MS) {
+      issues.push({ kind: 'stale-active', severity: 'warning', sessionIds: [session.id], excludesFromInsights: true })
+    } else if (session.endTime && duration < MIN_ANALYTICS_SLEEP_MS) {
+      issues.push({ kind: 'suspiciously-short', severity: 'warning', sessionIds: [session.id], excludesFromInsights: true })
+    } else if (duration >= EXTREME_SLEEP_DURATION_MS) {
+      issues.push({ kind: 'extreme-duration', severity: 'warning', sessionIds: [session.id], excludesFromInsights: true })
+    }
+    validIntervals.push({ session, start, end })
   }
 
-  const sorted = sessions.slice().sort((a, b) => Date.parse(a.startTime) - Date.parse(b.startTime))
+  const sorted = validIntervals.sort((a, b) => a.start - b.start)
   for (let index = 0; index < sorted.length; index += 1) {
-    const currentEnd = sorted[index].endTime ? Date.parse(sorted[index].endTime!) : now
     for (let nextIndex = index + 1; nextIndex < sorted.length; nextIndex += 1) {
-      if (Date.parse(sorted[nextIndex].startTime) >= currentEnd) break
-      warnings.push({ kind: 'overlap', sessionIds: [sorted[index].id, sorted[nextIndex].id] })
+      const current = sorted[index]
+      const next = sorted[nextIndex]
+      if (next.start >= current.end) break
+      const sameEndState = Boolean(current.session.endTime) === Boolean(next.session.endTime)
+      const nearSameTimes = Math.abs(current.start - next.start) <= DUPLICATE_TOLERANCE_MS && Math.abs(current.end - next.end) <= DUPLICATE_TOLERANCE_MS
+      issues.push({
+        kind: sameEndState && nearSameTimes ? 'possible-duplicate' : 'overlap',
+        severity: 'error',
+        sessionIds: [current.session.id, next.session.id],
+        excludesFromInsights: true
+      })
     }
   }
-  return warnings
+
+  const excluded = new Set(issues.filter((issue) => issue.excludesFromInsights).flatMap((issue) => issue.sessionIds))
+  return {
+    issues,
+    excludedSessionIds: Array.from(excluded),
+    usableCompletedSessionCount: sessions.filter((session) => session.endTime && !excluded.has(session.id)).length
+  }
+}
+
+export function getDataQualityWarnings(sessions: SleepSession[], now = Date.now()) {
+  return getDataQualityReport(sessions, now).issues
 }

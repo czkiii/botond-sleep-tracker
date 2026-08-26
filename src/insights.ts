@@ -1,5 +1,5 @@
 import type { SleepSession } from './types'
-import { EXTREME_SLEEP_DURATION_MS, durationOf, getDataQualityWarnings } from './utils'
+import { EXTREME_SLEEP_DURATION_MS, durationOf, getDataQualityReport } from './utils'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const MIN_WAKE_WINDOW_MS = 5 * 60 * 1000
@@ -30,8 +30,8 @@ function median(values: number[]) {
 }
 
 export function buildInsightsFoundation(sessions: SleepSession[], now = Date.now()): InsightsFoundation {
-  const warnings = getDataQualityWarnings(sessions, now)
-  const excludedIds = new Set(warnings.flatMap((warning) => warning.sessionIds))
+  const report = getDataQualityReport(sessions, now)
+  const excludedIds = new Set(report.excludedSessionIds)
   const allCompleted = sessions
     .filter((session) => session.endTime)
     .slice()
@@ -68,7 +68,7 @@ export function buildInsightsFoundation(sessions: SleepSession[], now = Date.now
     quality: {
       usableSessionCount: completed.length,
       excludedSessionCount: excludedIds.size,
-      warningCount: warnings.length
+      warningCount: report.issues.length
     }
   }
 }
