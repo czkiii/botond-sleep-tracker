@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import demoBackup from '../test-data/solemi-demo-v4-2026-08-26.json'
 import { ImportValidationError, inspectBackup } from './storage'
 import type { AppData, ChildProfile, SleepSession } from './types'
 
@@ -18,6 +19,15 @@ function expectCode(run: () => unknown, code: ImportValidationError['code']) {
 }
 
 describe('inspectBackup', () => {
+  it('accepts the bundled two-child demo backup', () => {
+    const result = inspectBackup(demoBackup)
+
+    expect(result.data.children.map((item) => item.name)).toEqual(['Boti', 'Frici'])
+    expect(result.data.sessions).toHaveLength(109)
+    expect(new Set(result.data.sessions.map((item) => item.childId))).toEqual(new Set(['child_demo_boti', 'child_demo_frici']))
+    expect(result.diagnostics).toEqual([])
+  })
+
   it('accepts a clean V4 backup', () => {
     const result = inspectBackup(backup())
     expect(result.data.sessions).toHaveLength(1)
