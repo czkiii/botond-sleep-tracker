@@ -104,7 +104,7 @@ A fejlesztés ugyanabban a repóban és ugyanazon a fő alkalmazáson folytatód
 - [x] Profil create/update megjelenik mindkét készüléken.
 - [x] Gyerekprofil törlése a hozzá tartozó alvásokkal együtt mindkét készüléken eltűnik.
 - [x] Lezárt alvás szerkesztése szinkronizálódik a másik böngészőkörnyezetbe.
-- [ ] Gyerekenkénti start/stop/edit/delete szinkronizálódik.
+- [x] Gyerekenkénti start/stop/edit/delete szinkronizálódik.
 - [ ] Offline queue visszacsatlakozás után helyesen ürül.
 - [ ] Dupla Start, dupla Stop és szerkesztési konfliktus teszt.
 - [ ] Egy gyerek hibája nem módosítja a másik gyerek adatait.
