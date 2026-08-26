@@ -25,11 +25,36 @@ export type WakeWindowInsight = {
 
 export type InsightsFoundation = {
   wakeWindow: WakeWindowInsight
+  routine: RoutineInsight
   quality: {
     usableSessionCount: number
     excludedSessionCount: number
     warningCount: number
   }
+}
+
+export type RoutineInsight = {
+  status: 'ready' | 'collecting'
+  lookbackDays: 7 | 14 | 30
+  observedDayCount: number
+  bedtime: ClockPattern | null
+  wakeTime: ClockPattern | null
+  daytimeSleepCount: CountPattern | null
+}
+
+export type ClockPattern = {
+  typicalMinutes: number
+  lowMinutes: number
+  highMinutes: number
+  sampleCount: number
+  consistentCount: number
+}
+
+export type CountPattern = {
+  typicalCount: number
+  lowCount: number
+  highCount: number
+  sampleCount: number
 }
 
 function median(values: number[]) {
@@ -51,6 +76,16 @@ function quantile(values: number[], position: number) {
 function localDateKey(iso: string) {
   const date = new Date(iso)
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
+}
+
+function clockMinutes(iso: string) {
+  const date = new Date(iso)
+  return date.getHours() * 60 + date.getMinutes()
+}
+
+function circularDistance(a: number, b: number) {
+  const difference = Math.abs(a - b) % 1440
+  return Math.min(difference, 1440 - difference)
 }
 
 export function buildInsightsFoundation(sessions: SleepSession[], now = Date.now(), options: { lookbackDays?: 7 | 14 | 30 } = {}): InsightsFoundation {
@@ -106,6 +141,67 @@ export function buildInsightsFoundation(sessions: SleepSession[], now = Date.now
     return values.length >= 3 && middle !== null && low !== null && high !== null ? [{ key, typicalMs: middle, lowMs: low, highMs: high, sampleCount: values.length }] : []
   })
 
+  const routineCutoff = now - lookbackDays * DAY_MS
+  const recentCompleted = completed.filter((session) => Date.parse(session.endTime!) >= routineCutoff)
+  const nighttimeByStartDay = new Map<string, SleepSession>()
+  const daytimeByDay = new Map<string, SleepSession[]>()
+  recentCompleted.forEach((session) => {
+    const parts = splitDayNight(session, now)
+    if (parts.night > parts.day) {
+      const key = localDateKey(session.startTime)
+      const existing = nighttimeByStartDay.get(key)
+      if (!existing || durationOf(session, now) > durationOf(existing, now)) nighttimeByStartDay.set(key, session)
+    } else {
+      const key = localDateKey(session.startTime)
+      daytimeByDay.set(key, [...(daytimeByDay.get(key) ?? []), session])
+    }
+  })
+
+  const bedtimeValues = Array.from(nighttimeByStartDay.values()).map((session) => {
+    const minutes = clockMinutes(session.startTime)
+    return minutes < 12 * 60 ? minutes + 1440 : minutes
+  })
+  const wakeValues = Array.from(nighttimeByStartDay.values()).map((session) => clockMinutes(session.endTime!))
+  const observedDays = new Set<string>([
+    ...Array.from(nighttimeByStartDay.values()).map((session) => localDateKey(session.endTime!)),
+    ...Array.from(daytimeByDay.keys())
+  ])
+  const napCountValues = Array.from(observedDays).map((key) => daytimeByDay.get(key)?.length ?? 0)
+
+  const clockPattern = (values: number[]): ClockPattern | null => {
+    const middle = median(values)
+    const low = quantile(values, 0.25)
+    const high = quantile(values, 0.75)
+    if (values.length < 3 || middle === null || low === null || high === null) return null
+    const typicalMinutes = Math.round(middle) % 1440
+    return {
+      typicalMinutes,
+      lowMinutes: Math.round(low) % 1440,
+      highMinutes: Math.round(high) % 1440,
+      sampleCount: values.length,
+      consistentCount: values.filter((value) => circularDistance(value % 1440, typicalMinutes) <= 30).length
+    }
+  }
+  const countMiddle = median(napCountValues)
+  const countLow = quantile(napCountValues, 0.25)
+  const countHigh = quantile(napCountValues, 0.75)
+  const daytimeSleepCount = napCountValues.length >= 3 && countMiddle !== null && countLow !== null && countHigh !== null ? {
+    typicalCount: countMiddle,
+    lowCount: countLow,
+    highCount: countHigh,
+    sampleCount: napCountValues.length
+  } : null
+  const bedtime = clockPattern(bedtimeValues)
+  const wakeTime = clockPattern(wakeValues)
+  const routine: RoutineInsight = {
+    status: bedtime || wakeTime || daytimeSleepCount ? 'ready' : 'collecting',
+    lookbackDays,
+    observedDayCount: observedDays.size,
+    bedtime,
+    wakeTime,
+    daytimeSleepCount
+  }
+
   return {
     wakeWindow: {
       status,
@@ -118,6 +214,7 @@ export function buildInsightsFoundation(sessions: SleepSession[], now = Date.now
       sourceSessionIds: Array.from(new Set(samples.flatMap((sample) => sample.sessionIds))),
       breakdown
     },
+    routine,
     quality: {
       usableSessionCount: report.usableCompletedSessionCount,
       excludedSessionCount: excludedIds.size,

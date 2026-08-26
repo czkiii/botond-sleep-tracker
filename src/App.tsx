@@ -208,6 +208,7 @@ function StatsPage({ sessions, now, locale }: { sessions: SleepSession[]; now: n
   const chartUnit = locale === 'hu' ? 'ó' : locale === 'de' ? 'Std.' : 'hr'
   const insights = useMemo(() => buildInsightsFoundation(sessions, now, { lookbackDays: insightsRange }), [sessions, now, insightsRange])
   const wakeWindow = insights.wakeWindow
+  const routine = insights.routine
 
   return <section className="screen stats-screen"><header className="page-header centered-header"><h1>{t(locale, 'statistics')}</h1></header>
     <div className="segmented"><button className={range === 'day' ? 'active' : ''} onClick={() => changeRange('day')}>{t(locale, 'day')}</button><button className={range === 'week' ? 'active' : ''} onClick={() => changeRange('week')}>{t(locale, 'week')}</button><button className={range === 'month' ? 'active' : ''} onClick={() => changeRange('month')}>{t(locale, 'month')}</button></div>
@@ -223,7 +224,27 @@ function StatsPage({ sessions, now, locale }: { sessions: SleepSession[]; now: n
       <small>{wakeWindow.status === 'ready' ? t(locale, 'wakeWindowBasis', { count: wakeWindow.sampleCount }) : t(locale, 'wakeWindowCollecting', { count: wakeWindow.sampleCount })}</small>
       {insights.quality.excludedSessionCount > 0 && <small className="insights-quality-note">{t(locale, 'insightsExcluded', { count: insights.quality.excludedSessionCount })}</small>}
     </div>
+    <div className="insights-card routine-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'routinePatterns')}</h2></div>{routine.status === 'ready' && <b>{t(locale, 'observedDays', { count: routine.observedDayCount })}</b>}</div>
+      {routine.status === 'collecting' && <p className="routine-empty">{t(locale, 'routineCollecting')}</p>}
+      {routine.bedtime && <RoutineRow label={t(locale, 'typicalBedtime')} value={formatClockMinutes(routine.bedtime.typicalMinutes, locale)} detail={t(locale, 'routineConsistency', { consistent: routine.bedtime.consistentCount, count: routine.bedtime.sampleCount })} />}
+      {routine.wakeTime && <RoutineRow label={t(locale, 'typicalWakeTime')} value={formatClockMinutes(routine.wakeTime.typicalMinutes, locale)} detail={t(locale, 'routineConsistency', { consistent: routine.wakeTime.consistentCount, count: routine.wakeTime.sampleCount })} />}
+      {routine.daytimeSleepCount && <RoutineRow label={t(locale, 'typicalNapCount')} value={formatCount(routine.daytimeSleepCount.typicalCount, locale)} detail={t(locale, 'napCountRange', { low: formatCount(routine.daytimeSleepCount.lowCount, locale), high: formatCount(routine.daytimeSleepCount.highCount, locale) })} />}
+      {routine.status === 'ready' && <small>{t(locale, 'routineOwnData')}</small>}
+    </div>
   </section>
+}
+
+function RoutineRow({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return <div className="routine-row"><span>{label}</span><strong>{value}</strong><small>{detail}</small></div>
+}
+
+function formatClockMinutes(minutes: number, locale: Locale) {
+  const date = new Date(2020, 0, 1, Math.floor(minutes / 60), minutes % 60)
+  return new Intl.DateTimeFormat(localeTag(locale), { hour: '2-digit', minute: '2-digit' }).format(date)
+}
+
+function formatCount(value: number, locale: Locale) {
+  return new Intl.NumberFormat(localeTag(locale), { maximumFractionDigits: 1 }).format(value)
 }
 
 function StatCard({ label, value, suffix, icon }: { label: string; value: string; suffix?: string; icon?: 'moon' | 'sun' }) {

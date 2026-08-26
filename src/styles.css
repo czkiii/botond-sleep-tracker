@@ -239,6 +239,12 @@ svg { display: block; }
 .wake-breakdown span { color: #8099b2; font-size: 11px; }
 .wake-breakdown b { color: #afd7fc; font-size: 12px; }
 .wake-breakdown small { grid-column: 1 / -1; color: #617a93; font-size: 9px; }
+.routine-card { display: grid; gap: 10px; }
+.routine-empty { margin: 12px 0 0 !important; }
+.routine-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; padding: 12px; border-radius: 14px; background: rgba(68, 128, 185, .09); }
+.routine-row span { color: #8099b2; font-size: 11px; }
+.routine-row strong { color: #c4e2fd; font-size: 16px; }
+.routine-row small { grid-column: 1 / -1; color: #617a93; font-size: 10px; }
 .text-action {
   align-self: center;
   border: 0;
