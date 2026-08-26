@@ -305,6 +305,7 @@ svg { display: block; }
   font-size: 16px;
   line-height: 1;
   letter-spacing: .08em;
+  touch-action: manipulation;
   cursor: pointer;
 }
 .section-more:hover, .section-more:focus-visible { color: #a8cff7; background: rgba(87, 157, 255, .10); }
