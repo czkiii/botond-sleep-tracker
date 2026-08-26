@@ -102,7 +102,7 @@ A fejlesztés ugyanabban a repóban és ugyanazon a fő alkalmazáson folytatód
 - [x] Két gyerek párhuzamos aktív alvása mindkét böngészőkörnyezetben helyesen megjelenik.
 - [x] Profilnév módosítása mindkét irányban szinkronizálódik.
 - [x] Profil create/update megjelenik mindkét készüléken.
-- [ ] Gyerekprofil törlése a hozzá tartozó alvásokkal együtt mindkét készüléken eltűnik.
+- [x] Gyerekprofil törlése a hozzá tartozó alvásokkal együtt mindkét készüléken eltűnik.
 - [x] Lezárt alvás szerkesztése szinkronizálódik a másik böngészőkörnyezetbe.
 - [ ] Gyerekenkénti start/stop/edit/delete szinkronizálódik.
 - [ ] Offline queue visszacsatlakozás után helyesen ürül.
