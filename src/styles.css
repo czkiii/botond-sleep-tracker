@@ -223,6 +223,9 @@ svg { display: block; }
 .insights-card-head span { color: #72a9df; font-size: 11px; font-weight: 760; letter-spacing: .08em; text-transform: uppercase; }
 .insights-card-head h2 { margin: 4px 0 0; font-size: 18px; }
 .insights-card-head b { padding: 5px 8px; border-radius: 999px; color: #9bc7ef; background: rgba(72, 133, 194, .15); font-size: 10px; white-space: nowrap; }
+.insights-range { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 14px; padding: 4px; border-radius: 12px; background: rgba(40, 78, 116, .14); }
+.insights-range button { padding: 7px; border: 0; border-radius: 9px; color: #7892ac; background: transparent; font-size: 11px; font-weight: 720; }
+.insights-range button.active { color: #e4f2ff; background: rgba(51, 113, 177, .56); }
 .insights-primary-value { display: block; margin-top: 18px; color: #dceeff; font-size: 30px; letter-spacing: -.03em; }
 .insights-card p { margin: 4px 0 14px; color: var(--muted); font-size: 12px; line-height: 1.45; }
 .insights-comparison { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 10px 0; padding: 12px; border-radius: 14px; background: rgba(68, 128, 185, .09); }
@@ -230,6 +233,12 @@ svg { display: block; }
 .insights-comparison strong { color: #afd7fc; font-size: 14px; }
 .insights-card > small { display: block; line-height: 1.45; }
 .insights-quality-note { margin-top: 5px; color: #c79f91 !important; }
+.wake-breakdown { display: grid; gap: 7px; margin: 14px 0; padding-top: 13px; border-top: 1px solid rgba(118, 181, 245, .1); }
+.wake-breakdown > strong { margin-bottom: 2px; color: #b8d0e6; font-size: 12px; }
+.wake-breakdown > div { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; }
+.wake-breakdown span { color: #8099b2; font-size: 11px; }
+.wake-breakdown b { color: #afd7fc; font-size: 12px; }
+.wake-breakdown small { grid-column: 1 / -1; color: #617a93; font-size: 9px; }
 .text-action {
   align-self: center;
   border: 0;

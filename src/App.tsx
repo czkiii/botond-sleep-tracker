@@ -161,6 +161,7 @@ function HistoryPage({ sessions, locale, onEdit, onDelete, onNew }: { sessions: 
 
 function StatsPage({ sessions, now, locale }: { sessions: SleepSession[]; now: number; locale: Locale }) {
   const [range, setRange] = useState<'day' | 'week' | 'month'>('week')
+  const [insightsRange, setInsightsRange] = useState<7 | 14 | 30>(14)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const days = range === 'day' ? 1 : range === 'week' ? 7 : 30
   const today = new Date(now)
@@ -204,7 +205,7 @@ function StatsPage({ sessions, now, locale }: { sessions: SleepSession[]; now: n
   const display = selectedStats ?? { total: sums.total / divisor, day: sums.day / divisor, night: sums.night / divisor, label: t(locale, 'average') }
   const timelineDate = range === 'day' || !selectedDate ? undefined : selectedDate
   const chartUnit = locale === 'hu' ? 'ó' : locale === 'de' ? 'Std.' : 'hr'
-  const insights = useMemo(() => buildInsightsFoundation(sessions, now), [sessions, now])
+  const insights = useMemo(() => buildInsightsFoundation(sessions, now, { lookbackDays: insightsRange }), [sessions, now, insightsRange])
   const wakeWindow = insights.wakeWindow
 
   return <section className="screen stats-screen"><header className="page-header centered-header"><h1>{t(locale, 'statistics')}</h1></header>
@@ -213,8 +214,11 @@ function StatsPage({ sessions, now, locale }: { sessions: SleepSession[]; now: n
     <h2 className="overview-title">{t(locale, 'overview24h')}</h2>
     <div className="overview-compact"><SleepTimeline sessions={sessions} now={now} day={timelineDate} locale={locale} /><div className="stats-row"><StatCard label={display.label} value={formatDuration(display.total, locale)} suffix={selectedStats ? undefined : t(locale, 'perDay')} /><StatCard label={t(locale, 'daytime')} value={formatDuration(display.day, locale)} icon="sun" /><StatCard label={t(locale, 'nighttime')} value={formatDuration(display.night, locale)} icon="moon" /></div></div>
     <div className="insights-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'wakeWindow')}</h2></div>{wakeWindow.confidence && <b>{t(locale, wakeWindow.confidence === 'medium' ? 'mediumConfidence' : 'lowConfidence')}</b>}</div>
+      <div className="insights-range" aria-label={t(locale, 'insightsRange')}>{([7, 14, 30] as const).map((value) => <button key={value} className={insightsRange === value ? 'active' : ''} onClick={() => setInsightsRange(value)}>{value} {t(locale, 'daysShort')}</button>)}</div>
       {wakeWindow.currentMs !== null ? <><strong className="insights-primary-value">{formatDuration(wakeWindow.currentMs, locale)}</strong><p>{t(locale, 'awakeForNow')}</p></> : <p>{t(locale, 'wakeWindowUnavailable')}</p>}
       {wakeWindow.typicalMs !== null && <div className="insights-comparison"><span>{t(locale, 'typicalWakeWindow')}</span><strong>{formatDuration(wakeWindow.typicalMs, locale)}</strong></div>}
+      {wakeWindow.typicalRange && <div className="insights-comparison"><span>{t(locale, 'typicalRange')}</span><strong>{formatDuration(wakeWindow.typicalRange.lowMs, locale)}–{formatDuration(wakeWindow.typicalRange.highMs, locale)}</strong></div>}
+      {wakeWindow.breakdown.length > 0 && <div className="wake-breakdown"><strong>{t(locale, 'bySleepOrder')}</strong>{wakeWindow.breakdown.map((item) => <div key={item.key}><span>{t(locale, item.key === 'day-1' ? 'firstNapWindow' : item.key === 'day-2' ? 'secondNapWindow' : item.key === 'day-3-plus' ? 'laterNapWindow' : 'nightSleepWindow')}</span><b>{formatDuration(item.typicalMs, locale)}</b><small>{t(locale, 'sampleCountShort', { count: item.sampleCount })}</small></div>)}</div>}
       <small>{wakeWindow.status === 'ready' ? t(locale, 'wakeWindowBasis', { count: wakeWindow.sampleCount }) : t(locale, 'wakeWindowCollecting', { count: wakeWindow.sampleCount })}</small>
       {insights.quality.excludedSessionCount > 0 && <small className="insights-quality-note">{t(locale, 'insightsExcluded', { count: insights.quality.excludedSessionCount })}</small>}
     </div>

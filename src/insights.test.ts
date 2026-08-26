@@ -21,7 +21,7 @@ function session(id: string, start: string, end: string | null): SleepSession {
 describe('buildInsightsFoundation', () => {
   it('returns an unavailable insight without sleep data', () => {
     const result = buildInsightsFoundation([], NOW)
-    expect(result.wakeWindow).toEqual({ status: 'unavailable', currentMs: null, typicalMs: null, sampleCount: 0, confidence: null })
+    expect(result.wakeWindow).toMatchObject({ status: 'unavailable', currentMs: null, typicalMs: null, typicalRange: null, sampleCount: 0, confidence: null, lookbackDays: 14 })
   })
 
   it('keeps collecting until three clean wake windows exist', () => {
@@ -57,6 +57,32 @@ describe('buildInsightsFoundation', () => {
     ], NOW)
     expect(result.wakeWindow.typicalMs).toBe(2.5 * HOUR)
     expect(result.wakeWindow.sampleCount).toBe(4)
+    expect(result.wakeWindow.typicalRange).toEqual({ lowMs: 1.75 * HOUR, highMs: 3.25 * HOUR })
+  })
+
+  it('respects the selected 7, 14 or 30 day lookback', () => {
+    const sessions = [
+      session('old-a', '2026-08-05T08:00:00.000Z', '2026-08-05T09:00:00.000Z'),
+      session('old-b', '2026-08-05T11:00:00.000Z', '2026-08-05T12:00:00.000Z'),
+      session('new-a', '2026-08-24T08:00:00.000Z', '2026-08-24T09:00:00.000Z'),
+      session('new-b', '2026-08-24T11:00:00.000Z', '2026-08-24T12:00:00.000Z')
+    ]
+    expect(buildInsightsFoundation(sessions, NOW, { lookbackDays: 7 }).wakeWindow.sampleCount).toBe(1)
+    expect(buildInsightsFoundation(sessions, NOW, { lookbackDays: 30 }).wakeWindow.sampleCount).toBe(2)
+  })
+
+  it('shows a sleep-order breakdown only after three matching samples', () => {
+    const result = buildInsightsFoundation([
+      session('night-a', '2026-08-21T20:00:00.000Z', '2026-08-22T05:00:00.000Z'),
+      session('nap-a', '2026-08-22T07:00:00.000Z', '2026-08-22T08:00:00.000Z'),
+      session('night-b', '2026-08-22T20:00:00.000Z', '2026-08-23T05:00:00.000Z'),
+      session('nap-b', '2026-08-23T07:00:00.000Z', '2026-08-23T08:00:00.000Z'),
+      session('night-c', '2026-08-23T20:00:00.000Z', '2026-08-24T05:00:00.000Z'),
+      session('nap-c', '2026-08-24T07:00:00.000Z', '2026-08-24T08:00:00.000Z')
+    ], NOW)
+    const firstNap = result.wakeWindow.breakdown.find((item) => item.key === 'day-1')
+    expect(firstNap?.sampleCount).toBe(3)
+    expect(firstNap?.typicalMs).toBe(2 * HOUR)
   })
 
   it('does not expose a current wake window while sleep is active', () => {
