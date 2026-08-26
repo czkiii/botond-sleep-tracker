@@ -1,0 +1,50 @@
+name: Build internal preview
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: internal-preview-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build isolated preview artifact
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout selected commit
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build internal frontend
+        run: npm run build
+        env:
+          VITE_INTERNAL_PREVIEW: 'true'
+          VITE_BUILD_SHA: ${{ github.sha }}
+          VITE_BASE_PATH: /
+
+      - name: Upload exact-commit artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: solemi-sleep-internal-${{ github.sha }}
+          path: dist
+          if-no-files-found: error
+          retention-days: 14

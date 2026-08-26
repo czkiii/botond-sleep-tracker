@@ -54,11 +54,11 @@ A fejlesztés ugyanabban a repóban és ugyanazon a fő alkalmazáson folytatód
 
 - [x] Belső hosting irány: ugyanazon GitHub-repó feature ágának preview buildje, forrásduplikáció nélkül.
 - [ ] Preview szolgáltató és hozzáférési mód véglegesítése a tényleges bekötés előtt.
-- [ ] A belső frontend környezet ne az éles Worker URL-jét használja.
+- [x] A frontend-only belső build ne töltse be a Family Sync réteget, így ne használja az éles Worker URL-jét.
 - [ ] Staging Worker + staging D1 környezet létrehozása vagy a Family Sync ideiglenes kikapcsolása a frontend-only körben.
-- [ ] A preview deploy workflow-t csak manuális indítással vagy kijelölt branchről engedélyezni.
-- [ ] A preview oldalon láthatóan jelezni: `INTERNAL / TEST`.
-- [ ] A pontos commit SHA megjelenítése vagy könnyű visszakereshetősége.
+- [x] A belső preview build workflow csak a `main` célú PR-ekből vagy manuálisan indítható.
+- [x] A preview oldalon láthatóan jelezni: `INTERNAL / TEST`.
+- [x] A pontos commit SHA megjelenítése vagy könnyű visszakereshetősége.
 - [ ] Belső preview URL rögzítése ebben a dokumentumban.
 
 **Kapu:** a feature ág egy ismert commitja külön URL-en megnyitható, az éles adatokat nem érinti.

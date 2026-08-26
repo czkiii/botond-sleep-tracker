@@ -10,11 +10,15 @@ import './copy-overrides.css'
 import './background-theme.css'
 import './family-sync.css'
 
-registerSW({ immediate: true })
+const internalPreview = import.meta.env.VITE_INTERNAL_PREVIEW === 'true'
+const buildSha = import.meta.env.VITE_BUILD_SHA?.slice(0, 7) || 'local'
+
+if (!internalPreview) registerSW({ immediate: true })
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
+    {internalPreview && <div className="internal-preview-banner">INTERNAL / TEST <span>Family Sync disabled · {buildSha}</span></div>}
     <App />
-    <FamilySyncLayer />
+    {!internalPreview && <FamilySyncLayer />}
   </React.StrictMode>
 )
