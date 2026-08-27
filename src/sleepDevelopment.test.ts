@@ -50,4 +50,19 @@ describe('buildSleepDevelopment', () => {
     expect(result.status).toBe('collecting')
     expect(result.months).toHaveLength(1)
   })
+
+  it('limits the development comparison to a selected month range', () => {
+    const sessions: SleepSession[] = []
+    for (const month of ['04', '05', '06']) {
+      for (let day = 1; day <= 3; day += 1) {
+        const paddedDay = String(day).padStart(2, '0')
+        sessions.push(session(`${month}-${day}`, `2026-${month}-${paddedDay}T20:00:00.000Z`, `2026-${month}-${paddedDay}T23:00:00.000Z`, 'night'))
+      }
+    }
+
+    const result = buildSleepDevelopment(sessions, NOW, 12, { startMonth: '2026-05', endMonth: '2026-06' })
+    expect(result.months.map((month) => month.key)).toEqual(['2026-05', '2026-06'])
+    expect(result.first?.key).toBe('2026-05')
+    expect(result.latest?.key).toBe('2026-06')
+  })
 })

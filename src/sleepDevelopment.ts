@@ -168,7 +168,7 @@ export function buildSleepDaySummaries(sessions: SleepSession[], now = Date.now(
   return buildSleepDaySource(sessions, now).days
 }
 
-export function buildSleepDevelopment(sessions: SleepSession[], now = Date.now(), rangeMonths: 3 | 6 | 12 = 12): SleepDevelopment {
+export function buildSleepDevelopment(sessions: SleepSession[], now = Date.now(), rangeMonths: 3 | 6 | 12 = 12, customRange?: { startMonth: string; endMonth: string }): SleepDevelopment {
   const source = buildSleepDaySource(sessions, now)
   const monthTotals = new Map<string, {
     year: number
@@ -200,7 +200,10 @@ export function buildSleepDevelopment(sessions: SleepSession[], now = Date.now()
   const current = new Date(now)
   const firstIncludedMonth = new Date(current.getFullYear(), current.getMonth() - rangeMonths + 1, 1)
   const months = Array.from(monthTotals.entries())
-    .filter(([, value]) => new Date(value.year, value.month, 1) >= firstIncludedMonth && value.recordedDays >= 3)
+    .filter(([key, value]) => {
+      const inRange = customRange ? key >= customRange.startMonth && key <= customRange.endMonth : new Date(value.year, value.month, 1) >= firstIncludedMonth
+      return inRange && value.recordedDays >= 3
+    })
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([, value]): SleepDevelopmentMonth => ({
       key: monthKey(value.year, value.month),

@@ -2,6 +2,8 @@ import type { SleepSession } from './types'
 import { getDataQualityReport, splitDayNight } from './utils'
 
 const HOUR_MS = 60 * 60 * 1000
+const DAY_MS = 24 * HOUR_MS
+const MAX_HISTORY_DAYS = 730
 
 export type DaySnapshot = {
   dateKey: string
@@ -101,7 +103,10 @@ export function buildSimilarDaysInsight(sessions: SleepSession[], now = Date.now
   if (!current || current.awakeMs === null) return { status: 'unavailable', lookbackDays, current, candidateCount: 0, matches: [] }
 
   const candidates: Array<{ snapshot: DaySnapshot; distance: number; nextSleep: SimilarDayMatch['nextSleep'] }> = []
-  for (let offset = 1; offset <= lookbackDays; offset += 1) {
+  const earliestStart = clean.reduce((earliest, session) => Math.min(earliest, Date.parse(session.startTime)), now)
+  const availableHistoryDays = Math.max(1, Math.ceil((currentDayStart - startOfLocalDay(new Date(earliestStart))) / DAY_MS))
+  const searchDays = Math.min(MAX_HISTORY_DAYS, availableHistoryDays)
+  for (let offset = 1; offset <= searchDays; offset += 1) {
     const date = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate() - offset)
     const dayStart = startOfLocalDay(date)
     const dayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime()

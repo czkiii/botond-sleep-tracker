@@ -53,4 +53,15 @@ describe('buildSimilarDaysInsight', () => {
     expect(result.status).toBe('collecting')
     expect(result.candidateCount).toBe(0)
   })
+
+  it('uses older imported history instead of stopping at the visible insights range', () => {
+    const result = buildSimilarDaysInsight([
+      session('today-night', '2026-08-24T20:00:00.000Z', '2026-08-25T06:00:00.000Z'),
+      session('old-1', '2026-06-24T20:00:00.000Z', '2026-06-25T06:00:00.000Z'),
+      session('old-2', '2026-06-23T20:00:00.000Z', '2026-06-24T06:00:00.000Z'),
+      session('old-3', '2026-06-22T20:00:00.000Z', '2026-06-23T06:00:00.000Z')
+    ], NOW, 7)
+    expect(result.status).toBe('ready')
+    expect(result.candidateCount).toBe(3)
+  })
 })
