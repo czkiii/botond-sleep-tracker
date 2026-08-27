@@ -12,13 +12,13 @@ import { removeChildProfile } from './childProfiles'
 import { buildInsightsFoundation } from './insights'
 import { buildSimilarDaysInsight } from './similarDays'
 import { buildPredictionLite } from './prediction'
-import { buildSleepDevelopment } from './sleepDevelopment'
+import { buildSleepDaySummaries, buildSleepDevelopment } from './sleepDevelopment'
 import type { SleepDevelopmentMilestone } from './sleepDevelopment'
 import { buildSleepChangeInsight } from './sleepChange'
 import type { SleepChangeMetric, SleepChangeSignal } from './sleepChange'
 import { buildMonthlyFamilyReport } from './monthlyReport'
 import type { MonthlyReportMetric, MonthlyReportMilestone, MonthlyReportTrend } from './monthlyReport'
-import { DEFAULT_DAY_START_MINUTES, DEFAULT_NIGHT_START_MINUTES, LONG_SLEEP_GUARDRAIL_MS, awakeSince, durationOf, formatDateHeader, formatDuration, formatTime, formatTimer, getDataQualityWarnings, splitDayNight, todaySessions, totalToday } from './utils'
+import { DEFAULT_DAY_START_MINUTES, DEFAULT_NIGHT_START_MINUTES, LONG_SLEEP_GUARDRAIL_MS, awakeSince, durationOf, formatDateHeader, formatDuration, formatTime, formatTimer, getDataQualityWarnings, todaySessions, totalToday } from './utils'
 import SleepTimeline from './SleepTimeline'
 import SwipeHistoryRow from './SwipeHistoryRow'
 
@@ -180,24 +180,6 @@ function dateKeyTime(value: string) {
   return new Date(year, month - 1, day, 0, 0, 0, 0).getTime()
 }
 
-function statsForDate(sessions: SleepSession[], dateKey: string, now: number) {
-  const startOfDay = dateKeyTime(dateKey)
-  const date = new Date(startOfDay)
-  const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime()
-  let total = 0, day = 0, night = 0
-  sessions.forEach((session) => {
-    const overlapStart = Math.max(new Date(session.startTime).getTime(), startOfDay)
-    const overlapEnd = Math.min(session.endTime ? new Date(session.endTime).getTime() : now, endOfDay)
-    if (overlapEnd <= overlapStart) return
-    const clipped: SleepSession = { ...session, startTime: new Date(overlapStart).toISOString(), endTime: new Date(overlapEnd).toISOString() }
-    const parts = splitDayNight(clipped, now)
-    total += overlapEnd - overlapStart
-    day += parts.day
-    night += parts.night
-  })
-  return { total, day, night }
-}
-
 function StatsPage({ sessions, now, locale, childName }: { sessions: SleepSession[]; now: number; locale: Locale; childName: string }) {
   const availableStart = sessions.length > 0 ? dateKeyAt(Math.min(...sessions.map((session) => new Date(session.startTime).getTime()))) : dateKeyAt(now)
   const availableEnd = dateKeyAt(now)
@@ -226,14 +208,35 @@ function StatsPage({ sessions, now, locale, childName }: { sessions: SleepSessio
     return result
   }, [availableStart, availableEnd, locale])
 
+  useEffect(() => {
+    if (!developmentMonthOptions.length) return
+    const first = developmentMonthOptions[0].value
+    const last = developmentMonthOptions[developmentMonthOptions.length - 1].value
+    setDevelopmentStart((current) => developmentMonthOptions.some((month) => month.value === current) ? current : first)
+    setDevelopmentEnd((current) => developmentMonthOptions.some((month) => month.value === current) ? current : last)
+  }, [developmentMonthOptions])
+
+  const moveDevelopmentMonth = (target: 'start' | 'end', delta: -1 | 1) => {
+    const currentValue = target === 'start' ? developmentStart : developmentEnd
+    const currentIndex = developmentMonthOptions.findIndex((month) => month.value === currentValue)
+    const candidate = developmentMonthOptions[currentIndex + delta]
+    if (!candidate) return
+    if (target === 'start' && candidate.value <= developmentEnd) setDevelopmentStart(candidate.value)
+    if (target === 'end' && candidate.value >= developmentStart) setDevelopmentEnd(candidate.value)
+  }
+
+  const developmentStartIndex = developmentMonthOptions.findIndex((month) => month.value === developmentStart)
+  const developmentEndIndex = developmentMonthOptions.findIndex((month) => month.value === developmentEnd)
+  const sleepDaysByDate = useMemo(() => new Map(buildSleepDaySummaries(sessions, now).map((day) => [day.key, { total: day.totalMs, day: day.dayMs, night: day.nightMs }])), [sessions, now])
+
   const chart = useMemo(() => Array.from({ length: days }, (_, index) => {
     const date = range === 'custom' ? new Date(customStartTime) : new Date(now)
     date.setHours(0, 0, 0, 0)
     date.setDate(date.getDate() + (range === 'custom' ? index : -(days - 1 - index)))
     const dateKey = dateKeyAt(date.getTime())
-    const stats = statsForDate(sessions, dateKey, now)
+    const stats = sleepDaysByDate.get(dateKey) ?? { total: 0, day: 0, night: 0 }
     return { dateKey, label: new Intl.DateTimeFormat(localeTag(locale), days > 31 ? { month: 'short', day: 'numeric' } : { day: 'numeric' }).format(date), hours: +(stats.total / 3600000).toFixed(2), ...stats }
-  }), [sessions, now, days, range, customStartTime, locale])
+  }), [sleepDaysByDate, now, days, range, customStartTime, locale])
 
   const sums = chart.reduce((acc, item) => ({ total: acc.total + item.total, day: acc.day + item.day, night: acc.night + item.night }), { total: 0, day: 0, night: 0 })
   const divisor = Math.max(1, chart.length)
@@ -241,10 +244,10 @@ function StatsPage({ sessions, now, locale, childName }: { sessions: SleepSessio
   const selectedStats = useMemo(() => {
     if (!selectedDate) return null
     const [year, month, day] = selectedDate.split('-').map(Number)
-    const values = statsForDate(sessions, selectedDate, now)
+    const values = sleepDaysByDate.get(selectedDate) ?? { total: 0, day: 0, night: 0 }
     const date = new Date(year, month - 1, day)
     return { ...values, label: new Intl.DateTimeFormat(localeTag(locale), { month: 'short', day: 'numeric' }).format(date) }
-  }, [sessions, now, selectedDate, locale])
+  }, [sleepDaysByDate, selectedDate, locale])
 
   const changeRange = (next: 'day' | 'week' | 'month' | 'custom') => { setRange(next); setSelectedDate(null) }
   const display = selectedStats ?? { total: sums.total / divisor, day: sums.day / divisor, night: sums.night / divisor, label: t(locale, 'average') }
@@ -258,7 +261,7 @@ function StatsPage({ sessions, now, locale, childName }: { sessions: SleepSessio
   const monthlyReport = useMemo(() => buildMonthlyFamilyReport(sessions, now), [sessions, now])
   const developmentChart = useMemo(() => development.months.map((item) => ({
     key: item.key,
-    label: new Intl.DateTimeFormat(localeTag(locale), { month: 'short' }).format(new Date(item.year, item.month, 1)),
+    label: new Intl.DateTimeFormat(localeTag(locale), { month: 'short' }).format(new Date(item.year, item.month, 1)).replace('.', '').slice(0, 3),
     day: +(item.averageDayMs / 3600000).toFixed(2),
     night: +(item.averageNightMs / 3600000).toFixed(2)
   })), [development.months, locale])
@@ -292,9 +295,9 @@ function StatsPage({ sessions, now, locale, childName }: { sessions: SleepSessio
     </div>
     <div className="insights-card development-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'sleepDevelopment')}</h2></div><b>{t(locale, 'familyPlus')}</b></div>
       <div className="insights-range four-options" aria-label={t(locale, 'developmentRange')}>{([3, 6, 12] as const).map((value) => <button key={value} className={developmentRange === value ? 'active' : ''} onClick={() => setDevelopmentRange(value)}>{value} {t(locale, 'monthsShort')}</button>)}<button className={developmentRange === 'custom' ? 'active' : ''} onClick={() => setDevelopmentRange('custom')}>{t(locale, 'customRange')}</button></div>
-      {developmentRange === 'custom' && <div className="custom-range-picker compact development-range-picker"><label>{t(locale, 'fromDate')}<select value={developmentStart} onChange={(event) => setDevelopmentStart(event.target.value)}>{developmentMonthOptions.filter((month) => month.value <= developmentEnd).map((month) => <option key={month.value} value={month.value}>{month.label}</option>)}</select></label><label>{t(locale, 'toDate')}<select value={developmentEnd} onChange={(event) => setDevelopmentEnd(event.target.value)}>{developmentMonthOptions.filter((month) => month.value >= developmentStart).map((month) => <option key={month.value} value={month.value}>{month.label}</option>)}</select></label><small>{t(locale, 'selectedDevelopmentRange', { start: developmentMonthOptions.find((month) => month.value === developmentStart)?.label ?? developmentStart, end: developmentMonthOptions.find((month) => month.value === developmentEnd)?.label ?? developmentEnd })}</small></div>}
+      {developmentRange === 'custom' && <div className="custom-range-picker compact development-range-picker"><label>{t(locale, 'fromDate')}<span className="month-stepper"><button type="button" aria-label={t(locale, 'previousMonth')} disabled={developmentStartIndex <= 0} onClick={() => moveDevelopmentMonth('start', -1)}>‹</button><strong>{developmentMonthOptions[developmentStartIndex]?.label ?? developmentStart}</strong><button type="button" aria-label={t(locale, 'nextMonth')} disabled={developmentStartIndex < 0 || developmentStartIndex >= developmentEndIndex} onClick={() => moveDevelopmentMonth('start', 1)}>›</button></span></label><label>{t(locale, 'toDate')}<span className="month-stepper"><button type="button" aria-label={t(locale, 'previousMonth')} disabled={developmentEndIndex <= developmentStartIndex} onClick={() => moveDevelopmentMonth('end', -1)}>‹</button><strong>{developmentMonthOptions[developmentEndIndex]?.label ?? developmentEnd}</strong><button type="button" aria-label={t(locale, 'nextMonth')} disabled={developmentEndIndex < 0 || developmentEndIndex >= developmentMonthOptions.length - 1} onClick={() => moveDevelopmentMonth('end', 1)}>›</button></span></label><small>{t(locale, 'selectedDevelopmentRange', { start: developmentMonthOptions[developmentStartIndex]?.label ?? developmentStart, end: developmentMonthOptions[developmentEndIndex]?.label ?? developmentEnd })}</small></div>}
       {development.status === 'collecting' ? <p className="routine-empty">{t(locale, 'developmentCollecting')}</p> : <>
-        <div className="development-chart" aria-label={t(locale, 'developmentChart')}><ResponsiveContainer width="100%" height="100%"><BarChart data={developmentChart} margin={{ top: 8, right: 0, bottom: 0, left: -30 }}><XAxis dataKey="label" tickLine={false} axisLine={false} /><YAxis tickLine={false} axisLine={false} /><Tooltip contentStyle={{ background: '#0d1a2b', border: '1px solid #1c3352', borderRadius: 10 }} formatter={(value, name) => [`${value} ${chartUnit}`, t(locale, name === 'day' ? 'daytime' : 'nighttime')]} /><Bar dataKey="night" stackId="sleep" fill="#3978bc" radius={[0, 0, 2, 2]} maxBarSize={24} /><Bar dataKey="day" stackId="sleep" fill="#73b9f6" radius={[4, 4, 0, 0]} maxBarSize={24} /></BarChart></ResponsiveContainer></div>
+        <div className="development-chart" aria-label={t(locale, 'developmentChart')}><ResponsiveContainer width="100%" height="100%"><BarChart data={developmentChart} margin={{ top: 8, right: 0, bottom: 0, left: -30 }}><XAxis dataKey="label" tickLine={false} axisLine={false} interval={0} minTickGap={0} tickMargin={6} /><YAxis tickLine={false} axisLine={false} /><Tooltip contentStyle={{ background: '#0d1a2b', border: '1px solid #1c3352', borderRadius: 10 }} formatter={(value, name) => [`${value} ${chartUnit}`, t(locale, name === 'day' ? 'daytime' : 'nighttime')]} /><Bar dataKey="night" stackId="sleep" fill="#3978bc" radius={[0, 0, 2, 2]} maxBarSize={24} /><Bar dataKey="day" stackId="sleep" fill="#73b9f6" radius={[4, 4, 0, 0]} maxBarSize={24} /></BarChart></ResponsiveContainer></div>
         {development.first && development.latest && <div className="then-now"><strong>{t(locale, 'thenNow')}</strong><div className="then-now-grid"><DevelopmentPoint label={t(locale, 'then')} month={development.first} locale={locale} /><DevelopmentPoint label={t(locale, 'nowPeriod')} month={development.latest} locale={locale} /></div></div>}
         {development.milestones.length > 0 && <div className="development-milestones">{development.milestones.slice(0, 3).map((milestone) => <span key={milestone.kind}>{developmentMilestoneLabel(locale, milestone)}</span>)}</div>}
       </>}
