@@ -190,6 +190,9 @@ function StatsPage({ sessions, now, locale, childName }: { sessions: SleepSessio
   const [customEnd, setCustomEnd] = useState(availableEnd)
   const [developmentStart, setDevelopmentStart] = useState(availableStart.slice(0, 7))
   const [developmentEnd, setDevelopmentEnd] = useState(availableEnd.slice(0, 7))
+  const [developmentPickerOpen, setDevelopmentPickerOpen] = useState(false)
+  const [developmentDraftStart, setDevelopmentDraftStart] = useState(availableStart.slice(0, 7))
+  const [developmentDraftEnd, setDevelopmentDraftEnd] = useState(availableEnd.slice(0, 7))
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const customStartTime = dateKeyTime(customStart)
   const customEndTime = dateKeyTime(customEnd)
@@ -217,16 +220,27 @@ function StatsPage({ sessions, now, locale, childName }: { sessions: SleepSessio
   }, [developmentMonthOptions])
 
   const moveDevelopmentMonth = (target: 'start' | 'end', delta: -1 | 1) => {
-    const currentValue = target === 'start' ? developmentStart : developmentEnd
+    const currentValue = target === 'start' ? developmentDraftStart : developmentDraftEnd
     const currentIndex = developmentMonthOptions.findIndex((month) => month.value === currentValue)
     const candidate = developmentMonthOptions[currentIndex + delta]
     if (!candidate) return
-    if (target === 'start' && candidate.value <= developmentEnd) setDevelopmentStart(candidate.value)
-    if (target === 'end' && candidate.value >= developmentStart) setDevelopmentEnd(candidate.value)
+    if (target === 'start' && candidate.value <= developmentDraftEnd) setDevelopmentDraftStart(candidate.value)
+    if (target === 'end' && candidate.value >= developmentDraftStart) setDevelopmentDraftEnd(candidate.value)
   }
 
-  const developmentStartIndex = developmentMonthOptions.findIndex((month) => month.value === developmentStart)
-  const developmentEndIndex = developmentMonthOptions.findIndex((month) => month.value === developmentEnd)
+  const developmentDraftStartIndex = developmentMonthOptions.findIndex((month) => month.value === developmentDraftStart)
+  const developmentDraftEndIndex = developmentMonthOptions.findIndex((month) => month.value === developmentDraftEnd)
+  const openDevelopmentPicker = () => {
+    setDevelopmentDraftStart(developmentStart)
+    setDevelopmentDraftEnd(developmentEnd)
+    setDevelopmentPickerOpen(true)
+  }
+  const applyDevelopmentRange = () => {
+    setDevelopmentStart(developmentDraftStart)
+    setDevelopmentEnd(developmentDraftEnd)
+    setDevelopmentRange('custom')
+    setDevelopmentPickerOpen(false)
+  }
   const sleepDaysByDate = useMemo(() => new Map(buildSleepDaySummaries(sessions, now).map((day) => [day.key, { total: day.totalMs, day: day.dayMs, night: day.nightMs }])), [sessions, now])
 
   const chart = useMemo(() => Array.from({ length: days }, (_, index) => {
@@ -294,8 +308,8 @@ function StatsPage({ sessions, now, locale, childName }: { sessions: SleepSessio
       {routine.status === 'ready' && <small>{t(locale, 'routineOwnData')}</small>}
     </div>
     <div className="insights-card development-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'sleepDevelopment')}</h2></div><b>{t(locale, 'familyPlus')}</b></div>
-      <div className="insights-range four-options" aria-label={t(locale, 'developmentRange')}>{([3, 6, 12] as const).map((value) => <button key={value} className={developmentRange === value ? 'active' : ''} onClick={() => setDevelopmentRange(value)}>{value} {t(locale, 'monthsShort')}</button>)}<button className={developmentRange === 'custom' ? 'active' : ''} onClick={() => setDevelopmentRange('custom')}>{t(locale, 'customRange')}</button></div>
-      {developmentRange === 'custom' && <div className="custom-range-picker compact development-range-picker"><label>{t(locale, 'fromDate')}<span className="month-stepper"><button type="button" aria-label={t(locale, 'previousMonth')} disabled={developmentStartIndex <= 0} onClick={() => moveDevelopmentMonth('start', -1)}>‹</button><strong>{developmentMonthOptions[developmentStartIndex]?.label ?? developmentStart}</strong><button type="button" aria-label={t(locale, 'nextMonth')} disabled={developmentStartIndex < 0 || developmentStartIndex >= developmentEndIndex} onClick={() => moveDevelopmentMonth('start', 1)}>›</button></span></label><label>{t(locale, 'toDate')}<span className="month-stepper"><button type="button" aria-label={t(locale, 'previousMonth')} disabled={developmentEndIndex <= developmentStartIndex} onClick={() => moveDevelopmentMonth('end', -1)}>‹</button><strong>{developmentMonthOptions[developmentEndIndex]?.label ?? developmentEnd}</strong><button type="button" aria-label={t(locale, 'nextMonth')} disabled={developmentEndIndex < 0 || developmentEndIndex >= developmentMonthOptions.length - 1} onClick={() => moveDevelopmentMonth('end', 1)}>›</button></span></label><small>{t(locale, 'selectedDevelopmentRange', { start: developmentMonthOptions[developmentStartIndex]?.label ?? developmentStart, end: developmentMonthOptions[developmentEndIndex]?.label ?? developmentEnd })}</small></div>}
+      <div className="insights-range four-options" aria-label={t(locale, 'developmentRange')}>{([3, 6, 12] as const).map((value) => <button key={value} className={developmentRange === value ? 'active' : ''} onClick={() => setDevelopmentRange(value)}>{value} {t(locale, 'monthsShort')}</button>)}<button className={developmentRange === 'custom' ? 'active' : ''} onClick={openDevelopmentPicker}>{t(locale, 'customRange')}</button></div>
+      {developmentRange === 'custom' && <small className="development-range-summary">{t(locale, 'selectedDevelopmentRange', { start: developmentMonthOptions.find((month) => month.value === developmentStart)?.label ?? developmentStart, end: developmentMonthOptions.find((month) => month.value === developmentEnd)?.label ?? developmentEnd })}</small>}
       {development.status === 'collecting' ? <p className="routine-empty">{t(locale, 'developmentCollecting')}</p> : <>
         <div className="development-chart" aria-label={t(locale, 'developmentChart')}><ResponsiveContainer width="100%" height="100%"><BarChart data={developmentChart} margin={{ top: 8, right: 0, bottom: 0, left: -30 }}><XAxis dataKey="label" tickLine={false} axisLine={false} interval={0} minTickGap={0} tickMargin={6} /><YAxis tickLine={false} axisLine={false} /><Tooltip contentStyle={{ background: '#0d1a2b', border: '1px solid #1c3352', borderRadius: 10 }} formatter={(value, name) => [`${value} ${chartUnit}`, t(locale, name === 'day' ? 'daytime' : 'nighttime')]} /><Bar dataKey="night" stackId="sleep" fill="#3978bc" radius={[0, 0, 2, 2]} maxBarSize={24} /><Bar dataKey="day" stackId="sleep" fill="#73b9f6" radius={[4, 4, 0, 0]} maxBarSize={24} /></BarChart></ResponsiveContainer></div>
         {development.first && development.latest && <div className="then-now"><strong>{t(locale, 'thenNow')}</strong><div className="then-now-grid"><DevelopmentPoint label={t(locale, 'then')} month={development.first} locale={locale} /><DevelopmentPoint label={t(locale, 'nowPeriod')} month={development.latest} locale={locale} /></div></div>}
@@ -330,6 +344,7 @@ function StatsPage({ sessions, now, locale, childName }: { sessions: SleepSessio
       {prediction.status === 'collecting' && <p className="routine-empty">{t(locale, 'predictionCollecting', { count: prediction.sampleCount })}</p>}
       {prediction.status === 'ready' && prediction.windowStart !== null && prediction.windowEnd !== null && <><strong className="prediction-window">{formatTime(new Date(prediction.windowStart).toISOString(), locale)}–{formatTime(new Date(prediction.windowEnd).toISOString(), locale)}</strong><p className={`prediction-state ${prediction.windowState}`}>{t(locale, prediction.windowState === 'upcoming' ? 'predictionUpcoming' : prediction.windowState === 'likely-now' ? 'predictionLikelyNow' : 'predictionPassed')}</p><small>{t(locale, 'predictionBasis', { count: prediction.sampleCount, order: t(locale, prediction.bucket === 'day-1' ? 'firstNap' : prediction.bucket === 'day-2' ? 'secondNap' : prediction.bucket === 'day-3-plus' ? 'laterNap' : 'nightSleep') })}</small><small className="prediction-disclaimer">{t(locale, 'predictionDisclaimer')}</small></>}
     </div>
+    {developmentPickerOpen && <div className="development-picker-overlay" role="dialog" aria-modal="true" aria-labelledby="development-picker-title"><div className="development-picker-sheet"><header><h2 id="development-picker-title">{t(locale, 'customDevelopmentRange')}</h2><button type="button" aria-label={t(locale, 'cancel')} onClick={() => setDevelopmentPickerOpen(false)}><Icon name="close" size={18} /></button></header><div className="development-picker-fields"><label>{t(locale, 'fromDate')}<span className="month-stepper"><button type="button" aria-label={t(locale, 'previousMonth')} disabled={developmentDraftStartIndex <= 0} onClick={() => moveDevelopmentMonth('start', -1)}>‹</button><strong>{developmentMonthOptions[developmentDraftStartIndex]?.label ?? developmentDraftStart}</strong><button type="button" aria-label={t(locale, 'nextMonth')} disabled={developmentDraftStartIndex < 0 || developmentDraftStartIndex >= developmentDraftEndIndex} onClick={() => moveDevelopmentMonth('start', 1)}>›</button></span></label><label>{t(locale, 'toDate')}<span className="month-stepper"><button type="button" aria-label={t(locale, 'previousMonth')} disabled={developmentDraftEndIndex <= developmentDraftStartIndex} onClick={() => moveDevelopmentMonth('end', -1)}>‹</button><strong>{developmentMonthOptions[developmentDraftEndIndex]?.label ?? developmentDraftEnd}</strong><button type="button" aria-label={t(locale, 'nextMonth')} disabled={developmentDraftEndIndex < 0 || developmentDraftEndIndex >= developmentMonthOptions.length - 1} onClick={() => moveDevelopmentMonth('end', 1)}>›</button></span></label></div><small>{t(locale, 'selectedDevelopmentRange', { start: developmentMonthOptions[developmentDraftStartIndex]?.label ?? developmentDraftStart, end: developmentMonthOptions[developmentDraftEndIndex]?.label ?? developmentDraftEnd })}</small><div className="development-picker-actions"><button type="button" onClick={() => setDevelopmentPickerOpen(false)}>{t(locale, 'cancel')}</button><button type="button" className="primary" onClick={applyDevelopmentRange}>{t(locale, 'apply')}</button></div></div></div>}
   </section>
 }
 

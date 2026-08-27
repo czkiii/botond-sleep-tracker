@@ -256,6 +256,18 @@ svg { display: block; }
 .month-stepper button:disabled { color: #3d566e; opacity: .55; }
 .month-stepper strong { min-width: 0; overflow: hidden; color: #d9ecff; font-size: 10px; font-weight: 720; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
 .development-range-picker > small { grid-column: 1 / -1; color: #7892aa; font-size: 9px; line-height: 1.4; text-align: center; }
+.development-range-summary { margin-top: -4px; color: #7892aa; font-size: 10px; line-height: 1.4; text-align: center; }
+.development-picker-overlay { position: fixed; inset: 0; z-index: 90; display: grid; align-items: end; padding: 20px var(--screen-pad) calc(20px + env(safe-area-inset-bottom)); background: rgba(2, 8, 15, .72); backdrop-filter: blur(8px); }
+.development-picker-sheet { width: 100%; max-width: 440px; margin: 0 auto; padding: 18px; display: grid; gap: 16px; border: 1px solid rgba(109, 174, 239, .2); border-radius: 22px; color: #d9ecff; background: linear-gradient(180deg, #0c2034, #081624); box-shadow: 0 24px 70px rgba(0, 0, 0, .48); }
+.development-picker-sheet header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.development-picker-sheet h2 { margin: 0; font-size: 17px; }
+.development-picker-sheet header button { width: 40px; height: 40px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 50%; color: #bad7f3; background: rgba(66, 121, 177, .13); }
+.development-picker-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.development-picker-fields label { min-width: 0; display: grid; gap: 7px; color: #8ca7c1; font-size: 11px; font-weight: 700; }
+.development-picker-sheet > small { color: #7892aa; font-size: 10px; line-height: 1.4; text-align: center; }
+.development-picker-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.development-picker-actions button { min-height: 46px; padding: 10px; border: 1px solid rgba(109, 174, 239, .16); border-radius: 14px; color: #a9c9e8; background: rgba(53, 102, 151, .12); font-size: 13px; font-weight: 740; }
+.development-picker-actions button.primary { border-color: transparent; color: #fff; background: #397ed4; }
 .insights-card p { margin: 4px 0 14px; color: var(--muted); font-size: 12px; line-height: 1.45; }
 .wake-window-hero { display: grid; gap: 6px; margin: 14px 0 10px; padding: 15px; border: 1px solid rgba(91, 159, 226, .16); border-radius: 16px; background: linear-gradient(145deg, rgba(55, 116, 178, .18), rgba(25, 66, 108, .1)); }
 .wake-window-hero span { color: #91bde7; font-size: 11px; font-weight: 690; }

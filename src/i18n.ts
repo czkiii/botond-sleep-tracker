@@ -18,7 +18,7 @@ export function detectLocale(): Locale {
 
 const translations = {
   hu: {
-    customRange: 'Egyedi', fromDate: 'Kezdő dátum', toDate: 'Záró dátum', previousMonth: 'Előző hónap', nextMonth: 'Következő hónap', changeEpisodesMore: 'Több alvási szakasz', changeEpisodesLess: 'Kevesebb alvási szakasz',
+    customRange: 'Egyedi', customDevelopmentRange: 'Egyedi alvásfejlődési időszak', apply: 'Alkalmaz', cancel: 'Mégse', fromDate: 'Kezdő dátum', toDate: 'Záró dátum', previousMonth: 'Előző hónap', nextMonth: 'Következő hónap', changeEpisodesMore: 'Több alvási szakasz', changeEpisodesLess: 'Kevesebb alvási szakasz',
     selectedDevelopmentRange: 'Kiválasztva: {start} – {end}', changeMetricMorePlain: 'Több {metric}', changeMetricLessPlain: 'Kevesebb {metric}', changeDaysBadge: '{count}/5 nap', changeEpisodesExplanation: 'Az utóbbi 5 napból {count} napon a korábbi jellemző {baseline} helyett {recent} alvási szakasz volt.', changeDurationExplanation: 'Az utóbbi 5 napból {count} napon hasonló változás látszott. Jellemzően {baseline}, most {recent} ({difference} eltérés).', changeNotWarning: 'Ez megfigyelés, nem hiba- vagy veszélyjelzés.',
     settings: 'Beállítások', todaySoFar: 'Ma eddig', sleepNoun: 'alvás', sleeping: 'ALSZIK', awake: 'ÉBREN',
     fellAsleep: 'Elaludt', wokeUp: 'Felébredt', noPreviousWake: 'Nincs korábbi ébredés', manualEntry: 'Egyedi alvási idő rögzítése',
@@ -38,7 +38,7 @@ const translations = {
     invalidJson: 'A fájl nem érvényes JSON mentés.', invalidBackup: 'Érvénytelen mentés.', wrongBackup: 'Ez nem támogatott Solemi Sleep mentés.', corruptBackup: 'A mentés sérült vagy hiányos alvásadatot tartalmaz.'
   },
   en: {
-    customRange: 'Custom', fromDate: 'Start date', toDate: 'End date', previousMonth: 'Previous month', nextMonth: 'Next month', changeEpisodesMore: 'More sleep periods', changeEpisodesLess: 'Fewer sleep periods',
+    customRange: 'Custom', customDevelopmentRange: 'Custom sleep development period', apply: 'Apply', cancel: 'Cancel', fromDate: 'Start date', toDate: 'End date', previousMonth: 'Previous month', nextMonth: 'Next month', changeEpisodesMore: 'More sleep periods', changeEpisodesLess: 'Fewer sleep periods',
     selectedDevelopmentRange: 'Selected: {start} – {end}', changeMetricMorePlain: 'More {metric}', changeMetricLessPlain: 'Less {metric}', changeDaysBadge: '{count}/5 days', changeEpisodesExplanation: 'On {count} of the last 5 days there were {recent} sleep periods instead of the earlier typical {baseline}.', changeDurationExplanation: 'A similar change appeared on {count} of the last 5 days. Typical: {baseline}; now: {recent} ({difference} difference).', changeNotWarning: 'This is an observation, not an error or danger warning.',
     settings: 'Settings', todaySoFar: 'Today so far', sleepNoun: 'sleep', sleeping: 'ASLEEP', awake: 'AWAKE',
     fellAsleep: 'Fell asleep', wokeUp: 'Woke up', noPreviousWake: 'No previous wake time', manualEntry: 'Record custom sleep time',
@@ -58,7 +58,7 @@ const translations = {
     invalidJson: 'The file is not a valid JSON backup.', invalidBackup: 'Invalid backup.', wrongBackup: 'This is not a supported Solemi Sleep backup.', corruptBackup: 'The backup contains damaged or incomplete sleep data.'
   },
   de: {
-    customRange: 'Eigene', fromDate: 'Von', toDate: 'Bis', previousMonth: 'Vorheriger Monat', nextMonth: 'Nächster Monat', changeEpisodesMore: 'Mehr Schlafphasen', changeEpisodesLess: 'Weniger Schlafphasen',
+    customRange: 'Eigene', customDevelopmentRange: 'Eigener Schlafentwicklungszeitraum', apply: 'Anwenden', cancel: 'Abbrechen', fromDate: 'Von', toDate: 'Bis', previousMonth: 'Vorheriger Monat', nextMonth: 'Nächster Monat', changeEpisodesMore: 'Mehr Schlafphasen', changeEpisodesLess: 'Weniger Schlafphasen',
     selectedDevelopmentRange: 'Ausgewählt: {start} – {end}', changeMetricMorePlain: 'Mehr {metric}', changeMetricLessPlain: 'Weniger {metric}', changeDaysBadge: '{count}/5 Tage', changeEpisodesExplanation: 'An {count} der letzten 5 Tage gab es {recent} Schlafphasen statt der früher typischen {baseline}.', changeDurationExplanation: 'An {count} der letzten 5 Tage zeigte sich eine ähnliche Veränderung. Typisch: {baseline}; jetzt: {recent} ({difference} Unterschied).', changeNotWarning: 'Das ist eine Beobachtung, keine Fehler- oder Gefahrenwarnung.',
     settings: 'Einstellungen', todaySoFar: 'Heute bisher', sleepNoun: 'Schlaf', sleeping: 'SCHLÄFT', awake: 'WACH',
     fellAsleep: 'Eingeschlafen', wokeUp: 'Aufgewacht', noPreviousWake: 'Keine frühere Aufwachzeit', manualEntry: 'Eigene Schlafzeit eintragen',
