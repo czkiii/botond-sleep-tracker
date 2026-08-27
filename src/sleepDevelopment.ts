@@ -39,6 +39,18 @@ export type SleepDevelopment = {
   usableSessionCount: number
 }
 
+export type SleepDaySummary = {
+  key: string
+  year: number
+  month: number
+  day: number
+  totalMs: number
+  dayMs: number
+  nightMs: number
+  longestBlockMs: number
+  episodeCount: number
+}
+
 function dateKey(time: number) {
   const date = new Date(time)
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
@@ -106,7 +118,7 @@ function classifyUnion(pieces: ClassifiedInterval[]) {
   return { day, night }
 }
 
-export function buildSleepDevelopment(sessions: SleepSession[], now = Date.now(), rangeMonths: 3 | 6 | 12 = 12): SleepDevelopment {
+function buildSleepDaySource(sessions: SleepSession[], now: number) {
   const intervals = sessions.flatMap((session) => {
     if (!session.endTime) return []
     const start = Date.parse(session.startTime)
@@ -132,6 +144,32 @@ export function buildSleepDevelopment(sessions: SleepSession[], now = Date.now()
     episodeStartsByDay.set(key, [...(episodeStartsByDay.get(key) ?? []), episode.end - episode.start])
   })
 
+  const days = Array.from(byDay.entries()).map(([key, pieces]): SleepDaySummary => {
+    const [year, monthNumber, day] = key.split('-').map(Number)
+    const classified = classifyUnion(pieces)
+    const episodes = episodeStartsByDay.get(key) ?? []
+    return {
+      key,
+      year,
+      month: monthNumber - 1,
+      day,
+      totalMs: classified.day + classified.night,
+      dayMs: classified.day,
+      nightMs: classified.night,
+      longestBlockMs: episodes.length ? Math.max(...episodes) : 0,
+      episodeCount: episodes.length
+    }
+  }).sort((left, right) => left.key.localeCompare(right.key))
+
+  return { days, usableSessionCount: intervals.length }
+}
+
+export function buildSleepDaySummaries(sessions: SleepSession[], now = Date.now()) {
+  return buildSleepDaySource(sessions, now).days
+}
+
+export function buildSleepDevelopment(sessions: SleepSession[], now = Date.now(), rangeMonths: 3 | 6 | 12 = 12): SleepDevelopment {
+  const source = buildSleepDaySource(sessions, now)
   const monthTotals = new Map<string, {
     year: number
     month: number
@@ -144,19 +182,16 @@ export function buildSleepDevelopment(sessions: SleepSession[], now = Date.now()
     episodes: number
   }>()
 
-  byDay.forEach((pieces, key) => {
-    const [year, monthNumber] = key.split('-').map(Number)
-    const keyMonth = monthKey(year, monthNumber - 1)
-    const classified = classifyUnion(pieces)
-    const episodes = episodeStartsByDay.get(key) ?? []
-    const previous = monthTotals.get(keyMonth) ?? { year, month: monthNumber - 1, recordedDays: 0, total: 0, day: 0, night: 0, longest: 0, longestDays: 0, episodes: 0 }
+  source.days.forEach((day) => {
+    const keyMonth = monthKey(day.year, day.month)
+    const previous = monthTotals.get(keyMonth) ?? { year: day.year, month: day.month, recordedDays: 0, total: 0, day: 0, night: 0, longest: 0, longestDays: 0, episodes: 0 }
     previous.recordedDays += 1
-    previous.total += classified.day + classified.night
-    previous.day += classified.day
-    previous.night += classified.night
-    previous.episodes += episodes.length
-    if (episodes.length) {
-      previous.longest += Math.max(...episodes)
+    previous.total += day.totalMs
+    previous.day += day.dayMs
+    previous.night += day.nightMs
+    previous.episodes += day.episodeCount
+    if (day.episodeCount) {
+      previous.longest += day.longestBlockMs
       previous.longestDays += 1
     }
     monthTotals.set(keyMonth, previous)
@@ -200,6 +235,6 @@ export function buildSleepDevelopment(sessions: SleepSession[], now = Date.now()
     first,
     latest,
     milestones,
-    usableSessionCount: intervals.length
+    usableSessionCount: source.usableSessionCount
   }
 }

@@ -14,6 +14,8 @@ import { buildSimilarDaysInsight } from './similarDays'
 import { buildPredictionLite } from './prediction'
 import { buildSleepDevelopment } from './sleepDevelopment'
 import type { SleepDevelopmentMilestone } from './sleepDevelopment'
+import { buildSleepChangeInsight } from './sleepChange'
+import type { SleepChangeMetric, SleepChangeSignal } from './sleepChange'
 import { DEFAULT_DAY_START_MINUTES, DEFAULT_NIGHT_START_MINUTES, LONG_SLEEP_GUARDRAIL_MS, awakeSince, durationOf, formatDateHeader, formatDuration, formatTime, formatTimer, getDataQualityWarnings, splitDayNight, todaySessions, totalToday } from './utils'
 import SleepTimeline from './SleepTimeline'
 import SwipeHistoryRow from './SwipeHistoryRow'
@@ -217,6 +219,7 @@ function StatsPage({ sessions, now, locale }: { sessions: SleepSession[]; now: n
   const similarDays = useMemo(() => buildSimilarDaysInsight(sessions, now, insightsRange), [sessions, now, insightsRange])
   const prediction = useMemo(() => buildPredictionLite(sessions, now, insightsRange), [sessions, now, insightsRange])
   const development = useMemo(() => buildSleepDevelopment(sessions, now, developmentRange), [sessions, now, developmentRange])
+  const sleepChange = useMemo(() => buildSleepChangeInsight(sessions, now), [sessions, now])
   const developmentChart = useMemo(() => development.months.map((item) => ({
     key: item.key,
     label: new Intl.DateTimeFormat(localeTag(locale), { month: 'short' }).format(new Date(item.year, item.month, 1)),
@@ -259,6 +262,12 @@ function StatsPage({ sessions, now, locale }: { sessions: SleepSession[]; now: n
       </>}
       <small>{t(locale, 'developmentOwnData')}</small>
     </div>
+    <div className="insights-card change-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'sleepChange')}</h2></div><b>{t(locale, sleepChange.status === 'changed' ? 'changeDetected' : sleepChange.status === 'stable' ? 'stablePattern' : 'familyPlus')}</b></div>
+      {sleepChange.status === 'collecting' && <p className="routine-empty">{t(locale, 'changeCollecting', { recent: sleepChange.recentSampleCount, baseline: sleepChange.baselineSampleCount })}</p>}
+      {sleepChange.status === 'stable' && <div className="change-stable"><strong>{t(locale, 'stablePattern')}</strong><span>{t(locale, 'changeStable')}</span></div>}
+      {sleepChange.status === 'changed' && <div className="change-signals">{sleepChange.signals.slice(0, 3).map((signal) => <ChangeSignal key={signal.metric} signal={signal} locale={locale} />)}</div>}
+      <small>{t(locale, 'changeOwnData')}</small>
+    </div>
     <div className="insights-card similar-days-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'similarDays')}</h2></div>{similarDays.status === 'ready' && <b>{t(locale, 'closestDays')}</b>}</div>
       {similarDays.status === 'unavailable' && <p className="routine-empty">{t(locale, 'similarDaysUnavailable')}</p>}
       {similarDays.status === 'collecting' && <p className="routine-empty">{t(locale, 'similarDaysCollecting', { count: similarDays.candidateCount })}</p>}
@@ -295,6 +304,17 @@ function developmentMilestoneLabel(locale: Locale, milestone: SleepDevelopmentMi
   if (milestone.kind === 'episodes-fewer') return t(locale, 'milestoneEpisodesFewer', { count: formatCount(Math.abs(milestone.delta), locale) })
   const duration = formatDuration(Math.abs(milestone.delta), locale)
   return t(locale, milestone.kind === 'night-longer' ? 'milestoneNightLonger' : milestone.kind === 'longest-longer' ? 'milestoneLongestLonger' : 'milestoneDayShorter', { duration })
+}
+
+function ChangeSignal({ signal, locale }: { signal: SleepChangeSignal; locale: Locale }) {
+  const value = signal.metric === 'episodes' ? formatCount(Math.abs(signal.delta), locale) : formatDuration(Math.abs(signal.delta), locale)
+  const baseline = signal.metric === 'episodes' ? formatCount(signal.baselineValue, locale) : formatDuration(signal.baselineValue, locale)
+  const recent = signal.metric === 'episodes' ? formatCount(signal.recentValue, locale) : formatDuration(signal.recentValue, locale)
+  return <div className={`change-signal ${signal.severity}`}><div><span>{changeMetricLabel(locale, signal.metric)}</span><b>{t(locale, signal.severity === 'strong' ? 'strongChange' : 'noticeChange')}</b></div><strong>{signal.direction === 'higher' ? '↑' : '↓'} {value}</strong><small>{t(locale, 'changeComparison', { baseline, recent })}</small><small>{t(locale, 'changePersistence', { count: signal.matchingRecentDays })}</small></div>
+}
+
+function changeMetricLabel(locale: Locale, metric: SleepChangeMetric) {
+  return t(locale, metric === 'total' ? 'changeMetricTotal' : metric === 'day' ? 'changeMetricDay' : metric === 'night' ? 'changeMetricNight' : metric === 'longest' ? 'changeMetricLongest' : 'changeMetricEpisodes')
 }
 
 function formatClockMinutes(minutes: number, locale: Locale) {
