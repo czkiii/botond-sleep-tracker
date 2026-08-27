@@ -18,7 +18,8 @@ export function detectLocale(): Locale {
 
 const translations = {
   hu: {
-    customRange: 'Egyedi', fromDate: 'Kezdő dátum', toDate: 'Záró dátum',
+    customRange: 'Egyedi', fromDate: 'Kezdő dátum', toDate: 'Záró dátum', changeEpisodesMore: 'Több alvási szakasz', changeEpisodesLess: 'Kevesebb alvási szakasz',
+    selectedDevelopmentRange: 'Kiválasztva: {start} – {end}', changeMetricMorePlain: 'Több {metric}', changeMetricLessPlain: 'Kevesebb {metric}', changeDaysBadge: '{count}/5 nap', changeEpisodesExplanation: 'Az utóbbi 5 napból {count} napon a korábbi jellemző {baseline} helyett {recent} alvási szakasz volt.', changeDurationExplanation: 'Az utóbbi 5 napból {count} napon hasonló változás látszott. Jellemzően {baseline}, most {recent} ({difference} eltérés).', changeNotWarning: 'Ez megfigyelés, nem hiba- vagy veszélyjelzés.',
     settings: 'Beállítások', todaySoFar: 'Ma eddig', sleepNoun: 'alvás', sleeping: 'ALSZIK', awake: 'ÉBREN',
     fellAsleep: 'Elaludt', wokeUp: 'Felébredt', noPreviousWake: 'Nincs korábbi ébredés', manualEntry: 'Egyedi alvási idő rögzítése',
     todaySleeps: 'Mai alvások', yesterdaySleeps: 'Tegnapi alvások', noSleepToday: 'Még nincs mai alvás.', noSleepYesterday: 'Nem volt tegnap rögzített alvás.', now: 'most',
@@ -37,7 +38,8 @@ const translations = {
     invalidJson: 'A fájl nem érvényes JSON mentés.', invalidBackup: 'Érvénytelen mentés.', wrongBackup: 'Ez nem támogatott Solemi Sleep mentés.', corruptBackup: 'A mentés sérült vagy hiányos alvásadatot tartalmaz.'
   },
   en: {
-    customRange: 'Custom', fromDate: 'Start date', toDate: 'End date',
+    customRange: 'Custom', fromDate: 'Start date', toDate: 'End date', changeEpisodesMore: 'More sleep periods', changeEpisodesLess: 'Fewer sleep periods',
+    selectedDevelopmentRange: 'Selected: {start} – {end}', changeMetricMorePlain: 'More {metric}', changeMetricLessPlain: 'Less {metric}', changeDaysBadge: '{count}/5 days', changeEpisodesExplanation: 'On {count} of the last 5 days there were {recent} sleep periods instead of the earlier typical {baseline}.', changeDurationExplanation: 'A similar change appeared on {count} of the last 5 days. Typical: {baseline}; now: {recent} ({difference} difference).', changeNotWarning: 'This is an observation, not an error or danger warning.',
     settings: 'Settings', todaySoFar: 'Today so far', sleepNoun: 'sleep', sleeping: 'ASLEEP', awake: 'AWAKE',
     fellAsleep: 'Fell asleep', wokeUp: 'Woke up', noPreviousWake: 'No previous wake time', manualEntry: 'Record custom sleep time',
     todaySleeps: "Today's sleep", yesterdaySleeps: "Yesterday's sleep", noSleepToday: 'No sleep recorded today yet.', noSleepYesterday: 'No sleep was recorded yesterday.', now: 'now',
@@ -56,7 +58,8 @@ const translations = {
     invalidJson: 'The file is not a valid JSON backup.', invalidBackup: 'Invalid backup.', wrongBackup: 'This is not a supported Solemi Sleep backup.', corruptBackup: 'The backup contains damaged or incomplete sleep data.'
   },
   de: {
-    customRange: 'Eigene', fromDate: 'Von', toDate: 'Bis',
+    customRange: 'Eigene', fromDate: 'Von', toDate: 'Bis', changeEpisodesMore: 'Mehr Schlafphasen', changeEpisodesLess: 'Weniger Schlafphasen',
+    selectedDevelopmentRange: 'Ausgewählt: {start} – {end}', changeMetricMorePlain: 'Mehr {metric}', changeMetricLessPlain: 'Weniger {metric}', changeDaysBadge: '{count}/5 Tage', changeEpisodesExplanation: 'An {count} der letzten 5 Tage gab es {recent} Schlafphasen statt der früher typischen {baseline}.', changeDurationExplanation: 'An {count} der letzten 5 Tage zeigte sich eine ähnliche Veränderung. Typisch: {baseline}; jetzt: {recent} ({difference} Unterschied).', changeNotWarning: 'Das ist eine Beobachtung, keine Fehler- oder Gefahrenwarnung.',
     settings: 'Einstellungen', todaySoFar: 'Heute bisher', sleepNoun: 'Schlaf', sleeping: 'SCHLÄFT', awake: 'WACH',
     fellAsleep: 'Eingeschlafen', wokeUp: 'Aufgewacht', noPreviousWake: 'Keine frühere Aufwachzeit', manualEntry: 'Eigene Schlafzeit eintragen',
     todaySleeps: 'Heutiger Schlaf', yesterdaySleeps: 'Gestriger Schlaf', noSleepToday: 'Heute wurde noch kein Schlaf erfasst.', noSleepYesterday: 'Gestern wurde kein Schlaf erfasst.', now: 'jetzt',

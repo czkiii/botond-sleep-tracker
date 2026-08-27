@@ -213,6 +213,18 @@ function StatsPage({ sessions, now, locale, childName }: { sessions: SleepSessio
   const customEndTime = dateKeyTime(customEnd)
   const customDays = Math.max(1, Math.round((customEndTime - customStartTime) / 86400000) + 1)
   const days = range === 'day' ? 1 : range === 'week' ? 7 : range === 'month' ? 30 : customDays
+  const developmentMonthOptions = useMemo(() => {
+    const [startYear, startMonth] = availableStart.slice(0, 7).split('-').map(Number)
+    const [endYear, endMonth] = availableEnd.slice(0, 7).split('-').map(Number)
+    const cursor = new Date(startYear, startMonth - 1, 1)
+    const limit = new Date(endYear, endMonth - 1, 1)
+    const result: Array<{ value: string; label: string }> = []
+    while (cursor <= limit) {
+      result.push({ value: `${cursor.getFullYear()}-${pad(cursor.getMonth() + 1)}`, label: new Intl.DateTimeFormat(localeTag(locale), { year: 'numeric', month: 'long' }).format(cursor) })
+      cursor.setMonth(cursor.getMonth() + 1)
+    }
+    return result
+  }, [availableStart, availableEnd, locale])
 
   const chart = useMemo(() => Array.from({ length: days }, (_, index) => {
     const date = range === 'custom' ? new Date(customStartTime) : new Date(now)
@@ -280,7 +292,7 @@ function StatsPage({ sessions, now, locale, childName }: { sessions: SleepSessio
     </div>
     <div className="insights-card development-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'sleepDevelopment')}</h2></div><b>{t(locale, 'familyPlus')}</b></div>
       <div className="insights-range four-options" aria-label={t(locale, 'developmentRange')}>{([3, 6, 12] as const).map((value) => <button key={value} className={developmentRange === value ? 'active' : ''} onClick={() => setDevelopmentRange(value)}>{value} {t(locale, 'monthsShort')}</button>)}<button className={developmentRange === 'custom' ? 'active' : ''} onClick={() => setDevelopmentRange('custom')}>{t(locale, 'customRange')}</button></div>
-      {developmentRange === 'custom' && <div className="custom-range-picker compact"><label>{t(locale, 'fromDate')}<input type="month" min={availableStart.slice(0, 7)} max={developmentEnd} value={developmentStart} onChange={(event) => setDevelopmentStart(event.target.value)} /></label><label>{t(locale, 'toDate')}<input type="month" min={developmentStart} max={availableEnd.slice(0, 7)} value={developmentEnd} onChange={(event) => setDevelopmentEnd(event.target.value)} /></label></div>}
+      {developmentRange === 'custom' && <div className="custom-range-picker compact development-range-picker"><label>{t(locale, 'fromDate')}<select value={developmentStart} onChange={(event) => setDevelopmentStart(event.target.value)}>{developmentMonthOptions.filter((month) => month.value <= developmentEnd).map((month) => <option key={month.value} value={month.value}>{month.label}</option>)}</select></label><label>{t(locale, 'toDate')}<select value={developmentEnd} onChange={(event) => setDevelopmentEnd(event.target.value)}>{developmentMonthOptions.filter((month) => month.value >= developmentStart).map((month) => <option key={month.value} value={month.value}>{month.label}</option>)}</select></label><small>{t(locale, 'selectedDevelopmentRange', { start: developmentMonthOptions.find((month) => month.value === developmentStart)?.label ?? developmentStart, end: developmentMonthOptions.find((month) => month.value === developmentEnd)?.label ?? developmentEnd })}</small></div>}
       {development.status === 'collecting' ? <p className="routine-empty">{t(locale, 'developmentCollecting')}</p> : <>
         <div className="development-chart" aria-label={t(locale, 'developmentChart')}><ResponsiveContainer width="100%" height="100%"><BarChart data={developmentChart} margin={{ top: 8, right: 0, bottom: 0, left: -30 }}><XAxis dataKey="label" tickLine={false} axisLine={false} /><YAxis tickLine={false} axisLine={false} /><Tooltip contentStyle={{ background: '#0d1a2b', border: '1px solid #1c3352', borderRadius: 10 }} formatter={(value, name) => [`${value} ${chartUnit}`, t(locale, name === 'day' ? 'daytime' : 'nighttime')]} /><Bar dataKey="night" stackId="sleep" fill="#3978bc" radius={[0, 0, 2, 2]} maxBarSize={24} /><Bar dataKey="day" stackId="sleep" fill="#73b9f6" radius={[4, 4, 0, 0]} maxBarSize={24} /></BarChart></ResponsiveContainer></div>
         {development.first && development.latest && <div className="then-now"><strong>{t(locale, 'thenNow')}</strong><div className="then-now-grid"><DevelopmentPoint label={t(locale, 'then')} month={development.first} locale={locale} /><DevelopmentPoint label={t(locale, 'nowPeriod')} month={development.latest} locale={locale} /></div></div>}
@@ -346,7 +358,13 @@ function ChangeSignal({ signal, locale }: { signal: SleepChangeSignal; locale: L
   const value = signal.metric === 'episodes' ? formatCount(Math.abs(signal.delta), locale) : formatDuration(Math.abs(signal.delta), locale)
   const baseline = signal.metric === 'episodes' ? formatCount(signal.baselineValue, locale) : formatDuration(signal.baselineValue, locale)
   const recent = signal.metric === 'episodes' ? formatCount(signal.recentValue, locale) : formatDuration(signal.recentValue, locale)
-  return <div className={`change-signal ${signal.severity}`}><div><span>{changeMetricLabel(locale, signal.metric)}</span><b>{t(locale, signal.severity === 'strong' ? 'strongChange' : 'noticeChange')}</b></div><strong>{signal.direction === 'higher' ? '↑' : '↓'} {value} {t(locale, signal.direction === 'higher' ? 'changeMore' : 'changeLess')}</strong><small>{t(locale, 'changeComparisonPlain', { baseline, recent })}</small><small>{t(locale, 'changePersistencePlain', { count: signal.matchingRecentDays })}</small></div>
+  const title = signal.metric === 'episodes'
+    ? t(locale, signal.direction === 'higher' ? 'changeEpisodesMore' : 'changeEpisodesLess')
+    : t(locale, signal.direction === 'higher' ? 'changeMetricMorePlain' : 'changeMetricLessPlain', { metric: changeMetricLabel(locale, signal.metric).toLocaleLowerCase(localeTag(locale)) })
+  const explanation = signal.metric === 'episodes'
+    ? t(locale, 'changeEpisodesExplanation', { count: signal.matchingRecentDays, baseline, recent })
+    : t(locale, 'changeDurationExplanation', { count: signal.matchingRecentDays, baseline, recent, difference: value })
+  return <div className={`change-signal ${signal.severity}`}><div><span>{title}</span><b>{t(locale, 'changeDaysBadge', { count: signal.matchingRecentDays })}</b></div><p>{explanation}</p><small>{t(locale, 'changeNotWarning')}</small></div>
 }
 
 function changeMetricLabel(locale: Locale, metric: SleepChangeMetric) {

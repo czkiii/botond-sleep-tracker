@@ -250,7 +250,8 @@ svg { display: block; }
 .custom-range-picker { margin: -8px 0 16px; padding: 10px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; border: 1px solid rgba(91, 159, 226, .12); border-radius: 14px; background: rgba(40, 78, 116, .1); }
 .custom-range-picker.compact { margin: -4px 0 0; }
 .custom-range-picker label { min-width: 0; display: grid; gap: 5px; color: #7892aa; font-size: 9px; font-weight: 700; }
-.custom-range-picker input { min-width: 0; width: 100%; padding: 9px 7px; border: 1px solid rgba(91, 159, 226, .16); border-radius: 10px; outline: 0; color: #d9ecff; background: #091827; color-scheme: dark; font-size: 11px; }
+.custom-range-picker input, .custom-range-picker select { min-width: 0; width: 100%; padding: 9px 7px; border: 1px solid rgba(91, 159, 226, .16); border-radius: 10px; outline: 0; color: #d9ecff; background: #091827; color-scheme: dark; font-size: 11px; }
+.development-range-picker > small { grid-column: 1 / -1; color: #7892aa; font-size: 9px; line-height: 1.4; text-align: center; }
 .insights-card p { margin: 4px 0 14px; color: var(--muted); font-size: 12px; line-height: 1.45; }
 .wake-window-hero { display: grid; gap: 6px; margin: 14px 0 10px; padding: 15px; border: 1px solid rgba(91, 159, 226, .16); border-radius: 16px; background: linear-gradient(145deg, rgba(55, 116, 178, .18), rgba(25, 66, 108, .1)); }
 .wake-window-hero span { color: #91bde7; font-size: 11px; font-weight: 690; }
@@ -296,7 +297,7 @@ svg { display: block; }
 .change-signal > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .change-signal span { color: #b9cfe3; font-size: 11px; font-weight: 700; }
 .change-signal > div b { padding: 4px 7px; border-radius: 999px; color: #d6ae7b; background: rgba(190, 126, 49, .11); font-size: 9px; }
-.change-signal > strong { color: #f0c18b; font-size: 20px; }
+.change-signal > p { margin: 2px 0 !important; color: #a9bfd3; font-size: 11px; line-height: 1.45; }
 .change-signal > small { color: #718ba4; font-size: 9px; line-height: 1.35; }
 .change-signal.strong { border-color: rgba(226, 137, 91, .18); background: rgba(172, 76, 40, .09); }
 .change-signal.strong > div b { color: #e7a27e; background: rgba(190, 82, 49, .13); }
