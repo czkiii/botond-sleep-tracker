@@ -16,6 +16,8 @@ import { buildSleepDevelopment } from './sleepDevelopment'
 import type { SleepDevelopmentMilestone } from './sleepDevelopment'
 import { buildSleepChangeInsight } from './sleepChange'
 import type { SleepChangeMetric, SleepChangeSignal } from './sleepChange'
+import { buildMonthlyFamilyReport } from './monthlyReport'
+import type { MonthlyReportMetric, MonthlyReportMilestone, MonthlyReportTrend } from './monthlyReport'
 import { DEFAULT_DAY_START_MINUTES, DEFAULT_NIGHT_START_MINUTES, LONG_SLEEP_GUARDRAIL_MS, awakeSince, durationOf, formatDateHeader, formatDuration, formatTime, formatTimer, getDataQualityWarnings, splitDayNight, todaySessions, totalToday } from './utils'
 import SleepTimeline from './SleepTimeline'
 import SwipeHistoryRow from './SwipeHistoryRow'
@@ -220,6 +222,7 @@ function StatsPage({ sessions, now, locale }: { sessions: SleepSession[]; now: n
   const prediction = useMemo(() => buildPredictionLite(sessions, now, insightsRange), [sessions, now, insightsRange])
   const development = useMemo(() => buildSleepDevelopment(sessions, now, developmentRange), [sessions, now, developmentRange])
   const sleepChange = useMemo(() => buildSleepChangeInsight(sessions, now), [sessions, now])
+  const monthlyReport = useMemo(() => buildMonthlyFamilyReport(sessions, now), [sessions, now])
   const developmentChart = useMemo(() => development.months.map((item) => ({
     key: item.key,
     label: new Intl.DateTimeFormat(localeTag(locale), { month: 'short' }).format(new Date(item.year, item.month, 1)),
@@ -268,6 +271,16 @@ function StatsPage({ sessions, now, locale }: { sessions: SleepSession[]; now: n
       {sleepChange.status === 'changed' && <div className="change-signals">{sleepChange.signals.slice(0, 3).map((signal) => <ChangeSignal key={signal.metric} signal={signal} locale={locale} />)}</div>}
       <small>{t(locale, 'changeOwnData')}</small>
     </div>
+    <div className="insights-card monthly-report-card"><div className="insights-card-head"><div><span>{t(locale, 'monthlyReportEyebrow')}</span><h2>{t(locale, 'monthlyReport')}</h2></div><b>{t(locale, 'familyPlus')}</b></div>
+      {monthlyReport.status === 'collecting' || !monthlyReport.month ? <p className="routine-empty">{t(locale, 'monthlyReportCollecting')}</p> : <>
+        <div className="monthly-report-hero"><span>{formatReportMonth(monthlyReport.month, locale)}</span><strong>{formatDuration(monthlyReport.month.averageTotalMs, locale)}</strong><small>{t(locale, 'monthlyDailyAverage')} · {t(locale, 'recordedDays', { count: monthlyReport.month.recordedDays })}</small></div>
+        <div className="monthly-kpis"><div><span>{t(locale, 'daytime')}</span><strong>{formatDuration(monthlyReport.month.averageDayMs, locale)}</strong></div><div><span>{t(locale, 'nighttime')}</span><strong>{formatDuration(monthlyReport.month.averageNightMs, locale)}</strong></div><div><span>{t(locale, 'longestBlock')}</span><strong>{formatDuration(monthlyReport.month.averageLongestBlockMs, locale)}</strong></div></div>
+        <small className="monthly-baseline">{t(locale, 'monthlyComparedTo', { count: monthlyReport.baselineMonthCount })}</small>
+        {monthlyReport.trends.length === 0 ? <div className="monthly-stable"><strong>{t(locale, 'monthlyStableTitle')}</strong><span>{t(locale, 'monthlyStable')}</span></div> : <div className="monthly-trends"><strong>{t(locale, 'monthlyTrends')}</strong>{monthlyReport.trends.slice(0, 3).map((trend) => <MonthlyTrend key={trend.metric} trend={trend} locale={locale} />)}</div>}
+        {monthlyReport.milestones.length > 0 && <div className="monthly-milestones"><strong>{t(locale, 'monthlyMilestones')}</strong>{monthlyReport.milestones.map((milestone) => <span key={milestone.kind}>{monthlyMilestoneLabel(locale, milestone)}</span>)}</div>}
+      </>}
+      <small>{t(locale, 'monthlyOwnData')}</small>
+    </div>
     <div className="insights-card similar-days-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'similarDays')}</h2></div>{similarDays.status === 'ready' && <b>{t(locale, 'closestDays')}</b>}</div>
       {similarDays.status === 'unavailable' && <p className="routine-empty">{t(locale, 'similarDaysUnavailable')}</p>}
       {similarDays.status === 'collecting' && <p className="routine-empty">{t(locale, 'similarDaysCollecting', { count: similarDays.candidateCount })}</p>}
@@ -315,6 +328,25 @@ function ChangeSignal({ signal, locale }: { signal: SleepChangeSignal; locale: L
 
 function changeMetricLabel(locale: Locale, metric: SleepChangeMetric) {
   return t(locale, metric === 'total' ? 'changeMetricTotal' : metric === 'day' ? 'changeMetricDay' : metric === 'night' ? 'changeMetricNight' : metric === 'longest' ? 'changeMetricLongest' : 'changeMetricEpisodes')
+}
+
+function formatReportMonth(month: import('./monthlyReport').MonthlyReportMonth, locale: Locale) {
+  return new Intl.DateTimeFormat(localeTag(locale), { year: 'numeric', month: 'long' }).format(new Date(month.year, month.month, 1))
+}
+
+function monthlyMetricLabel(locale: Locale, metric: MonthlyReportMetric) {
+  return changeMetricLabel(locale, metric)
+}
+
+function MonthlyTrend({ trend, locale }: { trend: MonthlyReportTrend; locale: Locale }) {
+  const delta = trend.metric === 'episodes' ? formatCount(Math.abs(trend.delta), locale) : formatDuration(Math.abs(trend.delta), locale)
+  const current = trend.metric === 'episodes' ? formatCount(trend.currentValue, locale) : formatDuration(trend.currentValue, locale)
+  return <div className="monthly-trend"><div><span>{monthlyMetricLabel(locale, trend.metric)}</span><strong>{trend.direction === 'higher' ? '↑' : '↓'} {delta}</strong></div><small>{t(locale, 'monthlyTrendCurrent', { value: current })}</small></div>
+}
+
+function monthlyMilestoneLabel(locale: Locale, milestone: MonthlyReportMilestone) {
+  if (milestone.kind === 'episodes-low') return t(locale, 'monthlyMilestoneEpisodes', { value: formatCount(milestone.value, locale) })
+  return t(locale, milestone.kind === 'night-high' ? 'monthlyMilestoneNight' : 'monthlyMilestoneLongest', { value: formatDuration(milestone.value, locale) })
 }
 
 function formatClockMinutes(minutes: number, locale: Locale) {
