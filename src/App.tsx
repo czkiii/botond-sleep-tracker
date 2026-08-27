@@ -12,6 +12,8 @@ import { removeChildProfile } from './childProfiles'
 import { buildInsightsFoundation } from './insights'
 import { buildSimilarDaysInsight } from './similarDays'
 import { buildPredictionLite } from './prediction'
+import { buildSleepDevelopment } from './sleepDevelopment'
+import type { SleepDevelopmentMilestone } from './sleepDevelopment'
 import { DEFAULT_DAY_START_MINUTES, DEFAULT_NIGHT_START_MINUTES, LONG_SLEEP_GUARDRAIL_MS, awakeSince, durationOf, formatDateHeader, formatDuration, formatTime, formatTimer, getDataQualityWarnings, splitDayNight, todaySessions, totalToday } from './utils'
 import SleepTimeline from './SleepTimeline'
 import SwipeHistoryRow from './SwipeHistoryRow'
@@ -167,6 +169,7 @@ function HistoryPage({ sessions, locale, onEdit, onDelete, onNew }: { sessions: 
 function StatsPage({ sessions, now, locale }: { sessions: SleepSession[]; now: number; locale: Locale }) {
   const [range, setRange] = useState<'day' | 'week' | 'month'>('week')
   const [insightsRange, setInsightsRange] = useState<7 | 14 | 30>(14)
+  const [developmentRange, setDevelopmentRange] = useState<3 | 6 | 12>(12)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const days = range === 'day' ? 1 : range === 'week' ? 7 : 30
   const today = new Date(now)
@@ -213,6 +216,13 @@ function StatsPage({ sessions, now, locale }: { sessions: SleepSession[]; now: n
   const insights = useMemo(() => buildInsightsFoundation(sessions, now, { lookbackDays: insightsRange }), [sessions, now, insightsRange])
   const similarDays = useMemo(() => buildSimilarDaysInsight(sessions, now, insightsRange), [sessions, now, insightsRange])
   const prediction = useMemo(() => buildPredictionLite(sessions, now, insightsRange), [sessions, now, insightsRange])
+  const development = useMemo(() => buildSleepDevelopment(sessions, now, developmentRange), [sessions, now, developmentRange])
+  const developmentChart = useMemo(() => development.months.map((item) => ({
+    key: item.key,
+    label: new Intl.DateTimeFormat(localeTag(locale), { month: 'short' }).format(new Date(item.year, item.month, 1)),
+    day: +(item.averageDayMs / 3600000).toFixed(2),
+    night: +(item.averageNightMs / 3600000).toFixed(2)
+  })), [development.months, locale])
   const wakeWindow = insights.wakeWindow
   const routine = insights.routine
   const relevantWakeWindow = prediction.bucket ? wakeWindow.breakdown.find((item) => item.key === prediction.bucket) ?? null : null
@@ -240,6 +250,15 @@ function StatsPage({ sessions, now, locale }: { sessions: SleepSession[]; now: n
       {routine.daytimeSleepCount && <RoutineRow label={t(locale, 'typicalNapCount')} value={formatCount(routine.daytimeSleepCount.typicalCount, locale)} detail={t(locale, 'napCountRange', { low: formatCount(routine.daytimeSleepCount.lowCount, locale), high: formatCount(routine.daytimeSleepCount.highCount, locale) })} />}
       {routine.status === 'ready' && <small>{t(locale, 'routineOwnData')}</small>}
     </div>
+    <div className="insights-card development-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'sleepDevelopment')}</h2></div><b>{t(locale, 'familyPlus')}</b></div>
+      <div className="insights-range" aria-label={t(locale, 'developmentRange')}>{([3, 6, 12] as const).map((value) => <button key={value} className={developmentRange === value ? 'active' : ''} onClick={() => setDevelopmentRange(value)}>{value} {t(locale, 'monthsShort')}</button>)}</div>
+      {development.status === 'collecting' ? <p className="routine-empty">{t(locale, 'developmentCollecting')}</p> : <>
+        <div className="development-chart" aria-label={t(locale, 'developmentChart')}><ResponsiveContainer width="100%" height="100%"><BarChart data={developmentChart} margin={{ top: 8, right: 0, bottom: 0, left: -30 }}><XAxis dataKey="label" tickLine={false} axisLine={false} /><YAxis tickLine={false} axisLine={false} /><Tooltip contentStyle={{ background: '#0d1a2b', border: '1px solid #1c3352', borderRadius: 10 }} formatter={(value, name) => [`${value} ${chartUnit}`, t(locale, name === 'day' ? 'daytime' : 'nighttime')]} /><Bar dataKey="night" stackId="sleep" fill="#3978bc" radius={[0, 0, 2, 2]} maxBarSize={24} /><Bar dataKey="day" stackId="sleep" fill="#73b9f6" radius={[4, 4, 0, 0]} maxBarSize={24} /></BarChart></ResponsiveContainer></div>
+        {development.first && development.latest && <div className="then-now"><strong>{t(locale, 'thenNow')}</strong><div className="then-now-grid"><DevelopmentPoint label={t(locale, 'then')} month={development.first} locale={locale} /><DevelopmentPoint label={t(locale, 'nowPeriod')} month={development.latest} locale={locale} /></div></div>}
+        {development.milestones.length > 0 && <div className="development-milestones">{development.milestones.slice(0, 3).map((milestone) => <span key={milestone.kind}>{developmentMilestoneLabel(locale, milestone)}</span>)}</div>}
+      </>}
+      <small>{t(locale, 'developmentOwnData')}</small>
+    </div>
     <div className="insights-card similar-days-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'similarDays')}</h2></div>{similarDays.status === 'ready' && <b>{t(locale, 'closestDays')}</b>}</div>
       {similarDays.status === 'unavailable' && <p className="routine-empty">{t(locale, 'similarDaysUnavailable')}</p>}
       {similarDays.status === 'collecting' && <p className="routine-empty">{t(locale, 'similarDaysCollecting', { count: similarDays.candidateCount })}</p>}
@@ -265,6 +284,17 @@ function wakeBucketLabel(locale: Locale, key: 'day-1' | 'day-2' | 'day-3-plus' |
 
 function RoutineRow({ label, value, detail }: { label: string; value: string; detail: string }) {
   return <div className="routine-row"><span>{label}</span><strong>{value}</strong><small>{detail}</small></div>
+}
+
+function DevelopmentPoint({ label, month, locale }: { label: string; month: import('./sleepDevelopment').SleepDevelopmentMonth; locale: Locale }) {
+  const monthLabel = new Intl.DateTimeFormat(localeTag(locale), { year: 'numeric', month: 'short' }).format(new Date(month.year, month.month, 1))
+  return <div><span>{label} · {monthLabel}</span><strong>{formatDuration(month.averageTotalMs, locale)}</strong><small>{t(locale, 'longestBlock')}: {formatDuration(month.averageLongestBlockMs, locale)} · {t(locale, 'recordedDays', { count: month.recordedDays })}</small></div>
+}
+
+function developmentMilestoneLabel(locale: Locale, milestone: SleepDevelopmentMilestone) {
+  if (milestone.kind === 'episodes-fewer') return t(locale, 'milestoneEpisodesFewer', { count: formatCount(Math.abs(milestone.delta), locale) })
+  const duration = formatDuration(Math.abs(milestone.delta), locale)
+  return t(locale, milestone.kind === 'night-longer' ? 'milestoneNightLonger' : milestone.kind === 'longest-longer' ? 'milestoneLongestLonger' : 'milestoneDayShorter', { duration })
 }
 
 function formatClockMinutes(minutes: number, locale: Locale) {

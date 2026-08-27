@@ -266,6 +266,18 @@ svg { display: block; }
 .routine-row span { color: #8099b2; font-size: 11px; }
 .routine-row strong { color: #c4e2fd; font-size: 16px; }
 .routine-row small { grid-column: 1 / -1; color: #617a93; font-size: 10px; }
+.development-card { display: grid; gap: 12px; }
+.development-chart { width: 100%; height: 180px; margin-top: 2px; }
+.development-chart .recharts-cartesian-axis-tick-value { fill: #718ba4; font-size: 9px; }
+.then-now { display: grid; gap: 8px; padding-top: 2px; }
+.then-now > strong { color: #b8d0e6; font-size: 12px; }
+.then-now-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.then-now-grid > div { min-width: 0; display: grid; gap: 5px; padding: 12px; border: 1px solid rgba(91, 159, 226, .12); border-radius: 14px; background: rgba(68, 128, 185, .08); }
+.then-now-grid span { color: #7892aa; font-size: 10px; }
+.then-now-grid strong { color: #d7ecff; font-size: 20px; letter-spacing: -.03em; }
+.then-now-grid small { color: #617a93; font-size: 9px; line-height: 1.4; }
+.development-milestones { display: grid; gap: 6px; }
+.development-milestones span { padding: 8px 10px; border-radius: 11px; color: #a8d6bd; background: rgba(54, 170, 116, .1); font-size: 10px; line-height: 1.35; }
 .similar-days-card { display: grid; gap: 9px; }
 .similar-day-row { display: grid; gap: 8px; padding: 12px; border-radius: 14px; background: rgba(68, 128, 185, .09); }
 .similar-day-row > div { display: grid; gap: 3px; }
