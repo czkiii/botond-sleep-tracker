@@ -1,0 +1,88 @@
+import { describe, expect, it } from 'vitest'
+import { buildSleepDevelopment } from './sleepDevelopment'
+import type { SleepSession } from './types'
+
+const HOUR = 60 * 60 * 1000
+const NOW = Date.parse('2026-08-27T12:00:00.000Z')
+
+function session(id: string, start: string, end: string, override: SleepSession['dayNightOverride'] = null): SleepSession {
+  return { id, childId: 'child-1', startTime: start, endTime: end, note: '', dayNightOverride: override, createdAt: start, updatedAt: end }
+}
+
+describe('buildSleepDevelopment', () => {
+  it('counts overlapping sleep only once', () => {
+    const result = buildSleepDevelopment([
+      session('a', '2026-08-01T08:00:00.000Z', '2026-08-01T10:00:00.000Z', 'day'),
+      session('b', '2026-08-01T09:00:00.000Z', '2026-08-01T11:00:00.000Z', 'day'),
+      session('c', '2026-08-02T08:00:00.000Z', '2026-08-02T11:00:00.000Z', 'day'),
+      session('d', '2026-08-03T08:00:00.000Z', '2026-08-03T11:00:00.000Z', 'day')
+    ], NOW, 3)
+
+    expect(result.months).toHaveLength(1)
+    expect(result.months[0].averageTotalMs).toBe(3 * HOUR)
+    expect(result.months[0].averageEpisodeCount).toBe(1)
+  })
+
+  it('builds a then-now comparison and deterministic milestones', () => {
+    const sessions: SleepSession[] = []
+    for (let day = 1; day <= 3; day += 1) {
+      const padded = String(day).padStart(2, '0')
+      sessions.push(session(`may-day-${day}`, `2026-05-${padded}T10:00:00.000Z`, `2026-05-${padded}T14:00:00.000Z`, 'day'))
+      sessions.push(session(`may-night-${day}`, `2026-05-${padded}T20:00:00.000Z`, `2026-05-${padded}T23:00:00.000Z`, 'night'))
+      sessions.push(session(`aug-night-${day}`, `2026-08-${padded}T20:00:00.000Z`, `2026-08-${String(day + 1).padStart(2, '0')}T04:00:00.000Z`, 'night'))
+    }
+
+    const result = buildSleepDevelopment(sessions, NOW, 6)
+    expect(result.status).toBe('ready')
+    expect(result.first?.key).toBe('2026-05')
+    expect(result.latest?.key).toBe('2026-08')
+    expect(result.latest?.averageNightMs).toBeGreaterThan(result.first!.averageNightMs)
+    expect(result.milestones.map((item) => item.kind)).toContain('night-longer')
+    expect(result.milestones.map((item) => item.kind)).toContain('longest-longer')
+  })
+
+  it('keeps collecting until two months have at least three recorded days', () => {
+    const result = buildSleepDevelopment([
+      session('a', '2026-08-01T20:00:00.000Z', '2026-08-02T05:00:00.000Z'),
+      session('b', '2026-08-02T20:00:00.000Z', '2026-08-03T05:00:00.000Z'),
+      session('c', '2026-08-03T20:00:00.000Z', '2026-08-04T05:00:00.000Z')
+    ], NOW, 12)
+    expect(result.status).toBe('collecting')
+    expect(result.months).toHaveLength(1)
+  })
+
+  it('limits the development comparison to a selected month range', () => {
+    const sessions: SleepSession[] = []
+    for (const month of ['04', '05', '06']) {
+      for (let day = 1; day <= 3; day += 1) {
+        const paddedDay = String(day).padStart(2, '0')
+        sessions.push(session(`${month}-${day}`, `2026-${month}-${paddedDay}T20:00:00.000Z`, `2026-${month}-${paddedDay}T23:00:00.000Z`, 'night'))
+      }
+    }
+
+    const result = buildSleepDevelopment(sessions, NOW, 12, { startMonth: '2026-05', endMonth: '2026-06' })
+    expect(result.months.map((month) => month.key)).toEqual(['2026-05', '2026-06'])
+    expect(result.first?.key).toBe('2026-05')
+    expect(result.latest?.key).toBe('2026-06')
+  })
+
+  it('keeps all thirteen months in an inclusive year-spanning custom range', () => {
+    const sessions: SleepSession[] = []
+    const months = Array.from({ length: 13 }, (_, index) => {
+      const date = new Date(Date.UTC(2025, 7 + index, 1))
+      return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`
+    })
+    for (const month of months) {
+      for (let day = 1; day <= 3; day += 1) {
+        const paddedDay = String(day).padStart(2, '0')
+        sessions.push(session(`${month}-${day}`, `${month}-${paddedDay}T20:00:00.000Z`, `${month}-${paddedDay}T23:00:00.000Z`, 'night'))
+      }
+    }
+
+    const result = buildSleepDevelopment(sessions, NOW, 12, { startMonth: '2025-08', endMonth: '2026-08' })
+    expect(result.status).toBe('ready')
+    expect(result.months.map((month) => month.key)).toEqual(months)
+    expect(result.first?.key).toBe('2025-08')
+    expect(result.latest?.key).toBe('2026-08')
+  })
+})

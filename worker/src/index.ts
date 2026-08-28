@@ -15,9 +15,22 @@ type DeviceAuth = {
 type SessionRow = {
   id: string
   family_id: string
+  child_id: string
   start_time: string
   end_time: string | null
   note: string
+  day_night_override: 'day' | 'night' | null
+  created_at: string
+  updated_at: string
+  deleted_at: string | null
+  revision: number
+}
+
+type ChildRow = {
+  id: string
+  family_id: string
+  name: string
+  birth_date: string | null
   created_at: string
   updated_at: string
   deleted_at: string | null
@@ -115,6 +128,10 @@ function isIsoDate(value: unknown): value is string {
   return typeof value === 'string' && Number.isFinite(Date.parse(value))
 }
 
+function isBirthDate(value: unknown): value is string | null {
+  return value === null || (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(`${value}T00:00:00Z`)))
+}
+
 function requireString(value: unknown, field: string, maxLength = 200) {
   if (typeof value !== 'string' || !value.trim() || value.length > maxLength) {
     throw new ApiError(400, 'INVALID_REQUEST', `Invalid ${field}.`)
@@ -137,9 +154,23 @@ async function readJson(request: Request): Promise<Record<string, unknown>> {
 function sessionDto(row: SessionRow) {
   return {
     id: row.id,
+    childId: row.child_id,
     startTime: row.start_time,
     endTime: row.end_time,
     note: row.note,
+    dayNightOverride: row.day_night_override,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    deletedAt: row.deleted_at,
+    revision: row.revision
+  }
+}
+
+function childDto(row: ChildRow) {
+  return {
+    id: row.id,
+    name: row.name,
+    birthDate: row.birth_date,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deletedAt: row.deleted_at,
@@ -149,18 +180,36 @@ function sessionDto(row: SessionRow) {
 
 async function getSession(env: Env, familyId: string, sessionId: string) {
   return env.DB.prepare(
-    `SELECT id, family_id, start_time, end_time, note, created_at, updated_at, deleted_at, revision
+    `SELECT id, family_id, child_id, start_time, end_time, note, day_night_override, created_at, updated_at, deleted_at, revision
      FROM sleep_sessions WHERE id = ? AND family_id = ?`
   ).bind(sessionId, familyId).first<SessionRow>()
 }
 
-async function getActiveSession(env: Env, familyId: string) {
+async function getActiveSession(env: Env, familyId: string, childId: string) {
   return env.DB.prepare(
-    `SELECT id, family_id, start_time, end_time, note, created_at, updated_at, deleted_at, revision
+    `SELECT id, family_id, child_id, start_time, end_time, note, day_night_override, created_at, updated_at, deleted_at, revision
      FROM sleep_sessions
-     WHERE family_id = ? AND end_time IS NULL AND deleted_at IS NULL
+     WHERE family_id = ? AND child_id = ? AND end_time IS NULL AND deleted_at IS NULL
      LIMIT 1`
-  ).bind(familyId).first<SessionRow>()
+  ).bind(familyId, childId).first<SessionRow>()
+}
+
+async function getChild(env: Env, familyId: string, childId: string) {
+  return env.DB.prepare(
+    `SELECT id, family_id, name, birth_date, created_at, updated_at, deleted_at, revision
+     FROM children WHERE id = ? AND family_id = ?`
+  ).bind(childId, familyId).first<ChildRow>()
+}
+
+function legacyChildId(familyId: string) {
+  return `child_legacy_${familyId}`
+}
+
+async function requireActiveChild(env: Env, familyId: string, childId: string) {
+  const child = await getChild(env, familyId, childId)
+  if (!child) throw new ApiError(404, 'CHILD_NOT_FOUND', 'Child profile not found.')
+  if (child.deleted_at) throw new ApiError(409, 'CHILD_DELETED', 'Child profile was deleted.')
+  return child
 }
 
 async function authenticate(request: Request, env: Env): Promise<DeviceAuth> {
@@ -226,6 +275,10 @@ async function createFamily(request: Request, env: Env) {
   const familyName = requireString(body.familyName, 'familyName', 60)
   const deviceName = typeof body.deviceName === 'string' ? body.deviceName.trim().slice(0, 80) : null
   const familyId = newId('fam')
+  const childId = typeof body.childId === 'string' && body.childId.trim() ? body.childId.trim().slice(0, 100) : legacyChildId(familyId)
+  const childName = typeof body.childName === 'string' ? body.childName.trim().slice(0, 60) : ''
+  const birthDate = body.birthDate === undefined ? null : body.birthDate
+  if (!isBirthDate(birthDate)) throw new ApiError(400, 'INVALID_REQUEST', 'Invalid birthDate.')
   const deviceId = newId('dev')
   const token = randomToken()
   const tokenHash = await hashSecret(token, env.TOKEN_PEPPER)
@@ -233,6 +286,10 @@ async function createFamily(request: Request, env: Env) {
 
   await env.DB.batch([
     env.DB.prepare('INSERT INTO families (id, name, revision, created_at) VALUES (?, ?, 0, ?)').bind(familyId, familyName, createdAt),
+    env.DB.prepare(
+      `INSERT INTO children (id, family_id, name, birth_date, created_at, updated_at, deleted_at, revision)
+       VALUES (?, ?, ?, ?, ?, ?, NULL, 0)`
+    ).bind(childId, familyId, childName, birthDate, createdAt, createdAt),
     env.DB.prepare(
       `INSERT INTO devices (id, family_id, token_hash, name, created_at, last_seen_at, revoked_at)
        VALUES (?, ?, ?, ?, ?, ?, NULL)`
@@ -242,6 +299,7 @@ async function createFamily(request: Request, env: Env) {
   return ok(request, env, {
     familyId,
     familyName,
+    child: { id: childId, name: childName, birthDate },
     device: { id: deviceId, name: deviceName },
     deviceToken: token,
     revision: 0
@@ -323,10 +381,14 @@ async function sync(request: Request, env: Env, auth: DeviceAuth) {
   const after = Number(afterRaw)
   if (!Number.isInteger(after) || after < 0) throw new ApiError(400, 'INVALID_REQUEST', 'Invalid revision.')
 
-  const [family, sessions] = await Promise.all([
+  const [family, children, sessions] = await Promise.all([
     env.DB.prepare('SELECT name, revision FROM families WHERE id = ?').bind(auth.familyId).first<{ name: string; revision: number }>(),
     env.DB.prepare(
-      `SELECT id, family_id, start_time, end_time, note, created_at, updated_at, deleted_at, revision
+      `SELECT id, family_id, name, birth_date, created_at, updated_at, deleted_at, revision
+       FROM children WHERE family_id = ? ORDER BY created_at ASC`
+    ).bind(auth.familyId).all<ChildRow>(),
+    env.DB.prepare(
+      `SELECT id, family_id, child_id, start_time, end_time, note, day_night_override, created_at, updated_at, deleted_at, revision
        FROM sleep_sessions
        WHERE family_id = ? AND revision > ?
        ORDER BY revision ASC`
@@ -336,6 +398,7 @@ async function sync(request: Request, env: Env, auth: DeviceAuth) {
   return ok(request, env, {
     familyName: family?.name ?? auth.familyName,
     revision: family?.revision ?? auth.familyRevision,
+    children: children.results.map(childDto),
     sessions: sessions.results.map(sessionDto)
   })
 }
@@ -358,10 +421,121 @@ async function leaveDevice(request: Request, env: Env, auth: DeviceAuth) {
   return ok(request, env, { revoked: true })
 }
 
+async function createChildProfile(request: Request, env: Env, auth: DeviceAuth) {
+  const body = await readJson(request)
+  const operationId = operationIdFrom(body)
+  const value = body.child
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new ApiError(400, 'INVALID_REQUEST', 'Invalid child.')
+  const input = value as Record<string, unknown>
+  const childId = requireString(input.id, 'child.id', 100)
+  const name = requireString(input.name, 'child.name', 60)
+  const birthDate = input.birthDate === undefined ? null : input.birthDate
+  if (!isBirthDate(birthDate)) throw new ApiError(400, 'INVALID_REQUEST', 'Invalid child.birthDate.')
+
+  if (await existingOperation(env, operationId, auth, 'CREATE_CHILD')) {
+    const existing = await getChild(env, auth.familyId, childId)
+    if (existing) return ok(request, env, { revision: await currentRevision(env, auth.familyId), child: childDto(existing), idempotent: true })
+  }
+
+  const at = nowIso()
+  try {
+    await env.DB.batch([
+      env.DB.prepare('INSERT INTO operations (id, family_id, device_id, operation_type, created_at) VALUES (?, ?, ?, ?, ?)')
+        .bind(operationId, auth.familyId, auth.deviceId, 'CREATE_CHILD', at),
+      env.DB.prepare('UPDATE families SET revision = revision + 1 WHERE id = ?').bind(auth.familyId),
+      env.DB.prepare(
+        `INSERT INTO children (id, family_id, name, birth_date, created_at, updated_at, deleted_at, revision)
+         VALUES (?, ?, ?, ?, ?, ?, NULL, (SELECT revision FROM families WHERE id = ?))`
+      ).bind(childId, auth.familyId, name, birthDate, at, at, auth.familyId)
+    ])
+  } catch {
+    throw new ApiError(409, 'CHILD_CREATE_CONFLICT', 'Child profile ID already exists.')
+  }
+
+  const child = await getChild(env, auth.familyId, childId)
+  if (!child) throw new ApiError(500, 'INTERNAL_ERROR')
+  return ok(request, env, { revision: child.revision, child: childDto(child) }, 201)
+}
+
+async function patchChildProfile(request: Request, env: Env, auth: DeviceAuth, childId: string) {
+  const body = await readJson(request)
+  const operationId = operationIdFrom(body)
+  const value = body.patch
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new ApiError(400, 'INVALID_REQUEST', 'Invalid patch.')
+  const patch = value as Record<string, unknown>
+  const keys = Object.keys(patch)
+  if (!keys.length || keys.some((key) => !['name', 'birthDate'].includes(key))) throw new ApiError(400, 'INVALID_REQUEST', 'Unsupported patch fields.')
+  const current = await requireActiveChild(env, auth.familyId, childId)
+  const name = 'name' in patch ? requireString(patch.name, 'name', 60) : current.name
+  const birthDate = 'birthDate' in patch ? patch.birthDate : current.birth_date
+  if (!isBirthDate(birthDate)) throw new ApiError(400, 'INVALID_REQUEST', 'Invalid birthDate.')
+
+  if (await existingOperation(env, operationId, auth, 'PATCH_CHILD')) {
+    const existing = await getChild(env, auth.familyId, childId)
+    return ok(request, env, { revision: await currentRevision(env, auth.familyId), child: existing ? childDto(existing) : null, idempotent: true })
+  }
+
+  const at = nowIso()
+  await env.DB.batch([
+    env.DB.prepare('INSERT INTO operations (id, family_id, device_id, operation_type, created_at) VALUES (?, ?, ?, ?, ?)')
+      .bind(operationId, auth.familyId, auth.deviceId, 'PATCH_CHILD', at),
+    env.DB.prepare('UPDATE families SET revision = revision + 1 WHERE id = ?').bind(auth.familyId),
+    env.DB.prepare(
+      `UPDATE children SET name = ?, birth_date = ?, updated_at = ?, revision = (SELECT revision FROM families WHERE id = ?)
+       WHERE id = ? AND family_id = ? AND deleted_at IS NULL`
+    ).bind(name, birthDate, at, auth.familyId, childId, auth.familyId)
+  ])
+
+  const child = await getChild(env, auth.familyId, childId)
+  if (!child) throw new ApiError(404, 'CHILD_NOT_FOUND')
+  return ok(request, env, { revision: child.revision, child: childDto(child) })
+}
+
+async function deleteChildProfile(request: Request, env: Env, auth: DeviceAuth, childId: string) {
+  const body = await readJson(request)
+  const operationId = operationIdFrom(body)
+  const current = await getChild(env, auth.familyId, childId)
+  if (!current) throw new ApiError(404, 'CHILD_NOT_FOUND')
+  if (current.deleted_at) return ok(request, env, { revision: await currentRevision(env, auth.familyId), child: childDto(current), alreadyDeleted: true })
+
+  if (await existingOperation(env, operationId, auth, 'DELETE_CHILD')) {
+    const existing = await getChild(env, auth.familyId, childId)
+    return ok(request, env, { revision: await currentRevision(env, auth.familyId), child: existing ? childDto(existing) : null, idempotent: true })
+  }
+
+  const activeChildren = await env.DB.prepare(
+    'SELECT COUNT(*) AS count FROM children WHERE family_id = ? AND deleted_at IS NULL'
+  ).bind(auth.familyId).first<{ count: number }>()
+  if (!activeChildren || activeChildren.count <= 1) throw new ApiError(409, 'LAST_CHILD', 'The final child profile cannot be deleted.')
+
+  const at = nowIso()
+  await env.DB.batch([
+    env.DB.prepare('INSERT INTO operations (id, family_id, device_id, operation_type, created_at) VALUES (?, ?, ?, ?, ?)')
+      .bind(operationId, auth.familyId, auth.deviceId, 'DELETE_CHILD', at),
+    env.DB.prepare('UPDATE families SET revision = revision + 1 WHERE id = ?').bind(auth.familyId),
+    env.DB.prepare(
+      `UPDATE children
+       SET deleted_at = ?, updated_at = ?, revision = (SELECT revision FROM families WHERE id = ?)
+       WHERE id = ? AND family_id = ? AND deleted_at IS NULL`
+    ).bind(at, at, auth.familyId, childId, auth.familyId),
+    env.DB.prepare(
+      `UPDATE sleep_sessions
+       SET deleted_at = ?, updated_at = ?, revision = (SELECT revision FROM families WHERE id = ?)
+       WHERE child_id = ? AND family_id = ? AND deleted_at IS NULL`
+    ).bind(at, at, auth.familyId, childId, auth.familyId)
+  ])
+
+  const deleted = await getChild(env, auth.familyId, childId)
+  if (!deleted) throw new ApiError(404, 'CHILD_NOT_FOUND')
+  return ok(request, env, { revision: await currentRevision(env, auth.familyId), child: childDto(deleted) })
+}
+
 async function startSleep(request: Request, env: Env, auth: DeviceAuth) {
   const body = await readJson(request)
   const operationId = operationIdFrom(body)
   const sessionId = requireString(body.sessionId, 'sessionId', 100)
+  const childId = typeof body.childId === 'string' && body.childId.trim() ? requireString(body.childId, 'childId', 100) : legacyChildId(auth.familyId)
+  await requireActiveChild(env, auth.familyId, childId)
   if (!isIsoDate(body.startTime)) throw new ApiError(400, 'INVALID_REQUEST', 'Invalid startTime.')
   const startTime = body.startTime
   if (Date.parse(startTime) > Date.now() + 60_000) throw new ApiError(400, 'FUTURE_TIME', 'Future start time is not allowed.')
@@ -371,7 +545,7 @@ async function startSleep(request: Request, env: Env, auth: DeviceAuth) {
     if (existing) return ok(request, env, { revision: await currentRevision(env, auth.familyId), session: sessionDto(existing), idempotent: true })
   }
 
-  const active = await getActiveSession(env, auth.familyId)
+  const active = await getActiveSession(env, auth.familyId, childId)
   if (active) throw new ApiError(409, 'ACTIVE_SLEEP_EXISTS', 'An active sleep session already exists.', {
     revision: await currentRevision(env, auth.familyId),
     activeSession: sessionDto(active)
@@ -386,12 +560,12 @@ async function startSleep(request: Request, env: Env, auth: DeviceAuth) {
       env.DB.prepare('UPDATE families SET revision = revision + 1 WHERE id = ?').bind(auth.familyId),
       env.DB.prepare(
         `INSERT INTO sleep_sessions
-         (id, family_id, start_time, end_time, note, created_at, updated_at, deleted_at, revision)
-         VALUES (?, ?, ?, NULL, '', ?, ?, NULL, (SELECT revision FROM families WHERE id = ?))`
-      ).bind(sessionId, auth.familyId, startTime, at, at, auth.familyId)
+         (id, family_id, child_id, start_time, end_time, note, day_night_override, created_at, updated_at, deleted_at, revision)
+         VALUES (?, ?, ?, ?, NULL, '', NULL, ?, ?, NULL, (SELECT revision FROM families WHERE id = ?))`
+      ).bind(sessionId, auth.familyId, childId, startTime, at, at, auth.familyId)
     ])
   } catch {
-    const authoritative = await getActiveSession(env, auth.familyId)
+    const authoritative = await getActiveSession(env, auth.familyId, childId)
     if (authoritative) throw new ApiError(409, 'ACTIVE_SLEEP_EXISTS', 'An active sleep session already exists.', {
       revision: await currentRevision(env, auth.familyId),
       activeSession: sessionDto(authoritative)
@@ -411,10 +585,13 @@ async function createCompletedSleep(request: Request, env: Env, auth: DeviceAuth
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new ApiError(400, 'INVALID_REQUEST', 'Invalid session.')
   const input = value as Record<string, unknown>
   const sessionId = requireString(input.id, 'session.id', 100)
+  const childId = typeof input.childId === 'string' && input.childId.trim() ? requireString(input.childId, 'session.childId', 100) : legacyChildId(auth.familyId)
+  await requireActiveChild(env, auth.familyId, childId)
   if (!isIsoDate(input.startTime) || !isIsoDate(input.endTime)) throw new ApiError(400, 'INVALID_REQUEST', 'Invalid sleep times.')
   const startTime = input.startTime
   const endTime = input.endTime
   const note = typeof input.note === 'string' ? input.note.slice(0, 2000) : ''
+  const dayNightOverride = input.dayNightOverride === 'day' || input.dayNightOverride === 'night' ? input.dayNightOverride : null
   if (Date.parse(endTime) <= Date.parse(startTime)) throw new ApiError(400, 'INVALID_TIME_RANGE', 'Wake time must be after sleep time.')
   if (Math.max(Date.parse(startTime), Date.parse(endTime)) > Date.now() + 60_000) throw new ApiError(400, 'FUTURE_TIME')
 
@@ -431,9 +608,9 @@ async function createCompletedSleep(request: Request, env: Env, auth: DeviceAuth
       env.DB.prepare('UPDATE families SET revision = revision + 1 WHERE id = ?').bind(auth.familyId),
       env.DB.prepare(
         `INSERT INTO sleep_sessions
-         (id, family_id, start_time, end_time, note, created_at, updated_at, deleted_at, revision)
-         VALUES (?, ?, ?, ?, ?, ?, ?, NULL, (SELECT revision FROM families WHERE id = ?))`
-      ).bind(sessionId, auth.familyId, startTime, endTime, note, at, at, auth.familyId)
+         (id, family_id, child_id, start_time, end_time, note, day_night_override, created_at, updated_at, deleted_at, revision)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, (SELECT revision FROM families WHERE id = ?))`
+      ).bind(sessionId, auth.familyId, childId, startTime, endTime, note, dayNightOverride, at, at, auth.familyId)
     ])
   } catch {
     throw new ApiError(409, 'SESSION_CREATE_CONFLICT', 'Session ID already exists.')
@@ -489,7 +666,7 @@ async function patchSleep(request: Request, env: Env, auth: DeviceAuth, sessionI
   const patchValue = body.patch
   if (!patchValue || typeof patchValue !== 'object' || Array.isArray(patchValue)) throw new ApiError(400, 'INVALID_REQUEST', 'Invalid patch.')
   const patch = patchValue as Record<string, unknown>
-  const allowed = ['startTime', 'endTime', 'note']
+  const allowed = ['startTime', 'endTime', 'note', 'dayNightOverride']
   const keys = Object.keys(patch)
   if (!keys.length || keys.some((key) => !allowed.includes(key))) throw new ApiError(400, 'INVALID_REQUEST', 'Unsupported patch fields.')
 
@@ -505,6 +682,7 @@ async function patchSleep(request: Request, env: Env, auth: DeviceAuth, sessionI
   if (nextEnd && Date.parse(nextEnd) <= Date.parse(nextStart)) throw new ApiError(400, 'INVALID_TIME_RANGE')
   if (Math.max(Date.parse(nextStart), nextEnd ? Date.parse(nextEnd) : 0) > Date.now() + 60_000) throw new ApiError(400, 'FUTURE_TIME')
   if ('note' in patch && typeof patch.note !== 'string') throw new ApiError(400, 'INVALID_REQUEST', 'Invalid note.')
+  if ('dayNightOverride' in patch && patch.dayNightOverride !== null && patch.dayNightOverride !== 'day' && patch.dayNightOverride !== 'night') throw new ApiError(400, 'INVALID_REQUEST', 'Invalid dayNightOverride.')
 
   if (await existingOperation(env, operationId, auth, 'PATCH_SLEEP')) {
     const existing = await getSession(env, auth.familyId, sessionId)
@@ -516,6 +694,7 @@ async function patchSleep(request: Request, env: Env, auth: DeviceAuth, sessionI
   if ('startTime' in patch) { assignments.push('start_time = ?'); params.push(nextStart) }
   if ('endTime' in patch) { assignments.push('end_time = ?'); params.push(nextEnd) }
   if ('note' in patch) { assignments.push('note = ?'); params.push((patch.note as string).slice(0, 2000)) }
+  if ('dayNightOverride' in patch) { assignments.push('day_night_override = ?'); params.push(patch.dayNightOverride) }
   const at = nowIso()
   assignments.push('updated_at = ?'); params.push(at)
   assignments.push('revision = (SELECT revision FROM families WHERE id = ?)'); params.push(auth.familyId)
@@ -586,11 +765,16 @@ async function route(request: Request, env: Env) {
   if (request.method === 'GET' && path === '/v1/sync') return sync(request, env, auth)
   if (request.method === 'GET' && path === '/v1/device') return getDevice(request, env, auth)
   if (request.method === 'POST' && path === '/v1/device/leave') return leaveDevice(request, env, auth)
+  if (request.method === 'POST' && path === '/v1/children') return createChildProfile(request, env, auth)
   if (request.method === 'POST' && path === '/v1/sessions/start') return startSleep(request, env, auth)
   if (request.method === 'POST' && path === '/v1/sessions') return createCompletedSleep(request, env, auth)
 
   const endMatch = path.match(/^\/v1\/sessions\/([^/]+)\/end$/)
   if (request.method === 'POST' && endMatch) return endSleep(request, env, auth, decodeURIComponent(endMatch[1]))
+
+  const childMatch = path.match(/^\/v1\/children\/([^/]+)$/)
+  if (request.method === 'PATCH' && childMatch) return patchChildProfile(request, env, auth, decodeURIComponent(childMatch[1]))
+  if (request.method === 'DELETE' && childMatch) return deleteChildProfile(request, env, auth, decodeURIComponent(childMatch[1]))
 
   const sessionMatch = path.match(/^\/v1\/sessions\/([^/]+)$/)
   if (request.method === 'PATCH' && sessionMatch) return patchSleep(request, env, auth, decodeURIComponent(sessionMatch[1]))

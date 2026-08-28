@@ -1,10 +1,24 @@
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { ChangeEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { languageOptions, localeTag, t } from './i18n'
 import type { Locale } from './i18n'
-import type { AppData, Page, SleepSession } from './types'
-import { createDefaultData, createSession, exportData, importData, loadData, saveData } from './storage'
-import { awakeSince, durationOf, formatDateHeader, formatDuration, formatTime, formatTimer, splitDayNight, todaySessions, totalToday } from './utils'
+import type { AppData, ChildProfile, DayNightOverride, Page, SleepSession } from './types'
+import type { DataQualityIssueKind } from './utils'
+import { createChild, createSession, exportData, importData, inspectBackup, loadData, saveData } from './storage'
+import type { ImportDiagnostic, ImportInspection } from './storage'
+import { deleteChildPhoto, loadChildPhoto, prepareChildPhoto, saveChildPhoto } from './photoStore'
+import type { AvatarCrop } from './photoStore'
+import { removeChildProfile } from './childProfiles'
+import { buildInsightsFoundation } from './insights'
+import { buildSimilarDaysInsight } from './similarDays'
+import { buildPredictionLite } from './prediction'
+import { buildSleepDaySummaries, buildSleepDevelopment } from './sleepDevelopment'
+import type { SleepDevelopmentMilestone } from './sleepDevelopment'
+import { buildSleepChangeInsight } from './sleepChange'
+import type { SleepChangeMetric, SleepChangeSignal } from './sleepChange'
+import { buildMonthlyFamilyReport } from './monthlyReport'
+import type { MonthlyReportMetric, MonthlyReportMilestone, MonthlyReportTrend } from './monthlyReport'
+import { DEFAULT_DAY_START_MINUTES, DEFAULT_NIGHT_START_MINUTES, LONG_SLEEP_GUARDRAIL_MS, awakeSince, durationOf, formatDateHeader, formatDuration, formatTime, formatTimer, getDataQualityWarnings, todaySessions, totalToday } from './utils'
 import SleepTimeline from './SleepTimeline'
 import SwipeHistoryRow from './SwipeHistoryRow'
 
@@ -55,18 +69,26 @@ export default function App() {
   const [now, setNow] = useState(Date.now())
   const [editor, setEditor] = useState<SleepSession | 'new' | null>(null)
   const locale = data.settings.locale
+  const activeChild = data.children.find((child) => child.id === data.settings.activeChildId) ?? data.children[0]
+  const activeSessions = useMemo(() => data.sessions.filter((session) => session.childId === activeChild.id), [data.sessions, activeChild.id])
 
   useEffect(() => saveData(data), [data])
   useEffect(() => { document.documentElement.lang = locale }, [locale])
   useEffect(() => { const id = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(id) }, [])
 
-  const current = useMemo(() => data.sessions.find((session) => !session.endTime) ?? null, [data.sessions])
+  const current = useMemo(() => activeSessions.find((session) => !session.endTime) ?? null, [activeSessions])
   const updateSessions = (sessions: SleepSession[]) => setData((previous) => ({ ...previous, sessions }))
-  const startNow = () => { if (!current) updateSessions([createSession(new Date().toISOString()), ...data.sessions]) }
+  const startNow = () => { if (!current) updateSessions([createSession(activeChild.id, new Date().toISOString()), ...data.sessions]) }
   const endNow = () => {
     if (!current) return
     const endTime = new Date().toISOString()
     updateSessions(data.sessions.map((session) => session.id === current.id ? { ...session, endTime, updatedAt: endTime } : session))
+  }
+  const adjustCurrentStart = (minutes: number) => {
+    if (!current) return
+    const updatedAt = new Date().toISOString()
+    const startTime = new Date(Date.parse(current.startTime) + minutes * 60000).toISOString()
+    updateSessions(data.sessions.map((session) => session.id === current.id ? { ...session, startTime, updatedAt } : session))
   }
   const saveEditor = (session: SleepSession) => {
     if (editor === 'new') updateSessions([session, ...data.sessions])
@@ -80,37 +102,56 @@ export default function App() {
 
   return <div className="app-shell">
     <main className="app-main">
-      {page === 'today' && <TodayPage data={data} now={now} locale={locale} current={current} onStart={startNow} onEnd={endNow} onOpenEditor={setEditor} onSettings={() => setPage('settings')} />}
-      {page === 'history' && <HistoryPage sessions={data.sessions} locale={locale} onEdit={setEditor} onDelete={deleteSession} onNew={() => setEditor('new')} />}
-      {page === 'stats' && <StatsPage sessions={data.sessions} now={now} locale={locale} />}
+      {page === 'today' && <TodayPage data={data} child={activeChild} sessions={activeSessions} now={now} locale={locale} current={current} onSelectChild={(childId) => setData((previous) => ({ ...previous, settings: { ...previous.settings, activeChildId: childId } }))} onStart={startNow} onEnd={endNow} onAdjustStart={adjustCurrentStart} onOpenEditor={setEditor} onHistory={() => setPage('history')} onSettings={() => setPage('settings')} />}
+      {page === 'history' && <HistoryPage sessions={activeSessions} locale={locale} onEdit={setEditor} onDelete={deleteSession} onNew={() => setEditor('new')} />}
+      {page === 'stats' && <StatsPage sessions={activeSessions} now={now} locale={locale} childName={activeChild.name} />}
       {page === 'settings' && <SettingsPage data={data} setData={setData} onBack={() => setPage('today')} />}
     </main>
     {page !== 'settings' && <BottomNav page={page} locale={locale} onChange={setPage} />}
-    {editor && <SleepEditor session={editor === 'new' ? null : editor} locale={locale} currentExists={Boolean(current)} onClose={() => setEditor(null)} onSave={saveEditor} onDelete={deleteSession} />}
+    {editor && <SleepEditor childId={activeChild.id} session={editor === 'new' ? null : editor} locale={locale} currentExists={Boolean(current)} onClose={() => setEditor(null)} onSave={saveEditor} onDelete={deleteSession} />}
   </div>
 }
 
-function TodayPage({ data, now, locale, current, onStart, onEnd, onOpenEditor, onSettings }: { data: AppData; now: number; locale: Locale; current: SleepSession | null; onStart: () => void; onEnd: () => void; onOpenEditor: (value: SleepSession | 'new') => void; onSettings: () => void }) {
-  const todays = todaySessions(data.sessions).sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
+function TodayPage({ data, child, sessions, now, locale, current, onSelectChild, onStart, onEnd, onAdjustStart, onOpenEditor, onHistory, onSettings }: { data: AppData; child: ChildProfile; sessions: SleepSession[]; now: number; locale: Locale; current: SleepSession | null; onSelectChild: (childId: string) => void; onStart: () => void; onEnd: () => void; onAdjustStart: (minutes: number) => void; onOpenEditor: (value: SleepSession | 'new') => void; onHistory: () => void; onSettings: () => void }) {
+  const todays = todaySessions(sessions).sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
   const yesterdayStart = new Date(now); yesterdayStart.setHours(0, 0, 0, 0); yesterdayStart.setDate(yesterdayStart.getDate() - 1)
   const yesterdayEnd = new Date(yesterdayStart); yesterdayEnd.setDate(yesterdayEnd.getDate() + 1)
-  const yesterdays = data.sessions
+  const yesterdays = sessions
     .filter((session) => { const start = new Date(session.startTime).getTime(); return start >= yesterdayStart.getTime() && start < yesterdayEnd.getTime() })
     .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
-  const total = totalToday(data.sessions, new Date(now))
-  const lastCompleted = data.sessions.filter((session) => session.endTime).sort((a, b) => new Date(b.endTime!).getTime() - new Date(a.endTime!).getTime())[0] ?? null
-  const elapsed = current ? durationOf(current, now) : awakeSince(data.sessions, now)
+  const total = totalToday(sessions, new Date(now))
+  const lastCompleted = sessions.filter((session) => session.endTime).sort((a, b) => new Date(b.endTime!).getTime() - new Date(a.endTime!).getTime())[0] ?? null
+  const elapsed = current ? durationOf(current, now) : awakeSince(sessions, now)
+  const qualityWarnings = getDataQualityWarnings(sessions, now)
+  const showLongSleepReminder = Boolean(current && data.settings.longSleepReminderEnabled && elapsed >= LONG_SLEEP_GUARDRAIL_MS)
+  const visibleQualityWarning = qualityWarnings.find((issue) => issue.kind !== 'stale-active')
 
   return <section className="screen today-screen">
-    <header className="compact-header"><div className="header-copy"><div className="date-label">{formatDateHeader(new Date(now), locale)}</div><div className="daily-summary">{t(locale, 'todaySoFar')} <strong>{formatDuration(total, locale)}</strong> {t(locale, 'sleepNoun')}</div></div><button className="icon-button" aria-label={t(locale, 'settings')} onClick={onSettings}><Icon name="settings" size={18} /></button></header>
+    <header className="compact-header"><div className="header-copy"><div className="child-header-line"><ChildAvatar child={child} className="child-avatar" />{data.children.length > 1 ? <select aria-label={t(locale, 'chooseChild')} className="child-switcher" value={child.id} onChange={(event) => onSelectChild(event.target.value)}>{data.children.map((item) => <option key={item.id} value={item.id}>{item.name || t(locale, 'unnamedChild')}</option>)}</select> : <strong className="single-child-name">{child.name || t(locale, 'unnamedChild')}</strong>}</div><div className="date-label">{formatDateHeader(new Date(now), locale)}</div><div className="daily-summary">{t(locale, 'todaySoFar')} <strong>{formatDuration(total, locale)}</strong> {t(locale, 'sleepNoun')}</div></div><button className="icon-button" aria-label={t(locale, 'settings')} onClick={onSettings}><Icon name="settings" size={18} /></button></header>
     <div className={`status-orb ${current ? 'sleeping' : 'awake'}`}><div className="orb-content"><div className="orb-status">{current ? t(locale, 'sleeping') : t(locale, 'awake')}</div><div className="orb-time">{formatTimer(elapsed)}</div><div className="orb-sub">{current ? `${t(locale, 'fellAsleep')} ${formatTime(current.startTime, locale)}` : lastCompleted ? `${t(locale, 'wokeUp')} ${formatTime(lastCompleted.endTime!, locale)}` : t(locale, 'noPreviousWake')}</div></div></div>
     <button className="primary-action" onClick={current ? onEnd : onStart}><Icon name={current ? 'sun' : 'moon'} size={20} /><span>{current ? t(locale, 'wokeUp') : t(locale, 'fellAsleep')}</span></button>
+    {current && <div className="quick-correction"><span>{t(locale, 'startedEarlier')}</span>{[5, 10, 15].map((minutes) => <button key={minutes} onClick={() => onAdjustStart(-minutes)}>−{minutes}</button>)}<button className="custom-correction" onClick={() => onOpenEditor(current)}>{t(locale, 'customTime')}</button></div>}
+    {showLongSleepReminder && <div className="sleep-warning-card"><strong>{t(locale, 'stillSleepingQuestion')}</strong><span>{t(locale, 'longSleepReminderText')}</span></div>}
+    {visibleQualityWarning && <button className="quality-warning-card" onClick={() => onOpenEditor(sessions.find((session) => visibleQualityWarning.sessionIds.includes(session.id)) ?? 'new')}><span className="quality-warning-icon" aria-hidden="true">!</span><span className="quality-warning-copy"><strong>{t(locale, qualityIssueTranslationKey(visibleQualityWarning.kind))}</strong><small>{t(locale, 'tapToFix')}</small></span><span className="quality-warning-arrow" aria-hidden="true">›</span></button>}
     <button className="text-action" onClick={() => onOpenEditor(current ?? 'new')}>{t(locale, 'manualEntry')}</button>
     <div className="sleep-cards-stack">
-      <div className="today-card"><div className="section-head"><h2>{t(locale, 'todaySleeps')}</h2><span>•••</span></div><div className="sleep-list scroll-list">{todays.length === 0 && <div className="empty">{t(locale, 'noSleepToday')}</div>}{todays.map((session) => <SleepRow key={session.id} session={session} now={now} locale={locale} onClick={() => onOpenEditor(session)} compact />)}</div></div>
-      <div className="today-card yesterday-card"><div className="section-head"><h2>{t(locale, 'yesterdaySleeps')}</h2><span>•••</span></div><div className="sleep-list scroll-list">{yesterdays.length === 0 && <div className="empty">{t(locale, 'noSleepYesterday')}</div>}{yesterdays.map((session) => <SleepRow key={session.id} session={session} now={now} locale={locale} onClick={() => onOpenEditor(session)} compact />)}</div></div>
+      <div className="today-card"><div className="section-head"><h2>{t(locale, 'todaySleeps')}</h2><button className="section-more" type="button" aria-label={t(locale, 'history')} onClick={onHistory}>•••</button></div><div className="sleep-list scroll-list">{todays.length === 0 && <div className="empty">{t(locale, 'noSleepToday')}</div>}{todays.map((session) => <SleepRow key={session.id} session={session} now={now} locale={locale} onClick={() => onOpenEditor(session)} compact />)}</div></div>
+      <div className="today-card yesterday-card"><div className="section-head"><h2>{t(locale, 'yesterdaySleeps')}</h2><button className="section-more" type="button" aria-label={t(locale, 'history')} onClick={onHistory}>•••</button></div><div className="sleep-list scroll-list">{yesterdays.length === 0 && <div className="empty">{t(locale, 'noSleepYesterday')}</div>}{yesterdays.map((session) => <SleepRow key={session.id} session={session} now={now} locale={locale} onClick={() => onOpenEditor(session)} compact />)}</div></div>
     </div>
   </section>
+}
+
+function qualityIssueTranslationKey(kind: DataQualityIssueKind) {
+  const keys = {
+    'invalid-time': 'invalidTimeWarning',
+    'future-time': 'futureTimeWarning',
+    'suspiciously-short': 'shortDurationWarning',
+    'stale-active': 'staleActiveWarning',
+    'extreme-duration': 'extremeDurationWarning',
+    'possible-duplicate': 'duplicateWarning',
+    overlap: 'overlapWarning'
+  } as const
+  return keys[kind]
 }
 
 function SleepRow({ session, now, locale, onClick, compact = false }: { session: SleepSession; now: number; locale: Locale; onClick?: () => void; compact?: boolean }) {
@@ -129,58 +170,262 @@ function HistoryPage({ sessions, locale, onEdit, onDelete, onNew }: { sessions: 
   return <section className="screen history-screen"><header className="page-header centered-header"><h1>{t(locale, 'history')}</h1><button className="add-button" onClick={onNew}><Icon name="plus" size={19} /></button></header><div className="history-wrap">{grouped.length === 0 && <div className="empty-card">{t(locale, 'noRecordedSleep')}</div>}{grouped.map(([date, items], index) => <div className="history-group" key={date}><h3>{index === 0 ? `${t(locale, 'today')} – ${date}` : index === 1 ? `${t(locale, 'yesterday')} – ${date}` : date}</h3><div className="sleep-list history-list">{items.map((session) => <SwipeHistoryRow key={session.id} session={session} now={Date.now()} locale={locale} onEdit={() => onEdit(session)} onDelete={() => onDelete(session.id)} />)}</div></div>)}</div></section>
 }
 
-function StatsPage({ sessions, now, locale }: { sessions: SleepSession[]; now: number; locale: Locale }) {
-  const [range, setRange] = useState<'day' | 'week' | 'month'>('week')
+function dateKeyAt(time: number) {
+  const date = new Date(time)
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+function dateKeyTime(value: string) {
+  const [year, month, day] = value.split('-').map(Number)
+  return new Date(year, month - 1, day, 0, 0, 0, 0).getTime()
+}
+
+function StatsPage({ sessions, now, locale, childName }: { sessions: SleepSession[]; now: number; locale: Locale; childName: string }) {
+  const availableStart = sessions.length > 0 ? dateKeyAt(Math.min(...sessions.map((session) => new Date(session.startTime).getTime()))) : dateKeyAt(now)
+  const availableEnd = dateKeyAt(now)
+  const [range, setRange] = useState<'day' | 'week' | 'month' | 'custom'>('week')
+  const [insightsRange, setInsightsRange] = useState<7 | 14 | 30>(14)
+  const [developmentRange, setDevelopmentRange] = useState<3 | 6 | 12 | 'custom'>(12)
+  const [customStart, setCustomStart] = useState(availableStart)
+  const [customEnd, setCustomEnd] = useState(availableEnd)
+  const [developmentStart, setDevelopmentStart] = useState(availableStart.slice(0, 7))
+  const [developmentEnd, setDevelopmentEnd] = useState(availableEnd.slice(0, 7))
+  const [developmentPickerOpen, setDevelopmentPickerOpen] = useState(false)
+  const [developmentDraftStart, setDevelopmentDraftStart] = useState(availableStart.slice(0, 7))
+  const [developmentDraftEnd, setDevelopmentDraftEnd] = useState(availableEnd.slice(0, 7))
+  const [selectedDevelopmentMonth, setSelectedDevelopmentMonth] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
-  const days = range === 'day' ? 1 : range === 'week' ? 7 : 30
-  const today = new Date(now)
+  const customStartTime = dateKeyTime(customStart)
+  const customEndTime = dateKeyTime(customEnd)
+  const customDays = Math.max(1, Math.round((customEndTime - customStartTime) / 86400000) + 1)
+  const days = range === 'day' ? 1 : range === 'week' ? 7 : range === 'month' ? 30 : customDays
+  const developmentMonthOptions = useMemo(() => {
+    const [startYear, startMonth] = availableStart.slice(0, 7).split('-').map(Number)
+    const [endYear, endMonth] = availableEnd.slice(0, 7).split('-').map(Number)
+    const cursor = new Date(startYear, startMonth - 1, 1)
+    const limit = new Date(endYear, endMonth - 1, 1)
+    const result: Array<{ value: string; label: string }> = []
+    while (cursor <= limit) {
+      result.push({ value: `${cursor.getFullYear()}-${pad(cursor.getMonth() + 1)}`, label: new Intl.DateTimeFormat(localeTag(locale), { year: 'numeric', month: 'long' }).format(cursor) })
+      cursor.setMonth(cursor.getMonth() + 1)
+    }
+    return result
+  }, [availableStart, availableEnd, locale])
+
+  useEffect(() => {
+    if (!developmentMonthOptions.length) return
+    const first = developmentMonthOptions[0].value
+    const last = developmentMonthOptions[developmentMonthOptions.length - 1].value
+    setDevelopmentStart((current) => developmentMonthOptions.some((month) => month.value === current) ? current : first)
+    setDevelopmentEnd((current) => developmentMonthOptions.some((month) => month.value === current) ? current : last)
+  }, [developmentMonthOptions])
+
+  const moveDevelopmentMonth = (target: 'start' | 'end', delta: -1 | 1) => {
+    const currentValue = target === 'start' ? developmentDraftStart : developmentDraftEnd
+    const currentIndex = developmentMonthOptions.findIndex((month) => month.value === currentValue)
+    const candidate = developmentMonthOptions[currentIndex + delta]
+    if (!candidate) return
+    if (target === 'start' && candidate.value <= developmentDraftEnd) setDevelopmentDraftStart(candidate.value)
+    if (target === 'end' && candidate.value >= developmentDraftStart) setDevelopmentDraftEnd(candidate.value)
+  }
+
+  const developmentDraftStartIndex = developmentMonthOptions.findIndex((month) => month.value === developmentDraftStart)
+  const developmentDraftEndIndex = developmentMonthOptions.findIndex((month) => month.value === developmentDraftEnd)
+  const openDevelopmentPicker = () => {
+    setDevelopmentDraftStart(developmentStart)
+    setDevelopmentDraftEnd(developmentEnd)
+    setDevelopmentPickerOpen(true)
+  }
+  const applyDevelopmentRange = () => {
+    setDevelopmentStart(developmentDraftStart)
+    setDevelopmentEnd(developmentDraftEnd)
+    setDevelopmentRange('custom')
+    setDevelopmentPickerOpen(false)
+  }
+  const sleepDaysByDate = useMemo(() => new Map(buildSleepDaySummaries(sessions, now).map((day) => [day.key, { total: day.totalMs, day: day.dayMs, night: day.nightMs }])), [sessions, now])
 
   const chart = useMemo(() => Array.from({ length: days }, (_, index) => {
-    const date = new Date(now)
+    const date = range === 'custom' ? new Date(customStartTime) : new Date(now)
     date.setHours(0, 0, 0, 0)
-    date.setDate(date.getDate() - (days - 1 - index))
-    const dateKey = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
-    const totalDate = date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth() && date.getDate() === today.getDate() ? new Date(now) : date
-    return { dateKey, label: new Intl.DateTimeFormat(localeTag(locale), { day: 'numeric' }).format(date), hours: +(totalToday(sessions, totalDate) / 3600000).toFixed(2) }
-  }), [sessions, now, days, locale])
+    date.setDate(date.getDate() + (range === 'custom' ? index : -(days - 1 - index)))
+    const dateKey = dateKeyAt(date.getTime())
+    const stats = sleepDaysByDate.get(dateKey) ?? { total: 0, day: 0, night: 0 }
+    return { dateKey, label: new Intl.DateTimeFormat(localeTag(locale), days > 31 ? { month: 'short', day: 'numeric' } : { day: 'numeric' }).format(date), hours: +(stats.total / 3600000).toFixed(2), ...stats }
+  }), [sleepDaysByDate, now, days, range, customStartTime, locale])
 
-  const recent = sessions.filter((session) => new Date(session.startTime).getTime() >= now - days * 86400000)
-  const sums = recent.reduce((acc, session) => { const parts = splitDayNight(session, now); acc.total += durationOf(session, now); acc.day += parts.day; acc.night += parts.night; return acc }, { total: 0, day: 0, night: 0 })
-  const divisor = Math.max(1, days)
+  const sums = chart.reduce((acc, item) => ({ total: acc.total + item.total, day: acc.day + item.day, night: acc.night + item.night }), { total: 0, day: 0, night: 0 })
+  const divisor = Math.max(1, chart.length)
 
   const selectedStats = useMemo(() => {
     if (!selectedDate) return null
     const [year, month, day] = selectedDate.split('-').map(Number)
-    const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0).getTime()
-    const endOfDay = new Date(year, month - 1, day + 1, 0, 0, 0, 0).getTime()
-    let total = 0, daytime = 0, nighttime = 0
-    sessions.forEach((session) => {
-      const start = new Date(session.startTime).getTime()
-      const end = session.endTime ? new Date(session.endTime).getTime() : now
-      const overlapStart = Math.max(start, startOfDay)
-      const overlapEnd = Math.min(end, endOfDay)
-      if (overlapEnd <= overlapStart) return
-      const clipped: SleepSession = { ...session, startTime: new Date(overlapStart).toISOString(), endTime: new Date(overlapEnd).toISOString() }
-      const parts = splitDayNight(clipped, now)
-      total += overlapEnd - overlapStart
-      daytime += parts.day
-      nighttime += parts.night
-    })
+    const values = sleepDaysByDate.get(selectedDate) ?? { total: 0, day: 0, night: 0 }
     const date = new Date(year, month - 1, day)
-    return { total, day: daytime, night: nighttime, label: new Intl.DateTimeFormat(localeTag(locale), { month: 'short', day: 'numeric' }).format(date) }
-  }, [sessions, now, selectedDate, locale])
+    return { ...values, label: new Intl.DateTimeFormat(localeTag(locale), { month: 'short', day: 'numeric' }).format(date) }
+  }, [sleepDaysByDate, selectedDate, locale])
 
-  const changeRange = (next: 'day' | 'week' | 'month') => { setRange(next); setSelectedDate(null) }
+  const changeRange = (next: 'day' | 'week' | 'month' | 'custom') => { setRange(next); setSelectedDate(null) }
   const display = selectedStats ?? { total: sums.total / divisor, day: sums.day / divisor, night: sums.night / divisor, label: t(locale, 'average') }
-  const timelineDate = range === 'day' || !selectedDate ? undefined : selectedDate
+  const timelineDate = selectedDate ?? (range === 'custom' ? customEnd : undefined)
   const chartUnit = locale === 'hu' ? 'ó' : locale === 'de' ? 'Std.' : 'hr'
+  const insights = useMemo(() => buildInsightsFoundation(sessions, now, { lookbackDays: insightsRange }), [sessions, now, insightsRange])
+  const similarDays = useMemo(() => buildSimilarDaysInsight(sessions, now, insightsRange), [sessions, now, insightsRange])
+  const prediction = useMemo(() => buildPredictionLite(sessions, now, insightsRange), [sessions, now, insightsRange])
+  const development = useMemo(() => buildSleepDevelopment(sessions, now, developmentRange === 'custom' ? 12 : developmentRange, developmentRange === 'custom' ? { startMonth: developmentStart, endMonth: developmentEnd } : undefined), [sessions, now, developmentRange, developmentStart, developmentEnd])
+  const sleepChange = useMemo(() => buildSleepChangeInsight(sessions, now), [sessions, now])
+  const monthlyReport = useMemo(() => buildMonthlyFamilyReport(sessions, now), [sessions, now])
+  const developmentChart = useMemo(() => development.months.map((item) => ({
+    key: item.key,
+    label: new Intl.DateTimeFormat(localeTag(locale), { month: 'short' }).format(new Date(item.year, item.month, 1)).replace('.', '').slice(0, 3),
+    day: +(item.averageDayMs / 3600000).toFixed(2),
+    night: +(item.averageNightMs / 3600000).toFixed(2)
+  })), [development.months, locale])
+  const developmentChartMax = Math.max(16, Math.ceil(Math.max(0, ...developmentChart.map((item) => item.day + item.night)) / 2) * 2)
+  const selectedDevelopmentPoint = developmentChart.find((item) => item.key === selectedDevelopmentMonth) ?? null
+  const wakeWindow = insights.wakeWindow
+  const routine = insights.routine
+  const relevantWakeWindow = prediction.bucket ? wakeWindow.breakdown.find((item) => item.key === prediction.bucket) ?? null : null
+  const primaryWakeMs = relevantWakeWindow?.typicalMs ?? wakeWindow.typicalMs
+  const primaryWakeRange = relevantWakeWindow ? { lowMs: relevantWakeWindow.lowMs, highMs: relevantWakeWindow.highMs } : wakeWindow.typicalRange
+  const primaryWakeLabel = relevantWakeWindow ? wakeBucketLabel(locale, relevantWakeWindow.key) : t(locale, 'typicalWakeWindow')
 
   return <section className="screen stats-screen"><header className="page-header centered-header"><h1>{t(locale, 'statistics')}</h1></header>
-    <div className="segmented"><button className={range === 'day' ? 'active' : ''} onClick={() => changeRange('day')}>{t(locale, 'day')}</button><button className={range === 'week' ? 'active' : ''} onClick={() => changeRange('week')}>{t(locale, 'week')}</button><button className={range === 'month' ? 'active' : ''} onClick={() => changeRange('month')}>{t(locale, 'month')}</button></div>
+    <div className="segmented four-options"><button className={range === 'day' ? 'active' : ''} onClick={() => changeRange('day')}>{t(locale, 'day')}</button><button className={range === 'week' ? 'active' : ''} onClick={() => changeRange('week')}>{t(locale, 'week')}</button><button className={range === 'month' ? 'active' : ''} onClick={() => changeRange('month')}>{t(locale, 'month')}</button><button className={range === 'custom' ? 'active' : ''} onClick={() => changeRange('custom')}>{t(locale, 'customRange')}</button></div>
+    {range === 'custom' && <div className="custom-range-picker"><label>{t(locale, 'fromDate')}<input type="date" min={availableStart} max={customEnd} value={customStart} onChange={(event) => setCustomStart(event.target.value)} /></label><label>{t(locale, 'toDate')}<input type="date" min={customStart} max={availableEnd} value={customEnd} onChange={(event) => setCustomEnd(event.target.value)} /></label></div>}
     <div className="chart-card compact-chart-card"><h2>{t(locale, 'sleepDuration')}</h2><div className="bar-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={chart} margin={{ top: 8, right: 2, bottom: 0, left: -26 }}><XAxis dataKey="label" tickLine={false} axisLine={false} /><YAxis domain={[0, 14]} tickLine={false} axisLine={false} /><Tooltip contentStyle={{ background: '#0d1a2b', border: '1px solid #1c3352', borderRadius: 10 }} formatter={(value) => [`${value} ${chartUnit}`, t(locale, 'sleep')]} /><Bar dataKey="hours" fill="#579dff" radius={[4, 4, 1, 1]} maxBarSize={17} onClick={(entry: any) => setSelectedDate(entry?.payload?.dateKey ?? null)} /></BarChart></ResponsiveContainer></div></div>
     <h2 className="overview-title">{t(locale, 'overview24h')}</h2>
     <div className="overview-compact"><SleepTimeline sessions={sessions} now={now} day={timelineDate} locale={locale} /><div className="stats-row"><StatCard label={display.label} value={formatDuration(display.total, locale)} suffix={selectedStats ? undefined : t(locale, 'perDay')} /><StatCard label={t(locale, 'daytime')} value={formatDuration(display.day, locale)} icon="sun" /><StatCard label={t(locale, 'nighttime')} value={formatDuration(display.night, locale)} icon="moon" /></div></div>
+    <div className="insights-card wake-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'wakeWindow')}</h2></div>{wakeWindow.confidence && <b>{t(locale, wakeWindow.confidence === 'medium' ? 'mediumConfidence' : 'lowConfidence')}</b>}</div>
+      <div className="insights-range" aria-label={t(locale, 'insightsRange')}>{([7, 14, 30] as const).map((value) => <button key={value} className={insightsRange === value ? 'active' : ''} onClick={() => setInsightsRange(value)}>{value} {t(locale, 'daysShort')}</button>)}</div>
+      {primaryWakeMs !== null ? <div className="wake-window-hero"><span>{primaryWakeLabel}</span><strong>{formatDuration(primaryWakeMs, locale)}</strong>{primaryWakeRange && <small>{t(locale, 'typicalRange')}: {formatDuration(primaryWakeRange.lowMs, locale)}–{formatDuration(primaryWakeRange.highMs, locale)} · {t(locale, 'sampleCountShort', { count: relevantWakeWindow?.sampleCount ?? wakeWindow.sampleCount })}</small>}</div> : <p>{t(locale, 'wakeWindowCollecting', { count: wakeWindow.sampleCount })}</p>}
+      {wakeWindow.currentMs !== null ? <div className="current-awake-status"><span>{t(locale, 'awakeForNow')}</span><strong>{formatDuration(wakeWindow.currentMs, locale)}</strong></div> : <p>{t(locale, 'wakeWindowUnavailable')}</p>}
+      {wakeWindow.breakdown.length > 0 && <div className="wake-breakdown"><strong>{t(locale, 'bySleepOrder')}</strong>{wakeWindow.breakdown.map((item) => <div key={item.key} className={item.key === relevantWakeWindow?.key ? 'relevant' : ''}><span>{wakeBucketLabel(locale, item.key)}</span><b>{formatDuration(item.typicalMs, locale)}</b><small>{t(locale, 'sampleCountShort', { count: item.sampleCount })}</small></div>)}</div>}
+      <small>{wakeWindow.status === 'ready' ? t(locale, 'wakeWindowBasis', { count: wakeWindow.sampleCount }) : t(locale, 'wakeWindowCollecting', { count: wakeWindow.sampleCount })}</small>
+      {insights.quality.excludedSessionCount > 0 && <small className="insights-quality-note">{t(locale, 'insightsExcluded', { count: insights.quality.excludedSessionCount })}</small>}
+    </div>
+    <div className="insights-card routine-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'routinePatterns')}</h2></div>{routine.status === 'ready' && <b>{t(locale, 'observedDays', { count: routine.observedDayCount })}</b>}</div>
+      {routine.status === 'collecting' && <p className="routine-empty">{t(locale, 'routineCollecting')}</p>}
+      {routine.bedtime && <RoutineRow label={t(locale, 'typicalBedtime')} value={formatClockMinutes(routine.bedtime.typicalMinutes, locale)} detail={t(locale, 'routineConsistency', { consistent: routine.bedtime.consistentCount, count: routine.bedtime.sampleCount })} />}
+      {routine.wakeTime && <RoutineRow label={t(locale, 'typicalWakeTime')} value={formatClockMinutes(routine.wakeTime.typicalMinutes, locale)} detail={t(locale, 'routineConsistency', { consistent: routine.wakeTime.consistentCount, count: routine.wakeTime.sampleCount })} />}
+      {routine.daytimeSleepCount && <RoutineRow label={t(locale, 'typicalNapCount')} value={formatCount(routine.daytimeSleepCount.typicalCount, locale)} detail={t(locale, 'napCountRange', { low: formatCount(routine.daytimeSleepCount.lowCount, locale), high: formatCount(routine.daytimeSleepCount.highCount, locale) })} />}
+      {routine.status === 'ready' && <small>{t(locale, 'routineOwnData')}</small>}
+    </div>
+    <div className="insights-card development-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'sleepDevelopment')}</h2></div><b>{t(locale, 'familyPlus')}</b></div>
+      <div className="insights-range four-options" aria-label={t(locale, 'developmentRange')}>{([3, 6, 12] as const).map((value) => <button key={value} className={developmentRange === value ? 'active' : ''} onClick={() => setDevelopmentRange(value)}>{value} {t(locale, 'monthsShort')}</button>)}<button className={developmentRange === 'custom' ? 'active' : ''} onClick={openDevelopmentPicker}>{t(locale, 'customRange')}</button></div>
+      {developmentRange === 'custom' && <small className="development-range-summary">{t(locale, 'selectedDevelopmentRange', { start: developmentMonthOptions.find((month) => month.value === developmentStart)?.label ?? developmentStart, end: developmentMonthOptions.find((month) => month.value === developmentEnd)?.label ?? developmentEnd })}</small>}
+      {development.status === 'collecting' ? <p className="routine-empty">{t(locale, 'developmentCollecting')}</p> : <>
+        <div className="development-chart" aria-label={t(locale, 'developmentChart')}>
+          <div className="development-y-axis" aria-hidden="true"><span>{developmentChartMax}</span><span>{developmentChartMax / 2}</span><span>0</span></div>
+          <div className="development-chart-scroll"><div className="development-bars" style={{ gridTemplateColumns: `repeat(${developmentChart.length}, minmax(24px, 1fr))`, minWidth: `${Math.max(100, developmentChart.length * 8.4)}%` }}>
+            {developmentChart.map((item) => <button key={item.key} type="button" className={selectedDevelopmentPoint?.key === item.key ? 'selected' : ''} onClick={() => setSelectedDevelopmentMonth((current) => current === item.key ? null : item.key)} aria-label={`${item.label}: ${t(locale, 'daytime')} ${item.day} ${chartUnit}, ${t(locale, 'nighttime')} ${item.night} ${chartUnit}`}>
+              <span className="development-bar-track"><i className="development-bar-night" style={{ height: `${item.night / developmentChartMax * 100}%` }} /><i className="development-bar-day" style={{ height: `${item.day / developmentChartMax * 100}%` }} /></span><small>{item.label}</small>
+            </button>)}
+          </div></div>
+        </div>
+        {selectedDevelopmentPoint && <div className="development-chart-detail"><strong>{selectedDevelopmentPoint.label}</strong><span>{t(locale, 'daytime')}: {selectedDevelopmentPoint.day} {chartUnit}</span><span>{t(locale, 'nighttime')}: {selectedDevelopmentPoint.night} {chartUnit}</span></div>}
+        {development.first && development.latest && <div className="then-now"><strong>{t(locale, 'thenNow')}</strong><div className="then-now-grid"><DevelopmentPoint label={t(locale, 'then')} month={development.first} locale={locale} /><DevelopmentPoint label={t(locale, 'nowPeriod')} month={development.latest} locale={locale} /></div></div>}
+        {development.milestones.length > 0 && <div className="development-milestones">{development.milestones.slice(0, 3).map((milestone) => <span key={milestone.kind}>{developmentMilestoneLabel(locale, milestone)}</span>)}</div>}
+      </>}
+      <small>{t(locale, 'developmentOwnData')}</small>
+    </div>
+    <div className="insights-card change-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'sleepChangePlain')}</h2></div><b>{t(locale, sleepChange.status === 'changed' ? 'changeDetectedPlain' : sleepChange.status === 'stable' ? 'stablePatternPlain' : 'familyPlus')}</b></div>
+      {sleepChange.status === 'collecting' && <p className="routine-empty">{t(locale, 'changeCollectingPlain', { recent: sleepChange.recentSampleCount, baseline: sleepChange.baselineSampleCount })}</p>}
+      {sleepChange.status === 'stable' && <div className="change-stable"><strong>{t(locale, 'stablePatternPlain')}</strong><span>{t(locale, 'changeStablePlain', { name: childName })}</span></div>}
+      {sleepChange.status === 'changed' && <><p className="change-intro">{t(locale, 'changeIntro', { name: childName })}</p><div className="change-signals">{sleepChange.signals.slice(0, 3).map((signal) => <ChangeSignal key={signal.metric} signal={signal} locale={locale} />)}</div></>}
+      <small>{t(locale, 'changeOwnDataPlain')}</small>
+    </div>
+    <div className="insights-card monthly-report-card"><div className="insights-card-head"><div><span>{t(locale, 'monthlyReportEyebrow')}</span><h2>{t(locale, 'monthlyReport')}</h2></div><b>{t(locale, 'familyPlus')}</b></div>
+      {monthlyReport.status === 'collecting' || !monthlyReport.month ? <p className="routine-empty">{t(locale, 'monthlyReportCollecting')}</p> : <>
+        <div className="monthly-report-hero"><span>{formatReportMonth(monthlyReport.month, locale)}</span><strong>{formatDuration(monthlyReport.month.averageTotalMs, locale)}</strong><small>{t(locale, 'monthlyDailyAverage')} · {t(locale, 'recordedDays', { count: monthlyReport.month.recordedDays })}</small></div>
+        <div className="monthly-kpis"><div><span>{t(locale, 'daytime')}</span><strong>{formatDuration(monthlyReport.month.averageDayMs, locale)}</strong></div><div><span>{t(locale, 'nighttime')}</span><strong>{formatDuration(monthlyReport.month.averageNightMs, locale)}</strong></div><div><span>{t(locale, 'longestBlock')}</span><strong>{formatDuration(monthlyReport.month.averageLongestBlockMs, locale)}</strong></div></div>
+        <small className="monthly-baseline">{t(locale, 'monthlyComparedTo', { count: monthlyReport.baselineMonthCount })}</small>
+        {monthlyReport.trends.length === 0 ? <div className="monthly-stable"><strong>{t(locale, 'monthlyStableTitle')}</strong><span>{t(locale, 'monthlyStable')}</span></div> : <div className="monthly-trends"><strong>{t(locale, 'monthlyTrends')}</strong>{monthlyReport.trends.slice(0, 3).map((trend) => <MonthlyTrend key={trend.metric} trend={trend} locale={locale} />)}</div>}
+        {monthlyReport.milestones.length > 0 && <div className="monthly-milestones"><strong>{t(locale, 'monthlyMilestones')}</strong>{monthlyReport.milestones.map((milestone) => <span key={milestone.kind}>{monthlyMilestoneLabel(locale, milestone)}</span>)}</div>}
+      </>}
+      <small>{t(locale, 'monthlyOwnData')}</small>
+    </div>
+    <div className="insights-card similar-days-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'similarDays')}</h2></div>{similarDays.status === 'ready' && <b>{t(locale, 'closestDays')}</b>}</div>
+      {similarDays.status === 'unavailable' && <p className="routine-empty">{t(locale, 'similarDaysUnavailablePlain', { name: childName })}</p>}
+      {similarDays.status === 'collecting' && <p className="routine-empty">{t(locale, 'similarDaysCollectingPlain', { count: similarDays.candidateCount })}</p>}
+      {similarDays.matches.map((match) => <div className="similar-day-row" key={match.dateKey}><div><strong>{formatDateKey(match.dateKey, locale)}</strong><small>{t(locale, 'similarDayEvidence', { naps: match.snapshot.daytimeSleepCount, sleep: formatDuration(match.snapshot.totalSleepMs, locale), awake: formatDuration(match.snapshot.awakeMs ?? 0, locale) })}</small></div>{match.nextSleep ? <span>{t(locale, 'thenSleptAt')} <b>{formatTime(match.nextSleep.startTime, locale)}</b></span> : <span>{t(locale, 'noLaterSleep')}</span>}</div>)}
+      {similarDays.status === 'ready' && <small>{t(locale, 'similarDaysExplanationPlain', { name: childName })}</small>}
+    </div>
+    <div className="insights-card prediction-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'nextSleepEstimate')}</h2></div>{prediction.confidence && <b>{t(locale, prediction.confidence === 'medium' ? 'mediumConfidence' : 'lowConfidence')}</b>}</div>
+      {prediction.status === 'unavailable' && <p className="routine-empty">{t(locale, 'predictionUnavailable')}</p>}
+      {prediction.status === 'collecting' && <p className="routine-empty">{t(locale, 'predictionCollecting', { count: prediction.sampleCount })}</p>}
+      {prediction.status === 'ready' && prediction.windowStart !== null && prediction.windowEnd !== null && <><strong className="prediction-window">{formatTime(new Date(prediction.windowStart).toISOString(), locale)}–{formatTime(new Date(prediction.windowEnd).toISOString(), locale)}</strong><p className={`prediction-state ${prediction.windowState}`}>{t(locale, prediction.windowState === 'upcoming' ? 'predictionUpcoming' : prediction.windowState === 'likely-now' ? 'predictionLikelyNow' : 'predictionPassed')}</p><small>{t(locale, 'predictionBasis', { count: prediction.sampleCount, order: t(locale, prediction.bucket === 'day-1' ? 'firstNap' : prediction.bucket === 'day-2' ? 'secondNap' : prediction.bucket === 'day-3-plus' ? 'laterNap' : 'nightSleep') })}</small><small className="prediction-disclaimer">{t(locale, 'predictionDisclaimer')}</small></>}
+    </div>
+    {developmentPickerOpen && <div className="development-picker-overlay" role="dialog" aria-modal="true" aria-labelledby="development-picker-title"><div className="development-picker-sheet"><header><h2 id="development-picker-title">{t(locale, 'customDevelopmentRange')}</h2><button type="button" aria-label={t(locale, 'cancel')} onClick={() => setDevelopmentPickerOpen(false)}><Icon name="close" size={18} /></button></header><div className="development-picker-fields"><label>{t(locale, 'fromDate')}<span className="month-stepper"><button type="button" aria-label={t(locale, 'previousMonth')} disabled={developmentDraftStartIndex <= 0} onClick={() => moveDevelopmentMonth('start', -1)}>‹</button><strong>{developmentMonthOptions[developmentDraftStartIndex]?.label ?? developmentDraftStart}</strong><button type="button" aria-label={t(locale, 'nextMonth')} disabled={developmentDraftStartIndex < 0 || developmentDraftStartIndex >= developmentDraftEndIndex} onClick={() => moveDevelopmentMonth('start', 1)}>›</button></span></label><label>{t(locale, 'toDate')}<span className="month-stepper"><button type="button" aria-label={t(locale, 'previousMonth')} disabled={developmentDraftEndIndex <= developmentDraftStartIndex} onClick={() => moveDevelopmentMonth('end', -1)}>‹</button><strong>{developmentMonthOptions[developmentDraftEndIndex]?.label ?? developmentDraftEnd}</strong><button type="button" aria-label={t(locale, 'nextMonth')} disabled={developmentDraftEndIndex < 0 || developmentDraftEndIndex >= developmentMonthOptions.length - 1} onClick={() => moveDevelopmentMonth('end', 1)}>›</button></span></label></div><small>{t(locale, 'selectedDevelopmentRange', { start: developmentMonthOptions[developmentDraftStartIndex]?.label ?? developmentDraftStart, end: developmentMonthOptions[developmentDraftEndIndex]?.label ?? developmentDraftEnd })}</small><div className="development-picker-actions"><button type="button" onClick={() => setDevelopmentPickerOpen(false)}>{t(locale, 'cancel')}</button><button type="button" className="primary" onClick={applyDevelopmentRange}>{t(locale, 'apply')}</button></div></div></div>}
   </section>
+}
+
+function formatDateKey(value: string, locale: Locale) {
+  const [year, month, day] = value.split('-').map(Number)
+  return new Intl.DateTimeFormat(localeTag(locale), { month: 'short', day: 'numeric', weekday: 'short' }).format(new Date(year, month - 1, day))
+}
+
+function wakeBucketLabel(locale: Locale, key: 'day-1' | 'day-2' | 'day-3-plus' | 'night') {
+  return t(locale, key === 'day-1' ? 'firstNapWindow' : key === 'day-2' ? 'secondNapWindow' : key === 'day-3-plus' ? 'laterNapWindow' : 'nightSleepWindow')
+}
+
+function RoutineRow({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return <div className="routine-row"><span>{label}</span><strong>{value}</strong><small>{detail}</small></div>
+}
+
+function DevelopmentPoint({ label, month, locale }: { label: string; month: import('./sleepDevelopment').SleepDevelopmentMonth; locale: Locale }) {
+  const monthLabel = new Intl.DateTimeFormat(localeTag(locale), { year: 'numeric', month: 'short' }).format(new Date(month.year, month.month, 1))
+  return <div><span>{label} · {monthLabel}</span><strong>{formatDuration(month.averageTotalMs, locale)}</strong><small>{t(locale, 'longestBlock')}: {formatDuration(month.averageLongestBlockMs, locale)} · {t(locale, 'recordedDays', { count: month.recordedDays })}</small></div>
+}
+
+function developmentMilestoneLabel(locale: Locale, milestone: SleepDevelopmentMilestone) {
+  if (milestone.kind === 'episodes-fewer') return t(locale, 'milestoneEpisodesFewer', { count: formatCount(Math.abs(milestone.delta), locale) })
+  const duration = formatDuration(Math.abs(milestone.delta), locale)
+  return t(locale, milestone.kind === 'night-longer' ? 'milestoneNightLonger' : milestone.kind === 'longest-longer' ? 'milestoneLongestLonger' : 'milestoneDayShorter', { duration })
+}
+
+function ChangeSignal({ signal, locale }: { signal: SleepChangeSignal; locale: Locale }) {
+  const value = signal.metric === 'episodes' ? formatCount(Math.abs(signal.delta), locale) : formatDuration(Math.abs(signal.delta), locale)
+  const baseline = signal.metric === 'episodes' ? formatCount(signal.baselineValue, locale) : formatDuration(signal.baselineValue, locale)
+  const recent = signal.metric === 'episodes' ? formatCount(signal.recentValue, locale) : formatDuration(signal.recentValue, locale)
+  const title = signal.metric === 'episodes'
+    ? t(locale, signal.direction === 'higher' ? 'changeEpisodesMore' : 'changeEpisodesLess')
+    : t(locale, signal.direction === 'higher' ? 'changeMetricMorePlain' : 'changeMetricLessPlain', { metric: changeMetricLabel(locale, signal.metric).toLocaleLowerCase(localeTag(locale)) })
+  const explanation = signal.metric === 'episodes'
+    ? t(locale, 'changeEpisodesExplanation', { count: signal.matchingRecentDays, baseline, recent })
+    : t(locale, 'changeDurationExplanation', { count: signal.matchingRecentDays, baseline, recent, difference: value })
+  return <div className={`change-signal ${signal.severity}`}><div><span>{title}</span><b>{t(locale, 'changeDaysBadge', { count: signal.matchingRecentDays })}</b></div><p>{explanation}</p><small>{t(locale, 'changeNotWarning')}</small></div>
+}
+
+function changeMetricLabel(locale: Locale, metric: SleepChangeMetric) {
+  return t(locale, metric === 'total' ? 'changeMetricTotal' : metric === 'day' ? 'changeMetricDay' : metric === 'night' ? 'changeMetricNight' : metric === 'longest' ? 'changeMetricLongest' : 'changeMetricEpisodes')
+}
+
+function formatReportMonth(month: import('./monthlyReport').MonthlyReportMonth, locale: Locale) {
+  return new Intl.DateTimeFormat(localeTag(locale), { year: 'numeric', month: 'long' }).format(new Date(month.year, month.month, 1))
+}
+
+function monthlyMetricLabel(locale: Locale, metric: MonthlyReportMetric) {
+  return changeMetricLabel(locale, metric)
+}
+
+function MonthlyTrend({ trend, locale }: { trend: MonthlyReportTrend; locale: Locale }) {
+  const delta = trend.metric === 'episodes' ? formatCount(Math.abs(trend.delta), locale) : formatDuration(Math.abs(trend.delta), locale)
+  const current = trend.metric === 'episodes' ? formatCount(trend.currentValue, locale) : formatDuration(trend.currentValue, locale)
+  return <div className="monthly-trend"><div><span>{monthlyMetricLabel(locale, trend.metric)}</span><strong>{trend.direction === 'higher' ? '↑' : '↓'} {delta}</strong></div><small>{t(locale, 'monthlyTrendCurrent', { value: current })}</small></div>
+}
+
+function monthlyMilestoneLabel(locale: Locale, milestone: MonthlyReportMilestone) {
+  if (milestone.kind === 'episodes-low') return t(locale, 'monthlyMilestoneEpisodes', { value: formatCount(milestone.value, locale) })
+  return t(locale, milestone.kind === 'night-high' ? 'monthlyMilestoneNight' : 'monthlyMilestoneLongest', { value: formatDuration(milestone.value, locale) })
+}
+
+function formatClockMinutes(minutes: number, locale: Locale) {
+  const date = new Date(2020, 0, 1, Math.floor(minutes / 60), minutes % 60)
+  return new Intl.DateTimeFormat(localeTag(locale), { hour: '2-digit', minute: '2-digit' }).format(date)
+}
+
+function formatCount(value: number, locale: Locale) {
+  return new Intl.NumberFormat(localeTag(locale), { maximumFractionDigits: 1 }).format(value)
 }
 
 function StatCard({ label, value, suffix, icon }: { label: string; value: string; suffix?: string; icon?: 'moon' | 'sun' }) {
@@ -189,32 +434,208 @@ function StatCard({ label, value, suffix, icon }: { label: string; value: string
 
 function SettingsPage({ data, setData, onBack }: { data: AppData; setData: (data: AppData) => void; onBack: () => void }) {
   const locale = data.settings.locale
-  const changeName = (event: ChangeEvent<HTMLInputElement>) => setData({ ...data, settings: { ...data.settings, childName: event.target.value } })
+  const [editingChild, setEditingChild] = useState<ChildProfile | 'new' | null>(null)
+  const [loadingDemo, setLoadingDemo] = useState(false)
   const changeLocale = (event: ChangeEvent<HTMLSelectElement>) => setData({ ...data, settings: { ...data.settings, locale: event.target.value as Locale } })
+  const applyImport = (inspection: ImportInspection) => {
+    const next = inspection.data
+    const diagnosticText = inspection.diagnostics.map((diagnostic) => `• ${importDiagnosticText(locale, diagnostic)}`).join('\n')
+    const summary = t(locale, 'importFound', { count: next.sessions.length, children: next.children.length })
+    if (!window.confirm(diagnosticText ? `${summary}\n\n${diagnosticText}\n\n${t(locale, 'importReplaceQuestion')}` : `${summary}\n\n${t(locale, 'importReplaceQuestion')}`)) return
+    exportData(data)
+    setData({ ...next, settings: { ...next.settings, locale } })
+  }
   const handleImport = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
     try {
-      const next = await importData(file, locale)
-      if (!window.confirm(t(locale, 'importFound', { count: next.sessions.length }))) return
-      exportData(data)
-      setData({ ...next, settings: { ...next.settings, locale } })
+      applyImport(await importData(file, locale))
     } catch (error) {
       window.alert(error instanceof Error ? error.message : t(locale, 'importError'))
+    } finally {
+      event.target.value = ''
     }
-    event.target.value = ''
+  }
+  const loadDemoData = async () => {
+    setLoadingDemo(true)
+    try {
+      const module = await import('../test-data/solemi-demo-v4-2026-08-26.json')
+      applyImport(inspectBackup(module.default))
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : t(locale, 'importError'))
+    } finally {
+      setLoadingDemo(false)
+    }
   }
   const clear = () => {
     if (!window.confirm(t(locale, 'clearConfirm'))) return
-    const clean = createDefaultData(locale)
-    setData({ ...clean, settings: { childName: data.settings.childName, locale } })
+    setData({ ...data, sessions: [] })
   }
-  return <section className="screen settings-screen"><header className="page-header"><button className="back-button" onClick={onBack}>‹</button><h1>{t(locale, 'settings')}</h1><span className="header-spacer" /></header>
+  return <><section className="screen settings-screen"><header className="page-header"><button className="back-button" onClick={onBack}>‹</button><h1>{t(locale, 'settings')}</h1><span className="header-spacer" /></header>
     <div className="settings-card settings-fields">
-      <label>{t(locale, 'babyName')}<input value={data.settings.childName} onChange={changeName} placeholder={t(locale, 'babyNamePlaceholder')} /></label>
       <label>{t(locale, 'language')}<select className="language-select" value={locale} onChange={changeLocale}>{languageOptions.map((language) => <option key={language.value} value={language.value}>{language.flag} {language.label}</option>)}</select></label>
+      <label className="settings-toggle-row"><span><strong>{t(locale, 'longSleepReminder')}</strong><small>{t(locale, 'longSleepReminderHint')}</small></span><input type="checkbox" checked={data.settings.longSleepReminderEnabled} onChange={(event) => setData({ ...data, settings: { ...data.settings, longSleepReminderEnabled: event.target.checked } })} /></label>
     </div>
-    <div className="settings-card action-stack"><button onClick={() => exportData(data)}>{t(locale, 'exportData')}</button><label className="file-button">{t(locale, 'importData')}<input type="file" accept="application/json" onChange={handleImport} /></label><button className="danger" onClick={clear}>{t(locale, 'clearAll')}</button></div><p className="muted">{t(locale, 'localOnly')}</p></section>
+    <div className="settings-section-head"><div><h2>{t(locale, 'children')}</h2><p>{t(locale, 'childrenHint')}</p></div><button className="mini-add-button" onClick={() => setEditingChild('new')}><Icon name="plus" size={17} />{t(locale, 'addChild')}</button></div>
+    <div className="settings-card child-list">{data.children.map((child) => {
+      const count = data.sessions.filter((session) => session.childId === child.id).length
+      const active = child.id === data.settings.activeChildId
+      return <button key={child.id} className={`child-list-row ${active ? 'active' : ''}`} onClick={() => setData({ ...data, settings: { ...data.settings, activeChildId: child.id } })}><ChildAvatar child={child} className="child-list-avatar" /><span><strong>{child.name || t(locale, 'unnamedChild')}</strong><small>{child.birthDate || t(locale, 'birthDateMissing')} · {t(locale, 'sleepEntries', { count })}</small></span>{active && <b>{t(locale, 'active')}</b>}<span className="child-edit-button" role="button" tabIndex={0} aria-label={t(locale, 'editChild')} onClick={(event) => { event.stopPropagation(); setEditingChild(child) }}><Icon name="edit" size={15} /></span></button>
+    })}</div>
+    <div className="settings-card action-stack"><button onClick={() => exportData(data)}>{t(locale, 'exportData')}</button><label className="file-button">{t(locale, 'importData')}<input type="file" accept="application/json" onChange={handleImport} /></label>{import.meta.env.VITE_INTERNAL_PREVIEW === 'true' && <button className="internal-demo-button" onClick={loadDemoData} disabled={loadingDemo}>{loadingDemo ? t(locale, 'loadingDemoData') : t(locale, 'loadDemoData')}</button>}<button className="danger" onClick={clear}>{t(locale, 'clearAll')}</button></div><p className="muted">{t(locale, 'localOnly')}</p></section>
+    {editingChild && <ChildEditor child={editingChild === 'new' ? null : editingChild as ChildProfile} locale={locale} onClose={() => setEditingChild(null)} onSave={(next) => {
+      if (editingChild === 'new') setData({ ...data, children: [...data.children, next], settings: { ...data.settings, activeChildId: next.id } })
+      else setData({ ...data, children: data.children.map((child) => child.id === next.id ? next : child) })
+      setEditingChild(null)
+    }} onDelete={editingChild === 'new' ? undefined : () => {
+      const child = editingChild as ChildProfile
+      if (data.children.length <= 1) return window.alert(t(locale, 'deleteLastChild'))
+      const count = data.sessions.filter((session) => session.childId === child.id).length
+      if (!window.confirm(t(locale, 'deleteChildConfirm', { name: child.name || t(locale, 'unnamedChild'), count }))) return
+      const next = removeChildProfile(data, child.id)
+      if (!next) return
+      if (child.photoRef) void deleteChildPhoto(child.photoRef).catch(() => {})
+      setData(next)
+      setEditingChild(null)
+    }} />}</>
+}
+
+function importDiagnosticText(locale: Locale, diagnostic: ImportDiagnostic) {
+  const keys = {
+    'migrated-v3': 'importMigratedV3',
+    'active-child-reset': 'importActiveChildReset',
+    'identical-children-removed': 'importDuplicateChildrenRemoved',
+    'identical-sessions-removed': 'importDuplicateSessionsRemoved',
+    'local-photos-not-included': 'importPhotosLocal'
+  } as const
+  return t(locale, keys[diagnostic.kind], { count: diagnostic.count })
+}
+
+function blobToDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Invalid image data'))
+    reader.onerror = () => reject(reader.error ?? new Error('Unable to read image'))
+    reader.readAsDataURL(blob)
+  })
+}
+
+function ChildAvatar({ child, className, previewUrl }: { child: ChildProfile; className: string; previewUrl?: string | null }) {
+  const [photoUrl, setPhotoUrl] = useState<string | null>(previewUrl ?? null)
+  useEffect(() => {
+    if (previewUrl !== undefined) { setPhotoUrl(previewUrl); return }
+    let stopped = false
+    if (!child.photoRef) { setPhotoUrl(null); return }
+    void loadChildPhoto(child.photoRef).then(async (blob) => {
+      if (!blob || stopped) return
+      const dataUrl = await blobToDataUrl(blob)
+      if (!stopped) setPhotoUrl(dataUrl)
+    }).catch(() => setPhotoUrl(null))
+    return () => { stopped = true }
+  }, [child.photoRef, previewUrl])
+  return <span className={className}>{photoUrl ? <img src={photoUrl} alt="" /> : (child.name.trim()[0] || '•').toUpperCase()}</span>
+}
+
+type CropCandidate = {
+  file: File
+  url: string
+  width: number
+  height: number
+}
+
+const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(high, value))
+
+function PhotoCropper({ candidate, locale, onCancel, onDone }: { candidate: CropCandidate; locale: Locale; onCancel: () => void; onDone: (blob: Blob) => void }) {
+  const viewportSize = Math.min(300, Math.max(240, window.innerWidth - 64))
+  const [zoom, setZoom] = useState(1)
+  const [offset, setOffset] = useState({ x: 0, y: 0 })
+  const [processing, setProcessing] = useState(false)
+  const drag = useRef<{ pointerId: number; startX: number; startY: number; x: number; y: number } | null>(null)
+  const baseScale = Math.max(viewportSize / candidate.width, viewportSize / candidate.height)
+  const imageScale = baseScale * zoom
+  const imageWidth = candidate.width * imageScale
+  const imageHeight = candidate.height * imageScale
+  const limitX = Math.max(0, (imageWidth - viewportSize) / 2)
+  const limitY = Math.max(0, (imageHeight - viewportSize) / 2)
+  const constrain = (x: number, y: number) => ({ x: clamp(x, -limitX, limitX), y: clamp(y, -limitY, limitY) })
+  const changeZoom = (nextZoom: number) => {
+    const nextScale = baseScale * nextZoom
+    const nextLimitX = Math.max(0, (candidate.width * nextScale - viewportSize) / 2)
+    const nextLimitY = Math.max(0, (candidate.height * nextScale - viewportSize) / 2)
+    setZoom(nextZoom)
+    setOffset((previous) => ({ x: clamp(previous.x, -nextLimitX, nextLimitX), y: clamp(previous.y, -nextLimitY, nextLimitY) }))
+  }
+  const pointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId)
+    drag.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, x: offset.x, y: offset.y }
+  }
+  const pointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!drag.current || drag.current.pointerId !== event.pointerId) return
+    setOffset(constrain(drag.current.x + event.clientX - drag.current.startX, drag.current.y + event.clientY - drag.current.startY))
+  }
+  const pointerEnd = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (drag.current?.pointerId === event.pointerId) drag.current = null
+  }
+  const confirm = async () => {
+    setProcessing(true)
+    try {
+      const size = viewportSize / imageScale
+      const crop: AvatarCrop = {
+        x: (candidate.width - size) / 2 - offset.x / imageScale,
+        y: (candidate.height - size) / 2 - offset.y / imageScale,
+        size
+      }
+      onDone(await prepareChildPhoto(candidate.file, crop))
+    } catch {
+      setProcessing(false)
+      window.alert(t(locale, 'photoSaveError'))
+    }
+  }
+
+  return <div className="photo-crop-overlay"><div className="photo-crop-screen">
+    <header className="photo-crop-header"><button type="button" onClick={onCancel} disabled={processing}><Icon name="close" size={20} /></button><h2>{t(locale, 'positionPhoto')}</h2><button type="button" className="crop-done" onClick={confirm} disabled={processing}>{processing ? t(locale, 'saving') : t(locale, 'done')}</button></header>
+    <div className="photo-crop-body"><p>{t(locale, 'positionPhotoHint')}</p><div className="photo-crop-stage" style={{ width: viewportSize, height: viewportSize }} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd} onPointerCancel={pointerEnd}>
+      <img src={candidate.url} alt="" draggable={false} style={{ width: imageWidth, height: imageHeight, transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px))` }} />
+      <span className="photo-crop-ring" />
+    </div><label className="photo-zoom"><span>{t(locale, 'zoomPhoto')}</span><input type="range" min="1" max="3" step="0.01" value={zoom} onChange={(event) => changeZoom(Number(event.target.value))} /></label></div>
+  </div></div>
+}
+
+function ChildEditor({ child, locale, onClose, onSave, onDelete }: { child: ChildProfile | null; locale: Locale; onClose: () => void; onSave: (child: ChildProfile) => void; onDelete?: () => void }) {
+  const draft = useRef(child ?? createChild()).current
+  const [name, setName] = useState(child?.name ?? '')
+  const [birthDate, setBirthDate] = useState(child?.birthDate ?? '')
+  const [photoRef, setPhotoRef] = useState(child?.photoRef ?? null)
+  const [photoFile, setPhotoFile] = useState<Blob | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null | undefined>(undefined)
+  const [cropCandidate, setCropCandidate] = useState<CropCandidate | null>(null)
+  const [saving, setSaving] = useState(false)
+  useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl) }, [previewUrl])
+  const choosePhoto = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/') || file.size > 12 * 1024 * 1024) return window.alert(t(locale, 'photoInvalid'))
+    const url = URL.createObjectURL(file)
+    const image = new Image()
+    image.onload = () => setCropCandidate({ file, url, width: image.naturalWidth, height: image.naturalHeight })
+    image.onerror = () => { URL.revokeObjectURL(url); window.alert(t(locale, 'photoInvalid')) }
+    image.src = url
+    event.target.value = ''
+  }
+  const submit = async () => {
+    if (!name.trim()) return window.alert(t(locale, 'childNameRequired'))
+    if (birthDate && new Date(`${birthDate}T00:00:00`).getTime() > Date.now()) return window.alert(t(locale, 'birthDateFuture'))
+    setSaving(true)
+    try {
+      const storedPhotoRef = photoFile ? await saveChildPhoto(draft.id, photoFile) : photoRef
+      onSave({ ...draft, name: name.trim(), birthDate: birthDate || null, photoRef: storedPhotoRef, updatedAt: new Date().toISOString() })
+    } catch {
+      setSaving(false)
+      window.alert(t(locale, 'photoSaveError'))
+    }
+  }
+  const previewChild = { ...draft, name, photoRef }
+  return <div className="editor-overlay"><div className="editor-screen child-editor-screen"><header className="editor-header"><button onClick={onClose} disabled={saving}><Icon name="close" size={18} /></button><h1>{child ? t(locale, 'editChild') : t(locale, 'addChild')}</h1><span /></header><div className="editor-body child-editor-body"><div className="profile-preview"><ChildAvatar child={previewChild} className="profile-preview-avatar" previewUrl={previewUrl} /><strong>{name || t(locale, 'unnamedChild')}</strong><div className="photo-actions"><label className="photo-button">{photoRef || photoFile ? t(locale, 'changePhoto') : t(locale, 'addPhoto')}<input type="file" accept="image/*" onChange={choosePhoto} /></label>{(photoRef || photoFile) && <button type="button" onClick={() => { setPhotoFile(null); setPreviewUrl(null); setPhotoRef(null) }}>{t(locale, 'removePhoto')}</button>}</div><small>{t(locale, 'photoLocalHint')}</small></div><label>{t(locale, 'childName')}<input value={name} maxLength={60} onChange={(event) => setName(event.target.value)} placeholder={t(locale, 'childNamePlaceholder')} /></label><label>{t(locale, 'birthDate')} <small>{t(locale, 'optional')}</small><input type="date" value={birthDate} max={new Date().toISOString().slice(0, 10)} onChange={(event) => setBirthDate(event.target.value)} /></label>{birthDate && <p className="profile-info-note">{t(locale, 'birthDateAnalyticsHint')}</p>}</div><div className={`editor-actions centered-actions ${onDelete ? '' : 'single-action'}`}>{onDelete && <button className="delete-button" onClick={onDelete} disabled={saving}>{t(locale, 'deleteChild')}</button>}<button className="save-button" onClick={submit} disabled={saving}>{saving ? t(locale, 'saving') : t(locale, 'save')}</button></div></div>{cropCandidate && <PhotoCropper candidate={cropCandidate} locale={locale} onCancel={() => { URL.revokeObjectURL(cropCandidate.url); setCropCandidate(null) }} onDone={(blob) => { URL.revokeObjectURL(cropCandidate.url); setPhotoFile(blob); setPreviewUrl((previous) => { if (previous) URL.revokeObjectURL(previous); return URL.createObjectURL(blob) }); setCropCandidate(null) }} />}</div>
 }
 
 type WheelItem = { value: string; label: string }
@@ -242,20 +663,21 @@ function DateTimeWheel({ label, icon, value, locale, disabled, onChange }: { lab
   return <div className={`wheel-block ${disabled ? 'disabled' : ''}`}><div className="wheel-label"><Icon name={icon} size={16} /><span>{label}</span></div><div className="wheel-columns custom-wheel"><WheelColumn items={dates} value={parts.date} disabled={disabled} onChange={(next) => update(next)} /><WheelColumn items={hours} value={String(parts.hour)} disabled={disabled} onChange={(next) => update(parts.date, Number(next), parts.minute)} /><WheelColumn items={minutes} value={String(parts.minute)} disabled={disabled} onChange={(next) => update(parts.date, parts.hour, Number(next))} /><div className="wheel-focus" /></div></div>
 }
 
-function SleepEditor({ session, locale, currentExists, onClose, onSave, onDelete }: { session: SleepSession | null; locale: Locale; currentExists: boolean; onClose: () => void; onSave: (session: SleepSession) => void; onDelete: (id: string) => void }) {
+function SleepEditor({ childId, session, locale, currentExists, onClose, onSave, onDelete }: { childId: string; session: SleepSession | null; locale: Locale; currentExists: boolean; onClose: () => void; onSave: (session: SleepSession) => void; onDelete: (id: string) => void }) {
   const [start, setStart] = useState(session?.startTime ?? new Date().toISOString())
   const [end, setEnd] = useState(session?.endTime ?? new Date().toISOString())
   const [stillSleeping, setStillSleeping] = useState(session ? !session.endTime : false)
   const [note, setNote] = useState(session?.note ?? '')
+  const [dayNightOverride, setDayNightOverride] = useState<DayNightOverride>(session?.dayNightOverride ?? null)
   const submit = () => {
     const endIso = stillSleeping ? null : end
     if (new Date(start).getTime() > Date.now() + 60000 || (endIso && new Date(endIso).getTime() > Date.now() + 60000)) return window.alert(t(locale, 'futureNotAllowed'))
     if (endIso && new Date(endIso) <= new Date(start)) return window.alert(t(locale, 'wakeAfterSleep'))
     if (stillSleeping && currentExists && !session) return window.alert(t(locale, 'activeExists'))
     const nowIso = new Date().toISOString()
-    onSave(session ? { ...session, startTime: start, endTime: endIso, note, updatedAt: nowIso } : { ...createSession(start, endIso), note })
+    onSave(session ? { ...session, startTime: start, endTime: endIso, note, dayNightOverride, updatedAt: nowIso } : { ...createSession(childId, start, endIso), note, dayNightOverride })
   }
-  return <div className="editor-overlay"><div className="editor-screen"><header className="editor-header"><button onClick={onClose}><Icon name="close" size={18} /></button><h1>{session ? t(locale, 'details') : t(locale, 'recordSleep')}</h1><span /></header><div className="editor-body"><DateTimeWheel label={t(locale, 'fellAsleep')} icon="moon" value={start} locale={locale} onChange={setStart} /><DateTimeWheel label={t(locale, 'wokeUp')} icon="sun" value={end} locale={locale} disabled={stillSleeping} onChange={setEnd} /><label className="toggle-row"><span className="toggle-label"><Icon name="moon" size={16} /> {t(locale, 'stillSleeping')}</span><input type="checkbox" checked={stillSleeping} onChange={(event) => setStillSleeping(event.target.checked)} /></label>{session && <label className="note-field">{t(locale, 'note')}<textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder={t(locale, 'optionalNote')} /></label>}</div><div className="editor-actions centered-actions">{session && <button className="delete-button" onClick={() => onDelete(session.id)}>{t(locale, 'delete')}</button>}<button className="save-button" onClick={submit}>{t(locale, 'save')}</button></div></div></div>
+  return <div className="editor-overlay"><div className="editor-screen"><header className="editor-header"><button onClick={onClose}><Icon name="close" size={18} /></button><h1>{session ? t(locale, 'details') : t(locale, 'recordSleep')}</h1><span /></header><div className="editor-body"><DateTimeWheel label={t(locale, 'fellAsleep')} icon="moon" value={start} locale={locale} onChange={setStart} /><label className={`toggle-row active-sleep-toggle ${stillSleeping ? 'active' : ''}`}><span className="toggle-label"><Icon name="moon" size={16} /> <span><strong>{t(locale, 'stillSleeping')}</strong><small>{t(locale, 'stillSleepingHint')}</small></span></span><input type="checkbox" checked={stillSleeping} onChange={(event) => setStillSleeping(event.target.checked)} /></label>{!stillSleeping && <DateTimeWheel label={t(locale, 'wokeUp')} icon="sun" value={end} locale={locale} onChange={setEnd} />}<div className="classification-block"><strong>{t(locale, 'sleepType')}</strong><div className="classification-options"><button className={dayNightOverride === null ? 'active' : ''} onClick={() => setDayNightOverride(null)}>{t(locale, 'automatic')}</button><button className={dayNightOverride === 'day' ? 'active' : ''} onClick={() => setDayNightOverride('day')}>{t(locale, 'daytime')}</button><button className={dayNightOverride === 'night' ? 'active' : ''} onClick={() => setDayNightOverride('night')}>{t(locale, 'nighttime')}</button></div><small>{t(locale, 'automaticRule', { dayStart: pad(DEFAULT_DAY_START_MINUTES / 60), nightStart: pad(DEFAULT_NIGHT_START_MINUTES / 60) })}</small></div><label className="note-field">{t(locale, 'note')}<textarea value={note} maxLength={2000} onChange={(event) => setNote(event.target.value)} placeholder={t(locale, 'optionalNote')} /></label></div><div className="editor-actions centered-actions">{session && <button className="delete-button" onClick={() => onDelete(session.id)}>{t(locale, 'delete')}</button>}<button className="save-button" onClick={submit}>{t(locale, 'save')}</button></div></div></div>
 }
 
 function BottomNav({ page, locale, onChange }: { page: Page; locale: Locale; onChange: (page: Page) => void }) {

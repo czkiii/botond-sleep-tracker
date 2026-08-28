@@ -5,12 +5,18 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
+    "dev:staging": "wrangler dev --config wrangler.staging.jsonc",
     "deploy": "wrangler deploy",
+    "deploy:staging": "wrangler deploy --config wrangler.staging.jsonc",
     "typecheck": "tsc --noEmit",
     "types": "wrangler types",
     "db:create": "wrangler d1 create solemi-sleep-db",
+    "db:create:staging": "wrangler d1 create solemi-sleep-db-staging",
     "db:apply:local": "wrangler d1 execute solemi-sleep-db --local --file=./schema.sql",
-    "db:apply:remote": "wrangler d1 execute solemi-sleep-db --remote --file=./schema.sql"
+    "db:apply:remote": "wrangler d1 execute solemi-sleep-db --remote --file=./schema.sql",
+    "db:apply:staging": "wrangler d1 execute solemi-sleep-db-staging --remote --file=./schema.sql --config wrangler.staging.jsonc",
+    "secret:staging": "wrangler secret put TOKEN_PEPPER --config wrangler.staging.jsonc",
+    "smoke:staging": "node ./scripts/staging-smoke.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260821.1",

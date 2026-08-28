@@ -1,4 +1,4 @@
-import type { AppData, SleepSession } from './types'
+import type { AppData, ChildProfile, SleepSession } from './types'
 import { STORAGE_KEY, loadData } from './storage'
 
 const API_BASE = (import.meta.env.VITE_SYNC_API_BASE || 'https://solemi-sleep-sync.czki-adam.workers.dev').replace(/\/$/, '')
@@ -18,6 +18,7 @@ type PendingOperation = {
   path: string
   body: Record<string, unknown>
   sessionId?: string
+  childId?: string
 }
 
 type SyncStore = {
@@ -25,7 +26,14 @@ type SyncStore = {
   pending: PendingOperation[]
 }
 
-type RemoteSession = SleepSession & {
+type RemoteSession = Omit<SleepSession, 'childId' | 'dayNightOverride'> & {
+  childId?: string
+  dayNightOverride?: SleepSession['dayNightOverride']
+  deletedAt: string | null
+  revision: number
+}
+
+type RemoteChild = Omit<ChildProfile, 'photoRef'> & {
   deletedAt: string | null
   revision: number
 }
@@ -33,6 +41,7 @@ type RemoteSession = SleepSession & {
 type MutationResult = {
   revision?: number
   session?: RemoteSession | null
+  child?: RemoteChild | null
 }
 
 type ApiEnvelope<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string }; data?: any }
@@ -81,30 +90,55 @@ function opId(prefix: string) {
 function toRemoteLocal(session: RemoteSession): SleepSession {
   return {
     id: session.id,
+    childId: session.childId || loadData().settings.activeChildId,
     startTime: session.startTime,
     endTime: session.endTime,
     note: session.note || '',
+    dayNightOverride: session.dayNightOverride ?? null,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt
   }
 }
 
-function mergeRemote(data: AppData, sessions: RemoteSession[]) {
-  const map = new Map(data.sessions.map((session) => [session.id, session]))
-  for (const remote of sessions) {
-    if (remote.deletedAt) map.delete(remote.id)
-    else map.set(remote.id, toRemoteLocal(remote))
+function toLocalChild(child: RemoteChild, existing?: ChildProfile): ChildProfile {
+  return {
+    id: child.id,
+    name: child.name,
+    birthDate: child.birthDate,
+    // Profile photos deliberately remain device-local in the first multi-child release.
+    photoRef: existing?.photoRef ?? null,
+    createdAt: child.createdAt,
+    updatedAt: child.updatedAt
   }
-  return { ...data, sessions: Array.from(map.values()).sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()) }
 }
 
-function replaceWithRemote(data: AppData, sessions: RemoteSession[]) {
+export function mergeRemote(data: AppData, sessions: RemoteSession[], children: RemoteChild[] = []) {
+  const childMap = new Map(data.children.map((child) => [child.id, child]))
+  const deletedChildIds = new Set<string>()
+  for (const remote of children) {
+    if (remote.deletedAt) {
+      childMap.delete(remote.id)
+      deletedChildIds.add(remote.id)
+    } else {
+      childMap.set(remote.id, toLocalChild(remote, childMap.get(remote.id)))
+    }
+  }
+
+  const map = new Map(data.sessions.filter((session) => !deletedChildIds.has(session.childId)).map((session) => [session.id, session]))
+  for (const remote of sessions) {
+    if (remote.deletedAt || (remote.childId && deletedChildIds.has(remote.childId))) map.delete(remote.id)
+    else map.set(remote.id, toRemoteLocal(remote))
+  }
+  const mergedChildren = Array.from(childMap.values()).sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+  const activeChildId = childMap.has(data.settings.activeChildId)
+    ? data.settings.activeChildId
+    : (mergedChildren[0]?.id ?? data.settings.activeChildId)
+
   return {
     ...data,
-    sessions: sessions
-      .filter((session) => !session.deletedAt)
-      .map(toRemoteLocal)
-      .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
+    settings: { ...data.settings, activeChildId },
+    children: mergedChildren,
+    sessions: Array.from(map.values()).sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
   }
 }
 
@@ -125,14 +159,32 @@ export function getSyncStore() { return readStore() }
 export function isFamilyConnected() { return Boolean(readStore().connection) }
 
 export async function createFamily(familyName: string, deviceName: string) {
+  const local = loadData()
+  const primaryChild = local.children.find((child) => child.id === local.settings.activeChildId) ?? local.children[0]
   const created = await request<{ familyId: string; familyName: string; device: { id: string; name: string | null }; deviceToken: string; revision: number }>('/v1/families', {
-    method: 'POST', body: JSON.stringify({ familyName: familyName.trim(), deviceName })
+    method: 'POST',
+    body: JSON.stringify({
+      familyName: familyName.trim(),
+      deviceName,
+      childId: primaryChild?.id,
+      childName: primaryChild?.name ?? '',
+      birthDate: primaryChild?.birthDate ?? null
+    })
   })
   const connection: SyncConnection = { familyId: created.familyId, familyName: created.familyName, deviceId: created.device.id, deviceToken: created.deviceToken, revision: created.revision }
-  writeStore({ connection, pending: [] })
-  const local = loadData()
-  writeRemoteData({ ...local, sessions: [] })
+  const baseline = { ...local, children: primaryChild ? [primaryChild] : [], sessions: [] }
+  writeStore({ connection, pending: makeOperations(baseline, local) })
+  await flushPending()
   return createInvite()
+}
+
+function applyAuthoritativeChild(child?: RemoteChild | null) {
+  if (!child) return false
+  const current = loadData()
+  const merged = mergeRemote(current, [], [child])
+  const changed = JSON.stringify(merged) !== JSON.stringify(current)
+  if (changed) writeRemoteData(merged)
+  return changed
 }
 
 export async function joinFamily(code: string, deviceName: string) {
@@ -142,11 +194,10 @@ export async function joinFamily(code: string, deviceName: string) {
   const connection: SyncConnection = { familyId: joined.familyId, familyName: joined.familyName, deviceId: joined.device.id, deviceToken: joined.deviceToken, revision: 0 }
   writeStore({ connection, pending: [] })
 
-  // A newly joined device must adopt the cloud family as its canonical dataset.
-  // Keeping unrelated pre-pairing local sessions here can create duplicate sleeps later.
-  const local = loadData()
-  writeRemoteData({ ...local, sessions: [] })
-  return pullRemote(true)
+  // Merge the cloud family into the device without silently discarding an
+  // existing local diary. A dedicated, confirmed import flow can resolve any
+  // unrelated pre-pairing data in a later release.
+  return pullRemote()
 }
 
 export async function refreshFamilyInfo() {
@@ -176,18 +227,54 @@ export async function leaveFamily() {
   writeStore(defaultStore())
 }
 
-function makeOperations(previous: AppData, next: AppData): PendingOperation[] {
+export function makeOperations(previous: AppData, next: AppData): PendingOperation[] {
+  const beforeChildren = new Map(previous.children.map((child) => [child.id, child]))
+  const afterChildren = new Map(next.children.map((child) => [child.id, child]))
+  const removedChildIds = new Set(previous.children.filter((child) => !afterChildren.has(child.id)).map((child) => child.id))
   const before = new Map(previous.sessions.map((session) => [session.id, session]))
   const after = new Map(next.sessions.map((session) => [session.id, session]))
   const operations: PendingOperation[] = []
+
+  for (const child of next.children) {
+    const old = beforeChildren.get(child.id)
+    if (!old) {
+      operations.push({
+        id: opId('op_child_create'),
+        method: 'POST',
+        path: '/v1/children',
+        childId: child.id,
+        body: { operationId: opId('mut'), child: { id: child.id, name: child.name, birthDate: child.birthDate } }
+      })
+      continue
+    }
+
+    const patch: Record<string, unknown> = {}
+    if (old.name !== child.name) patch.name = child.name
+    if (old.birthDate !== child.birthDate) patch.birthDate = child.birthDate
+    if (Object.keys(patch).length) {
+      operations.push({
+        id: opId('op_child_patch'),
+        method: 'PATCH',
+        path: `/v1/children/${encodeURIComponent(child.id)}`,
+        childId: child.id,
+        body: { operationId: opId('mut'), patch }
+      })
+    }
+  }
+
+  for (const child of previous.children) {
+    if (removedChildIds.has(child.id)) {
+      operations.push({ id: opId('op_child_delete'), method: 'DELETE', path: `/v1/children/${encodeURIComponent(child.id)}`, childId: child.id, body: { operationId: opId('mut') } })
+    }
+  }
 
   for (const session of next.sessions) {
     const old = before.get(session.id)
     if (!old) {
       if (session.endTime) {
-        operations.push({ id: opId('op_create'), method: 'POST', path: '/v1/sessions', sessionId: session.id, body: { operationId: opId('mut'), session: { id: session.id, startTime: session.startTime, endTime: session.endTime, note: session.note } } })
+        operations.push({ id: opId('op_create'), method: 'POST', path: '/v1/sessions', sessionId: session.id, body: { operationId: opId('mut'), session: { id: session.id, childId: session.childId, startTime: session.startTime, endTime: session.endTime, note: session.note, dayNightOverride: session.dayNightOverride } } })
       } else {
-        operations.push({ id: opId('op_start'), method: 'POST', path: '/v1/sessions/start', sessionId: session.id, body: { operationId: opId('mut'), sessionId: session.id, startTime: session.startTime } })
+        operations.push({ id: opId('op_start'), method: 'POST', path: '/v1/sessions/start', sessionId: session.id, body: { operationId: opId('mut'), sessionId: session.id, childId: session.childId, startTime: session.startTime } })
       }
       continue
     }
@@ -195,6 +282,7 @@ function makeOperations(previous: AppData, next: AppData): PendingOperation[] {
     const patch: Record<string, unknown> = {}
     if (old.startTime !== session.startTime) patch.startTime = session.startTime
     if (old.note !== session.note) patch.note = session.note
+    if (old.dayNightOverride !== session.dayNightOverride) patch.dayNightOverride = session.dayNightOverride
 
     if (!old.endTime && session.endTime) {
       operations.push({ id: opId('op_end'), method: 'POST', path: `/v1/sessions/${encodeURIComponent(session.id)}/end`, sessionId: session.id, body: { operationId: opId('mut'), endTime: session.endTime } })
@@ -208,7 +296,7 @@ function makeOperations(previous: AppData, next: AppData): PendingOperation[] {
   }
 
   for (const session of previous.sessions) {
-    if (!after.has(session.id)) operations.push({ id: opId('op_delete'), method: 'DELETE', path: `/v1/sessions/${encodeURIComponent(session.id)}`, sessionId: session.id, body: { operationId: opId('mut') } })
+    if (!after.has(session.id) && !removedChildIds.has(session.childId)) operations.push({ id: opId('op_delete'), method: 'DELETE', path: `/v1/sessions/${encodeURIComponent(session.id)}`, sessionId: session.id, body: { operationId: opId('mut') } })
   }
   return operations
 }
@@ -237,6 +325,7 @@ export async function flushPending() {
     try {
       const result = await request<MutationResult>(operation.path, { method: operation.method, body: JSON.stringify(operation.body) }, store.connection.deviceToken)
       if (applyAuthoritativeSession(result?.session)) changedLocal = true
+      if (applyAuthoritativeChild(result?.child)) changedLocal = true
 
       store = readStore()
       if (!store.connection) return changedLocal
@@ -274,12 +363,12 @@ export async function pullRemote(forceFromZero = false) {
   const fresh = readStore()
   if (!fresh.connection) return false
   const after = forceFromZero ? 0 : fresh.connection.revision
-  const result = await request<{ revision: number; familyName?: string; sessions: RemoteSession[] }>(`/v1/sync?after=${after}`, {}, fresh.connection.deviceToken)
+  const result = await request<{ revision: number; familyName?: string; children?: RemoteChild[]; sessions: RemoteSession[] }>(`/v1/sync?after=${after}`, {}, fresh.connection.deviceToken)
   const latest = readStore()
   if (!latest.connection) return false
   const current = loadData()
-  const merged = forceFromZero ? replaceWithRemote(current, result.sessions) : mergeRemote(current, result.sessions)
-  const changed = JSON.stringify(merged.sessions) !== JSON.stringify(current.sessions)
+  const merged = mergeRemote(current, result.sessions, result.children ?? [])
+  const changed = JSON.stringify(merged) !== JSON.stringify(current)
   if (changed) writeRemoteData(merged)
   // /v1/sync is the only authoritative place allowed to advance the cursor.
   latest.connection.revision = result.revision
