@@ -193,6 +193,7 @@ function StatsPage({ sessions, now, locale, childName }: { sessions: SleepSessio
   const [developmentPickerOpen, setDevelopmentPickerOpen] = useState(false)
   const [developmentDraftStart, setDevelopmentDraftStart] = useState(availableStart.slice(0, 7))
   const [developmentDraftEnd, setDevelopmentDraftEnd] = useState(availableEnd.slice(0, 7))
+  const [selectedDevelopmentMonth, setSelectedDevelopmentMonth] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const customStartTime = dateKeyTime(customStart)
   const customEndTime = dateKeyTime(customEnd)
@@ -279,6 +280,8 @@ function StatsPage({ sessions, now, locale, childName }: { sessions: SleepSessio
     day: +(item.averageDayMs / 3600000).toFixed(2),
     night: +(item.averageNightMs / 3600000).toFixed(2)
   })), [development.months, locale])
+  const developmentChartMax = Math.max(16, Math.ceil(Math.max(0, ...developmentChart.map((item) => item.day + item.night)) / 2) * 2)
+  const selectedDevelopmentPoint = developmentChart.find((item) => item.key === selectedDevelopmentMonth) ?? null
   const wakeWindow = insights.wakeWindow
   const routine = insights.routine
   const relevantWakeWindow = prediction.bucket ? wakeWindow.breakdown.find((item) => item.key === prediction.bucket) ?? null : null
@@ -311,7 +314,15 @@ function StatsPage({ sessions, now, locale, childName }: { sessions: SleepSessio
       <div className="insights-range four-options" aria-label={t(locale, 'developmentRange')}>{([3, 6, 12] as const).map((value) => <button key={value} className={developmentRange === value ? 'active' : ''} onClick={() => setDevelopmentRange(value)}>{value} {t(locale, 'monthsShort')}</button>)}<button className={developmentRange === 'custom' ? 'active' : ''} onClick={openDevelopmentPicker}>{t(locale, 'customRange')}</button></div>
       {developmentRange === 'custom' && <small className="development-range-summary">{t(locale, 'selectedDevelopmentRange', { start: developmentMonthOptions.find((month) => month.value === developmentStart)?.label ?? developmentStart, end: developmentMonthOptions.find((month) => month.value === developmentEnd)?.label ?? developmentEnd })}</small>}
       {development.status === 'collecting' ? <p className="routine-empty">{t(locale, 'developmentCollecting')}</p> : <>
-        <div className="development-chart" aria-label={t(locale, 'developmentChart')}><ResponsiveContainer width="100%" height="100%"><BarChart data={developmentChart} margin={{ top: 8, right: 0, bottom: 0, left: -30 }}><XAxis dataKey="label" tickLine={false} axisLine={false} interval={0} minTickGap={0} tickMargin={6} /><YAxis tickLine={false} axisLine={false} /><Tooltip contentStyle={{ background: '#0d1a2b', border: '1px solid #1c3352', borderRadius: 10 }} formatter={(value, name) => [`${value} ${chartUnit}`, t(locale, name === 'day' ? 'daytime' : 'nighttime')]} /><Bar dataKey="night" stackId="sleep" fill="#3978bc" radius={[0, 0, 2, 2]} maxBarSize={24} /><Bar dataKey="day" stackId="sleep" fill="#73b9f6" radius={[4, 4, 0, 0]} maxBarSize={24} /></BarChart></ResponsiveContainer></div>
+        <div className="development-chart" aria-label={t(locale, 'developmentChart')}>
+          <div className="development-y-axis" aria-hidden="true"><span>{developmentChartMax}</span><span>{developmentChartMax / 2}</span><span>0</span></div>
+          <div className="development-chart-scroll"><div className="development-bars" style={{ gridTemplateColumns: `repeat(${developmentChart.length}, minmax(24px, 1fr))`, minWidth: `${Math.max(100, developmentChart.length * 8.4)}%` }}>
+            {developmentChart.map((item) => <button key={item.key} type="button" className={selectedDevelopmentPoint?.key === item.key ? 'selected' : ''} onClick={() => setSelectedDevelopmentMonth((current) => current === item.key ? null : item.key)} aria-label={`${item.label}: ${t(locale, 'daytime')} ${item.day} ${chartUnit}, ${t(locale, 'nighttime')} ${item.night} ${chartUnit}`}>
+              <span className="development-bar-track"><i className="development-bar-night" style={{ height: `${item.night / developmentChartMax * 100}%` }} /><i className="development-bar-day" style={{ height: `${item.day / developmentChartMax * 100}%` }} /></span><small>{item.label}</small>
+            </button>)}
+          </div></div>
+        </div>
+        {selectedDevelopmentPoint && <div className="development-chart-detail"><strong>{selectedDevelopmentPoint.label}</strong><span>{t(locale, 'daytime')}: {selectedDevelopmentPoint.day} {chartUnit}</span><span>{t(locale, 'nighttime')}: {selectedDevelopmentPoint.night} {chartUnit}</span></div>}
         {development.first && development.latest && <div className="then-now"><strong>{t(locale, 'thenNow')}</strong><div className="then-now-grid"><DevelopmentPoint label={t(locale, 'then')} month={development.first} locale={locale} /><DevelopmentPoint label={t(locale, 'nowPeriod')} month={development.latest} locale={locale} /></div></div>}
         {development.milestones.length > 0 && <div className="development-milestones">{development.milestones.slice(0, 3).map((milestone) => <span key={milestone.kind}>{developmentMilestoneLabel(locale, milestone)}</span>)}</div>}
       </>}
@@ -500,19 +511,27 @@ function importDiagnosticText(locale: Locale, diagnostic: ImportDiagnostic) {
   return t(locale, keys[diagnostic.kind], { count: diagnostic.count })
 }
 
+function blobToDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Invalid image data'))
+    reader.onerror = () => reject(reader.error ?? new Error('Unable to read image'))
+    reader.readAsDataURL(blob)
+  })
+}
+
 function ChildAvatar({ child, className, previewUrl }: { child: ChildProfile; className: string; previewUrl?: string | null }) {
   const [photoUrl, setPhotoUrl] = useState<string | null>(previewUrl ?? null)
   useEffect(() => {
     if (previewUrl !== undefined) { setPhotoUrl(previewUrl); return }
     let stopped = false
-    let objectUrl: string | null = null
     if (!child.photoRef) { setPhotoUrl(null); return }
-    void loadChildPhoto(child.photoRef).then((blob) => {
+    void loadChildPhoto(child.photoRef).then(async (blob) => {
       if (!blob || stopped) return
-      objectUrl = URL.createObjectURL(blob)
-      setPhotoUrl(objectUrl)
+      const dataUrl = await blobToDataUrl(blob)
+      if (!stopped) setPhotoUrl(dataUrl)
     }).catch(() => setPhotoUrl(null))
-    return () => { stopped = true; if (objectUrl) URL.revokeObjectURL(objectUrl) }
+    return () => { stopped = true }
   }, [child.photoRef, previewUrl])
   return <span className={className}>{photoUrl ? <img src={photoUrl} alt="" /> : (child.name.trim()[0] || '•').toUpperCase()}</span>
 }
