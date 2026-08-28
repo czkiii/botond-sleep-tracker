@@ -65,4 +65,24 @@ describe('buildSleepDevelopment', () => {
     expect(result.first?.key).toBe('2026-05')
     expect(result.latest?.key).toBe('2026-06')
   })
+
+  it('keeps all thirteen months in an inclusive year-spanning custom range', () => {
+    const sessions: SleepSession[] = []
+    const months = Array.from({ length: 13 }, (_, index) => {
+      const date = new Date(Date.UTC(2025, 7 + index, 1))
+      return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`
+    })
+    for (const month of months) {
+      for (let day = 1; day <= 3; day += 1) {
+        const paddedDay = String(day).padStart(2, '0')
+        sessions.push(session(`${month}-${day}`, `${month}-${paddedDay}T20:00:00.000Z`, `${month}-${paddedDay}T23:00:00.000Z`, 'night'))
+      }
+    }
+
+    const result = buildSleepDevelopment(sessions, NOW, 12, { startMonth: '2025-08', endMonth: '2026-08' })
+    expect(result.status).toBe('ready')
+    expect(result.months.map((month) => month.key)).toEqual(months)
+    expect(result.first?.key).toBe('2025-08')
+    expect(result.latest?.key).toBe('2026-08')
+  })
 })
