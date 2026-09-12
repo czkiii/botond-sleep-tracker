@@ -135,14 +135,14 @@ describe('buildInsightsFoundation', () => {
 
   it('derives bedtime, wake-up and nap-count routines from clean days', () => {
     const result = buildInsightsFoundation([
-      session('night-a', '2026-08-21T20:00:00.000Z', '2026-08-22T06:00:00.000Z'),
-      session('nap-a1', '2026-08-22T10:00:00.000Z', '2026-08-22T11:00:00.000Z'),
-      session('nap-a2', '2026-08-22T14:00:00.000Z', '2026-08-22T15:00:00.000Z'),
-      session('night-b', '2026-08-22T20:15:00.000Z', '2026-08-23T06:15:00.000Z'),
-      session('nap-b', '2026-08-23T10:00:00.000Z', '2026-08-23T11:00:00.000Z'),
-      session('night-c', '2026-08-23T19:45:00.000Z', '2026-08-24T05:45:00.000Z'),
-      session('nap-c1', '2026-08-24T10:00:00.000Z', '2026-08-24T11:00:00.000Z'),
-      session('nap-c2', '2026-08-24T14:00:00.000Z', '2026-08-24T15:00:00.000Z')
+      session('night-a', new Date(2026, 7, 21, 20, 0, 0).toISOString(), new Date(2026, 7, 22, 6, 0, 0).toISOString()),
+      session('nap-a1', new Date(2026, 7, 22, 10, 0, 0).toISOString(), new Date(2026, 7, 22, 11, 0, 0).toISOString()),
+      session('nap-a2', new Date(2026, 7, 22, 14, 0, 0).toISOString(), new Date(2026, 7, 22, 15, 0, 0).toISOString()),
+      session('night-b', new Date(2026, 7, 22, 20, 15, 0).toISOString(), new Date(2026, 7, 23, 6, 15, 0).toISOString()),
+      session('nap-b', new Date(2026, 7, 23, 10, 0, 0).toISOString(), new Date(2026, 7, 23, 11, 0, 0).toISOString()),
+      session('night-c', new Date(2026, 7, 23, 19, 45, 0).toISOString(), new Date(2026, 7, 24, 5, 45, 0).toISOString()),
+      session('nap-c1', new Date(2026, 7, 24, 10, 0, 0).toISOString(), new Date(2026, 7, 24, 11, 0, 0).toISOString()),
+      session('nap-c2', new Date(2026, 7, 24, 14, 0, 0).toISOString(), new Date(2026, 7, 24, 15, 0, 0).toISOString())
     ], NOW)
     expect(result.routine.status).toBe('ready')
     expect(result.routine.bedtime?.typicalMinutes).toBe(20 * 60)
