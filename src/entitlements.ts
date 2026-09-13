@@ -1,5 +1,8 @@
 export const productPlans = ['free', 'family', 'familyPlus'] as const
 
+export const INTERNAL_PLAN_PREVIEW_KEY = 'solemi-internal-plan-preview'
+export const INTERNAL_PLAN_PREVIEW_EVENT = 'solemi-internal-plan-preview-change'
+
 export type ProductPlan = typeof productPlans[number]
 
 export const premiumInsightFeatures = [

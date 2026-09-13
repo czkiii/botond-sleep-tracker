@@ -60,11 +60,19 @@ Az aktuális csomagon Codex-környezetben:
 - diff whitespace-ellenőrzés: sikeres;
 - a teljes Vitest/PWA build lezárását a környezet Node/proxy hibája akadályozta.
 
-**Következő kapu:** GitHub CI Node 22-n teljes typecheck + 71 teszt + build, majd az internal Cloudflare build kézi vizuális ellenőrzése.
+Az `a43d936` commit GitHub `CI` (#75) és `Build internal preview` (#42) futása sikeres; ezt 2026-09-13-án a GitHub API alapján ellenőriztük.
+
+A felhasználó 2026-09-13-án telefonon ellenőrizte az internal csomagnézetet, és visszaigazolta, hogy a kártyák zárolása megfelelő. A telefonon megnyitott build SHA-ját külön nem rögzítettük.
+
+**Feltárt eltérés:** a jelenlegi prototípusban az új család létrehozása rögtön szinkronkapcsolatot és adatfeltöltést indít, szerveroldali account/entitlement-ellenőrzés nélkül. A célmodellben a családlétrehozás/tagság és a fizetős aktív szinkron külön döntés; Free tag is szinkronizálhat, ha van aktív Family/Family+ jogosultságú tag. Ez a már nyitott account/entitlement implementáció része.
+
+Az internal tesztkapcsoló helyben már a Family Sync előnézetét is vezérli: Free nézetben zárolt kártyát és Family-előfizetéses magyarázatot mutat, nem engedi a család létrehozását/csatlakoztatását, és nem futtat hálózati szinkront; Family és Family+ nézetben elérhető. A HU / EN / DE szöveg ennek megfelelő. Ez még nem valódi szerveres entitlement, és a módosítás nincs commitolva vagy publikálva.
+
+Az aktuális helyi módosításokon a frontend typecheck, a teljes 71 teszt és a production build sikeres. A diff whitespace-ellenőrzése szintén sikeres.
 
 ## Fő nyitott blokkok a `main` migráció előtt
 
-1. A csomagnézet és a zárolt kártyák vizuális elfogadása.
+1. A családlétrehozás/tagság és az aktív Family Sync jogosultságának szétválasztása a meglévő architektúraterv szerint.
 2. Valódi account/session rendszer és Google-belépés.
 3. Szerveroldali entitlement-ellenőrzés.
 4. App Store / Google Play előfizetés és visszaállítás.
@@ -76,7 +84,7 @@ Az aktuális csomagon Codex-környezetben:
 
 ## Következő konkrét feladat
 
-Várd meg a GitHub CI eredményét. Ha zöld, nyisd meg az internal oldalt mobilon, válts végig Free / Family / Family+ nézeten, és ellenőrizd, hogy az alap statisztikák minden csomagban látszanak, a Family+ elemzések pedig csak Family+ nézetben jelennek meg.
+A következő fejlesztési szelet az account- és entitlement-állapotmodell előkészítése az `ACCOUNT_ENTITLEMENT_ARCHITECTURE.md` alapján. Külön döntés kell a személyes funkcióhozzáférésre és a család aktív szinkronjára; a Free tag hozzáférését nem szabad pusztán a saját csomagja alapján tiltani. Elsőként tiszta, tesztelhető állapotmodellt kell készíteni (fiók nélkül / bejelentkezve; tagság nélkül / aktív tagság; szinkron szünetel / engedélyezett), a meglévő sync-protokoll átállítása előtt. Kötelező esetek: Free + Free → nincs aktív sync; Family + Free → mindkettő szinkronizálhat; Family+ + Free → csak az előfizető kap prémium Insightsot; utolsó fizető jogosultságának lejárata → sync szünetel, adatok és tagság megmaradnak.
 
 ## Munkamegosztás
 

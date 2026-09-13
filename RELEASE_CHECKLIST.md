@@ -141,7 +141,10 @@ Nem minden tervezett Insights-funkció szükséges az első belső RC-hez. Kül�
 - [ ] Végleges navigáció: `Alvások · Előzmények · Insights`.
 - [x] Free / Family / Family+ csomaghatár rögzítése a `FEATURE_ENTITLEMENT_MATRIX.md` fájlban.
 - [x] Internal Free / Family / Family+ nézetváltó és Family+ Insights-zárolási előnézet implementálása.
-- [ ] A csomagnézet ellenőrzése a GitHub CI és a Cloudflare internal preview friss buildjén.
+- [x] Az `a43d936` commit GitHub CI és internal preview buildje sikeres (2026-09-13).
+- [x] A csomagnézet kártyazárolásának telefonos vizuális elfogadása a felhasználó visszajelzése alapján (2026-09-13; a telefonos build SHA nincs külön rögzítve).
+- [x] Internal Free nézetben a Family Sync zárolási előnézete, Family-előfizetéses magyarázata és hálózati leállítása elkészült (helyi, még nem publikált módosítás).
+- [ ] A családlétrehozás/tagság és a fizetős aktív szinkron valódi szerveroldali szétválasztása az account/entitlement implementációban.
 
 **Javasolt első kiadási minimum:** Child Profile V4 + stabil Family Sync + wake window V1 + átlátható adatminőség. Prediction csak akkor legyen blokkoló, ha megfelelő saját tesztadat és érthető bizonytalansági kommunikáció áll rendelkezésre.
 
@@ -179,8 +182,8 @@ Nem minden tervezett Insights-funkció szükséges az első belső RC-hez. Kül�
 
 ## Következő konkrét munkamenet
 
-1. A Free / Family / Family+ nézet ellenőrzése a friss internal buildben.
-2. Account- és entitlement-állapotmodell implementációjának megtervezése a lezárt csomagszabályokból.
+1. Account- és entitlement-állapotmodell előkészítése a lezárt architektúrából: személyes funkciók és családi sync külön döntésként.
+2. Free családtag, fizető családtag és lejáró jogosultság tesztesetei; családlétrehozás/tagság önmagában ne indítson jogosultság nélküli adatfeltöltést.
 3. Mobil háttérbe küldés/visszatérés és teljes offline felhasználói próba az internal oldalon.
 4. Staging D1 backup/restore próba és rollback dokumentáció.
 5. A Cloudflare Pages preview hozzáférés-védelmének véglegesítése.

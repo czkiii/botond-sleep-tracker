@@ -33,6 +33,12 @@
   border-color: rgba(105, 179, 255, .2);
   box-shadow: 0 0 18px rgba(72, 151, 233, .08);
 }
+.family-sync-settings-icon.locked {
+  color: #8a9bae;
+  background: rgba(108, 125, 145, .09);
+  border-color: rgba(135, 155, 180, .12);
+  font-size: 15px;
+}
 .family-sync-settings-copy {
   min-width: 0;
   display: grid;
@@ -133,6 +139,10 @@
 .family-sync-status-card strong { font-size: 14px; }
 .family-sync-status-card small { color: #8298b2; overflow: hidden; text-overflow: ellipsis; }
 .family-sync-error { margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: rgba(68, 105, 143, .16); color: #cfe2f7; font-size: 12px; line-height: 1.4; }
+.family-sync-locked { justify-items: center; padding: 10px 4px 8px; text-align: center; }
+.family-sync-locked strong { color: #dce9f7; font-size: 15px; }
+.family-sync-locked p { max-width: 390px; margin: 0; }
+.family-sync-lock-icon { width: 48px; height: 48px; display: grid; place-items: center; border: 1px solid rgba(135, 155, 180, .15); border-radius: 50%; background: rgba(108, 125, 145, .08); font-size: 20px; }
 
 @media (min-width: 700px) {
   .family-sync-overlay { align-items: center; padding: 20px; }

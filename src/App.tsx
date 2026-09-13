@@ -18,7 +18,7 @@ import { buildSleepChangeInsight } from './sleepChange'
 import type { SleepChangeMetric, SleepChangeSignal } from './sleepChange'
 import { buildMonthlyFamilyReport } from './monthlyReport'
 import type { MonthlyReportMetric, MonthlyReportMilestone, MonthlyReportTrend } from './monthlyReport'
-import { canUsePremiumInsights, parseProductPlan, premiumInsightFeatures, productPlans } from './entitlements'
+import { INTERNAL_PLAN_PREVIEW_EVENT, INTERNAL_PLAN_PREVIEW_KEY, canUsePremiumInsights, parseProductPlan, premiumInsightFeatures, productPlans } from './entitlements'
 import type { PremiumInsightFeature, ProductPlan } from './entitlements'
 import { DEFAULT_DAY_START_MINUTES, DEFAULT_NIGHT_START_MINUTES, LONG_SLEEP_GUARDRAIL_MS, awakeSince, durationOf, formatDateHeader, formatDuration, formatTime, formatTimer, getDataQualityWarnings, todaySessions, totalToday } from './utils'
 import SleepTimeline from './SleepTimeline'
@@ -26,7 +26,6 @@ import SwipeHistoryRow from './SwipeHistoryRow'
 
 const pad = (value: number) => String(value).padStart(2, '0')
 const internalPreview = import.meta.env.VITE_INTERNAL_PREVIEW === 'true'
-const INTERNAL_PLAN_PREVIEW_KEY = 'solemi-internal-plan-preview'
 
 function loadInternalPlanPreview(): ProductPlan {
   if (!internalPreview) return 'familyPlus'
@@ -91,6 +90,7 @@ export default function App() {
   useEffect(() => {
     if (!internalPreview) return
     try { window.localStorage.setItem(INTERNAL_PLAN_PREVIEW_KEY, previewPlan) } catch { /* preview preference is non-critical */ }
+    window.dispatchEvent(new CustomEvent<ProductPlan>(INTERNAL_PLAN_PREVIEW_EVENT, { detail: previewPlan }))
   }, [previewPlan])
   useEffect(() => { document.documentElement.lang = locale }, [locale])
   useEffect(() => { const id = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(id) }, [])

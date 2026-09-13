@@ -4,9 +4,21 @@ import type { AppData } from './types'
 import type { Locale } from './i18n'
 import { loadData } from './storage'
 import { createFamily, createInvite, getSyncStore, joinFamily, leaveFamily, pullRemote, queueLocalChange, refreshFamilyInfo } from './familySync'
+import { INTERNAL_PLAN_PREVIEW_EVENT, INTERNAL_PLAN_PREVIEW_KEY, canUseFamilySync, parseProductPlan } from './entitlements'
+import type { ProductPlan } from './entitlements'
 
 const LAST_INVITE_KEY = 'solemiSleep:lastInvite'
 const LAST_SYNC_KEY = 'solemiSleep:lastSyncAt'
+const internalPreview = import.meta.env.VITE_INTERNAL_PREVIEW === 'true'
+
+function loadInternalPlanPreview(): ProductPlan {
+  if (!internalPreview) return 'familyPlus'
+  try {
+    return parseProductPlan(window.localStorage.getItem(INTERNAL_PLAN_PREVIEW_KEY)) ?? 'familyPlus'
+  } catch {
+    return 'familyPlus'
+  }
+}
 
 const copy = {
   hu: {
@@ -22,7 +34,8 @@ const copy = {
     offlineHint: 'A módosításokat elmentjük, és internetkapcsolatnál elküldjük.', syncIssue: 'Szinkron ellenőrzése szükséges',
     lastSyncNow: 'Utolsó szinkron: most', lastSyncMinutes: (minutes: number) => `Utolsó szinkron: ${minutes} perce`, lastSyncLongAgo: 'Utolsó szinkron: régebben',
     inviteNotFound: 'A meghívókód nem található. Ellenőrizd a kódot, vagy kérj újat.', inviteUsed: 'Ezt a meghívókódot már felhasználták. Kérj egy új kódot.', inviteExpired: 'A meghívókód lejárt. Kérj egy új kódot.',
-    deviceRevoked: 'Ez a telefon már le lett választva a családról.', invalidToken: 'A készülék kapcsolata már nem érvényes. Párosítsd újra a telefont.', networkError: 'Nincs kapcsolat a Solemi Sleep szerverével. Próbáld újra később.'
+    deviceRevoked: 'Ez a telefon már le lett választva a családról.', invalidToken: 'A készülék kapcsolata már nem érvényes. Párosítsd újra a telefont.', networkError: 'Nincs kapcsolat a Solemi Sleep szerverével. Próbáld újra később.',
+    locked: 'Zárolva', lockedHint: 'Ehhez a funkcióhoz Family előfizetés szükséges.', lockedDescription: 'A Family csomaggal összekapcsolhatod a család telefonjait, hogy ugyanazokat az alvásadatokat lássátok.'
   },
   en: {
     title: 'Family Sync', connected: 'Sync active', disconnected: 'Not connected',
@@ -37,7 +50,8 @@ const copy = {
     offlineHint: 'Changes are saved and will be sent when the internet connection returns.', syncIssue: 'Sync needs attention',
     lastSyncNow: 'Last sync: now', lastSyncMinutes: (minutes: number) => `Last sync: ${minutes} min ago`, lastSyncLongAgo: 'Last sync: earlier',
     inviteNotFound: 'Invite code not found. Check the code or request a new one.', inviteUsed: 'This invite code has already been used. Request a new code.', inviteExpired: 'This invite code has expired. Request a new code.',
-    deviceRevoked: 'This phone has already been disconnected from the family.', invalidToken: 'This device connection is no longer valid. Pair the phone again.', networkError: 'Cannot reach the Solemi Sleep server. Try again later.'
+    deviceRevoked: 'This phone has already been disconnected from the family.', invalidToken: 'This device connection is no longer valid. Pair the phone again.', networkError: 'Cannot reach the Solemi Sleep server. Try again later.',
+    locked: 'Locked', lockedHint: 'A Family subscription is required for this feature.', lockedDescription: 'With the Family plan, you can connect the family’s phones so everyone sees the same sleep data.'
   },
   de: {
     title: 'Familien-Sync', connected: 'Sync aktiv', disconnected: 'Nicht verbunden',
@@ -52,7 +66,8 @@ const copy = {
     offlineHint: 'Änderungen werden gespeichert und bei Internetverbindung übertragen.', syncIssue: 'Sync muss geprüft werden',
     lastSyncNow: 'Letzter Sync: gerade eben', lastSyncMinutes: (minutes: number) => `Letzter Sync: vor ${minutes} Min.`, lastSyncLongAgo: 'Letzter Sync: vor längerer Zeit',
     inviteNotFound: 'Einladungscode nicht gefunden. Prüfe den Code oder fordere einen neuen an.', inviteUsed: 'Dieser Einladungscode wurde bereits verwendet. Fordere einen neuen an.', inviteExpired: 'Dieser Einladungscode ist abgelaufen. Fordere einen neuen an.',
-    deviceRevoked: 'Dieses Telefon wurde bereits von der Familie getrennt.', invalidToken: 'Diese Geräteverbindung ist nicht mehr gültig. Kopple das Telefon erneut.', networkError: 'Der Solemi-Sleep-Server ist nicht erreichbar. Versuche es später erneut.'
+    deviceRevoked: 'Dieses Telefon wurde bereits von der Familie getrennt.', invalidToken: 'Diese Geräteverbindung ist nicht mehr gültig. Kopple das Telefon erneut.', networkError: 'Der Solemi-Sleep-Server ist nicht erreichbar. Versuche es später erneut.',
+    locked: 'Gesperrt', lockedHint: 'Für diese Funktion ist ein Family-Abo erforderlich.', lockedDescription: 'Mit dem Family-Abo kannst du die Telefone der Familie verbinden, damit alle dieselben Schlafdaten sehen.'
   }
 } as const
 
@@ -82,8 +97,10 @@ export default function FamilySyncLayer() {
   const [, setClock] = useState(0)
   const [settingsTarget, setSettingsTarget] = useState<Element | null>(() => document.querySelector('.settings-screen'))
   const [connectionName, setConnectionName] = useState(() => getSyncStore().connection?.familyName || '')
+  const [previewPlan, setPreviewPlan] = useState<ProductPlan>(() => loadInternalPlanPreview())
   const locale = loadData().settings.locale as Locale
   const text = copy[locale]
+  const familySyncAvailable = !internalPreview || canUseFamilySync(previewPlan)
 
   const friendlyError = (err: unknown) => {
     const apiError = err as SyncError
@@ -103,6 +120,16 @@ export default function FamilySyncLayer() {
     setSyncIssue(false)
     setPendingCount(getSyncStore().pending.length)
   }
+
+  useEffect(() => {
+    if (!internalPreview) return
+    const onPlanChange = (event: Event) => {
+      const plan = parseProductPlan((event as CustomEvent<unknown>).detail)
+      if (plan) setPreviewPlan(plan)
+    }
+    window.addEventListener(INTERNAL_PLAN_PREVIEW_EVENT, onPlanChange)
+    return () => window.removeEventListener(INTERNAL_PLAN_PREVIEW_EVENT, onPlanChange)
+  }, [])
 
   useEffect(() => {
     const refreshTarget = () => setSettingsTarget(document.querySelector('.settings-screen'))
@@ -144,9 +171,9 @@ export default function FamilySyncLayer() {
   }, [])
 
   useEffect(() => {
-    if (!connected || connectionName) return
+    if (!familySyncAvailable || !connected || connectionName) return
     void refreshFamilyInfo().catch(() => {})
-  }, [connected, connectionName])
+  }, [familySyncAvailable, connected, connectionName])
 
   useEffect(() => {
     const refreshNetwork = () => setOnline(navigator.onLine)
@@ -164,7 +191,7 @@ export default function FamilySyncLayer() {
   }, [])
 
   useEffect(() => {
-    if (!connected) return
+    if (!familySyncAvailable || !connected) return
     let stopped = false
     const run = async () => {
       if (!navigator.onLine || stopped) return
@@ -190,7 +217,7 @@ export default function FamilySyncLayer() {
       window.removeEventListener('online', onFocus)
       document.removeEventListener('visibilitychange', onFocus)
     }
-  }, [connected])
+  }, [familySyncAvailable, connected])
 
   const lastSyncLabel = useMemo(() => {
     if (!lastSyncAt) return ''
@@ -201,21 +228,23 @@ export default function FamilySyncLayer() {
   }, [lastSyncAt, text])
 
   const status = useMemo(() => {
+    if (!familySyncAvailable) return text.locked
     if (!connected) return text.disconnected
     if (!online) return text.offline
     if (pendingCount) return text.syncing
     if (syncIssue) return text.syncIssue
     return text.connected
-  }, [connected, online, pendingCount, syncIssue, text])
+  }, [familySyncAvailable, connected, online, pendingCount, syncIssue, text])
 
   const detailHint = useMemo(() => {
+    if (!familySyncAvailable) return text.lockedHint
     if (!connected) return text.settingsHintDisconnected
     if (!online) return text.offlineHint
     if (pendingCount === 1) return text.pendingOne
     if (pendingCount > 1) return text.pendingMany(pendingCount)
     if (syncIssue) return text.syncIssue
     return lastSyncLabel || text.settingsHintConnected
-  }, [connected, online, pendingCount, syncIssue, lastSyncLabel, text])
+  }, [familySyncAvailable, connected, online, pendingCount, syncIssue, lastSyncLabel, text])
 
   const handleCreate = async () => {
     if (!familyName.trim()) return
@@ -274,12 +303,12 @@ export default function FamilySyncLayer() {
   const settingsEntry = settingsTarget ? createPortal(
     <div className="settings-card family-sync-settings-card">
       <button className="family-sync-settings-button" onClick={openPanel} aria-label={text.title}>
-        <span className={`family-sync-settings-icon ${connected ? 'connected' : ''}`}>☁</span>
+        <span className={`family-sync-settings-icon ${familySyncAvailable && connected ? 'connected' : ''} ${!familySyncAvailable ? 'locked' : ''}`}>{familySyncAvailable ? '☁' : '🔒'}</span>
         <span className="family-sync-settings-copy">
           <strong>{connected && connectionName ? connectionName : text.title}</strong>
           <small>{detailHint}</small>
         </span>
-        <span className={`family-sync-settings-state ${connected && online && !syncIssue ? 'connected' : ''}`}>{status}</span>
+        <span className={`family-sync-settings-state ${familySyncAvailable && connected && online && !syncIssue ? 'connected' : ''}`}>{status}</span>
         <span className="family-sync-settings-chevron">›</span>
       </button>
     </div>,
@@ -292,29 +321,34 @@ export default function FamilySyncLayer() {
       <section className="family-sync-sheet" onClick={(event) => event.stopPropagation()}>
         <div className="family-sync-handle" />
         <header><div><small>{status}</small><h2>{text.title}</h2></div><button onClick={() => setOpen(false)} disabled={busy}>×</button></header>
-        {mode === 'home' && !connected && <div className="family-sync-content">
+        {!familySyncAvailable && <div className="family-sync-content family-sync-locked">
+          <div className="family-sync-lock-icon">🔒</div>
+          <strong>{text.lockedHint}</strong>
+          <p>{text.lockedDescription}</p>
+        </div>}
+        {familySyncAvailable && mode === 'home' && !connected && <div className="family-sync-content">
           <p>{text.intro}</p>
           <button className="family-sync-primary" onClick={() => setMode('create')} disabled={busy}>{text.create}</button>
           <button className="family-sync-secondary" onClick={() => setMode('join')} disabled={busy}>{text.join}</button>
         </div>}
-        {mode === 'create' && !connected && <div className="family-sync-content">
+        {familySyncAvailable && mode === 'create' && !connected && <div className="family-sync-content">
           <p>{text.familyName}</p>
           <input className="family-sync-name-input" value={familyName} onChange={(event) => setFamilyName(event.target.value.slice(0, 60))} placeholder={text.familyNamePlaceholder} autoCorrect="off" />
           <button className="family-sync-primary" onClick={handleCreate} disabled={busy || !familyName.trim()}>{busy ? text.syncing : text.createButton}</button>
           <button className="family-sync-link" onClick={() => setMode('home')} disabled={busy}>{text.cancel}</button>
         </div>}
-        {mode === 'join' && !connected && <div className="family-sync-content">
+        {familySyncAvailable && mode === 'join' && !connected && <div className="family-sync-content">
           <p>{text.join}</p>
           <input className="family-sync-code-input" value={code} onChange={(event) => setCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10))} placeholder={text.codePlaceholder} autoCapitalize="characters" autoCorrect="off" />
           <button className="family-sync-primary" onClick={handleJoin} disabled={busy || !code.trim()}>{busy ? text.syncing : text.joinButton}</button>
           <button className="family-sync-link" onClick={() => setMode('home')} disabled={busy}>{text.cancel}</button>
         </div>}
-        {mode === 'home' && connected && <div className="family-sync-content">
+        {familySyncAvailable && mode === 'home' && connected && <div className="family-sync-content">
           <div className="family-sync-status-card"><span>{online && !syncIssue ? '✓' : '↻'}</span><div><strong>{connectionName || text.connected}</strong><small>{detailHint}</small></div></div>
           <button className="family-sync-primary" onClick={handleInvite} disabled={busy || !online}>{busy ? text.syncing : text.newInvite}</button>
           <button className="family-sync-link danger" onClick={handleLeave} disabled={busy}>{text.leave}</button>
         </div>}
-        {mode === 'invite' && <div className="family-sync-content invite-view">
+        {familySyncAvailable && mode === 'invite' && <div className="family-sync-content invite-view">
           {connectionName && <strong className="family-sync-family-name">{connectionName}</strong>}
           <p>{text.inviteHelp}</p>
           <button className="invite-code" onClick={handleCopy}>{inviteCode}</button>
