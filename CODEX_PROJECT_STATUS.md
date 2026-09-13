@@ -3,7 +3,7 @@
 **Utolsó frissítés:** 2026-09-13  
 **Aktív fejlesztési ág:** `feat/child-profile-v4`  
 **Éles ág:** `main` (`a529a64`)  
-**A státusz előtti utolsó távoli fejlesztési commit:** `676f4f6`
+**A munkamenet elején ellenőrzött fejlesztési HEAD:** `abfb2aa` (`Add account entitlement state model`)
 
 Ez a fájl az új Codex-beszélgetések rövid belépési pontja. A pillanatnyi pontos commit mindig az a commit, amely ezt a fájlt tartalmazza; ellenőrzéshez futtasd a `git log -1 --oneline` parancsot.
 
@@ -68,9 +68,15 @@ A felhasználó 2026-09-13-án telefonon ellenőrizte az internal csomagnézetet
 
 Az internal tesztkapcsoló a `676f4f6` commitban már a Family Sync előnézetét is vezérli: Free nézetben zárolt kártyát és Family-előfizetéses magyarázatot mutat, nem engedi a család létrehozását/csatlakoztatását, és nem futtat hálózati szinkront; Family és Family+ nézetben elérhető. A HU / EN / DE szöveg ennek megfelelő. Ez még nem valódi szerveres entitlement.
 
-Az aktuális helyi, még nem commitolt fejlesztési szeletben elkészült a tisztán tesztelhető account–membership–entitlement állapotmodell. Külön kezeli a személyes feature-jogosultságot és a család aktív szinkronját, valamint a `SIGNED_OUT`, `NO_ACTIVE_MEMBERSHIP`, `PAUSED`, `RECONCILIATION_REQUIRED` és `ACTIVE` állapotokat.
+Az `abfb2aa` commitban elkészült a tisztán tesztelhető account–membership–entitlement állapotmodell. Külön kezeli a személyes feature-jogosultságot és a család aktív szinkronját, valamint a `SIGNED_OUT`, `NO_ACTIVE_MEMBERSHIP`, `PAUSED`, `RECONCILIATION_REQUIRED` és `ACTIVE` állapotokat. Az `activeFeatures` már ellenőrzött jogosultságokat vár; a lejárat és a hitelesség ellenőrzése még a későbbi szerverréteg feladata.
 
-Az aktuális helyi módosításokon a frontend typecheck és a teljes 79 teszt sikeres. A diff whitespace-ellenőrzése szintén sikeres.
+Az aktuális helyi fejlesztési szelet:
+
+- `worker/migrations/003_accounts_and_sessions.sql`: négy additív identity tábla; két aktív eszköz korlátja INSERT/UPDATE esetén; session és eszköz accountazonosságának adatbázis-ellenőrzése.
+- `worker/src/accountStore.ts`: Google issuer+subject alapú lookup, atomi account/identity létrehozás, eszközregisztráció/listázás, session létrehozás/ellenőrzés, atomi eszköz/session-visszavonás.
+- 13 új helyi SQLite-teszt: legacy adatok és séma megőrzése, eszközlimit, session-tulajdonos, lejárat, visszavonás, hibás tranzakció visszaállítása.
+- Frontend és Worker typecheck sikeres; teljes tesztcsomag: 92/92. A tesztadapter valódi SQLite-on futtatja a SQL-t; távoli D1/runtime próba még hátravan.
+- A modul nincs bekötve a Worker-végpontokba. Nincs Google-belépés, refresh-rotáció vagy szerveres entitlement enforcement. Távoli erőforrás nem módosult.
 
 ## Fő nyitott blokkok a `main` migráció előtt
 
@@ -86,12 +92,12 @@ Az aktuális helyi módosításokon a frontend typecheck és a teljes 79 teszt s
 
 ## Következő konkrét feladat
 
-A következő fejlesztési szelet az additív account/session D1 migration és a hozzá tartozó Worker-adatelérési réteg elkészítése az `ACCOUNT_ENTITLEMENT_ARCHITECTURE.md` alapján. A migration csak fájlként és lokális/staging tesztekhez készülhet el; production D1-en nem futtatható külön jóváhagyás nélkül. Első körben az `accounts`, `account_identities`, `account_devices` és `account_sessions` táblák, indexek és a két aktív eszköz korlátja készüljenek el, a jelenlegi Family Sync végpontok viselkedésének megváltoztatása nélkül.
+A következő fejlesztési szelet a Google-belépés szerveroldali ellenőrzése és a Solemi account/session szolgáltatás az új adatelérési rétegen: ellenőrzött issuer/audience/aláírás/lejárat, idempotens accountfeloldás, hashként tárolt és forgatott refresh token, valamint visszavonási és token-újrafelhasználási tesztek. A kliensbekötés előtt tisztázni kell az internal környezet Google OAuth client ID-ját és a webes session tárolási módját. A 003-as migráció staging D1 próbája csak mentés és history-ellenőrzés után következhet; production művelet továbbra is külön jóváhagyáshoz kötött.
 
 ## Munkamegosztás
 
 - **Codex:** architektúra, több fájlt/rendszert érintő fejlesztés, review és release-biztonság.
 - **LOCAL AI DESK:** csak jól körülhatárolt, mechanikus részfeladatok; használata nem kötelező.
-- **Felhasználó:** termékdöntések, telefonos vizuális teszt és éles műveletek jóváhagyása.
+- **Felhasználó:** termékdöntések, telefonos vizuális teszt, commit és push a GitHub Desktopban, valamint éles műveletek jóváhagyása. Codex a helyi módosításokat és a javasolt commit Summary szöveget készíti el.
 
 Minden érdemi commit után frissítsd ezt a fájlt, ha megváltozik az aktuális állapot, a következő feladat vagy valamelyik release-blokkoló.

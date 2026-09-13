@@ -1,6 +1,6 @@
 # Solemi Sleep — végleges account, membership, subscription és entitlement D1 architektúra
 
-Státusz: **ARCHITEKTÚRA LEZÁRVA — implementáció előtt**
+Státusz: **ARCHITEKTÚRA LEZÁRVA — account/session adatbázisalap helyben implementálva**
 
 Dátum: 2026-08-24
 Ellenőrzött GitHub-alap: `main` / `37d1728` (`Lock Free Family Family+ feature matrix`)
@@ -8,6 +8,23 @@ Ellenőrzött GitHub-alap: `main` / `37d1728` (`Lock Free Family Family+ feature
 Ez a dokumentum a következő backend-implementáció normatív terve. Nem migráció és nem módosítja a live Cloudflare D1-et vagy Workert. A jelenlegi prototípus `worker/schema.sql` és `worker/src/index.ts` fájljait a célarchitektúrára való átálláskor, külön ellenőrzött migrációkkal kell módosítani.
 
 Kapcsolódó lezárt döntések: `FEATURE_ENTITLEMENT_MATRIX.md`, `PRODUCT_DESIGN_LOCK.md`, `TECHNICAL_COLLISION_AUDIT.md`.
+
+### Implementációs állapot — 2026-09-13
+
+A `worker/migrations/003_accounts_and_sessions.sql` az identity séma additív
+implementációja; a 002-es sorszámot már a Child Profile V4 migráció használja.
+A `worker/src/accountStore.ts` az új táblák adatelérési alapja. A nyilvános
+Worker-végpontok még nem használják; Google-tokenellenőrzés, session-tokenkiadás,
+refresh-rotáció és eszközcsere-folyamat még nincs bekötve.
+
+A normatív sémához képest két integritási pontosítás került a migrációba:
+az eszközlimit UPDATE-ellenőrzése accountváltásra is kiterjed, a session pedig
+összetett `(account_id, device_id)` idegen kulccsal csak a saját account eszközére
+hivatkozhat. Az új szöveges elsődleges kulcsok explicit `NOT NULL` mezők.
+
+A helyi SQLite-tesztek ellenőrzik a legacy adatok/séma változatlanságát, a
+jogosultsági határokat és a tranzakciós visszaállást. Távoli D1 migráció vagy
+Worker deploy nem történt; a D1-specifikus staging próba külön hátravan.
 
 ## 1. Lezárt termékszabályok
 
