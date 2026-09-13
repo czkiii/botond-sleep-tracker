@@ -182,8 +182,9 @@ Nem minden tervezett Insights-funkció szükséges az első belső RC-hez. Kül�
 
 ## Következő konkrét munkamenet
 
-1. Account- és entitlement-állapotmodell előkészítése a lezárt architektúrából: személyes funkciók és családi sync külön döntésként.
-2. Free családtag, fizető családtag és lejáró jogosultság tesztesetei; családlétrehozás/tagság önmagában ne indítson jogosultság nélküli adatfeltöltést.
-3. Mobil háttérbe küldés/visszatérés és teljes offline felhasználói próba az internal oldalon.
-4. Staging D1 backup/restore próba és rollback dokumentáció.
-5. A Cloudflare Pages preview hozzáférés-védelmének véglegesítése.
+1. Account- és entitlement-állapotmodell előkészítése: személyes funkciók és családi sync külön döntésként — elkészült.
+2. Free családtag, fizető családtag, lejáró jogosultság, másik megmaradó fizető és reaktiválási egyeztetés tesztesetei — elkészültek.
+3. Additív account/session D1 migration és Worker-adatelérési réteg lokális elkészítése, production módosítása nélkül.
+4. Mobil háttérbe küldés/visszatérés és teljes offline felhasználói próba az internal oldalon.
+5. Staging D1 backup/restore próba és rollback dokumentáció.
+6. A Cloudflare Pages preview hozzáférés-védelmének véglegesítése.

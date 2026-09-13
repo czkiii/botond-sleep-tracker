@@ -3,7 +3,7 @@
 **Utolsó frissítés:** 2026-09-13  
 **Aktív fejlesztési ág:** `feat/child-profile-v4`  
 **Éles ág:** `main` (`a529a64`)  
-**A státusz előtti utolsó távoli fejlesztési commit:** `70b29ab`
+**A státusz előtti utolsó távoli fejlesztési commit:** `676f4f6`
 
 Ez a fájl az új Codex-beszélgetések rövid belépési pontja. A pillanatnyi pontos commit mindig az a commit, amely ezt a fájlt tartalmazza; ellenőrzéshez futtasd a `git log -1 --oneline` parancsot.
 
@@ -66,9 +66,11 @@ A felhasználó 2026-09-13-án telefonon ellenőrizte az internal csomagnézetet
 
 **Feltárt eltérés:** a jelenlegi prototípusban az új család létrehozása rögtön szinkronkapcsolatot és adatfeltöltést indít, szerveroldali account/entitlement-ellenőrzés nélkül. A célmodellben a családlétrehozás/tagság és a fizetős aktív szinkron külön döntés; Free tag is szinkronizálhat, ha van aktív Family/Family+ jogosultságú tag. Ez a már nyitott account/entitlement implementáció része.
 
-Az internal tesztkapcsoló helyben már a Family Sync előnézetét is vezérli: Free nézetben zárolt kártyát és Family-előfizetéses magyarázatot mutat, nem engedi a család létrehozását/csatlakoztatását, és nem futtat hálózati szinkront; Family és Family+ nézetben elérhető. A HU / EN / DE szöveg ennek megfelelő. Ez még nem valódi szerveres entitlement, és a módosítás nincs commitolva vagy publikálva.
+Az internal tesztkapcsoló a `676f4f6` commitban már a Family Sync előnézetét is vezérli: Free nézetben zárolt kártyát és Family-előfizetéses magyarázatot mutat, nem engedi a család létrehozását/csatlakoztatását, és nem futtat hálózati szinkront; Family és Family+ nézetben elérhető. A HU / EN / DE szöveg ennek megfelelő. Ez még nem valódi szerveres entitlement.
 
-Az aktuális helyi módosításokon a frontend typecheck, a teljes 71 teszt és a production build sikeres. A diff whitespace-ellenőrzése szintén sikeres.
+Az aktuális helyi, még nem commitolt fejlesztési szeletben elkészült a tisztán tesztelhető account–membership–entitlement állapotmodell. Külön kezeli a személyes feature-jogosultságot és a család aktív szinkronját, valamint a `SIGNED_OUT`, `NO_ACTIVE_MEMBERSHIP`, `PAUSED`, `RECONCILIATION_REQUIRED` és `ACTIVE` állapotokat.
+
+Az aktuális helyi módosításokon a frontend typecheck és a teljes 79 teszt sikeres. A diff whitespace-ellenőrzése szintén sikeres.
 
 ## Fő nyitott blokkok a `main` migráció előtt
 
@@ -84,7 +86,7 @@ Az aktuális helyi módosításokon a frontend typecheck, a teljes 71 teszt és 
 
 ## Következő konkrét feladat
 
-A következő fejlesztési szelet az account- és entitlement-állapotmodell előkészítése az `ACCOUNT_ENTITLEMENT_ARCHITECTURE.md` alapján. Külön döntés kell a személyes funkcióhozzáférésre és a család aktív szinkronjára; a Free tag hozzáférését nem szabad pusztán a saját csomagja alapján tiltani. Elsőként tiszta, tesztelhető állapotmodellt kell készíteni (fiók nélkül / bejelentkezve; tagság nélkül / aktív tagság; szinkron szünetel / engedélyezett), a meglévő sync-protokoll átállítása előtt. Kötelező esetek: Free + Free → nincs aktív sync; Family + Free → mindkettő szinkronizálhat; Family+ + Free → csak az előfizető kap prémium Insightsot; utolsó fizető jogosultságának lejárata → sync szünetel, adatok és tagság megmaradnak.
+A következő fejlesztési szelet az additív account/session D1 migration és a hozzá tartozó Worker-adatelérési réteg elkészítése az `ACCOUNT_ENTITLEMENT_ARCHITECTURE.md` alapján. A migration csak fájlként és lokális/staging tesztekhez készülhet el; production D1-en nem futtatható külön jóváhagyás nélkül. Első körben az `accounts`, `account_identities`, `account_devices` és `account_sessions` táblák, indexek és a két aktív eszköz korlátja készüljenek el, a jelenlegi Family Sync végpontok viselkedésének megváltoztatása nélkül.
 
 ## Munkamegosztás
 
