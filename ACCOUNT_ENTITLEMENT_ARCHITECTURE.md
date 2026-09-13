@@ -11,6 +11,7 @@ Kapcsolódó lezárt döntések: `FEATURE_ENTITLEMENT_MATRIX.md`, `PRODUCT_DESIG
 
 ## 1. Lezárt termékszabályok
 
+- A Free csomag fiók nélkül, local-first módon használható. Fiók csak Family Synchez, vásárláshoz és előfizetés-visszaállításhoz kötelező.
 - V1-ben kizárólag Google-belépés van. A Google csak identitásszolgáltató, nem alvásadat-tároló.
 - Egy embernek egy Solemi accountja van; egy accountnak legfeljebb 2 aktív eszköze lehet.
 - Egy account egyszerre legfeljebb 1 aktív Family tagja lehet. A korábbi tagságok historyként megmaradnak.

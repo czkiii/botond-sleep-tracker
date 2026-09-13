@@ -1,6 +1,6 @@
 # Solemi Sleep — belső verziótól a kiadásig
 
-Utolsó frissítés: 2026-08-26
+Utolsó frissítés: 2026-09-13
 
 Ez az operatív lista a `SOLEMI_EXECUTION_PLAN.md` és a `SOLEMI_MASTER_ROADMAP.md` kiadási pontjait rendezi végrehajtási sorrendbe.
 
@@ -139,13 +139,15 @@ Nem minden tervezett Insights-funkció szükséges az első belső RC-hez. Kül�
   - [x] konfliktusos rekordok blokkolása csendes adateldobás helyett;
   - [ ] opcionális, alkalmazáson belüli vezetett szerkesztő a blokkolt importokhoz.
 - [ ] Végleges navigáció: `Alvások · Előzmények · Insights`.
-- [ ] Free / Family csomaghatár rögzítése legalább a kiadott funkciókra.
+- [x] Free / Family / Family+ csomaghatár rögzítése a `FEATURE_ENTITLEMENT_MATRIX.md` fájlban.
+- [x] Internal Free / Family / Family+ nézetváltó és Family+ Insights-zárolási előnézet implementálása.
+- [ ] A csomagnézet ellenőrzése a GitHub CI és a Cloudflare internal preview friss buildjén.
 
 **Javasolt első kiadási minimum:** Child Profile V4 + stabil Family Sync + wake window V1 + átlátható adatminőség. Prediction csak akkor legyen blokkoló, ha megfelelő saját tesztadat és érthető bizonytalansági kommunikáció áll rendelkezésre.
 
 ## F. Release engineering, privacy és support
 
-- [ ] Staging és production Cloudflare erőforrások egyértelmű szétválasztása.
+- [x] Staging és production Cloudflare erőforrások egyértelmű szétválasztása.
 - [ ] D1 backup és restore eljárás dokumentálása és kipróbálása stagingen.
 - [ ] Worker és frontend rollback eljárás dokumentálása.
 - [ ] Hibalog/crash reporting döntés.
@@ -177,8 +179,8 @@ Nem minden tervezett Insights-funkció szükséges az első belső RC-hez. Kül�
 
 ## Következő konkrét munkamenet
 
-1. Mobil háttérbe küldés/visszatérés és teljes offline felhasználói próba az internal oldalon.
-2. HU / EN / DE mobil layout gyors ellenőrzése.
-3. Prediction Lite állapotainak kézi ellenőrzése ismert tesztadatokkal.
+1. A Free / Family / Family+ nézet ellenőrzése a friss internal buildben.
+2. Account- és entitlement-állapotmodell implementációjának megtervezése a lezárt csomagszabályokból.
+3. Mobil háttérbe küldés/visszatérés és teljes offline felhasználói próba az internal oldalon.
 4. Staging D1 backup/restore próba és rollback dokumentáció.
 5. A Cloudflare Pages preview hozzáférés-védelmének véglegesítése.

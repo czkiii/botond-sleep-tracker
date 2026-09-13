@@ -18,13 +18,26 @@ import { buildSleepChangeInsight } from './sleepChange'
 import type { SleepChangeMetric, SleepChangeSignal } from './sleepChange'
 import { buildMonthlyFamilyReport } from './monthlyReport'
 import type { MonthlyReportMetric, MonthlyReportMilestone, MonthlyReportTrend } from './monthlyReport'
+import { canUsePremiumInsights, parseProductPlan, premiumInsightFeatures, productPlans } from './entitlements'
+import type { PremiumInsightFeature, ProductPlan } from './entitlements'
 import { DEFAULT_DAY_START_MINUTES, DEFAULT_NIGHT_START_MINUTES, LONG_SLEEP_GUARDRAIL_MS, awakeSince, durationOf, formatDateHeader, formatDuration, formatTime, formatTimer, getDataQualityWarnings, todaySessions, totalToday } from './utils'
 import SleepTimeline from './SleepTimeline'
 import SwipeHistoryRow from './SwipeHistoryRow'
 
 const pad = (value: number) => String(value).padStart(2, '0')
+const internalPreview = import.meta.env.VITE_INTERNAL_PREVIEW === 'true'
+const INTERNAL_PLAN_PREVIEW_KEY = 'solemi-internal-plan-preview'
 
-function Icon({ name, size = 18 }: { name: 'moon' | 'sun' | 'settings' | 'home' | 'history' | 'stats' | 'edit' | 'plus' | 'close'; size?: number }) {
+function loadInternalPlanPreview(): ProductPlan {
+  if (!internalPreview) return 'familyPlus'
+  try {
+    return parseProductPlan(window.localStorage.getItem(INTERNAL_PLAN_PREVIEW_KEY)) ?? 'familyPlus'
+  } catch {
+    return 'familyPlus'
+  }
+}
+
+function Icon({ name, size = 18 }: { name: 'moon' | 'sun' | 'settings' | 'home' | 'history' | 'stats' | 'edit' | 'plus' | 'close' | 'lock'; size?: number }) {
   const common = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true }
   if (name === 'moon') return <svg {...common}><path d="M20.2 15.2A8.6 8.6 0 0 1 8.8 3.8 8.7 8.7 0 1 0 20.2 15.2Z" /></svg>
   if (name === 'sun') return <svg {...common}><circle cx="12" cy="12" r="3.6" /><path d="M12 2v2.2M12 19.8V22M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M2 12h2.2M19.8 12H22M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6" /></svg>
@@ -34,6 +47,7 @@ function Icon({ name, size = 18 }: { name: 'moon' | 'sun' | 'settings' | 'home' 
   if (name === 'stats') return <svg {...common}><path d="M5 20V11M10 20V5M15 20v-8M20 20V8" /></svg>
   if (name === 'edit') return <svg {...common}><path d="m4 20 4.3-1 9.8-9.8-3.3-3.3L5 15.7 4 20Z" /><path d="m13.8 6.9 3.3 3.3" /></svg>
   if (name === 'plus') return <svg {...common}><path d="M12 5v14M5 12h14" /></svg>
+  if (name === 'lock') return <svg {...common}><rect x="5" y="10" width="14" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v2" /></svg>
   return <svg {...common}><path d="M6 6l12 12M18 6 6 18" /></svg>
 }
 
@@ -65,6 +79,7 @@ function dateOptions(locale: Locale) {
 
 export default function App() {
   const [data, setData] = useState<AppData>(() => loadData())
+  const [previewPlan, setPreviewPlan] = useState<ProductPlan>(() => loadInternalPlanPreview())
   const [page, setPage] = useState<Page>('today')
   const [now, setNow] = useState(Date.now())
   const [editor, setEditor] = useState<SleepSession | 'new' | null>(null)
@@ -73,6 +88,10 @@ export default function App() {
   const activeSessions = useMemo(() => data.sessions.filter((session) => session.childId === activeChild.id), [data.sessions, activeChild.id])
 
   useEffect(() => saveData(data), [data])
+  useEffect(() => {
+    if (!internalPreview) return
+    try { window.localStorage.setItem(INTERNAL_PLAN_PREVIEW_KEY, previewPlan) } catch { /* preview preference is non-critical */ }
+  }, [previewPlan])
   useEffect(() => { document.documentElement.lang = locale }, [locale])
   useEffect(() => { const id = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(id) }, [])
 
@@ -104,7 +123,7 @@ export default function App() {
     <main className="app-main">
       {page === 'today' && <TodayPage data={data} child={activeChild} sessions={activeSessions} now={now} locale={locale} current={current} onSelectChild={(childId) => setData((previous) => ({ ...previous, settings: { ...previous.settings, activeChildId: childId } }))} onStart={startNow} onEnd={endNow} onAdjustStart={adjustCurrentStart} onOpenEditor={setEditor} onHistory={() => setPage('history')} onSettings={() => setPage('settings')} />}
       {page === 'history' && <HistoryPage sessions={activeSessions} locale={locale} onEdit={setEditor} onDelete={deleteSession} onNew={() => setEditor('new')} />}
-      {page === 'stats' && <StatsPage sessions={activeSessions} now={now} locale={locale} childName={activeChild.name} />}
+      {page === 'stats' && <StatsPage sessions={activeSessions} now={now} locale={locale} childName={activeChild.name} productPlan={previewPlan} onPreviewPlanChange={internalPreview ? setPreviewPlan : undefined} />}
       {page === 'settings' && <SettingsPage data={data} setData={setData} onBack={() => setPage('today')} />}
     </main>
     {page !== 'settings' && <BottomNav page={page} locale={locale} onChange={setPage} />}
@@ -180,7 +199,7 @@ function dateKeyTime(value: string) {
   return new Date(year, month - 1, day, 0, 0, 0, 0).getTime()
 }
 
-function StatsPage({ sessions, now, locale, childName }: { sessions: SleepSession[]; now: number; locale: Locale; childName: string }) {
+function StatsPage({ sessions, now, locale, childName, productPlan, onPreviewPlanChange }: { sessions: SleepSession[]; now: number; locale: Locale; childName: string; productPlan: ProductPlan; onPreviewPlanChange?: (plan: ProductPlan) => void }) {
   const availableStart = sessions.length > 0 ? dateKeyAt(Math.min(...sessions.map((session) => new Date(session.startTime).getTime()))) : dateKeyAt(now)
   const availableEnd = dateKeyAt(now)
   const [range, setRange] = useState<'day' | 'week' | 'month' | 'custom'>('week')
@@ -288,14 +307,16 @@ function StatsPage({ sessions, now, locale, childName }: { sessions: SleepSessio
   const primaryWakeMs = relevantWakeWindow?.typicalMs ?? wakeWindow.typicalMs
   const primaryWakeRange = relevantWakeWindow ? { lowMs: relevantWakeWindow.lowMs, highMs: relevantWakeWindow.highMs } : wakeWindow.typicalRange
   const primaryWakeLabel = relevantWakeWindow ? wakeBucketLabel(locale, relevantWakeWindow.key) : t(locale, 'typicalWakeWindow')
+  const premiumInsightsAvailable = canUsePremiumInsights(productPlan)
 
   return <section className="screen stats-screen"><header className="page-header centered-header"><h1>{t(locale, 'statistics')}</h1></header>
+    {onPreviewPlanChange && <InternalPlanPreview locale={locale} plan={productPlan} onChange={onPreviewPlanChange} />}
     <div className="segmented four-options"><button className={range === 'day' ? 'active' : ''} onClick={() => changeRange('day')}>{t(locale, 'day')}</button><button className={range === 'week' ? 'active' : ''} onClick={() => changeRange('week')}>{t(locale, 'week')}</button><button className={range === 'month' ? 'active' : ''} onClick={() => changeRange('month')}>{t(locale, 'month')}</button><button className={range === 'custom' ? 'active' : ''} onClick={() => changeRange('custom')}>{t(locale, 'customRange')}</button></div>
     {range === 'custom' && <div className="custom-range-picker"><label>{t(locale, 'fromDate')}<input type="date" min={availableStart} max={customEnd} value={customStart} onChange={(event) => setCustomStart(event.target.value)} /></label><label>{t(locale, 'toDate')}<input type="date" min={customStart} max={availableEnd} value={customEnd} onChange={(event) => setCustomEnd(event.target.value)} /></label></div>}
     <div className="chart-card compact-chart-card"><h2>{t(locale, 'sleepDuration')}</h2><div className="bar-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={chart} margin={{ top: 8, right: 2, bottom: 0, left: -26 }}><XAxis dataKey="label" tickLine={false} axisLine={false} /><YAxis domain={[0, 14]} tickLine={false} axisLine={false} /><Tooltip contentStyle={{ background: '#0d1a2b', border: '1px solid #1c3352', borderRadius: 10 }} formatter={(value) => [`${value} ${chartUnit}`, t(locale, 'sleep')]} /><Bar dataKey="hours" fill="#579dff" radius={[4, 4, 1, 1]} maxBarSize={17} onClick={(entry: any) => setSelectedDate(entry?.payload?.dateKey ?? null)} /></BarChart></ResponsiveContainer></div></div>
     <h2 className="overview-title">{t(locale, 'overview24h')}</h2>
     <div className="overview-compact"><SleepTimeline sessions={sessions} now={now} day={timelineDate} locale={locale} /><div className="stats-row"><StatCard label={display.label} value={formatDuration(display.total, locale)} suffix={selectedStats ? undefined : t(locale, 'perDay')} /><StatCard label={t(locale, 'daytime')} value={formatDuration(display.day, locale)} icon="sun" /><StatCard label={t(locale, 'nighttime')} value={formatDuration(display.night, locale)} icon="moon" /></div></div>
-    <div className="insights-card wake-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'wakeWindow')}</h2></div>{wakeWindow.confidence && <b>{t(locale, wakeWindow.confidence === 'medium' ? 'mediumConfidence' : 'lowConfidence')}</b>}</div>
+    {premiumInsightsAvailable ? <><div className="insights-card wake-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'wakeWindow')}</h2></div>{wakeWindow.confidence && <b>{t(locale, wakeWindow.confidence === 'medium' ? 'mediumConfidence' : 'lowConfidence')}</b>}</div>
       <div className="insights-range" aria-label={t(locale, 'insightsRange')}>{([7, 14, 30] as const).map((value) => <button key={value} className={insightsRange === value ? 'active' : ''} onClick={() => setInsightsRange(value)}>{value} {t(locale, 'daysShort')}</button>)}</div>
       {primaryWakeMs !== null ? <div className="wake-window-hero"><span>{primaryWakeLabel}</span><strong>{formatDuration(primaryWakeMs, locale)}</strong>{primaryWakeRange && <small>{t(locale, 'typicalRange')}: {formatDuration(primaryWakeRange.lowMs, locale)}–{formatDuration(primaryWakeRange.highMs, locale)} · {t(locale, 'sampleCountShort', { count: relevantWakeWindow?.sampleCount ?? wakeWindow.sampleCount })}</small>}</div> : <p>{t(locale, 'wakeWindowCollecting', { count: wakeWindow.sampleCount })}</p>}
       {wakeWindow.currentMs !== null ? <div className="current-awake-status"><span>{t(locale, 'awakeForNow')}</span><strong>{formatDuration(wakeWindow.currentMs, locale)}</strong></div> : <p>{t(locale, 'wakeWindowUnavailable')}</p>}
@@ -354,9 +375,34 @@ function StatsPage({ sessions, now, locale, childName }: { sessions: SleepSessio
       {prediction.status === 'unavailable' && <p className="routine-empty">{t(locale, 'predictionUnavailable')}</p>}
       {prediction.status === 'collecting' && <p className="routine-empty">{t(locale, 'predictionCollecting', { count: prediction.sampleCount })}</p>}
       {prediction.status === 'ready' && prediction.windowStart !== null && prediction.windowEnd !== null && <><strong className="prediction-window">{formatTime(new Date(prediction.windowStart).toISOString(), locale)}–{formatTime(new Date(prediction.windowEnd).toISOString(), locale)}</strong><p className={`prediction-state ${prediction.windowState}`}>{t(locale, prediction.windowState === 'upcoming' ? 'predictionUpcoming' : prediction.windowState === 'likely-now' ? 'predictionLikelyNow' : 'predictionPassed')}</p><small>{t(locale, 'predictionBasis', { count: prediction.sampleCount, order: t(locale, prediction.bucket === 'day-1' ? 'firstNap' : prediction.bucket === 'day-2' ? 'secondNap' : prediction.bucket === 'day-3-plus' ? 'laterNap' : 'nightSleep') })}</small><small className="prediction-disclaimer">{t(locale, 'predictionDisclaimer')}</small></>}
-    </div>
+    </div></> : <LockedInsightsOverview locale={locale} />}
     {developmentPickerOpen && <div className="development-picker-overlay" role="dialog" aria-modal="true" aria-labelledby="development-picker-title"><div className="development-picker-sheet"><header><h2 id="development-picker-title">{t(locale, 'customDevelopmentRange')}</h2><button type="button" aria-label={t(locale, 'cancel')} onClick={() => setDevelopmentPickerOpen(false)}><Icon name="close" size={18} /></button></header><div className="development-picker-fields"><label>{t(locale, 'fromDate')}<span className="month-stepper"><button type="button" aria-label={t(locale, 'previousMonth')} disabled={developmentDraftStartIndex <= 0} onClick={() => moveDevelopmentMonth('start', -1)}>‹</button><strong>{developmentMonthOptions[developmentDraftStartIndex]?.label ?? developmentDraftStart}</strong><button type="button" aria-label={t(locale, 'nextMonth')} disabled={developmentDraftStartIndex < 0 || developmentDraftStartIndex >= developmentDraftEndIndex} onClick={() => moveDevelopmentMonth('start', 1)}>›</button></span></label><label>{t(locale, 'toDate')}<span className="month-stepper"><button type="button" aria-label={t(locale, 'previousMonth')} disabled={developmentDraftEndIndex <= developmentDraftStartIndex} onClick={() => moveDevelopmentMonth('end', -1)}>‹</button><strong>{developmentMonthOptions[developmentDraftEndIndex]?.label ?? developmentDraftEnd}</strong><button type="button" aria-label={t(locale, 'nextMonth')} disabled={developmentDraftEndIndex < 0 || developmentDraftEndIndex >= developmentMonthOptions.length - 1} onClick={() => moveDevelopmentMonth('end', 1)}>›</button></span></label></div><small>{t(locale, 'selectedDevelopmentRange', { start: developmentMonthOptions[developmentDraftStartIndex]?.label ?? developmentDraftStart, end: developmentMonthOptions[developmentDraftEndIndex]?.label ?? developmentDraftEnd })}</small><div className="development-picker-actions"><button type="button" onClick={() => setDevelopmentPickerOpen(false)}>{t(locale, 'cancel')}</button><button type="button" className="primary" onClick={applyDevelopmentRange}>{t(locale, 'apply')}</button></div></div></div>}
   </section>
+}
+
+function InternalPlanPreview({ locale, plan, onChange }: { locale: Locale; plan: ProductPlan; onChange: (plan: ProductPlan) => void }) {
+  return <aside className="internal-plan-preview" aria-label={t(locale, 'internalPlanPreview')}>
+    <div><span>INTERNAL</span><strong>{t(locale, 'internalPlanPreview')}</strong></div>
+    <div className="internal-plan-options">{productPlans.map((value) => <button key={value} type="button" className={plan === value ? 'active' : ''} onClick={() => onChange(value)}>{value === 'familyPlus' ? 'Family+' : value === 'family' ? 'Family' : 'Free'}</button>)}</div>
+    <small>{t(locale, 'internalPlanPreviewHint')}</small>
+  </aside>
+}
+
+function premiumInsightTitle(locale: Locale, feature: PremiumInsightFeature) {
+  if (feature === 'wakeWindow') return t(locale, 'wakeWindow')
+  if (feature === 'routinePatterns') return t(locale, 'routinePatterns')
+  if (feature === 'sleepDevelopment') return t(locale, 'sleepDevelopment')
+  if (feature === 'sleepChange') return t(locale, 'sleepChangePlain')
+  if (feature === 'monthlyReport') return t(locale, 'monthlyReport')
+  if (feature === 'similarDays') return t(locale, 'similarDays')
+  return t(locale, 'nextSleepEstimate')
+}
+
+function LockedInsightsOverview({ locale }: { locale: Locale }) {
+  return <div className="locked-insights-list">{premiumInsightFeatures.map((feature) => <article className="insights-card locked-insight-card" key={feature}>
+    <div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{premiumInsightTitle(locale, feature)}</h2></div><b>Family+</b></div>
+    <div className="locked-insight-copy"><span><Icon name="lock" size={19} /></span><p>{t(locale, 'familyPlusLockedDescription')}</p></div>
+  </article>)}</div>
 }
 
 function formatDateKey(value: string, locale: Locale) {
