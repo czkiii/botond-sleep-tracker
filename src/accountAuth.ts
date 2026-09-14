@@ -7,6 +7,7 @@ const ACCESS_KEY = 'solemiSleep:accountAccess'
 const INSTALLATION_KEY = 'solemiSleep:installationSecret'
 
 export type SignedInAccount = { id: string; email: string | null; name: string | null }
+export type AccountDevice = { id: string; name: string | null; platform: 'WEB' | 'IOS' | 'ANDROID' | 'OTHER' | null; last_seen_at: number }
 type AccessResponse = { account: SignedInAccount; deviceId: string; sessionId?: string;
   accessToken: string; accessExpiresAt: number; expiresAt: number }
 type ApiEnvelope<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string }; data?: unknown }
@@ -63,7 +64,7 @@ export async function restoreAccount() {
 
 export async function beginGoogleSignIn(
   target: HTMLElement, onSuccess: (account: SignedInAccount) => void,
-  onError: (error: AccountAuthError) => void
+  onError: (error: AccountAuthError) => void, replaceDeviceId?: string
 ) {
   const { nonce, clientId } = await request<{ nonce: string; clientId: string }>('/v1/auth/challenge')
   await loadGoogleIdentity()
@@ -76,7 +77,8 @@ export async function beginGoogleSignIn(
         const data = await request<AccessResponse>('/v1/auth/google', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ credential, nonce, installationSecret: installationSecret(),
-            deviceName: /Android/i.test(navigator.userAgent) ? 'Android' : /iPhone|iPad/i.test(navigator.userAgent) ? 'iPhone' : 'Web' })
+            deviceName: browserDeviceName(),
+            ...(replaceDeviceId ? { replaceDeviceId } : {}) })
         })
         onSuccess(saveAccess(data))
       } catch (error) {
@@ -85,6 +87,22 @@ export async function beginGoogleSignIn(
     }
   })
   window.google!.accounts.id.renderButton(target, { theme: 'filled_black', size: 'large', shape: 'pill', width: 280 })
+}
+
+function browserDeviceName() {
+  const ua = navigator.userAgent
+  const browser = /Edg\//i.test(ua) ? 'Edge'
+    : /OPR\//i.test(ua) ? 'Opera'
+      : /CriOS|Chrome\//i.test(ua) ? 'Chrome'
+        : /FxiOS|Firefox\//i.test(ua) ? 'Firefox'
+          : /Safari\//i.test(ua) ? 'Safari' : 'Browser'
+  const platform = /iPhone/i.test(ua) ? 'iPhone'
+    : /iPad/i.test(ua) ? 'iPad'
+      : /Android/i.test(ua) ? 'Android'
+        : /Windows/i.test(ua) ? 'Windows'
+          : /Macintosh|Mac OS X/i.test(ua) ? 'Mac'
+            : /Linux/i.test(ua) ? 'Linux' : 'Web'
+  return `${browser} · ${platform}`
 }
 
 export async function signOutAccount() {

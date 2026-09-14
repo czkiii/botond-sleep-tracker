@@ -99,7 +99,9 @@ A Google OAuth Web client létrejött, a publikus client ID bekerült a staging 
 
 A `60d90f7` internal Pages buildben a felhasználó sikeresen belépett Google-fiókkal; a staging D1-ben egy aktív account, Google identity, eszköz és session jött létre. A lap teljes bezárása és újranyitása után a session nem állt vissza, mert a böngésző blokkolta a `pages.dev` → `workers.dev` cross-site refresh sütit. A `9508809` javítás egy `functions/api/[[path]].ts` Pages Function proxyn keresztül az internal oldal saját eredetére hozta az account API-t, és a sütit `HttpOnly; Secure; SameSite=Lax; Path=/api/v1/auth` értékre szűkítette. Az új deploy után a lapbezárás/újranyitás és a logout felhasználói próbája sikeres; a D1 két aktív account-eszközt, egy aktív és két visszavont sessiont mutatott. A teljes 113/113 teszt, a frontend typecheck/build, a Pages Functions build és a helyi Pages→staging challenge próba sikeres.
 
-A második böngészőben a Google-belépés nem vitte át az alvásadatokat. Ez a lezárt termékmodell szerint helyes: a Free előzmény local-first, az account önmagában nem felhőmentés, és a Family Sync kapcsolat/entitlement külön állapot. A még nem commitolt HU/EN/DE fiókkártya-szöveg ezt most explicit jelzi.
+A második böngészőben a Google-belépés nem vitte át az alvásadatokat. Ez a lezárt termékmodell szerint helyes: a Free előzmény local-first, az account önmagában nem felhőmentés, és a családi adatmegosztás/entitlement külön állapot. A még nem commitolt HU/EN/DE szöveg ezt most explicit, hétköznapi nyelven jelzi, a látható „Family Sync” elnevezést pedig „Családi megosztás” megfelelőkre cseréli.
+
+A még nem commitolt kliensfelület a harmadik account-eszköznél már felsorolja a két aktív régi eszközt. A felhasználó kiválaszthatja a lecserélendőt, majd új Google-belépéssel bizonyítja az account tulajdonjogát; a backend a kijelölt eszköz sessionjeit atomikusan vonja vissza az új eszköz regisztrálásakor. Frontend typecheck, az érintett 13 teszt és az auth-funkcióval bekapcsolt internal build sikeres.
 
 ## Fő nyitott blokkok a `main` migráció előtt
 
@@ -115,7 +117,7 @@ A második böngészőben a Google-belépés nem vitte át az alvásadatokat. Ez
 
 ## Következő konkrét feladat
 
-Commitold és pushold a pontosított fiókkártya-szöveget, majd ellenőrizd az internal buildben. Ezután következhet a harmadik eszköz limitje és az interaktív eszközcsere, majd a membership/legacy Family claim fejlesztési szelet; ez kapcsolja majd össze biztonságosan a helyi Familyt az accounttal. Production előtt az API számára továbbra is azonos webhely alatti saját domain javasolt.
+Commitold és pushold az egyszerűsített Családi megosztás szöveget és az eszközcsere UI-t, majd egy harmadik böngészővel ellenőrizd a limitet és egy kijelölt régi eszköz lecserélését. Ezután következhet a membership/legacy Family claim fejlesztési szelet; ez kapcsolja majd össze biztonságosan a helyi Familyt az accounttal. Production előtt az API számára továbbra is azonos webhely alatti saját domain javasolt.
 
 ## Munkamegosztás
 

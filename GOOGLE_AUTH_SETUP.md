@@ -30,7 +30,7 @@ A Google hivatalos útmutatója: [OAuth client ID létrehozása](https://develop
 - Első belépés egy accountot, identityt, account device-ot és sessiont hoz létre.
 - Reload után a session visszaáll.
 - Kijelentkezés után a refresh és access token nem használható.
-- Két eszköz beléphet; a harmadik `DEVICE_LIMIT_REACHED` állapotot kap és egyik korábbi eszköz sem lép ki automatikusan.
+- Két eszköz beléphet; a harmadiknál megjelenik a két régi eszköz, és csak a felhasználó által kiválasztott eszköz lép ki az új Google-megerősítés után.
 - Azonos Google `sub` megváltozott e-maillel ugyanaz marad; azonos e-mail más `sub`-bal külön account.
 - A meglévő legacy Family Sync végpontok tovább működnek.
 

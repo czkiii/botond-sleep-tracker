@@ -22,13 +22,13 @@ function loadInternalPlanPreview(): ProductPlan {
 
 const copy = {
   hu: {
-    title: 'Családi szinkron', connected: 'Szinkron aktív', disconnected: 'Nincs összekapcsolva',
-    intro: 'Kapcsold össze a két telefont fiók és jelszó nélkül.', create: 'Új család létrehozása', join: 'Csatlakozás kóddal',
+    title: 'Családi megosztás', connected: 'A családi adatok megosztva', disconnected: 'Nincs család összekapcsolva',
+    intro: 'Kapcsold össze a család telefonjait, hogy ugyanazokat az alvásadatokat lássátok.', create: 'Új család létrehozása', join: 'Csatlakozás kóddal',
     familyName: 'Család neve', familyNamePlaceholder: 'Pl. Kovács család', createButton: 'Család létrehozása',
     codePlaceholder: 'Meghívókód', joinButton: 'Csatlakozás', cancel: 'Mégse', close: 'Bezárás',
     inviteTitle: 'Meghívókód', inviteHelp: 'Ezt a kódot írd be a másik telefonon. 30 percig érvényes.',
     newInvite: 'Új meghívókód', copyCode: 'Kód másolása', copied: 'Másolva ✓', leave: 'Eszköz leválasztása',
-    leaveConfirm: 'Leválasztod ezt a telefont a családi szinkronról?', syncing: 'Szinkronizálás…', offline: 'Offline', error: 'Nem sikerült a szinkronizálás.',
+    leaveConfirm: 'Leválasztod ezt a telefont a közös családi adatokról?', syncing: 'Adatok frissítése…', offline: 'Offline', error: 'Nem sikerült frissíteni a családi adatokat.',
     settingsHintConnected: 'A család eszközei ugyanazokat az alvásadatokat látják.', settingsHintDisconnected: 'Párosíts egy másik telefont meghívókóddal.', familyConnected: 'Család összekapcsolva',
     pendingOne: '1 módosítás várakozik', pendingMany: (count: number) => `${count} módosítás várakozik`,
     offlineHint: 'A módosításokat elmentjük, és internetkapcsolatnál elküldjük.', syncIssue: 'Szinkron ellenőrzése szükséges',
@@ -38,13 +38,13 @@ const copy = {
     locked: 'Zárolva', lockedHint: 'Ehhez a funkcióhoz Family előfizetés szükséges.', lockedDescription: 'A Family csomaggal összekapcsolhatod a család telefonjait, hogy ugyanazokat az alvásadatokat lássátok.'
   },
   en: {
-    title: 'Family Sync', connected: 'Sync active', disconnected: 'Not connected',
-    intro: 'Connect two phones without an account or password.', create: 'Create a new family', join: 'Join with a code',
+    title: 'Family sharing', connected: 'Family data is shared', disconnected: 'No family connected',
+    intro: 'Connect the family’s phones so everyone sees the same sleep data.', create: 'Create a new family', join: 'Join with a code',
     familyName: 'Family name', familyNamePlaceholder: 'e.g. Smith family', createButton: 'Create family',
     codePlaceholder: 'Invite code', joinButton: 'Join', cancel: 'Cancel', close: 'Close',
     inviteTitle: 'Invite code', inviteHelp: 'Enter this code on the other phone. It is valid for 30 minutes.',
     newInvite: 'New invite code', copyCode: 'Copy code', copied: 'Copied ✓', leave: 'Disconnect this device',
-    leaveConfirm: 'Disconnect this phone from Family Sync?', syncing: 'Syncing…', offline: 'Offline', error: 'Sync failed.',
+    leaveConfirm: 'Disconnect this phone from the shared family data?', syncing: 'Updating family data…', offline: 'Offline', error: 'Could not update family data.',
     settingsHintConnected: 'Family devices see the same sleep data.', settingsHintDisconnected: 'Pair another phone with an invite code.', familyConnected: 'Family connected',
     pendingOne: '1 change waiting', pendingMany: (count: number) => `${count} changes waiting`,
     offlineHint: 'Changes are saved and will be sent when the internet connection returns.', syncIssue: 'Sync needs attention',
@@ -54,13 +54,13 @@ const copy = {
     locked: 'Locked', lockedHint: 'A Family subscription is required for this feature.', lockedDescription: 'With the Family plan, you can connect the family’s phones so everyone sees the same sleep data.'
   },
   de: {
-    title: 'Familien-Sync', connected: 'Sync aktiv', disconnected: 'Nicht verbunden',
-    intro: 'Verbinde zwei Telefone ohne Konto oder Passwort.', create: 'Neue Familie erstellen', join: 'Mit Code beitreten',
+    title: 'Familienfreigabe', connected: 'Familiendaten werden geteilt', disconnected: 'Keine Familie verbunden',
+    intro: 'Verbinde die Telefone der Familie, damit alle dieselben Schlafdaten sehen.', create: 'Neue Familie erstellen', join: 'Mit Code beitreten',
     familyName: 'Familienname', familyNamePlaceholder: 'z. B. Familie Müller', createButton: 'Familie erstellen',
     codePlaceholder: 'Einladungscode', joinButton: 'Beitreten', cancel: 'Abbrechen', close: 'Schließen',
     inviteTitle: 'Einladungscode', inviteHelp: 'Gib diesen Code auf dem anderen Telefon ein. Er ist 30 Minuten gültig.',
     newInvite: 'Neuer Einladungscode', copyCode: 'Code kopieren', copied: 'Kopiert ✓', leave: 'Dieses Gerät trennen',
-    leaveConfirm: 'Dieses Telefon vom Familien-Sync trennen?', syncing: 'Synchronisieren…', offline: 'Offline', error: 'Synchronisierung fehlgeschlagen.',
+    leaveConfirm: 'Dieses Telefon von den gemeinsamen Familiendaten trennen?', syncing: 'Familiendaten werden aktualisiert…', offline: 'Offline', error: 'Familiendaten konnten nicht aktualisiert werden.',
     settingsHintConnected: 'Familiengeräte sehen dieselben Schlafdaten.', settingsHintDisconnected: 'Verbinde ein weiteres Telefon per Einladungscode.', familyConnected: 'Familie verbunden',
     pendingOne: '1 Änderung wartet', pendingMany: (count: number) => `${count} Änderungen warten`,
     offlineHint: 'Änderungen werden gespeichert und bei Internetverbindung übertragen.', syncIssue: 'Sync muss geprüft werden',
