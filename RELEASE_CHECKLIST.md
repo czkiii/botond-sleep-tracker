@@ -184,8 +184,8 @@ Nem minden tervezett Insights-funkció szükséges az első belső RC-hez. Kül�
 
 1. Account- és entitlement-állapotmodell előkészítése: személyes funkciók és családi sync külön döntésként — elkészült.
 2. Free családtag, fizető családtag, lejáró jogosultság, másik megmaradó fizető és reaktiválási egyeztetés tesztesetei — elkészültek.
-3. Additív account/session D1 migration és Worker-adatelérési réteg lokális elkészítése — elkészült, 13 helyi SQLite-teszttel; staging D1 próba még hátravan.
+3. Additív account/session D1 migration és Worker-adatelérési réteg lokális elkészítése — elkészült; a 003/004 staging D1 próba before/after exporttal, FK-ellenőrzéssel és változatlan legacy hash-ekkel sikeres (2026-09-14).
 4. Mobil háttérbe küldés/visszatérés és teljes offline felhasználói próba az internal oldalon.
 5. Staging D1 backup/restore próba és rollback dokumentáció.
 6. A Cloudflare Pages preview hozzáférés-védelmének véglegesítése.
-7. Google-tokenellenőrzés és account/session szolgáltatás az új adatelérési rétegen; refresh-rotáció, token-újrafelhasználás és visszavonás tesztjei.
+7. Google-tokenellenőrzés és account/session szolgáltatás az új adatelérési rétegen; refresh-rotáció, token-újrafelhasználás és visszavonás tesztjei — helyben elkészültek, Google OAuth client ID és valódi internal smoke teszt még szükséges.

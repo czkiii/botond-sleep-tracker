@@ -1,7 +1,11 @@
+import { AuthError, AuthService, SESSION_MS } from './authService'
+
 interface Env {
   DB: D1Database
   TOKEN_PEPPER: string
   ALLOWED_ORIGINS: string
+  GOOGLE_CLIENT_ID?: string
+  AUTH_SECRET?: string
 }
 
 type DeviceAuth = {
@@ -70,6 +74,7 @@ function corsHeaders(request: Request, env: Env) {
 
   if (origin && allowed.includes(origin)) {
     headers.set('Access-Control-Allow-Origin', origin)
+    headers.set('Access-Control-Allow-Credentials', 'true')
     headers.set('Access-Control-Allow-Headers', 'Authorization, Content-Type')
     headers.set('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS')
     headers.set('Access-Control-Max-Age', '86400')
@@ -87,6 +92,12 @@ function json(request: Request, env: Env, body: unknown, status = 200) {
 
 function ok(request: Request, env: Env, data: unknown, status = 200) {
   return json(request, env, { ok: true, data }, status)
+}
+
+function okWithCookie(request: Request, env: Env, data: unknown, cookie: string, status = 200) {
+  const headers = corsHeaders(request, env)
+  headers.append('Set-Cookie', cookie)
+  return new Response(JSON.stringify({ ok: true, data }), { status, headers })
 }
 
 function fail(request: Request, env: Env, error: ApiError) {
@@ -744,6 +755,85 @@ async function deleteSleep(request: Request, env: Env, auth: DeviceAuth, session
   return ok(request, env, { revision: await currentRevision(env, auth.familyId), session: sessionDto(deleted) })
 }
 
+const REFRESH_COOKIE = 'solemi_refresh'
+
+function accountAuth(env: Env) {
+  if (!env.GOOGLE_CLIENT_ID || !env.AUTH_SECRET || env.AUTH_SECRET.length < 32) {
+    throw new ApiError(503, 'AUTH_NOT_CONFIGURED', 'Account sign-in is not configured.')
+  }
+  return new AuthService(env.DB, { clientId: env.GOOGLE_CLIENT_ID, secret: env.AUTH_SECRET })
+}
+
+function requireAllowedAuthOrigin(request: Request, env: Env) {
+  const origin = request.headers.get('Origin')
+  const allowed = env.ALLOWED_ORIGINS.split(',').map((item) => item.trim()).filter(Boolean)
+  if (!origin || !allowed.includes(origin)) throw new ApiError(403, 'ORIGIN_NOT_ALLOWED')
+}
+
+function cookieValue(request: Request, name: string) {
+  const prefix = `${name}=`
+  for (const part of (request.headers.get('Cookie') ?? '').split(';')) {
+    const value = part.trim()
+    if (value.startsWith(prefix)) return decodeURIComponent(value.slice(prefix.length))
+  }
+  return null
+}
+
+function refreshCookie(token: string, maxAgeSeconds: number) {
+  return `${REFRESH_COOKIE}=${encodeURIComponent(token)}; Path=/v1/auth; Max-Age=${maxAgeSeconds}; HttpOnly; Secure; SameSite=None`
+}
+
+function accountBearer(request: Request) {
+  const header = request.headers.get('Authorization')
+  if (!header?.startsWith('Bearer ')) throw new ApiError(401, 'SESSION_INVALID')
+  return header.slice(7).trim()
+}
+
+async function accountAuthRoute(request: Request, env: Env, path: string) {
+  const service = accountAuth(env)
+  try {
+    if (request.method === 'GET' && path === '/v1/auth/challenge') {
+      return ok(request, env, { nonce: await service.challenge(), clientId: env.GOOGLE_CLIENT_ID })
+    }
+    if (request.method === 'POST' && path === '/v1/auth/google') {
+      requireAllowedAuthOrigin(request, env)
+      const body = await readJson(request)
+      const result = await service.login({
+        credential: requireString(body.credential, 'credential', 10_000),
+        nonce: requireString(body.nonce, 'nonce', 64),
+        installationSecret: requireString(body.installationSecret, 'installationSecret', 64),
+        deviceName: typeof body.deviceName === 'string' ? body.deviceName : 'Web',
+        replaceDeviceId: typeof body.replaceDeviceId === 'string' ? body.replaceDeviceId : undefined
+      })
+      const { refresh, ...data } = result
+      return okWithCookie(request, env, data, refreshCookie(refresh, Math.floor(SESSION_MS / 1000)))
+    }
+    if (request.method === 'POST' && path === '/v1/auth/refresh') {
+      requireAllowedAuthOrigin(request, env)
+      const token = cookieValue(request, REFRESH_COOKIE)
+      if (!token) throw new AuthError('SESSION_INVALID')
+      const result = await service.refresh(token)
+      const { refresh, ...data } = result
+      const maxAge = Math.max(0, Math.floor((result.expiresAt - Date.now()) / 1000))
+      return okWithCookie(request, env, data, refreshCookie(refresh, maxAge))
+    }
+    if (request.method === 'GET' && path === '/v1/auth/me') {
+      return ok(request, env, await service.authenticate(accountBearer(request)))
+    }
+    if (request.method === 'POST' && path === '/v1/auth/logout') {
+      requireAllowedAuthOrigin(request, env)
+      const token = cookieValue(request, REFRESH_COOKIE)
+      if (token) await service.logout(token)
+      return okWithCookie(request, env, { signedOut: true }, refreshCookie('', 0))
+    }
+    throw new ApiError(404, 'NOT_FOUND', 'Endpoint not found.')
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    if (error instanceof AuthError) throw new ApiError(error.status, error.code, error.code, error.data)
+    throw error
+  }
+}
+
 async function route(request: Request, env: Env) {
   const url = new URL(request.url)
   const path = url.pathname.replace(/\/+$/, '') || '/'
@@ -755,6 +845,8 @@ async function route(request: Request, env: Env) {
   if (request.method === 'GET' && path === '/health') {
     return ok(request, env, { service: 'solemi-sleep-sync', status: 'ok' })
   }
+
+  if (path.startsWith('/v1/auth/')) return accountAuthRoute(request, env, path)
 
   if (request.method === 'POST' && path === '/v1/families') return createFamily(request, env)
   if (request.method === 'POST' && path === '/v1/join') return joinFamily(request, env)

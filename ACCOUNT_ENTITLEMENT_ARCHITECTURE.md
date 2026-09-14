@@ -1,6 +1,6 @@
 # Solemi Sleep — végleges account, membership, subscription és entitlement D1 architektúra
 
-Státusz: **ARCHITEKTÚRA LEZÁRVA — account/session adatbázisalap helyben implementálva**
+Státusz: **ARCHITEKTÚRA LEZÁRVA — account/session és Google-auth alap helyben implementálva**
 
 Dátum: 2026-08-24
 Ellenőrzött GitHub-alap: `main` / `37d1728` (`Lock Free Family Family+ feature matrix`)
@@ -9,13 +9,14 @@ Ez a dokumentum a következő backend-implementáció normatív terve. Nem migr�
 
 Kapcsolódó lezárt döntések: `FEATURE_ENTITLEMENT_MATRIX.md`, `PRODUCT_DESIGN_LOCK.md`, `TECHNICAL_COLLISION_AUDIT.md`.
 
-### Implementációs állapot — 2026-09-13
+### Implementációs állapot — 2026-09-14
 
 A `worker/migrations/003_accounts_and_sessions.sql` az identity séma additív
 implementációja; a 002-es sorszámot már a Child Profile V4 migráció használja.
-A `worker/src/accountStore.ts` az új táblák adatelérési alapja. A nyilvános
-Worker-végpontok még nem használják; Google-tokenellenőrzés, session-tokenkiadás,
-refresh-rotáció és eszközcsere-folyamat még nincs bekötve.
+A `worker/src/accountStore.ts` az új táblák adatelérési alapja. A még nem
+deployolt Worker-kód Google-tokenellenőrzést, session-tokenkiadást,
+refresh-rotációt és két aktív eszközös korlátot használó auth-végpontokat ad.
+Az interaktív eszközcsere-folyamat még nincs bekötve a kliensbe.
 
 A normatív sémához képest két integritási pontosítás került a migrációba:
 az eszközlimit UPDATE-ellenőrzése accountváltásra is kiterjed, a session pedig
@@ -23,8 +24,10 @@ az eszközlimit UPDATE-ellenőrzése accountváltásra is kiterjed, a session pe
 hivatkozhat. Az új szöveges elsődleges kulcsok explicit `NOT NULL` mezők.
 
 A helyi SQLite-tesztek ellenőrzik a legacy adatok/séma változatlanságát, a
-jogosultsági határokat és a tranzakciós visszaállást. Távoli D1 migráció vagy
-Worker deploy nem történt; a D1-specifikus staging próba külön hátravan.
+jogosultsági határokat és a tranzakciós visszaállást. A 003/004 staging D1
+migráció before/after exporttal és változatlan legacy hash-ekkel sikeres volt.
+Worker deploy és valódi Google-login próba még nem történt, mert a Google OAuth
+Web client ID még hiányzik.
 
 ## 1. Lezárt termékszabályok
 

@@ -23,6 +23,7 @@ import type { PremiumInsightFeature, ProductPlan } from './entitlements'
 import { DEFAULT_DAY_START_MINUTES, DEFAULT_NIGHT_START_MINUTES, LONG_SLEEP_GUARDRAIL_MS, awakeSince, durationOf, formatDateHeader, formatDuration, formatTime, formatTimer, getDataQualityWarnings, todaySessions, totalToday } from './utils'
 import SleepTimeline from './SleepTimeline'
 import SwipeHistoryRow from './SwipeHistoryRow'
+import AccountCard from './AccountCard'
 
 const pad = (value: number) => String(value).padStart(2, '0')
 const internalPreview = import.meta.env.VITE_INTERNAL_PREVIEW === 'true'
@@ -518,6 +519,7 @@ function SettingsPage({ data, setData, onBack }: { data: AppData; setData: (data
     setData({ ...data, sessions: [] })
   }
   return <><section className="screen settings-screen"><header className="page-header"><button className="back-button" onClick={onBack}>‹</button><h1>{t(locale, 'settings')}</h1><span className="header-spacer" /></header>
+    {import.meta.env.VITE_ACCOUNT_AUTH === 'true' && <AccountCard locale={locale} />}
     <div className="settings-card settings-fields">
       <label>{t(locale, 'language')}<select className="language-select" value={locale} onChange={changeLocale}>{languageOptions.map((language) => <option key={language.value} value={language.value}>{language.flag} {language.label}</option>)}</select></label>
       <label className="settings-toggle-row"><span><strong>{t(locale, 'longSleepReminder')}</strong><small>{t(locale, 'longSleepReminderHint')}</small></span><input type="checkbox" checked={data.settings.longSleepReminderEnabled} onChange={(event) => setData({ ...data, settings: { ...data.settings, longSleepReminderEnabled: event.target.checked } })} /></label>

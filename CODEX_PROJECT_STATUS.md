@@ -1,9 +1,9 @@
 # Solemi Sleep — Codex projektállapot
 
-**Utolsó frissítés:** 2026-09-13  
-**Aktív fejlesztési ág:** `feat/child-profile-v4`  
-**Éles ág:** `main` (`a529a64`)  
-**A munkamenet elején ellenőrzött fejlesztési HEAD:** `abfb2aa` (`Add account entitlement state model`)
+**Utolsó frissítés:** 2026-09-14
+**Aktív fejlesztési ág:** `feat/child-profile-v4`
+**Éles ág:** `main` (`a529a64`)
+**A munkamenet elején ellenőrzött fejlesztési HEAD:** `94e3554` (`Add account and session database foundation`)
 
 Ez a fájl az új Codex-beszélgetések rövid belépési pontja. A pillanatnyi pontos commit mindig az a commit, amely ezt a fájlt tartalmazza; ellenőrzéshez futtasd a `git log -1 --oneline` parancsot.
 
@@ -70,7 +70,7 @@ Az internal tesztkapcsoló a `676f4f6` commitban már a Family Sync előnézeté
 
 Az `abfb2aa` commitban elkészült a tisztán tesztelhető account–membership–entitlement állapotmodell. Külön kezeli a személyes feature-jogosultságot és a család aktív szinkronját, valamint a `SIGNED_OUT`, `NO_ACTIVE_MEMBERSHIP`, `PAUSED`, `RECONCILIATION_REQUIRED` és `ACTIVE` állapotokat. Az `activeFeatures` már ellenőrzött jogosultságokat vár; a lejárat és a hitelesség ellenőrzése még a későbbi szerverréteg feladata.
 
-Az aktuális helyi fejlesztési szelet:
+Az előző, már commitolt helyi fejlesztési szelet:
 
 - `worker/migrations/003_accounts_and_sessions.sql`: négy additív identity tábla; két aktív eszköz korlátja INSERT/UPDATE esetén; session és eszköz accountazonosságának adatbázis-ellenőrzése.
 - `worker/src/accountStore.ts`: Google issuer+subject alapú lookup, atomi account/identity létrehozás, eszközregisztráció/listázás, session létrehozás/ellenőrzés, atomi eszköz/session-visszavonás.
@@ -78,10 +78,29 @@ Az aktuális helyi fejlesztési szelet:
 - Frontend és Worker typecheck sikeres; teljes tesztcsomag: 92/92. A tesztadapter valódi SQLite-on futtatja a SQL-t; távoli D1/runtime próba még hátravan.
 - A modul nincs bekötve a Worker-végpontokba. Nincs Google-belépés, refresh-rotáció vagy szerveres entitlement enforcement. Távoli erőforrás nem módosult.
 
+Az aktuális, még nem commitolt Google-auth fejlesztési szelet:
+
+- Google ID token ellenőrzése forgó JWKS-kulcsokkal: RS256 aláírás, issuer, audience, `azp`, `exp`, `iat`, egyszer használható nonce és hitelesített e-mail.
+- Account auth HTTP-végpontok, ötperces access token, 30 napos forgatott refresh token HttpOnly sütiben, logout és régi refresh token újrafelhasználásakor eszközszintű session-visszavonás.
+- Két aktív eszköz határa; a harmadik eszköz nem dob ki automatikusan korábbi eszközt. Az interaktív eszközválasztó UI még nincs kész.
+- Internal, feature flag mögötti HU/EN/DE Solemi-fiók kártya és Google Identity Services popup kliens.
+- Teljes ellenőrzés: frontend és Worker typecheck, production és auth-funkcióval bekapcsolt internal frontend build, Worker dry-run bundle, 111/111 teszt.
+
+Staging D1 próba 2026-09-14-én:
+
+- migráció előtti export és helyi restore sikeres;
+- a 003 és 004 additív migráció sikeresen lefutott kizárólag `solemi-sleep-db-staging` adatbázison;
+- migráció utáni export és restore sikeres, `PRAGMA foreign_key_check` tiszta;
+- mind a hat legacy tábla teljes tartalmi hash-e változatlan (10 family, 20 legacy device, 11 invite, 22 child, 180 sleep session, 254 operation);
+- az új identity/auth táblák üresek; legacy claim nem történt;
+- staging `AUTH_SECRET` létrejött. Production D1/Worker nem módosult.
+
+Blokkoló: még nincs Google OAuth Web client ID. Emiatt a staging Worker auth-verziója nincs deployolva, az internal account UI nincs engedélyezve, és valódi Google-fiókos belépési próba nem történt. Beállítás: `GOOGLE_AUTH_SETUP.md`.
+
 ## Fő nyitott blokkok a `main` migráció előtt
 
 1. A családlétrehozás/tagság és az aktív Family Sync jogosultságának szétválasztása a meglévő architektúraterv szerint.
-2. Valódi account/session rendszer és Google-belépés.
+2. A helyben elkészült account/session rendszer valódi Google-belépési staging próbája és eszközkezelő UI-ja.
 3. Szerveroldali entitlement-ellenőrzés.
 4. App Store / Google Play előfizetés és visszaállítás.
 5. Paywall és upgrade/downgrade folyamat.
@@ -92,7 +111,7 @@ Az aktuális helyi fejlesztési szelet:
 
 ## Következő konkrét feladat
 
-A következő fejlesztési szelet a Google-belépés szerveroldali ellenőrzése és a Solemi account/session szolgáltatás az új adatelérési rétegen: ellenőrzött issuer/audience/aláírás/lejárat, idempotens accountfeloldás, hashként tárolt és forgatott refresh token, valamint visszavonási és token-újrafelhasználási tesztek. A kliensbekötés előtt tisztázni kell az internal környezet Google OAuth client ID-ját és a webes session tárolási módját. A 003-as migráció staging D1 próbája csak mentés és history-ellenőrzés után következhet; production művelet továbbra is külön jóváhagyáshoz kötött.
+Hozd létre a Google OAuth Web client ID-t a `GOOGLE_AUTH_SETUP.md` szerint. Ezután állítsd be a staging Worker `GOOGLE_CLIENT_ID` változóját, deployold a staging Workert, kapcsold be az internal frontend `VITE_ACCOUNT_AUTH=true` buildjét, majd végezd el a valódi Google login/reload/logout és két-/háromeszközös smoke tesztet. Mobilon külön ellenőrizni kell, hogy a `pages.dev` → `workers.dev` cross-site HttpOnly refresh sütit nem blokkolja-e a böngésző; production előtt az API számára azonos webhely alatti saját domain javasolt.
 
 ## Munkamegosztás
 
