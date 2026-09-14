@@ -5,6 +5,7 @@ const API_BASE = (import.meta.env.VITE_ACCOUNT_API_BASE || internalAccountProxy
   || 'https://solemi-sleep-sync.czki-adam.workers.dev').replace(/\/$/, '')
 const ACCESS_KEY = 'solemiSleep:accountAccess'
 const INSTALLATION_KEY = 'solemiSleep:installationSecret'
+export const ACCOUNT_STATE_EVENT = 'solemi-account-state'
 
 export type SignedInAccount = { id: string; email: string | null; name: string | null }
 export type AccountDevice = { id: string; name: string | null; platform: 'WEB' | 'IOS' | 'ANDROID' | 'OTHER' | null; last_seen_at: number }
@@ -26,8 +27,13 @@ async function request<T>(path: string, options: RequestInit = {}) {
   return envelope.data
 }
 
+function announceAccount(account: SignedInAccount | null) {
+  window.dispatchEvent(new CustomEvent(ACCOUNT_STATE_EVENT, { detail: { account } }))
+}
+
 function saveAccess(data: AccessResponse) {
   sessionStorage.setItem(ACCESS_KEY, JSON.stringify(data))
+  announceAccount(data.account)
   return data.account
 }
 
@@ -54,6 +60,7 @@ export async function restoreAccount() {
       const current = await request<{ account: SignedInAccount }>('/v1/auth/me', {
         headers: { Authorization: `Bearer ${saved.accessToken}` }
       })
+      announceAccount(current.account)
       return current.account
     } catch { sessionStorage.removeItem(ACCESS_KEY) }
   }
@@ -108,8 +115,34 @@ function browserDeviceName() {
 export async function signOutAccount() {
   await request('/v1/auth/logout', { method: 'POST' })
   sessionStorage.removeItem(ACCESS_KEY)
+  announceAccount(null)
   window.google?.accounts.id.disableAutoSelect()
 }
+
+let refreshPromise: Promise<AccessResponse | null> | null = null
+
+async function usableAccess() {
+  const saved = readAccess()
+  if (saved && saved.accessExpiresAt > Date.now() + 5_000) return saved
+  if (!refreshPromise) {
+    refreshPromise = request<AccessResponse>('/v1/auth/refresh', { method: 'POST' })
+      .then((data) => { saveAccess(data); return data })
+      .catch(() => { sessionStorage.removeItem(ACCESS_KEY); announceAccount(null); return null })
+      .finally(() => { refreshPromise = null })
+  }
+  return refreshPromise
+}
+
+export async function accountRequest<T>(path: string, options: RequestInit = {}) {
+  const access = await usableAccess()
+  if (!access) throw new AccountAuthError('SESSION_INVALID')
+  const headers = new Headers(options.headers)
+  headers.set('Authorization', `Bearer ${access.accessToken}`)
+  if (options.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
+  return request<T>(path, { ...options, headers })
+}
+
+export function accountDeviceName() { return browserDeviceName() }
 
 let googleScript: Promise<void> | null = null
 function loadGoogleIdentity() {

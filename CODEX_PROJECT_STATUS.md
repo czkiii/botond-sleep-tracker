@@ -3,7 +3,7 @@
 **Utolsó frissítés:** 2026-09-14
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
-**A munkamenet elején ellenőrzött fejlesztési HEAD:** `9508809` (`Fix Google session persistence in internal app`)
+**A munkamenet elején ellenőrzött fejlesztési HEAD:** `6433608` (`Clarify family sharing and add device replacement`)
 
 Ez a fájl az új Codex-beszélgetések rövid belépési pontja. A pillanatnyi pontos commit mindig az a commit, amely ezt a fájlt tartalmazza; ellenőrzéshez futtasd a `git log -1 --oneline` parancsot.
 
@@ -99,13 +99,24 @@ A Google OAuth Web client létrejött, a publikus client ID bekerült a staging 
 
 A `60d90f7` internal Pages buildben a felhasználó sikeresen belépett Google-fiókkal; a staging D1-ben egy aktív account, Google identity, eszköz és session jött létre. A lap teljes bezárása és újranyitása után a session nem állt vissza, mert a böngésző blokkolta a `pages.dev` → `workers.dev` cross-site refresh sütit. A `9508809` javítás egy `functions/api/[[path]].ts` Pages Function proxyn keresztül az internal oldal saját eredetére hozta az account API-t, és a sütit `HttpOnly; Secure; SameSite=Lax; Path=/api/v1/auth` értékre szűkítette. Az új deploy után a lapbezárás/újranyitás és a logout felhasználói próbája sikeres; a D1 két aktív account-eszközt, egy aktív és két visszavont sessiont mutatott. A teljes 113/113 teszt, a frontend typecheck/build, a Pages Functions build és a helyi Pages→staging challenge próba sikeres.
 
-A második böngészőben a Google-belépés nem vitte át az alvásadatokat. Ez a lezárt termékmodell szerint helyes: a Free előzmény local-first, az account önmagában nem felhőmentés, és a családi adatmegosztás/entitlement külön állapot. A még nem commitolt HU/EN/DE szöveg ezt most explicit, hétköznapi nyelven jelzi, a látható „Family Sync” elnevezést pedig „Családi megosztás” megfelelőkre cseréli.
+A második böngészőben a Google-belépés önmagában nem vitte át az alvásadatokat. A Free előzmény továbbra is local-first, viszont ugyanannak az accountnak az aktív családi tagságát a saját második eszközén meghívókód nélkül vissza kell kapnia. A `6433608` commit HU/EN/DE szövege ezt hétköznapi nyelven jelzi, a látható „Family Sync” elnevezést pedig „Családi megosztás” megfelelőkre cseréli.
 
-A még nem commitolt kliensfelület a harmadik account-eszköznél már felsorolja a két aktív régi eszközt. A felhasználó kiválaszthatja a lecserélendőt, majd új Google-belépéssel bizonyítja az account tulajdonjogát; a backend a kijelölt eszköz sessionjeit atomikusan vonja vissza az új eszköz regisztrálásakor. Frontend typecheck, az érintett 13 teszt és az auth-funkcióval bekapcsolt internal build sikeres.
+A `6433608` kliensfelülete a harmadik account-eszköznél felsorolja a két aktív régi eszközt. A felhasználó kiválaszthatja a lecserélendőt, majd új Google-belépéssel bizonyítja az account tulajdonjogát; a backend a kijelölt eszköz sessionjeit atomikusan vonja vissza az új eszköz regisztrálásakor.
+
+Az aktuális, még nem commitolt account–legacy family bridge szelet:
+
+- az `005_family_memberships.sql` két additív átmeneti kapcsolótáblát hoz létre a meglévő Family Sync adatok módosítása nélkül;
+- a már családhoz kapcsolt böngésző érvényes legacy eszközkulccsal és bejelentkezett accounttal claimeli a családot;
+- ugyanannak az accountnak a második eszköze meghívókód nélkül új családi eszközkulcsot kap és lehúzza a családi adatokat;
+- másik account nem claimelheti a már tulajdonossal rendelkező családot; számára a későbbi accountos meghívóbeváltás szükséges;
+- a bridge kizárólag a staging Worker konfigurációjában engedélyezett, productionben nincs bekapcsolva;
+- teljes helyi tesztcsomag: 115/115; frontend és Worker typecheck, internal build és Worker dry-run sikeres;
+- a staging migráció before/after exporttal, változatlan legacy hash-ekkel és tiszta idegenkulcs-ellenőrzéssel sikeres;
+- staging Worker verzió: `3a1853ad-02c5-4ee3-b06e-b1371b095d94`; a teljes legacy staging smoke teszt sikeres.
 
 ## Fő nyitott blokkok a `main` migráció előtt
 
-1. A családlétrehozás/tagság és az aktív Family Sync jogosultságának szétválasztása a meglévő architektúraterv szerint.
+1. Az accountos családtagság és a legacy Family Sync átmeneti összekötésének böngészős elfogadása, majd az accountos meghívóbeváltás elkészítése.
 2. A helyben elkészült account/session rendszer valódi Google-belépési staging próbája és eszközkezelő UI-ja.
 3. Szerveroldali entitlement-ellenőrzés.
 4. App Store / Google Play előfizetés és visszaállítás.
@@ -117,7 +128,7 @@ A még nem commitolt kliensfelület a harmadik account-eszköznél már felsorol
 
 ## Következő konkrét feladat
 
-Commitold és pushold az egyszerűsített Családi megosztás szöveget és az eszközcsere UI-t, majd egy harmadik böngészővel ellenőrizd a limitet és egy kijelölt régi eszköz lecserélését. Ezután következhet a membership/legacy Family claim fejlesztési szelet; ez kapcsolja majd össze biztonságosan a helyi Familyt az accounttal. Production előtt az API számára továbbra is azonos webhely alatti saját domain javasolt.
+Commitold és pushold az account–legacy family bridge szeletet. Az új internal Pages buildben először a családot már tartalmazó Safariban nyisd meg a Beállításokat, hogy a belépett account claimelje a családot; utána ugyanazzal a Google-fiókkal a Chrome Beállítások oldalán a családnak és az adatoknak meghívókód nélkül meg kell jelenniük. Ezután következik a külön családtag saját accountos meghívóbeváltása és a valódi entitlement enforcement. Production előtt az API számára továbbra is azonos webhely alatti saját domain javasolt.
 
 ## Munkamegosztás
 

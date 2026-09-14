@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom'
 import type { AppData } from './types'
 import type { Locale } from './i18n'
 import { loadData } from './storage'
-import { createFamily, createInvite, getSyncStore, joinFamily, leaveFamily, pullRemote, queueLocalChange, refreshFamilyInfo } from './familySync'
+import { createFamily, createInvite, getSyncStore, joinFamily, leaveFamily, pullRemote, queueLocalChange, reconcileAccountFamily, refreshFamilyInfo } from './familySync'
+import { ACCOUNT_STATE_EVENT } from './accountAuth'
 import { INTERNAL_PLAN_PREVIEW_EVENT, INTERNAL_PLAN_PREVIEW_KEY, canUseFamilySync, parseProductPlan } from './entitlements'
 import type { ProductPlan } from './entitlements'
 
@@ -130,6 +131,29 @@ export default function FamilySyncLayer() {
     window.addEventListener(INTERNAL_PLAN_PREVIEW_EVENT, onPlanChange)
     return () => window.removeEventListener(INTERNAL_PLAN_PREVIEW_EVENT, onPlanChange)
   }, [])
+
+  useEffect(() => {
+    if (!familySyncAvailable || import.meta.env.VITE_ACCOUNT_AUTH !== 'true') return
+    let running = false
+    const reconcile = async (event: Event) => {
+      if (!(event as CustomEvent<{ account?: unknown }>).detail?.account || running) return
+      running = true
+      try {
+        const result = await reconcileAccountFamily()
+        if (result.connected) {
+          const next = getSyncStore().connection
+          setConnected(Boolean(next))
+          setConnectionName(next?.familyName || '')
+          markSynced()
+          if (result.changed) window.location.reload()
+        }
+      } catch {
+        setSyncIssue(true)
+      } finally { running = false }
+    }
+    window.addEventListener(ACCOUNT_STATE_EVENT, reconcile)
+    return () => window.removeEventListener(ACCOUNT_STATE_EVENT, reconcile)
+  }, [familySyncAvailable])
 
   useEffect(() => {
     const refreshTarget = () => setSettingsTarget(document.querySelector('.settings-screen'))

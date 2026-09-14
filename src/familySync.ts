@@ -1,5 +1,6 @@
 import type { AppData, ChildProfile, SleepSession } from './types'
 import { STORAGE_KEY, loadData } from './storage'
+import { accountDeviceName, accountRequest } from './accountAuth'
 
 const API_BASE = (import.meta.env.VITE_SYNC_API_BASE || 'https://solemi-sleep-sync.czki-adam.workers.dev').replace(/\/$/, '')
 const SYNC_KEY = 'solemiSleep:sync:v1'
@@ -157,6 +158,27 @@ function applyAuthoritativeSession(session?: RemoteSession | null) {
 
 export function getSyncStore() { return readStore() }
 export function isFamilyConnected() { return Boolean(readStore().connection) }
+
+export async function reconcileAccountFamily() {
+  const store = readStore()
+  if (store.connection) {
+    await accountRequest('/v1/auth/family/claim', {
+      method: 'POST', body: JSON.stringify({ familyDeviceToken: store.connection.deviceToken })
+    })
+    return { claimed: true, connected: true, changed: false }
+  }
+
+  const result = await accountRequest<{
+    membership: null | { familyId: string; familyName: string; role: 'ADMIN' | 'MEMBER' }
+    connection?: SyncConnection
+  }>('/v1/auth/family/bootstrap', {
+    method: 'POST', body: JSON.stringify({ deviceName: accountDeviceName() })
+  })
+  if (!result.membership || !result.connection) return { claimed: false, connected: false, changed: false }
+  writeStore({ connection: result.connection, pending: [] })
+  const changed = await pullRemote(true)
+  return { claimed: false, connected: true, changed }
+}
 
 export async function createFamily(familyName: string, deviceName: string) {
   const local = loadData()

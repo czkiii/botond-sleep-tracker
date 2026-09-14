@@ -6,6 +6,7 @@ interface Env {
   ALLOWED_ORIGINS: string
   GOOGLE_CLIENT_ID?: string
   AUTH_SECRET?: string
+  ACCOUNT_FAMILY_BRIDGE?: string
 }
 
 type DeviceAuth = {
@@ -789,6 +790,133 @@ function accountBearer(request: Request) {
   return header.slice(7).trim()
 }
 
+function requireAccountFamilyBridge(env: Env) {
+  if (env.ACCOUNT_FAMILY_BRIDGE !== 'true') {
+    throw new ApiError(404, 'NOT_FOUND', 'Endpoint not found.')
+  }
+}
+
+type AccountAccess = Awaited<ReturnType<AuthService['authenticate']>>
+
+async function legacyFamilyByToken(env: Env, token: string) {
+  const tokenHash = await hashSecret(token, env.TOKEN_PEPPER)
+  return env.DB.prepare(`SELECT d.id AS device_id, d.family_id, d.revoked_at,
+      f.name AS family_name, f.revision
+    FROM devices d JOIN families f ON f.id = d.family_id
+    WHERE d.token_hash = ?`).bind(tokenHash).first<{
+      device_id: string; family_id: string; family_name: string
+      revision: number; revoked_at: string | null
+    }>()
+}
+
+async function claimAccountFamily(request: Request, env: Env, access: AccountAccess) {
+  const body = await readJson(request)
+  const familyDeviceToken = requireString(body.familyDeviceToken, 'familyDeviceToken', 200)
+  const legacy = await legacyFamilyByToken(env, familyDeviceToken)
+  if (!legacy) throw new ApiError(401, 'INVALID_DEVICE_TOKEN', 'Invalid device token.')
+  if (legacy.revoked_at) throw new ApiError(403, 'DEVICE_REVOKED', 'This device has been revoked.')
+
+  const accountId = access.account.id
+  const activeForAccount = await env.DB.prepare(`SELECT family_id, role FROM legacy_family_memberships
+    WHERE account_id = ? AND status = 'ACTIVE'`).bind(accountId)
+    .first<{ family_id: string; role: 'ADMIN' | 'MEMBER' }>()
+  if (activeForAccount && activeForAccount.family_id !== legacy.family_id) {
+    throw new ApiError(409, 'ACCOUNT_ALREADY_IN_FAMILY')
+  }
+
+  const activeForFamily = await env.DB.prepare(`SELECT account_id FROM legacy_family_memberships
+    WHERE family_id = ? AND status = 'ACTIVE' LIMIT 1`).bind(legacy.family_id)
+    .first<{ account_id: string }>()
+  if (!activeForAccount && activeForFamily && activeForFamily.account_id !== accountId) {
+    throw new ApiError(409, 'ACCOUNT_INVITE_REQUIRED')
+  }
+
+  const deviceMapping = await env.DB.prepare(`SELECT family_id, legacy_device_id
+    FROM account_family_devices WHERE account_device_id = ?`)
+    .bind(access.deviceId).first<{ family_id: string; legacy_device_id: string }>()
+  if (deviceMapping && (deviceMapping.family_id !== legacy.family_id
+    || deviceMapping.legacy_device_id !== legacy.device_id)) {
+    throw new ApiError(409, 'ACCOUNT_DEVICE_ALREADY_LINKED')
+  }
+  const legacyMapping = await env.DB.prepare(`SELECT account_device_id, account_id
+    FROM account_family_devices WHERE legacy_device_id = ?`)
+    .bind(legacy.device_id).first<{ account_device_id: string; account_id: string }>()
+  if (legacyMapping && (legacyMapping.account_device_id !== access.deviceId
+    || legacyMapping.account_id !== accountId)) {
+    throw new ApiError(409, 'FAMILY_DEVICE_ALREADY_CLAIMED')
+  }
+
+  const now = Date.now()
+  const statements: D1PreparedStatement[] = []
+  if (!activeForAccount) {
+    statements.push(env.DB.prepare(`INSERT INTO legacy_family_memberships
+      (id, family_id, account_id, role, status, joined_at, ended_at)
+      VALUES (?, ?, ?, 'ADMIN', 'ACTIVE', ?, NULL)`)
+      .bind(newId('mem'), legacy.family_id, accountId, now))
+  }
+  if (!deviceMapping) {
+    statements.push(env.DB.prepare(`INSERT INTO account_family_devices
+      (account_device_id, account_id, family_id, legacy_device_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)`)
+      .bind(access.deviceId, accountId, legacy.family_id, legacy.device_id, now, now))
+  }
+  if (statements.length) await env.DB.batch(statements)
+
+  return ok(request, env, { familyId: legacy.family_id, familyName: legacy.family_name,
+    role: activeForAccount?.role ?? 'ADMIN' })
+}
+
+async function bootstrapAccountFamily(request: Request, env: Env, access: AccountAccess) {
+  const body = await readJson(request)
+  const deviceName = typeof body.deviceName === 'string' ? body.deviceName.trim().slice(0, 80) : null
+  const membership = await env.DB.prepare(`SELECT m.family_id, m.role, f.name AS family_name, f.revision
+    FROM legacy_family_memberships m JOIN families f ON f.id = m.family_id
+    WHERE m.account_id = ? AND m.status = 'ACTIVE'`)
+    .bind(access.account.id).first<{
+      family_id: string; family_name: string; role: 'ADMIN' | 'MEMBER'; revision: number
+    }>()
+  if (!membership) return ok(request, env, { membership: null })
+
+  const token = randomToken()
+  const tokenHash = await hashSecret(token, env.TOKEN_PEPPER)
+  const now = Date.now()
+  const seenAt = nowIso()
+  const mapped = await env.DB.prepare(`SELECT afd.legacy_device_id
+    FROM account_family_devices afd
+    WHERE afd.account_device_id = ? AND afd.account_id = ? AND afd.family_id = ?`)
+    .bind(access.deviceId, access.account.id, membership.family_id)
+    .first<{ legacy_device_id: string }>()
+
+  let deviceId = mapped?.legacy_device_id
+  if (deviceId) {
+    const result = await env.DB.prepare(`UPDATE devices
+      SET token_hash = ?, name = ?, last_seen_at = ?, revoked_at = NULL
+      WHERE id = ? AND family_id = ?`).bind(tokenHash, deviceName, seenAt,
+        deviceId, membership.family_id).run()
+    if (result.meta.changes !== 1) throw new ApiError(409, 'FAMILY_DEVICE_UNAVAILABLE')
+    await env.DB.prepare('UPDATE account_family_devices SET updated_at = ? WHERE account_device_id = ?')
+      .bind(now, access.deviceId).run()
+  } else {
+    deviceId = newId('dev')
+    await env.DB.batch([
+      env.DB.prepare(`INSERT INTO devices
+        (id, family_id, token_hash, name, created_at, last_seen_at, revoked_at)
+        VALUES (?, ?, ?, ?, ?, ?, NULL)`)
+        .bind(deviceId, membership.family_id, tokenHash, deviceName, seenAt, seenAt),
+      env.DB.prepare(`INSERT INTO account_family_devices
+        (account_device_id, account_id, family_id, legacy_device_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)`)
+        .bind(access.deviceId, access.account.id, membership.family_id, deviceId, now, now)
+    ])
+  }
+
+  return ok(request, env, {
+    membership: { familyId: membership.family_id, familyName: membership.family_name, role: membership.role },
+    connection: { familyId: membership.family_id, familyName: membership.family_name,
+      deviceId, deviceToken: token, revision: 0 }
+  })
+}
+
 async function accountAuthRoute(request: Request, env: Env, path: string) {
   const service = accountAuth(env)
   try {
@@ -819,6 +947,18 @@ async function accountAuthRoute(request: Request, env: Env, path: string) {
     }
     if (request.method === 'GET' && path === '/v1/auth/me') {
       return ok(request, env, await service.authenticate(accountBearer(request)))
+    }
+    if (request.method === 'POST' && path === '/v1/auth/family/claim') {
+      requireAccountFamilyBridge(env)
+      requireAllowedAuthOrigin(request, env)
+      const access = await service.authenticate(accountBearer(request))
+      return claimAccountFamily(request, env, access)
+    }
+    if (request.method === 'POST' && path === '/v1/auth/family/bootstrap') {
+      requireAccountFamilyBridge(env)
+      requireAllowedAuthOrigin(request, env)
+      const access = await service.authenticate(accountBearer(request))
+      return bootstrapAccountFamily(request, env, access)
     }
     if (request.method === 'POST' && path === '/v1/auth/logout') {
       requireAllowedAuthOrigin(request, env)

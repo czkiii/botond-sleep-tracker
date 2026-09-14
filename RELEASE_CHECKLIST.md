@@ -108,6 +108,9 @@ A fejlesztés ugyanabban a repóban és ugyanazon a fő alkalmazáson folytatód
 - [x] Offline queue visszacsatlakozás után helyesen ürül, hálózatvesztést modellező egységteszttel.
 - [x] Dupla Start, dupla Stop és szerkesztési konfliktus teszt a staging Workeren.
 - [x] Egy gyerek hibája nem módosítja a másik gyerek adatait a teljes staging állapot ellenőrzésével.
+- [x] Account–legacy family additív staging D1 migráció teljes before/after exporttal, változatlan legacy hash-ekkel és tiszta idegenkulcs-ellenőrzéssel.
+- [ ] Ugyanaz a Google-account a második saját böngészőben meghívókód nélkül visszakapja a már claimelt családot és annak adatait.
+- [ ] Külön családtag saját Google-accounttal, accountos meghívóbeváltással csatlakozik.
 
 ### Insights és adatminőség
 
