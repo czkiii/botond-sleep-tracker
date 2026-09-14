@@ -3,7 +3,7 @@
 **Utolsó frissítés:** 2026-09-14
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
-**A munkamenet elején ellenőrzött fejlesztési HEAD:** `dc24958` (`Add Google auth and validate staging migrations`)
+**A munkamenet elején ellenőrzött fejlesztési HEAD:** `9508809` (`Fix Google session persistence in internal app`)
 
 Ez a fájl az új Codex-beszélgetések rövid belépési pontja. A pillanatnyi pontos commit mindig az a commit, amely ezt a fájlt tartalmazza; ellenőrzéshez futtasd a `git log -1 --oneline` parancsot.
 
@@ -97,7 +97,9 @@ Staging D1 próba 2026-09-14-én:
 
 A Google OAuth Web client létrejött, a publikus client ID bekerült a staging konfigurációba, és az auth-verzió `6d8e2f50-4927-438d-ae65-6450c7e366a4` verzióazonosítóval kikerült kizárólag a staging Workerre. Az élő health/challenge/CORS ellenőrzés és a teljes legacy Family Sync staging smoke teszt sikeres.
 
-A `60d90f7` internal Pages buildben a felhasználó sikeresen belépett Google-fiókkal; a staging D1-ben egy aktív account, Google identity, eszköz és session jött létre. A lap teljes bezárása és újranyitása után a session nem állt vissza, mert a böngésző blokkolta a `pages.dev` → `workers.dev` cross-site refresh sütit. A még nem commitolt javítás egy `functions/api/[[path]].ts` Pages Function proxyn keresztül az internal oldal saját eredetére hozza az account API-t, és a sütit `HttpOnly; Secure; SameSite=Lax; Path=/api/v1/auth` értékre szűkíti. A proxy egységtesztjei, a teljes 113/113 teszt, a frontend typecheck/build, a Pages Functions build és a helyi Pages→staging challenge próba sikeres.
+A `60d90f7` internal Pages buildben a felhasználó sikeresen belépett Google-fiókkal; a staging D1-ben egy aktív account, Google identity, eszköz és session jött létre. A lap teljes bezárása és újranyitása után a session nem állt vissza, mert a böngésző blokkolta a `pages.dev` → `workers.dev` cross-site refresh sütit. A `9508809` javítás egy `functions/api/[[path]].ts` Pages Function proxyn keresztül az internal oldal saját eredetére hozta az account API-t, és a sütit `HttpOnly; Secure; SameSite=Lax; Path=/api/v1/auth` értékre szűkítette. Az új deploy után a lapbezárás/újranyitás és a logout felhasználói próbája sikeres; a D1 két aktív account-eszközt, egy aktív és két visszavont sessiont mutatott. A teljes 113/113 teszt, a frontend typecheck/build, a Pages Functions build és a helyi Pages→staging challenge próba sikeres.
+
+A második böngészőben a Google-belépés nem vitte át az alvásadatokat. Ez a lezárt termékmodell szerint helyes: a Free előzmény local-first, az account önmagában nem felhőmentés, és a Family Sync kapcsolat/entitlement külön állapot. A még nem commitolt HU/EN/DE fiókkártya-szöveg ezt most explicit jelzi.
 
 ## Fő nyitott blokkok a `main` migráció előtt
 
@@ -113,7 +115,7 @@ A `60d90f7` internal Pages buildben a felhasználó sikeresen belépett Google-f
 
 ## Következő konkrét feladat
 
-Commitold és pushold a same-origin Pages Function proxy javítását, várd meg az internal Pages deployt, majd jelentkezz be újra és ismételd meg a lapbezárás/újranyitás és logout próbát. Ezután következhet a két-/háromeszközös smoke teszt. Production előtt az API számára továbbra is azonos webhely alatti saját domain javasolt.
+Commitold és pushold a pontosított fiókkártya-szöveget, majd ellenőrizd az internal buildben. Ezután következhet a harmadik eszköz limitje és az interaktív eszközcsere, majd a membership/legacy Family claim fejlesztési szelet; ez kapcsolja majd össze biztonságosan a helyi Familyt az accounttal. Production előtt az API számára továbbra is azonos webhely alatti saját domain javasolt.
 
 ## Munkamegosztás
 

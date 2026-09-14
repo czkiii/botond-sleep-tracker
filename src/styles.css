@@ -616,6 +616,7 @@ svg { display: block; }
 .google-signin-button { min-height: 44px; display: grid; place-items: center; }
 .account-signout, .account-retry { min-height: 43px; border: 1px solid var(--line); border-radius: 14px; color: #badcff; background: #0b1d30; font: inherit; font-size: 13px; font-weight: 700; }
 .account-error { color: #ffabb4; font-size: 11px; line-height: 1.4; }
+.account-data-note { color: var(--muted); font-size: 11px; line-height: 1.45; }
 .settings-card input, .note-field textarea {
   width: 100%;
   border: 1px solid var(--line);

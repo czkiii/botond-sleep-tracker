@@ -1,6 +1,6 @@
 # Solemi Sleep — Google-belépés internal beállítása
 
-Státusz: a kód, a staging D1 séma és a Google OAuth Web client elkészült; a staging Worker auth-verziója deployolva van. A Google-login sikeres volt, de a közvetlen cross-site refresh süti nem élte túl a böngészőlap bezárását. A same-origin Pages Function proxy helyben elkészült; internal deploy és ismételt session-próba szükséges.
+Státusz: a kód, a staging D1 séma és a Google OAuth Web client elkészült; a staging Worker auth-verziója deployolva van. A közvetlen cross-site refresh süti hibáját a same-origin Pages Function proxy javította. A Google-login, lapbezárás/újranyitás és logout internal próbája sikeres.
 
 ## Google Cloud Console
 

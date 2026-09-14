@@ -47,6 +47,7 @@ export default function AccountCard({ locale }: { locale: Locale }) {
     {status === 'ready' && <button type="button" className="account-signout" onClick={logout}>{t(locale, 'signOut')}</button>}
     {status === 'error' && <button type="button" className="account-retry" onClick={() => setStatus('signedOut')}>{t(locale, 'retry')}</button>}
     {error && <small className="account-error">{error}</small>}
+    <small className="account-data-note">{t(locale, 'accountDataLocal')}</small>
   </div>
 }
 
