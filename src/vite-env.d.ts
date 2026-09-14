@@ -7,6 +7,7 @@ interface ImportMetaEnv {
   readonly VITE_BASE_PATH?: string
   readonly VITE_SYNC_API_BASE?: string
   readonly VITE_ACCOUNT_AUTH?: string
+  readonly VITE_ACCOUNT_API_BASE?: string
 }
 
 interface Window {

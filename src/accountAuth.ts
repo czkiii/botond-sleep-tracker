@@ -1,4 +1,8 @@
-const API_BASE = (import.meta.env.VITE_SYNC_API_BASE || 'https://solemi-sleep-sync.czki-adam.workers.dev').replace(/\/$/, '')
+const internalAccountProxy = import.meta.env.VITE_INTERNAL_PREVIEW === 'true'
+  && import.meta.env.VITE_ACCOUNT_AUTH === 'true' ? '/api' : ''
+const API_BASE = (import.meta.env.VITE_ACCOUNT_API_BASE || internalAccountProxy
+  || import.meta.env.VITE_SYNC_API_BASE
+  || 'https://solemi-sleep-sync.czki-adam.workers.dev').replace(/\/$/, '')
 const ACCESS_KEY = 'solemiSleep:accountAccess'
 const INSTALLATION_KEY = 'solemiSleep:installationSecret'
 

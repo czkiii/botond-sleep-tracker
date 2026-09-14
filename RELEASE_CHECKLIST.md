@@ -188,4 +188,4 @@ Nem minden tervezett Insights-funkció szükséges az első belső RC-hez. Kül�
 4. Mobil háttérbe küldés/visszatérés és teljes offline felhasználói próba az internal oldalon.
 5. Staging D1 backup/restore próba és rollback dokumentáció.
 6. A Cloudflare Pages preview hozzáférés-védelmének véglegesítése.
-7. Google-tokenellenőrzés és account/session szolgáltatás az új adatelérési rétegen; refresh-rotáció, token-újrafelhasználás és visszavonás tesztjei — elkészültek, a Google OAuth client és a staging Worker beállítva; valódi Google-fiókos internal smoke teszt még szükséges.
+7. Google-tokenellenőrzés és account/session szolgáltatás az új adatelérési rétegen; refresh-rotáció, token-újrafelhasználás és visszavonás tesztjei — elkészültek, a Google OAuth client és a staging Worker beállítva; a login sikeres, a cross-site süti hibájára same-origin Pages proxy készült, ismételt session/logout smoke teszt szükséges.

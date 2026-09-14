@@ -95,7 +95,9 @@ Staging D1 próba 2026-09-14-én:
 - az új identity/auth táblák üresek; legacy claim nem történt;
 - staging `AUTH_SECRET` létrejött. Production D1/Worker nem módosult.
 
-A Google OAuth Web client létrejött, a publikus client ID bekerült a staging konfigurációba, és az auth-verzió `6d8e2f50-4927-438d-ae65-6450c7e366a4` verzióazonosítóval kikerült kizárólag a staging Workerre. Az élő health/challenge/CORS ellenőrzés és a teljes legacy Family Sync staging smoke teszt sikeres. Az internal account UI még nincs engedélyezve, és valódi Google-fiókos belépési próba nem történt.
+A Google OAuth Web client létrejött, a publikus client ID bekerült a staging konfigurációba, és az auth-verzió `6d8e2f50-4927-438d-ae65-6450c7e366a4` verzióazonosítóval kikerült kizárólag a staging Workerre. Az élő health/challenge/CORS ellenőrzés és a teljes legacy Family Sync staging smoke teszt sikeres.
+
+A `60d90f7` internal Pages buildben a felhasználó sikeresen belépett Google-fiókkal; a staging D1-ben egy aktív account, Google identity, eszköz és session jött létre. A lap teljes bezárása és újranyitása után a session nem állt vissza, mert a böngésző blokkolta a `pages.dev` → `workers.dev` cross-site refresh sütit. A még nem commitolt javítás egy `functions/api/[[path]].ts` Pages Function proxyn keresztül az internal oldal saját eredetére hozza az account API-t, és a sütit `HttpOnly; Secure; SameSite=Lax; Path=/api/v1/auth` értékre szűkíti. A proxy egységtesztjei, a teljes 113/113 teszt, a frontend typecheck/build, a Pages Functions build és a helyi Pages→staging challenge próba sikeres.
 
 ## Fő nyitott blokkok a `main` migráció előtt
 
@@ -111,7 +113,7 @@ A Google OAuth Web client létrejött, a publikus client ID bekerült a staging 
 
 ## Következő konkrét feladat
 
-Add hozzá a belépéshez használt Google-fiókot az OAuth app tesztfelhasználóihoz, majd a Cloudflare Pages internal projektjében állítsd be a `VITE_ACCOUNT_AUTH=true` buildváltozót és indíts új buildet. Ezután végezd el a valódi Google login/reload/logout és két-/háromeszközös smoke tesztet. Mobilon külön ellenőrizni kell, hogy a `pages.dev` → `workers.dev` cross-site HttpOnly refresh sütit nem blokkolja-e a böngésző; production előtt az API számára azonos webhely alatti saját domain javasolt.
+Commitold és pushold a same-origin Pages Function proxy javítását, várd meg az internal Pages deployt, majd jelentkezz be újra és ismételd meg a lapbezárás/újranyitás és logout próbát. Ezután következhet a két-/háromeszközös smoke teszt. Production előtt az API számára továbbra is azonos webhely alatti saját domain javasolt.
 
 ## Munkamegosztás
 

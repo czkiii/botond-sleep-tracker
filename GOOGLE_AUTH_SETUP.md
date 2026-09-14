@@ -1,6 +1,6 @@
 # Solemi Sleep — Google-belépés internal beállítása
 
-Státusz: a kód, a staging D1 séma és a Google OAuth Web client elkészült; a staging Worker auth-verziója deployolva van. Az internal Pages buildkapcsoló és a valódi Google-login próba még hátravan.
+Státusz: a kód, a staging D1 séma és a Google OAuth Web client elkészült; a staging Worker auth-verziója deployolva van. A Google-login sikeres volt, de a közvetlen cross-site refresh süti nem élte túl a böngészőlap bezárását. A same-origin Pages Function proxy helyben elkészült; internal deploy és ismételt session-próba szükséges.
 
 ## Google Cloud Console
 
@@ -34,4 +34,4 @@ A Google hivatalos útmutatója: [OAuth client ID létrehozása](https://develop
 - Azonos Google `sub` megváltozott e-maillel ugyanaz marad; azonos e-mail más `sub`-bal külön account.
 - A meglévő legacy Family Sync végpontok tovább működnek.
 
-Az internal frontend és a staging Worker jelenleg külön webhelyen van (`pages.dev` és `workers.dev`). Emiatt a HttpOnly, `SameSite=None` refresh sütit egyes mobilböngészők harmadik féltől származó sütiként blokkolhatják. Ezt telefonon külön ellenőrizni kell. Nyilvános kiadás előtt az API-t az appal azonos webhely alatti saját domainre kell tenni, vagy más, dokumentált natív sessiontárolási megoldást kell választani.
+Az internal frontend és a staging Worker külön webhelyen van (`pages.dev` és `workers.dev`), és a közvetlen HttpOnly, `SameSite=None` refresh sütit a tesztböngésző a lap újranyitásakor blokkolta. Az internal build ezért a `functions/api/[[path]].ts` same-origin Pages Function proxyt használja, amely a sütit az `/api/v1/auth` útvonalra és `SameSite=Lax` módra írja át. Ezt minden internal deploy után lapbezárás/újranyitás próbával ellenőrizni kell. Nyilvános kiadás előtt az API számára továbbra is az appal azonos webhely alatti saját domain javasolt.
