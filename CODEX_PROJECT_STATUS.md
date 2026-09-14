@@ -3,7 +3,7 @@
 **Utolsó frissítés:** 2026-09-14
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
-**A munkamenet elején ellenőrzött fejlesztési HEAD:** `94e3554` (`Add account and session database foundation`)
+**A munkamenet elején ellenőrzött fejlesztési HEAD:** `dc24958` (`Add Google auth and validate staging migrations`)
 
 Ez a fájl az új Codex-beszélgetések rövid belépési pontja. A pillanatnyi pontos commit mindig az a commit, amely ezt a fájlt tartalmazza; ellenőrzéshez futtasd a `git log -1 --oneline` parancsot.
 
@@ -95,7 +95,7 @@ Staging D1 próba 2026-09-14-én:
 - az új identity/auth táblák üresek; legacy claim nem történt;
 - staging `AUTH_SECRET` létrejött. Production D1/Worker nem módosult.
 
-Blokkoló: még nincs Google OAuth Web client ID. Emiatt a staging Worker auth-verziója nincs deployolva, az internal account UI nincs engedélyezve, és valódi Google-fiókos belépési próba nem történt. Beállítás: `GOOGLE_AUTH_SETUP.md`.
+A Google OAuth Web client létrejött, a publikus client ID bekerült a staging konfigurációba, és az auth-verzió `6d8e2f50-4927-438d-ae65-6450c7e366a4` verzióazonosítóval kikerült kizárólag a staging Workerre. Az élő health/challenge/CORS ellenőrzés és a teljes legacy Family Sync staging smoke teszt sikeres. Az internal account UI még nincs engedélyezve, és valódi Google-fiókos belépési próba nem történt.
 
 ## Fő nyitott blokkok a `main` migráció előtt
 
@@ -111,7 +111,7 @@ Blokkoló: még nincs Google OAuth Web client ID. Emiatt a staging Worker auth-v
 
 ## Következő konkrét feladat
 
-Hozd létre a Google OAuth Web client ID-t a `GOOGLE_AUTH_SETUP.md` szerint. Ezután állítsd be a staging Worker `GOOGLE_CLIENT_ID` változóját, deployold a staging Workert, kapcsold be az internal frontend `VITE_ACCOUNT_AUTH=true` buildjét, majd végezd el a valódi Google login/reload/logout és két-/háromeszközös smoke tesztet. Mobilon külön ellenőrizni kell, hogy a `pages.dev` → `workers.dev` cross-site HttpOnly refresh sütit nem blokkolja-e a böngésző; production előtt az API számára azonos webhely alatti saját domain javasolt.
+Add hozzá a belépéshez használt Google-fiókot az OAuth app tesztfelhasználóihoz, majd a Cloudflare Pages internal projektjében állítsd be a `VITE_ACCOUNT_AUTH=true` buildváltozót és indíts új buildet. Ezután végezd el a valódi Google login/reload/logout és két-/háromeszközös smoke tesztet. Mobilon külön ellenőrizni kell, hogy a `pages.dev` → `workers.dev` cross-site HttpOnly refresh sütit nem blokkolja-e a böngésző; production előtt az API számára azonos webhely alatti saját domain javasolt.
 
 ## Munkamegosztás
 

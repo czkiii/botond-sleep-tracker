@@ -1,6 +1,6 @@
 # Solemi Sleep — Google-belépés internal beállítása
 
-Státusz: a kód és a staging D1 séma elkészült; Google OAuth client ID még nincs.
+Státusz: a kód, a staging D1 séma és a Google OAuth Web client elkészült; a staging Worker auth-verziója deployolva van. Az internal Pages buildkapcsoló és a valódi Google-login próba még hátravan.
 
 ## Google Cloud Console
 
@@ -16,12 +16,12 @@ Státusz: a kód és a staging D1 séma elkészült; Google OAuth client ID még
 
 A Google hivatalos útmutatója: [OAuth client ID létrehozása](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid). A szerver a Google előírása szerint ellenőrzi az aláírást, audience-ot, issuert és lejáratot, és kizárólag a `sub` claimet használja stabil identitásként: [ID token szerveroldali ellenőrzése](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token).
 
-## Staging konfiguráció a client ID elkészülte után
+## Staging konfiguráció
 
-1. Add a publikus client ID-t `GOOGLE_CLIENT_ID` Worker-változóként a `worker/wrangler.staging.jsonc` fájlhoz.
+1. A publikus client ID `GOOGLE_CLIENT_ID` Worker-változóként bekerült a `worker/wrangler.staging.jsonc` fájlba.
 2. Az `AUTH_SECRET` staging secret 2026-09-14-én már létrejött; ne cseréld rutin deploynál, mert az minden meglévő Solemi sessiont érvénytelenítene.
 3. Futtasd a Worker typechecket, teszteket és `wrangler deploy --dry-run` csomagolást.
-4. Deployold csak a staging Workert.
+4. A staging Worker auth-verziója 2026-09-14-én deployolva lett; production nem változott.
 5. A Cloudflare Pages internal build környezetében állítsd `VITE_ACCOUNT_AUTH=true` értékre, a meglévő `VITE_SYNC_API_BASE` megtartásával, majd indíts új internal buildet.
 
 ## Kötelező internal smoke test

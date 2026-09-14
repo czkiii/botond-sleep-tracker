@@ -6,7 +6,8 @@
   "workers_dev": true,
   "preview_urls": true,
   "vars": {
-    "ALLOWED_ORIGINS": "https://solemi-sleep-internal.pages.dev,http://localhost:5173"
+    "ALLOWED_ORIGINS": "https://solemi-sleep-internal.pages.dev,http://localhost:5173",
+    "GOOGLE_CLIENT_ID": "637253731977-hfds5vtk53nqlkc9vul67m78sckqpsc9.apps.googleusercontent.com"
   },
   "d1_databases": [
     {

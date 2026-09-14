@@ -22,4 +22,4 @@
 
 Az új `accounts`, `account_identities`, `account_devices`, `account_sessions`, `auth_challenges` és `used_refresh_tokens` táblák a migráció után üresek voltak. Ez elvárt: legacy account-claim és automatikus paid grant nem történt.
 
-A staging Workerhez külön, véletlen `AUTH_SECRET` secret létrejött; az értéke nem került fájlba vagy naplóba. `GOOGLE_CLIENT_ID` még nincs, ezért az új Workert nem deployoltuk, valódi Google-fiókos smoke test nem történt, és az internal account UI nincs engedélyezve.
+A staging Workerhez külön, véletlen `AUTH_SECRET` secret létrejött; az értéke nem került fájlba vagy naplóba. A Google OAuth Web client ID beállítása után az auth-verzió `6d8e2f50-4927-438d-ae65-6450c7e366a4` verzióazonosítóval kikerült kizárólag a staging Workerre. Az élő health/challenge/CORS ellenőrzés és a teljes legacy Family Sync staging smoke teszt sikeres. Valódi Google-fiókos smoke test még nem történt, és az internal account UI nincs engedélyezve.

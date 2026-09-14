@@ -191,6 +191,7 @@ procedure. Such a restore is not yet verified here.
 
 The authorized staging migration was completed on 2026-09-14 with before/after
 exports, foreign-key checks and full legacy content hashes. See
-`STAGING_AUTH_MIGRATION_2026-09-14.md`. A staging `AUTH_SECRET` exists, but the
-Worker and UI are not enabled because the Google OAuth client ID is still
-missing. Follow the repository-root `GOOGLE_AUTH_SETUP.md` before deployment.
+`STAGING_AUTH_MIGRATION_2026-09-14.md`. The staging `AUTH_SECRET` and Google OAuth
+client ID are configured, and the auth Worker version is deployed to staging.
+The internal account UI and real Google-account smoke test are still pending;
+follow the repository-root `GOOGLE_AUTH_SETUP.md`.
