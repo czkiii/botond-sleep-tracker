@@ -31,6 +31,20 @@ család nyers alvásadata csak érvényes account session és az account eszköz
 rendelt családi eszközkulcs együttesével érhető el. A teljes legacy staging
 smoke teszt sikeres.
 
+## Valódi két-accountos elfogadás
+
+Az internal Pages `9e5a381` buildjét a felhasználó és a felesége két külön
+Google-accounttal ellenőrizte. Family+ + Free mellett a sync működött. Free +
+Free alatt a módosítások várakoztak, majd a másik account Family+ aktiválása
+után a kliens újraellenőrzési ciklusában mindkét eszköz szinkronizált.
+Kijelentkezés, a teljes helyi appadat törlése és Google-belépés után a cloud
+családi adatok visszatöltődtek.
+
+A személyes adat nélküli D1 összesítés ekkor egy aktív és egy lejárt `MANUAL`
+Family+ subscriptiont, egy aktív `FAMILY_SYNC` grantot és egy syncre jogosult
+accountos családot mutatott. Ez megfelel a teszt végállapotának: az egyik tag
+Free, a másik Family+, a családi sync aktív.
+
 Alkalmazás-visszaállításkor a korábbi Worker-verzió újratelepíthető; az additív,
 kezdetben üres táblák helyükön maradhatnak. Production rollbacket ez a próba nem
 érint és nem helyettesít.

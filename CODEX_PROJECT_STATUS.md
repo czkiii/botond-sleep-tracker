@@ -3,7 +3,7 @@
 **Utolsó frissítés:** 2026-09-15
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
-**A munkamenet elején ellenőrzött fejlesztési HEAD:** `3c42497` (`Add account-based family invitations`)
+**A munkamenet elején ellenőrzött fejlesztési HEAD:** `9e5a381` (`Enforce family entitlements on the server`)
 
 Ez a fájl az új Codex-beszélgetések rövid belépési pontja. A pillanatnyi pontos commit mindig az a commit, amely ezt a fájlt tartalmazza; ellenőrzéshez futtasd a `git log -1 --oneline` parancsot.
 
@@ -137,7 +137,7 @@ accountos meghívást és a kétirányú Family Syncet. A próba feltárta, hogy
 internal csomagkapcsoló a Free családtag saját böngészőjében leállította a
 szinkront akkor is, amikor egy másik aktív tag Family+ nézetben volt.
 
-Az aktuális, még nem commitolt szerveroldali entitlement szelet:
+A `9e5a381` commit szerveroldali entitlement szelete:
 
 - a `006_subscriptions_and_entitlements.sql` providerfüggetlen `subscriptions`,
   `subscription_events` és `account_entitlements` táblákat hoz létre Apple,
@@ -159,9 +159,19 @@ Az aktuális, még nem commitolt szerveroldali entitlement szelet:
 - staging Worker verzió: `4ff4309f-537d-43e5-8a39-d64de6a83b0a`; a teljes
   legacy staging smoke teszt sikeres.
 
+A felhasználó 2026-09-15-én két valódi Google-accounttal elfogadta a staging
+entitlement folyamatot. Family+ + Free mellett a kétirányú sync működött. Free +
+Free alatt két helyi módosítás várakozott; amikor a másik account Family+ lett,
+a család legfeljebb a 15 másodperces újraellenőrzés után reaktiválódott, és a
+várakozó módosítások szinkronizálódtak. Kijelentkezés, minden helyi appadat
+törlése és ismételt Google-belépés után a családi profilok és alvásadatok
+visszatöltődtek. A személyes adat nélküli staging D1 összesítés egy aktív és egy
+lejárt teszt-előfizetést, valamint egy aktív sync-jogosultságú accountos családot
+mutatott. Adatvesztést nem tapasztaltunk.
+
 ## Fő nyitott blokkok a `main` migráció előtt
 
-1. Az új szerveroldali entitlement szelet valódi két-accountos staging elfogadása.
+1. Pause alatti kétoldali módosítások biztonságos reconciliation protokollja és konfliktustesztje.
 2. Az account/session eszközkezelő harmadik böngészős staging próbája.
 3. App Store / Google Play vásárlás-ellenőrzés és visszaállítás provider adapterei.
 4. Paywall és upgrade/downgrade folyamat.
@@ -172,13 +182,11 @@ Az aktuális, még nem commitolt szerveroldali entitlement szelet:
 
 ## Következő konkrét feladat
 
-Commitold és pushold a szerveroldali entitlement szeletet, majd várd meg az
-internal Pages buildet. Az egyik account legyen Family+, a másik Free. Mindkét
-böngészőben frissítsd az oldalt, és ellenőrizd a kétirányú syncet. Ezután az
-utolsó fizető accountot állítsd Free-re: a syncnek szünetelnie kell, a helyi
-módosításnak meg kell maradnia. Visszaállítás Familyre vagy Family+-ra után a
-másik böngésző legfeljebb 15 másodpercen belül vagy fókuszba visszatéréskor
-észlelje az újraaktiválást.
+Implementáld a pause utáni `RECONCILIATION_REQUIRED` szerverállapotot és az
+operation manifest alapú egyeztetés első szeletét. Elsőként azt a konfliktust
+fedd le, amikor Free + Free szünet alatt két telefon ugyanazt az alvást eltérően
+módosítja. Egyik változat se írhassa felül csendben a másikat; az egyszerű,
+különálló pending módosítások továbbra is automatikusan szinkronizálódjanak.
 
 ## Munkamegosztás
 

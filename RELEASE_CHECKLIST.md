@@ -114,7 +114,9 @@ A fejlesztés ugyanabban a repóban és ugyanazon a fő alkalmazáson folytatód
 - [x] Külön családtag saját Google-accounttal, accountos meghívóbeváltással csatlakozik.
 - [x] Additív subscription/entitlement staging migráció teljes before/after exporttal, változatlan legacy hash-ekkel és tiszta idegenkulcs-ellenőrzéssel.
 - [x] Szerveroldali Family Sync gate automatizált tesztje: Family+ fizető + Free tag aktív; az utolsó grant megszűnése pause-t ad és megőrzi a pending módosítást.
-- [ ] Ugyanez valódi két Google-accounttal az új internal Pages buildben elfogadva.
+- [x] Ugyanez valódi két Google-accounttal az új internal Pages buildben elfogadva: Family+ + Free sync, Free + Free pause, Family+ reaktiválás és pending flush sikeres.
+- [x] Kijelentkezés, helyi appadatok törlése és Google-belépés után a családi cloud adatok visszaállnak.
+- [ ] Pause alatt két eszközön létrejövő, ugyanazt a rekordot érintő módosítás explicit konfliktuskezelése.
 
 ### Insights és adatminőség
 
