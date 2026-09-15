@@ -13,7 +13,8 @@ const origin = 'https://solemi-sleep-internal.pages.dev'
 let sqlite: DatabaseSync
 let env: { DB: D1Database; TOKEN_PEPPER: string; ALLOWED_ORIGINS: string;
   GOOGLE_CLIENT_ID?: string; AUTH_SECRET?: string; ACCOUNT_FAMILY_BRIDGE?: string;
-  ENTITLEMENT_ENFORCEMENT?: string; ENTITLEMENT_TEST_MODE?: string }
+  ENTITLEMENT_ENFORCEMENT?: string; ENTITLEMENT_TEST_MODE?: string;
+  RECONCILIATION_CONFLICTS?: string }
 
 beforeEach(() => {
   sqlite = new DatabaseSync(':memory:')
@@ -285,5 +286,50 @@ describe('account auth routes', () => {
     })
     expect(response.status).toBe(404)
     expect(sqlite.prepare('SELECT COUNT(*) AS count FROM subscriptions').get()).toEqual({ count: 0 })
+  })
+
+  it('rejects a stale edit of the same sleep but accepts an unrelated sleep edit', async () => {
+    env.RECONCILIATION_CONFLICTS = 'true'
+    const firstToken = 'ss_dv_conflict_first'
+    const secondToken = 'ss_dv_conflict_second'
+    await seedLegacyFamily(firstToken)
+    const at = '2026-09-14T18:00:00.000Z'
+    sqlite.prepare(`INSERT INTO devices
+      (id, family_id, token_hash, name, created_at, last_seen_at, revoked_at)
+      VALUES ('dev_second', 'fam_test', ?, 'Chrome', ?, ?, NULL)`)
+      .run(await sha256(`${env.TOKEN_PEPPER}:${secondToken}`), at, at)
+    sqlite.prepare(`INSERT INTO children
+      (id, family_id, name, birth_date, created_at, updated_at, deleted_at, revision)
+      VALUES ('child_test', 'fam_test', 'Baba', NULL, ?, ?, NULL, 1)`).run(at, at)
+    sqlite.prepare(`INSERT INTO sleep_sessions
+      (id, family_id, child_id, start_time, end_time, note, day_night_override,
+       created_at, updated_at, deleted_at, revision)
+      VALUES ('sleep_shared', 'fam_test', 'child_test', ?, ?, '', NULL, ?, ?, NULL, 2),
+             ('sleep_other', 'fam_test', 'child_test', ?, ?, '', NULL, ?, ?, NULL, 2)`)
+      .run('2026-09-14T10:00:00.000Z', '2026-09-14T11:00:00.000Z', at, at,
+        '2026-09-14T12:00:00.000Z', '2026-09-14T13:00:00.000Z', at, at)
+    sqlite.prepare(`UPDATE families SET revision = 2 WHERE id = 'fam_test'`).run()
+
+    const patch = (token: string, id: string, operationId: string, note: string) => fetch(`/v1/sessions/${id}`, {
+      method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ operationId, baseRevision: 2, patch: { note } })
+    })
+    const first = await patch(firstToken, 'sleep_shared', 'op_first', 'Első telefon')
+    expect(first.status).toBe(200)
+    expect(await first.json()).toMatchObject({ data: { session: { note: 'Első telefon', revision: 3 } } })
+
+    const conflict = await patch(secondToken, 'sleep_shared', 'op_second', 'Második telefon')
+    expect(conflict.status).toBe(409)
+    expect(await conflict.json()).toMatchObject({
+      error: { code: 'SYNC_CONFLICT' },
+      data: { conflict: { entityType: 'SESSION', entityId: 'sleep_shared',
+        baseRevision: 2, serverRevision: 3, serverValue: { note: 'Első telefon' } } }
+    })
+    expect(sqlite.prepare(`SELECT note FROM sleep_sessions WHERE id = 'sleep_shared'`).get())
+      .toEqual({ note: 'Első telefon' })
+
+    const unrelated = await patch(secondToken, 'sleep_other', 'op_other', 'Másik alvás')
+    expect(unrelated.status).toBe(200)
+    expect(await unrelated.json()).toMatchObject({ data: { session: { note: 'Másik alvás' } } })
   })
 })

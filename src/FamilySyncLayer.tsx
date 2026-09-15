@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import type { AppData } from './types'
 import type { Locale } from './i18n'
 import { loadData } from './storage'
-import { createFamily, createInvite, getSyncStore, joinFamily, leaveFamily, pullRemote, queueLocalChange, reconcileAccountFamily, refreshFamilyInfo } from './familySync'
+import { createFamily, createInvite, getSyncStore, joinFamily, leaveFamily, pullRemote, queueLocalChange, reconcileAccountFamily, refreshFamilyInfo, resolveSyncConflict } from './familySync'
 import { ACCOUNT_STATE_EVENT, getAccountAccess, setInternalTestPlan } from './accountAuth'
 import { INTERNAL_PLAN_PREVIEW_EVENT, INTERNAL_PLAN_PREVIEW_KEY, canUseFamilySync, parseProductPlan } from './entitlements'
 import type { ProductPlan } from './entitlements'
@@ -32,6 +32,8 @@ const copy = {
     leaveConfirm: 'Leválasztod ezt a telefont a közös családi adatokról?', syncing: 'Adatok frissítése…', offline: 'Offline', error: 'Nem sikerült frissíteni a családi adatokat.',
     settingsHintConnected: 'A család eszközei ugyanazokat az alvásadatokat látják.', settingsHintDisconnected: 'Párosíts egy másik telefont meghívókóddal.', familyConnected: 'Család összekapcsolva',
     pendingOne: '1 módosítás várakozik', pendingMany: (count: number) => `${count} módosítás várakozik`,
+    conflictOne: '1 módosítás ütközik egy másik telefon változatával', conflictMany: (count: number) => `${count} módosítás ütközik egy másik telefon változatával`,
+    conflictTitle: 'Ugyanezt az alvást két telefonon módosítottátok.', conflictHelp: 'Válaszd ki, melyik változat maradjon meg. Egyiket sem írjuk felül a döntésed nélkül.', keepLocal: 'Ezen a telefonon lévő maradjon', keepFamily: 'A családi változat maradjon',
     offlineHint: 'A módosításokat elmentjük, és internetkapcsolatnál elküldjük.', syncIssue: 'Szinkron ellenőrzése szükséges',
     lastSyncNow: 'Utolsó szinkron: most', lastSyncMinutes: (minutes: number) => `Utolsó szinkron: ${minutes} perce`, lastSyncLongAgo: 'Utolsó szinkron: régebben',
     inviteNotFound: 'A meghívókód nem található. Ellenőrizd a kódot, vagy kérj újat.', inviteUsed: 'Ezt a meghívókódot már felhasználták. Kérj egy új kódot.', inviteExpired: 'A meghívókód lejárt. Kérj egy új kódot.',
@@ -49,6 +51,8 @@ const copy = {
     leaveConfirm: 'Disconnect this phone from the shared family data?', syncing: 'Updating family data…', offline: 'Offline', error: 'Could not update family data.',
     settingsHintConnected: 'Family devices see the same sleep data.', settingsHintDisconnected: 'Pair another phone with an invite code.', familyConnected: 'Family connected',
     pendingOne: '1 change waiting', pendingMany: (count: number) => `${count} changes waiting`,
+    conflictOne: '1 change conflicts with another phone’s version', conflictMany: (count: number) => `${count} changes conflict with another phone’s version`,
+    conflictTitle: 'The same sleep was changed on two phones.', conflictHelp: 'Choose which version to keep. Neither is overwritten without your decision.', keepLocal: 'Keep this phone’s version', keepFamily: 'Keep the family version',
     offlineHint: 'Changes are saved and will be sent when the internet connection returns.', syncIssue: 'Sync needs attention',
     lastSyncNow: 'Last sync: now', lastSyncMinutes: (minutes: number) => `Last sync: ${minutes} min ago`, lastSyncLongAgo: 'Last sync: earlier',
     inviteNotFound: 'Invite code not found. Check the code or request a new one.', inviteUsed: 'This invite code has already been used. Request a new code.', inviteExpired: 'This invite code has expired. Request a new code.',
@@ -66,6 +70,8 @@ const copy = {
     leaveConfirm: 'Dieses Telefon von den gemeinsamen Familiendaten trennen?', syncing: 'Familiendaten werden aktualisiert…', offline: 'Offline', error: 'Familiendaten konnten nicht aktualisiert werden.',
     settingsHintConnected: 'Familiengeräte sehen dieselben Schlafdaten.', settingsHintDisconnected: 'Verbinde ein weiteres Telefon per Einladungscode.', familyConnected: 'Familie verbunden',
     pendingOne: '1 Änderung wartet', pendingMany: (count: number) => `${count} Änderungen warten`,
+    conflictOne: '1 Änderung steht im Konflikt mit der Version eines anderen Telefons', conflictMany: (count: number) => `${count} Änderungen stehen im Konflikt mit der Version eines anderen Telefons`,
+    conflictTitle: 'Derselbe Schlaf wurde auf zwei Telefonen geändert.', conflictHelp: 'Wähle aus, welche Version bleiben soll. Keine wird ohne deine Entscheidung überschrieben.', keepLocal: 'Version dieses Telefons behalten', keepFamily: 'Familienversion behalten',
     offlineHint: 'Änderungen werden gespeichert und bei Internetverbindung übertragen.', syncIssue: 'Sync muss geprüft werden',
     lastSyncNow: 'Letzter Sync: gerade eben', lastSyncMinutes: (minutes: number) => `Letzter Sync: vor ${minutes} Min.`, lastSyncLongAgo: 'Letzter Sync: vor längerer Zeit',
     inviteNotFound: 'Einladungscode nicht gefunden. Prüfe den Code oder fordere einen neuen an.', inviteUsed: 'Dieser Einladungscode wurde bereits verwendet. Fordere einen neuen an.', inviteExpired: 'Dieser Einladungscode ist abgelaufen. Fordere einen neuen an.',
@@ -95,6 +101,7 @@ export default function FamilySyncLayer() {
   const [error, setError] = useState('')
   const [connected, setConnected] = useState(() => Boolean(getSyncStore().connection))
   const [pendingCount, setPendingCount] = useState(() => getSyncStore().pending.length)
+  const [conflictCount, setConflictCount] = useState(() => getSyncStore().conflicts.length)
   const [online, setOnline] = useState(() => navigator.onLine)
   const [lastSyncAt, setLastSyncAt] = useState(() => Number(localStorage.getItem(LAST_SYNC_KEY) || 0))
   const [syncIssue, setSyncIssue] = useState(false)
@@ -128,6 +135,7 @@ export default function FamilySyncLayer() {
     setLastSyncAt(now)
     setSyncIssue(false)
     setPendingCount(getSyncStore().pending.length)
+    setConflictCount(getSyncStore().conflicts.length)
   }
 
   useEffect(() => {
@@ -196,6 +204,7 @@ export default function FamilySyncLayer() {
       setConnected(Boolean(next))
       setConnectionName(next?.familyName || '')
       setPendingCount(store.pending.length)
+      setConflictCount(store.conflicts.length)
     }
     const onSaved = (event: Event) => {
       const detail = (event as CustomEvent<{ previous: AppData; next: AppData }>).detail
@@ -308,21 +317,24 @@ export default function FamilySyncLayer() {
     if (!familySyncAvailable) return text.locked
     if (!connected) return text.disconnected
     if (!online) return text.offline
+    if (conflictCount) return text.syncIssue
     if (pendingCount) return text.syncing
     if (syncIssue) return text.syncIssue
     return text.connected
-  }, [serverPaused, familySyncAvailable, connected, online, pendingCount, syncIssue, text])
+  }, [serverPaused, familySyncAvailable, connected, online, conflictCount, pendingCount, syncIssue, text])
 
   const detailHint = useMemo(() => {
     if (serverPaused) return text.pausedHint
     if (!familySyncAvailable) return text.lockedHint
     if (!connected) return text.settingsHintDisconnected
     if (!online) return text.offlineHint
+    if (conflictCount === 1) return text.conflictOne
+    if (conflictCount > 1) return text.conflictMany(conflictCount)
     if (pendingCount === 1) return text.pendingOne
     if (pendingCount > 1) return text.pendingMany(pendingCount)
     if (syncIssue) return text.syncIssue
     return lastSyncLabel || text.settingsHintConnected
-  }, [serverPaused, familySyncAvailable, connected, online, pendingCount, syncIssue, lastSyncLabel, text])
+  }, [serverPaused, familySyncAvailable, connected, online, conflictCount, pendingCount, syncIssue, lastSyncLabel, text])
 
   const handleCreate = async () => {
     if (!familyName.trim()) return
@@ -376,6 +388,19 @@ export default function FamilySyncLayer() {
     window.location.reload()
   }
 
+  const handleConflict = async (resolution: 'local' | 'family') => {
+    const conflict = getSyncStore().conflicts[0]
+    if (!conflict) return
+    setBusy(true); setError('')
+    try {
+      await resolveSyncConflict(conflict.operationId, resolution)
+      window.location.reload()
+    } catch (err) {
+      setError(friendlyError(err))
+      setBusy(false)
+    }
+  }
+
   const openPanel = () => { setOpen(true); setMode(inviteCode ? 'invite' : 'home'); setError('') }
 
   const settingsEntry = settingsTarget ? createPortal(
@@ -421,7 +446,12 @@ export default function FamilySyncLayer() {
           <button className="family-sync-primary" onClick={handleJoin} disabled={busy || !code.trim()}>{busy ? text.syncing : text.joinButton}</button>
           <button className="family-sync-link" onClick={() => setMode('home')} disabled={busy}>{text.cancel}</button>
         </div>}
-        {familySyncAvailable && mode === 'home' && connected && <div className="family-sync-content">
+        {familySyncAvailable && mode === 'home' && connected && conflictCount > 0 && <div className="family-sync-content">
+          <div className="family-sync-status-card"><span>!</span><div><strong>{text.conflictTitle}</strong><small>{text.conflictHelp}</small></div></div>
+          <button className="family-sync-primary" onClick={() => handleConflict('local')} disabled={busy}>{text.keepLocal}</button>
+          <button className="family-sync-secondary" onClick={() => handleConflict('family')} disabled={busy}>{text.keepFamily}</button>
+        </div>}
+        {familySyncAvailable && mode === 'home' && connected && conflictCount === 0 && <div className="family-sync-content">
           <div className="family-sync-status-card"><span>{online && !syncIssue ? '✓' : '↻'}</span><div><strong>{connectionName || text.connected}</strong><small>{detailHint}</small></div></div>
           <button className="family-sync-primary" onClick={handleInvite} disabled={busy || !online}>{busy ? text.syncing : text.newInvite}</button>
           <button className="family-sync-link danger" onClick={handleLeave} disabled={busy}>{text.leave}</button>

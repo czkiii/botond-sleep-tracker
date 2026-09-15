@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { flushPending, getSyncStore, isEmptyStarterData, makeOperations, mergeRemote, queueLocalChange } from './familySync'
+import { flushPending, getSyncStore, isEmptyStarterData, makeOperations, mergeRemote, pullRemote, queueLocalChange, resolveSyncConflict } from './familySync'
+import { STORAGE_KEY } from './storage'
 import type { AppData, ChildProfile, SleepSession } from './types'
 
 const at = '2026-08-26T10:00:00.000Z'
@@ -139,7 +140,7 @@ describe('Family Sync offline queue', () => {
   it('keeps queued changes when the server pauses Family Sync', async () => {
     const storage = new MemoryStorage()
     Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage })
-    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { onLine: true } })
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { onLine: true, language: 'hu-HU' } })
     Object.defineProperty(globalThis, 'window', { configurable: true, value: { dispatchEvent: vi.fn() } })
     storage.setItem('solemiSleep:sync:v1', JSON.stringify({
       connection: { familyId: 'family-1', familyName: 'Teszt', deviceId: 'device-1', deviceToken: 'token-1', revision: 1 },
@@ -154,5 +155,100 @@ describe('Family Sync offline queue', () => {
 
     expect(getSyncStore().pending).toHaveLength(1)
     expect(getSyncStore().pending[0].id).toBe('op-paused')
+  })
+
+  it('keeps a stale local edit and records an explicit server conflict', async () => {
+    const storage = new MemoryStorage()
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage })
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { onLine: true } })
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { dispatchEvent: vi.fn() } })
+    storage.setItem('solemiSleep:sync:v1', JSON.stringify({
+      connection: { familyId: 'family-1', familyName: 'Teszt', deviceId: 'device-1', deviceToken: 'token-1', revision: 4 },
+      pending: [{ id: 'op-conflict', method: 'PATCH', path: '/v1/sessions/sleep-a',
+        sessionId: 'sleep-a', body: { operationId: 'mut-conflict', baseRevision: 4, patch: { note: 'Helyi változat' } } }],
+      conflicts: []
+    }))
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      ok: false,
+      error: { code: 'SYNC_CONFLICT', message: 'This sleep changed on another device.' },
+      data: { conflict: { entityType: 'SESSION', entityId: 'sleep-a', baseRevision: 4,
+        serverRevision: 5, serverValue: { note: 'Másik telefon változata' } }
+      }
+    }), { status: 409, headers: { 'Content-Type': 'application/json' } }))
+    Object.defineProperty(globalThis, 'fetch', { configurable: true, value: fetchMock })
+
+    await pullRemote()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(getSyncStore().pending).toHaveLength(1)
+    expect(getSyncStore().conflicts).toEqual([{
+      operationId: 'op-conflict', entityType: 'SESSION', entityId: 'sleep-a',
+      baseRevision: 4, serverRevision: 5,
+      serverValue: { note: 'Másik telefon változata' }
+    }])
+  })
+
+  it('retries with the server revision only after choosing the local version', async () => {
+    const storage = new MemoryStorage()
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage })
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { onLine: true, language: 'hu-HU' } })
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { dispatchEvent: vi.fn() } })
+    storage.setItem('solemiSleep:sync:v1', JSON.stringify({
+      connection: { familyId: 'family-1', familyName: 'Teszt', deviceId: 'device-1', deviceToken: 'token-1', revision: 4 },
+      pending: [{ id: 'op-conflict', method: 'PATCH', path: '/v1/sessions/sleep-a',
+        sessionId: 'sleep-a', body: { operationId: 'mut-conflict', baseRevision: 4, patch: { note: 'Helyi változat' } } }],
+      conflicts: [{ operationId: 'op-conflict', entityType: 'SESSION', entityId: 'sleep-a',
+        baseRevision: 4, serverRevision: 5, serverValue: { id: 'sleep-a', childId: 'a',
+          startTime: at, endTime: '2026-08-26T11:00:00.000Z', note: 'Családi változat',
+          dayNightOverride: null, createdAt: at, updatedAt: at, deletedAt: null, revision: 5 } }]
+    }))
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, data: { revision: 6 } }), {
+        status: 200, headers: { 'Content-Type': 'application/json' }
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, data: {
+        revision: 6, familyName: 'Teszt', children: [], sessions: []
+      } }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    Object.defineProperty(globalThis, 'fetch', { configurable: true, value: fetchMock })
+
+    await resolveSyncConflict('op-conflict', 'local')
+
+    const sent = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
+    expect(sent.baseRevision).toBe(5)
+    expect(getSyncStore().pending).toEqual([])
+    expect(getSyncStore().conflicts).toEqual([])
+  })
+
+  it('discards local operations for that sleep after choosing the family version', async () => {
+    const storage = new MemoryStorage()
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage })
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { onLine: true } })
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { dispatchEvent: vi.fn() } })
+    storage.setItem(STORAGE_KEY, JSON.stringify(previous))
+    const serverValue = { id: 'sleep-a', childId: 'a', startTime: at,
+      endTime: '2026-08-26T11:00:00.000Z', note: 'Családi változat', dayNightOverride: null,
+      createdAt: at, updatedAt: at, deletedAt: null, revision: 5 }
+    storage.setItem('solemiSleep:sync:v1', JSON.stringify({
+      connection: { familyId: 'family-1', familyName: 'Teszt', deviceId: 'device-1', deviceToken: 'token-1', revision: 4 },
+      pending: [
+        { id: 'op-conflict', method: 'PATCH', path: '/v1/sessions/sleep-a', sessionId: 'sleep-a',
+          body: { operationId: 'mut-conflict', baseRevision: 4, patch: { note: 'Helyi változat' } } },
+        { id: 'op-later', method: 'PATCH', path: '/v1/sessions/sleep-a', sessionId: 'sleep-a',
+          body: { operationId: 'mut-later', baseRevision: 4, patch: { startTime: at } } }
+      ],
+      conflicts: [{ operationId: 'op-conflict', entityType: 'SESSION', entityId: 'sleep-a',
+        baseRevision: 4, serverRevision: 5, serverValue }]
+    }))
+    Object.defineProperty(globalThis, 'fetch', { configurable: true, value: vi.fn(async () =>
+      new Response(JSON.stringify({ ok: true, data: {
+        revision: 5, familyName: 'Teszt', children: [], sessions: []
+      } }), { status: 200, headers: { 'Content-Type': 'application/json' } })) })
+
+    await resolveSyncConflict('op-conflict', 'family')
+
+    expect(getSyncStore().pending).toEqual([])
+    expect(getSyncStore().conflicts).toEqual([])
+    expect(JSON.parse(storage.getItem(STORAGE_KEY)!).sessions.find((item: SleepSession) => item.id === 'sleep-a').note)
+      .toBe('Családi változat')
   })
 })

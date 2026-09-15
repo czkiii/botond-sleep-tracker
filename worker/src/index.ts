@@ -11,6 +11,7 @@ interface Env {
   ACCOUNT_FAMILY_BRIDGE?: string
   ENTITLEMENT_ENFORCEMENT?: string
   ENTITLEMENT_TEST_MODE?: string
+  RECONCILIATION_CONFLICTS?: string
 }
 
 type DeviceAuth = {
@@ -279,6 +280,62 @@ async function existingOperation(env: Env, operationId: string, auth: DeviceAuth
 
 function operationIdFrom(body: Record<string, unknown>) {
   return requireString(body.operationId, 'operationId', 100)
+}
+
+function baseRevisionFrom(body: Record<string, unknown>, env: Env) {
+  if (env.RECONCILIATION_CONFLICTS !== 'true') return null
+  const value = body.baseRevision
+  if (!Number.isInteger(value) || (value as number) < 0) {
+    throw new ApiError(400, 'INVALID_BASE_REVISION', 'A non-negative baseRevision is required.')
+  }
+  return value as number
+}
+
+function requireCurrentSessionVersion(env: Env, body: Record<string, unknown>, current: SessionRow) {
+  const baseRevision = baseRevisionFrom(body, env)
+  if (baseRevision !== null && current.revision > baseRevision) {
+    throw new ApiError(409, 'SYNC_CONFLICT', 'This sleep changed on another device.', {
+      conflict: {
+        entityType: 'SESSION',
+        entityId: current.id,
+        baseRevision,
+        serverRevision: current.revision,
+        serverValue: sessionDto(current)
+      }
+    })
+  }
+  return baseRevision
+}
+
+function insertSessionOperation(
+  env: Env, auth: DeviceAuth, operationId: string, operationType: string,
+  at: string, sessionId: string, baseRevision: number | null
+) {
+  if (baseRevision === null) {
+    return env.DB.prepare('INSERT INTO operations (id, family_id, device_id, operation_type, created_at) VALUES (?, ?, ?, ?, ?)')
+      .bind(operationId, auth.familyId, auth.deviceId, operationType, at)
+  }
+  return env.DB.prepare(`INSERT INTO operations (id, family_id, device_id, operation_type, created_at)
+    SELECT ?, ?, ?, ?, ? WHERE EXISTS (
+      SELECT 1 FROM sleep_sessions
+      WHERE id = ? AND family_id = ? AND revision <= ?
+    )`).bind(operationId, auth.familyId, auth.deviceId, operationType, at,
+      sessionId, auth.familyId, baseRevision)
+}
+
+function advanceFamilyForOperation(env: Env, auth: DeviceAuth, operationId: string) {
+  return env.DB.prepare(`UPDATE families SET revision = revision + 1
+    WHERE id = ? AND EXISTS (SELECT 1 FROM operations WHERE id = ? AND family_id = ?)`)
+    .bind(auth.familyId, operationId, auth.familyId)
+}
+
+async function throwLatestSessionConflict(
+  env: Env, auth: DeviceAuth, body: Record<string, unknown>, sessionId: string
+) {
+  const latest = await getSession(env, auth.familyId, sessionId)
+  if (!latest) throw new ApiError(404, 'SESSION_NOT_FOUND')
+  requireCurrentSessionVersion(env, body, latest)
+  throw new ApiError(409, 'SYNC_CONFLICT', 'The sleep changed while saving.')
 }
 
 async function currentRevision(env: Env, familyId: string) {
@@ -646,6 +703,12 @@ async function endSleep(request: Request, env: Env, auth: DeviceAuth, sessionId:
 
   const existing = await getSession(env, auth.familyId, sessionId)
   if (!existing) throw new ApiError(404, 'SESSION_NOT_FOUND')
+
+  if (await existingOperation(env, operationId, auth, 'END_SLEEP')) {
+    const current = await getSession(env, auth.familyId, sessionId)
+    return ok(request, env, { revision: await currentRevision(env, auth.familyId), session: current ? sessionDto(current) : null, idempotent: true })
+  }
+  const baseRevision = requireCurrentSessionVersion(env, body, existing)
   if (existing.deleted_at) throw new ApiError(409, 'SESSION_DELETED')
   if (existing.end_time) return ok(request, env, {
     revision: await currentRevision(env, auth.familyId),
@@ -655,22 +718,20 @@ async function endSleep(request: Request, env: Env, auth: DeviceAuth, sessionId:
   if (Date.parse(endTime) <= Date.parse(existing.start_time)) throw new ApiError(400, 'INVALID_TIME_RANGE')
   if (Date.parse(endTime) > Date.now() + 60_000) throw new ApiError(400, 'FUTURE_TIME')
 
-  if (await existingOperation(env, operationId, auth, 'END_SLEEP')) {
-    const current = await getSession(env, auth.familyId, sessionId)
-    return ok(request, env, { revision: await currentRevision(env, auth.familyId), session: current ? sessionDto(current) : null, idempotent: true })
-  }
-
   const at = nowIso()
-  await env.DB.batch([
-    env.DB.prepare('INSERT INTO operations (id, family_id, device_id, operation_type, created_at) VALUES (?, ?, ?, ?, ?)')
-      .bind(operationId, auth.familyId, auth.deviceId, 'END_SLEEP', at),
-    env.DB.prepare('UPDATE families SET revision = revision + 1 WHERE id = ?').bind(auth.familyId),
+  const results = await env.DB.batch([
+    insertSessionOperation(env, auth, operationId, 'END_SLEEP', at, sessionId, baseRevision),
+    advanceFamilyForOperation(env, auth, operationId),
     env.DB.prepare(
       `UPDATE sleep_sessions
        SET end_time = ?, updated_at = ?, revision = (SELECT revision FROM families WHERE id = ?)
-       WHERE id = ? AND family_id = ? AND end_time IS NULL AND deleted_at IS NULL`
-    ).bind(endTime, at, auth.familyId, sessionId, auth.familyId)
+       WHERE id = ? AND family_id = ? AND end_time IS NULL AND deleted_at IS NULL
+         AND EXISTS (SELECT 1 FROM operations WHERE id = ? AND family_id = ?)`
+    ).bind(endTime, at, auth.familyId, sessionId, auth.familyId, operationId, auth.familyId)
   ])
+  if (baseRevision !== null && results[0].meta.changes !== 1) {
+    await throwLatestSessionConflict(env, auth, body, sessionId)
+  }
 
   const current = await getSession(env, auth.familyId, sessionId)
   if (!current) throw new ApiError(404, 'SESSION_NOT_FOUND')
@@ -689,7 +750,14 @@ async function patchSleep(request: Request, env: Env, auth: DeviceAuth, sessionI
 
   const current = await getSession(env, auth.familyId, sessionId)
   if (!current) throw new ApiError(404, 'SESSION_NOT_FOUND')
+
+  if (await existingOperation(env, operationId, auth, 'PATCH_SLEEP')) {
+    const existing = await getSession(env, auth.familyId, sessionId)
+    return ok(request, env, { revision: await currentRevision(env, auth.familyId), session: existing ? sessionDto(existing) : null, idempotent: true })
+  }
+  const baseRevision = requireCurrentSessionVersion(env, body, current)
   if (current.deleted_at) throw new ApiError(409, 'SESSION_DELETED')
+
   if (current.end_time === null && 'endTime' in patch) throw new ApiError(409, 'INVALID_SESSION_STATE', 'Use the end endpoint for an active sleep.')
 
   const nextStart = 'startTime' in patch ? patch.startTime : current.start_time
@@ -701,11 +769,6 @@ async function patchSleep(request: Request, env: Env, auth: DeviceAuth, sessionI
   if ('note' in patch && typeof patch.note !== 'string') throw new ApiError(400, 'INVALID_REQUEST', 'Invalid note.')
   if ('dayNightOverride' in patch && patch.dayNightOverride !== null && patch.dayNightOverride !== 'day' && patch.dayNightOverride !== 'night') throw new ApiError(400, 'INVALID_REQUEST', 'Invalid dayNightOverride.')
 
-  if (await existingOperation(env, operationId, auth, 'PATCH_SLEEP')) {
-    const existing = await getSession(env, auth.familyId, sessionId)
-    return ok(request, env, { revision: await currentRevision(env, auth.familyId), session: existing ? sessionDto(existing) : null, idempotent: true })
-  }
-
   const assignments: string[] = []
   const params: unknown[] = []
   if ('startTime' in patch) { assignments.push('start_time = ?'); params.push(nextStart) }
@@ -715,17 +778,20 @@ async function patchSleep(request: Request, env: Env, auth: DeviceAuth, sessionI
   const at = nowIso()
   assignments.push('updated_at = ?'); params.push(at)
   assignments.push('revision = (SELECT revision FROM families WHERE id = ?)'); params.push(auth.familyId)
-  params.push(sessionId, auth.familyId)
+  params.push(sessionId, auth.familyId, operationId, auth.familyId)
 
-  await env.DB.batch([
-    env.DB.prepare('INSERT INTO operations (id, family_id, device_id, operation_type, created_at) VALUES (?, ?, ?, ?, ?)')
-      .bind(operationId, auth.familyId, auth.deviceId, 'PATCH_SLEEP', at),
-    env.DB.prepare('UPDATE families SET revision = revision + 1 WHERE id = ?').bind(auth.familyId),
+  const results = await env.DB.batch([
+    insertSessionOperation(env, auth, operationId, 'PATCH_SLEEP', at, sessionId, baseRevision),
+    advanceFamilyForOperation(env, auth, operationId),
     env.DB.prepare(
       `UPDATE sleep_sessions SET ${assignments.join(', ')}
-       WHERE id = ? AND family_id = ? AND deleted_at IS NULL`
+       WHERE id = ? AND family_id = ? AND deleted_at IS NULL
+         AND EXISTS (SELECT 1 FROM operations WHERE id = ? AND family_id = ?)`
     ).bind(...params as D1PreparedStatementParameters)
   ])
+  if (baseRevision !== null && results[0].meta.changes !== 1) {
+    await throwLatestSessionConflict(env, auth, body, sessionId)
+  }
 
   const updated = await getSession(env, auth.familyId, sessionId)
   if (!updated || updated.deleted_at) throw new ApiError(409, 'SESSION_DELETED')
@@ -737,24 +803,28 @@ async function deleteSleep(request: Request, env: Env, auth: DeviceAuth, session
   const operationId = operationIdFrom(body)
   const current = await getSession(env, auth.familyId, sessionId)
   if (!current) throw new ApiError(404, 'SESSION_NOT_FOUND')
-  if (current.deleted_at) return ok(request, env, { revision: await currentRevision(env, auth.familyId), session: sessionDto(current), alreadyDeleted: true })
 
   if (await existingOperation(env, operationId, auth, 'DELETE_SLEEP')) {
     const existing = await getSession(env, auth.familyId, sessionId)
     return ok(request, env, { revision: await currentRevision(env, auth.familyId), session: existing ? sessionDto(existing) : null, idempotent: true })
   }
+  const baseRevision = requireCurrentSessionVersion(env, body, current)
+  if (current.deleted_at) return ok(request, env, { revision: await currentRevision(env, auth.familyId), session: sessionDto(current), alreadyDeleted: true })
 
   const at = nowIso()
-  await env.DB.batch([
-    env.DB.prepare('INSERT INTO operations (id, family_id, device_id, operation_type, created_at) VALUES (?, ?, ?, ?, ?)')
-      .bind(operationId, auth.familyId, auth.deviceId, 'DELETE_SLEEP', at),
-    env.DB.prepare('UPDATE families SET revision = revision + 1 WHERE id = ?').bind(auth.familyId),
+  const results = await env.DB.batch([
+    insertSessionOperation(env, auth, operationId, 'DELETE_SLEEP', at, sessionId, baseRevision),
+    advanceFamilyForOperation(env, auth, operationId),
     env.DB.prepare(
       `UPDATE sleep_sessions
        SET deleted_at = ?, updated_at = ?, revision = (SELECT revision FROM families WHERE id = ?)
-       WHERE id = ? AND family_id = ? AND deleted_at IS NULL`
-    ).bind(at, at, auth.familyId, sessionId, auth.familyId)
+       WHERE id = ? AND family_id = ? AND deleted_at IS NULL
+         AND EXISTS (SELECT 1 FROM operations WHERE id = ? AND family_id = ?)`
+    ).bind(at, at, auth.familyId, sessionId, auth.familyId, operationId, auth.familyId)
   ])
+  if (baseRevision !== null && results[0].meta.changes !== 1) {
+    await throwLatestSessionConflict(env, auth, body, sessionId)
+  }
 
   const deleted = await getSession(env, auth.familyId, sessionId)
   if (!deleted) throw new ApiError(404, 'SESSION_NOT_FOUND')

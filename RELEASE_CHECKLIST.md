@@ -116,7 +116,10 @@ A fejlesztés ugyanabban a repóban és ugyanazon a fő alkalmazáson folytatód
 - [x] Szerveroldali Family Sync gate automatizált tesztje: Family+ fizető + Free tag aktív; az utolsó grant megszűnése pause-t ad és megőrzi a pending módosítást.
 - [x] Ugyanez valódi két Google-accounttal az új internal Pages buildben elfogadva: Family+ + Free sync, Free + Free pause, Family+ reaktiválás és pending flush sikeres.
 - [x] Kijelentkezés, helyi appadatok törlése és Google-belépés után a családi cloud adatok visszaállnak.
-- [ ] Pause alatt két eszközön létrejövő, ugyanazt a rekordot érintő módosítás explicit konfliktuskezelése.
+- [x] Pause alatt két eszközön ugyanazt az alvást érintő eltérő módosítás szerveroldali revision-conflictet ad, és egyik változatot sem írja felül csendben.
+- [x] Kliensoldali választás: ezen a telefonon lévő vagy családi alvásváltozat megtartása.
+- [x] Külön alvásokat érintő stale módosítások automatizált tesztje konfliktus nélkül sikeres.
+- [ ] Az alvásszintű konfliktusészlelés és mindkét feloldás valódi kéttelefonos staging elfogadása.
 
 ### Insights és adatminőség
 

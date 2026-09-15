@@ -10,7 +10,8 @@
     "GOOGLE_CLIENT_ID": "637253731977-hfds5vtk53nqlkc9vul67m78sckqpsc9.apps.googleusercontent.com",
     "ACCOUNT_FAMILY_BRIDGE": "true",
     "ENTITLEMENT_ENFORCEMENT": "true",
-    "ENTITLEMENT_TEST_MODE": "true"
+    "ENTITLEMENT_TEST_MODE": "true",
+    "RECONCILIATION_CONFLICTS": "true"
   },
   "d1_databases": [
     {

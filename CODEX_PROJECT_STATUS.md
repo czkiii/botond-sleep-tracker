@@ -169,9 +169,29 @@ visszatöltődtek. A személyes adat nélküli staging D1 összesítés egy akt�
 lejárt teszt-előfizetést, valamint egy aktív sync-jogosultságú accountos családot
 mutatott. Adatvesztést nem tapasztaltunk.
 
+Az aktuális, még nem commitolt reconciliation szelet minden kliensművelethez
+rögzíti a legutóbb látott szerverrevisiont. A staging Worker az alvás lezárása,
+szerkesztése és törlése előtt összeveti ezt az adott alvás aktuális
+revisionjével. Ha ugyanazt az alvást közben másik eszköz módosította,
+`SYNC_CONFLICT` választ és a szerver változatát adja vissza; eltérő alvás
+módosítása továbbra is automatikusan felmehet. Az ellenőrzés és az írás D1
+batchen belül is feltételes, ezért két közel egyszerre érkező mentés sem tudja
+észrevétlenül felülírni egymást vagy hibásan előreléptetni a family revisiont.
+
+A kliens konfliktusnál megtartja a helyi pending műveletet, nem húzza rá a
+szerver változatát, és a Családi megosztás panelen explicit választást kér:
+az ezen a telefonon lévő vagy a családi változat maradjon. A helyi változat
+választásakor a kliens csak a megismert friss szerverrevisionnel próbálkozik
+újra; a családi változat választásakor az adott alvás helyi pending műveleteit
+eldobja és a szerverpéldányt alkalmazza. HU / EN / DE szöveg elkészült.
+
+Teljes helyi ellenőrzés: frontend és Worker typecheck, 127/127 teszt, internal
+frontend build és staging Worker dry-run sikeres. Új D1-migráció nincs. A
+staging deploy a commit/push utáni azonos verziójú Pages- és Worker-buildre vár.
+
 ## Fő nyitott blokkok a `main` migráció előtt
 
-1. Pause alatti kétoldali módosítások biztonságos reconciliation protokollja és konfliktustesztje.
+1. Az alvásszintű reconciliation valódi kéttelefonos staging elfogadása.
 2. Az account/session eszközkezelő harmadik böngészős staging próbája.
 3. App Store / Google Play vásárlás-ellenőrzés és visszaállítás provider adapterei.
 4. Paywall és upgrade/downgrade folyamat.
@@ -182,11 +202,13 @@ mutatott. Adatvesztést nem tapasztaltunk.
 
 ## Következő konkrét feladat
 
-Implementáld a pause utáni `RECONCILIATION_REQUIRED` szerverállapotot és az
-operation manifest alapú egyeztetés első szeletét. Elsőként azt a konfliktust
-fedd le, amikor Free + Free szünet alatt két telefon ugyanazt az alvást eltérően
-módosítja. Egyik változat se írhassa felül csendben a másikat; az egyszerű,
-különálló pending módosítások továbbra is automatikusan szinkronizálódjanak.
+Commitold és pushold az alvásszintű konfliktuskezelési szeletet, majd várd meg a
+Pages és Workers Builds sikerét. Free + Free szünet alatt mindkét telefonon
+módosítsd ugyanannak a lezárt alvásnak a megjegyzését eltérően. Egyik accountot
+állítsd Family vagy Family+ csomagra. Az elsőként felküldött változat legyen a
+családi példány, a másik telefon pedig mutassa a két választási lehetőséget.
+Mindkét választást külön körben ellenőrizd. Ezután két különböző alvást
+módosítsatok szünet alatt; reaktiválás után mindkettő automatikusan jelenjen meg.
 
 ## Munkamegosztás
 

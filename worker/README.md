@@ -216,3 +216,18 @@ adapters exist. Both `ENTITLEMENT_TEST_MODE` and `ENTITLEMENT_ENFORCEMENT` are
 explicit staging flags; the manual endpoint is unavailable without the former.
 See `STAGING_ENTITLEMENT_MIGRATION_2026-09-15.md` for the staging migration and
 verification record.
+
+### Sleep reconciliation
+
+When `RECONCILIATION_CONFLICTS=true`, sleep end, patch and delete requests must
+include the family revision last seen by the client as `baseRevision`. A write
+is rejected with `409 SYNC_CONFLICT` when that same sleep has a newer revision;
+the response includes the current server value. A newer family revision caused
+only by another sleep does not block the write.
+
+The client persists the conflict beside its pending operation and does not pull
+the server value over the local edit. The user explicitly chooses the local or
+family version in the Family sharing panel. Choosing local retries against the
+reported server revision; choosing family removes pending operations for that
+sleep and applies the returned server value. The flag is currently enabled only
+in staging while the flow is under two-device acceptance testing.

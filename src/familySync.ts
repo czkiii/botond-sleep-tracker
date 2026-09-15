@@ -22,9 +22,19 @@ type PendingOperation = {
   childId?: string
 }
 
+export type SyncConflict = {
+  operationId: string
+  entityType: 'SESSION'
+  entityId: string
+  baseRevision: number
+  serverRevision: number
+  serverValue: RemoteSession
+}
+
 type SyncStore = {
   connection: SyncConnection | null
   pending: PendingOperation[]
+  conflicts: SyncConflict[]
 }
 
 type RemoteSession = Omit<SleepSession, 'childId' | 'dayNightOverride'> & {
@@ -47,7 +57,7 @@ type MutationResult = {
 
 type ApiEnvelope<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string }; data?: any }
 
-const defaultStore = (): SyncStore => ({ connection: null, pending: [] })
+const defaultStore = (): SyncStore => ({ connection: null, pending: [], conflicts: [] })
 
 function readStore(): SyncStore {
   try {
@@ -58,7 +68,12 @@ function readStore(): SyncStore {
     const connection = parsed.connection && typeof parsed.connection.deviceToken === 'string'
       ? { ...parsed.connection, familyName: typeof parsed.connection.familyName === 'string' ? parsed.connection.familyName : '' }
       : null
-    return { connection, pending: Array.isArray(parsed.pending) ? parsed.pending : [] }
+    const pending = Array.isArray(parsed.pending) ? parsed.pending.map((operation) => ({
+      ...operation,
+      body: { ...operation.body, baseRevision: Number.isInteger(operation.body?.baseRevision)
+        ? operation.body.baseRevision : (connection?.revision ?? 0) }
+    })) : []
+    return { connection, pending, conflicts: Array.isArray(parsed.conflicts) ? parsed.conflicts : [] }
   } catch {
     return defaultStore()
   }
@@ -183,7 +198,7 @@ export async function reconcileAccountFamily() {
     method: 'POST', body: JSON.stringify({ deviceName: accountDeviceName() })
   })
   if (!result.membership || !result.connection) return { claimed: false, connected: false, changed: false }
-  writeStore({ connection: result.connection, pending: [] })
+  writeStore({ connection: result.connection, pending: [], conflicts: [] })
   const changed = await pullRemote(true)
   return { claimed: false, connected: true, changed }
 }
@@ -212,7 +227,7 @@ export async function createFamily(familyName: string, deviceName: string) {
   })
   const connection: SyncConnection = { familyId: created.familyId, familyName: created.familyName, deviceId: created.device.id, deviceToken: created.deviceToken, revision: created.revision }
   const baseline = { ...local, children: primaryChild ? [primaryChild] : [], sessions: [] }
-  writeStore({ connection, pending: makeOperations(baseline, local) })
+  writeStore({ connection, pending: makeOperations(baseline, local, connection.revision), conflicts: [] })
   await flushPending()
   return createInvite()
 }
@@ -241,7 +256,7 @@ export async function joinFamily(code: string, deviceName: string) {
     connection = { familyId: joined.familyId, familyName: joined.familyName,
       deviceId: joined.device.id, deviceToken: joined.deviceToken, revision: 0 }
   }
-  writeStore({ connection, pending: [] })
+  writeStore({ connection, pending: [], conflicts: [] })
 
   // Merge the cloud family into the device without silently discarding an
   // existing local diary. A dedicated, confirmed import flow can resolve any
@@ -276,7 +291,7 @@ export async function leaveFamily() {
   writeStore(defaultStore())
 }
 
-export function makeOperations(previous: AppData, next: AppData): PendingOperation[] {
+export function makeOperations(previous: AppData, next: AppData, baseRevision = 0): PendingOperation[] {
   const beforeChildren = new Map(previous.children.map((child) => [child.id, child]))
   const afterChildren = new Map(next.children.map((child) => [child.id, child]))
   const removedChildIds = new Set(previous.children.filter((child) => !afterChildren.has(child.id)).map((child) => child.id))
@@ -347,13 +362,16 @@ export function makeOperations(previous: AppData, next: AppData): PendingOperati
   for (const session of previous.sessions) {
     if (!after.has(session.id) && !removedChildIds.has(session.childId)) operations.push({ id: opId('op_delete'), method: 'DELETE', path: `/v1/sessions/${encodeURIComponent(session.id)}`, sessionId: session.id, body: { operationId: opId('mut') } })
   }
-  return operations
+  return operations.map((operation) => ({
+    ...operation,
+    body: { ...operation.body, baseRevision }
+  }))
 }
 
 export function queueLocalChange(previous: AppData, next: AppData) {
   const store = readStore()
   if (!store.connection) return
-  const operations = makeOperations(previous, next)
+  const operations = makeOperations(previous, next, store.connection.revision)
   if (!operations.length) return
   writeStore({ ...store, pending: [...store.pending, ...operations] })
   void flushPending()
@@ -367,13 +385,17 @@ function removeLocalSession(sessionId?: string) {
 
 export async function flushPending() {
   let store = readStore()
-  if (!store.connection || !store.pending.length || !navigator.onLine) return false
+  if (!store.connection || !store.pending.length || store.conflicts.length || !navigator.onLine) return false
   let changedLocal = false
   while (store.connection && store.pending.length) {
     const operation = store.pending[0]
     try {
       const result = await request<MutationResult>(operation.path, { method: operation.method, body: JSON.stringify(operation.body) }, store.connection.deviceToken)
-      if (applyAuthoritativeSession(result?.session)) changedLocal = true
+      const resultRevision = result?.session?.revision ?? result?.child?.revision ?? result?.revision
+      const hasLaterSameEntity = store.pending.slice(1).some((item) =>
+        (operation.sessionId && item.sessionId === operation.sessionId)
+        || (operation.childId && item.childId === operation.childId))
+      if (!hasLaterSameEntity && applyAuthoritativeSession(result?.session)) changedLocal = true
       if (applyAuthoritativeChild(result?.child)) changedLocal = true
 
       store = readStore()
@@ -381,6 +403,14 @@ export async function flushPending() {
       // Mutation responses can have a newer family revision than this device has pulled.
       // Advancing the cursor here would skip intervening changes from another phone.
       store.pending = store.pending.filter((item) => item.id !== operation.id)
+      if (Number.isInteger(resultRevision)) {
+        store.pending = store.pending.map((item) => {
+          const sameEntity = (operation.sessionId && item.sessionId === operation.sessionId)
+            || (operation.childId && item.childId === operation.childId)
+          return sameEntity ? { ...item, body: { ...item.body, baseRevision: resultRevision } } : item
+        })
+      }
+      store.conflicts = store.conflicts.filter((item) => item.operationId !== operation.id)
       writeStore(store)
     } catch (error) {
       const apiError = error as Error & { code?: string; data?: any; status?: number }
@@ -394,6 +424,16 @@ export async function flushPending() {
         continue
       }
       if (apiError.code === 'FAMILY_SYNC_PAUSED' || apiError.code === 'RECONCILIATION_REQUIRED') break
+      if (apiError.code === 'SYNC_CONFLICT') {
+        const conflict = apiError.data?.conflict as Omit<SyncConflict, 'operationId'> | undefined
+        if (conflict) {
+          store = readStore()
+          store.conflicts = [...store.conflicts.filter((item) => item.operationId !== operation.id),
+            { ...conflict, operationId: operation.id }]
+          writeStore(store)
+        }
+        break
+      }
       if (apiError.status && apiError.status >= 400 && apiError.status < 500 && apiError.code !== 'INTERNAL_ERROR') {
         store = readStore()
         store.pending = store.pending.filter((item) => item.id !== operation.id)
@@ -406,12 +446,36 @@ export async function flushPending() {
   return changedLocal
 }
 
+export async function resolveSyncConflict(operationId: string, resolution: 'local' | 'family') {
+  let store = readStore()
+  const conflict = store.conflicts.find((item) => item.operationId === operationId)
+  const operation = store.pending.find((item) => item.id === operationId)
+  if (!store.connection || !conflict || !operation) return false
+
+  if (resolution === 'local') {
+    store.pending = store.pending.map((item) => item.id === operationId
+      ? { ...item, body: { ...item.body, baseRevision: conflict.serverRevision } }
+      : item)
+    store.conflicts = store.conflicts.filter((item) => item.operationId !== operationId)
+    writeStore(store)
+  } else {
+    store.pending = store.pending.filter((item) => item.sessionId !== conflict.entityId)
+    store.conflicts = store.conflicts.filter((item) => item.entityId !== conflict.entityId)
+    writeStore(store)
+    applyAuthoritativeSession(conflict.serverValue)
+  }
+
+  await flushPending()
+  if (readStore().conflicts.length) return false
+  return pullRemote()
+}
+
 export async function pullRemote(forceFromZero = false) {
   const store = readStore()
   if (!store.connection || !navigator.onLine) return false
   await flushPending()
   const fresh = readStore()
-  if (!fresh.connection) return false
+  if (!fresh.connection || fresh.conflicts.length) return false
   const after = forceFromZero ? 0 : fresh.connection.revision
   const result = await request<{ revision: number; familyName?: string; children?: RemoteChild[]; sessions: RemoteSession[] }>(`/v1/sync?after=${after}`, {}, fresh.connection.deviceToken)
   const latest = readStore()
