@@ -72,6 +72,10 @@ function writeStore(store: SyncStore) {
 async function request<T>(path: string, options: RequestInit = {}, token?: string): Promise<T> {
   const headers = new Headers(options.headers)
   if (options.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
+  if (token && import.meta.env.VITE_ACCOUNT_AUTH === 'true') {
+    headers.set('X-Solemi-Family-Token', token)
+    return accountRequest<T>(path, { ...options, headers })
+  }
   if (token) headers.set('Authorization', `Bearer ${token}`)
   const response = await fetch(`${API_BASE}${path}`, { ...options, headers, cache: 'no-store' })
   const payload = await response.json() as ApiEnvelope<T>
@@ -389,6 +393,7 @@ export async function flushPending() {
         await pullRemote(true)
         continue
       }
+      if (apiError.code === 'FAMILY_SYNC_PAUSED' || apiError.code === 'RECONCILIATION_REQUIRED') break
       if (apiError.status && apiError.status >= 400 && apiError.status < 500 && apiError.code !== 'INTERNAL_ERROR') {
         store = readStore()
         store.pending = store.pending.filter((item) => item.id !== operation.id)

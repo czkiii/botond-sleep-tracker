@@ -111,7 +111,10 @@ A fejlesztés ugyanabban a repóban és ugyanazon a fő alkalmazáson folytatód
 - [x] Account–legacy family additív staging D1 migráció teljes before/after exporttal, változatlan legacy hash-ekkel és tiszta idegenkulcs-ellenőrzéssel.
 - [x] Ugyanaz a Google-account a második saját böngészőben meghívókód nélkül visszakapja a már claimelt családot és annak adatait.
 - [ ] Friss második böngészőben a családi profil átvétele eltávolítja az érintetlen névtelen kezdőprofilt, de valódi helyi profilt nem töröl.
-- [ ] Külön családtag saját Google-accounttal, accountos meghívóbeváltással csatlakozik.
+- [x] Külön családtag saját Google-accounttal, accountos meghívóbeváltással csatlakozik.
+- [x] Additív subscription/entitlement staging migráció teljes before/after exporttal, változatlan legacy hash-ekkel és tiszta idegenkulcs-ellenőrzéssel.
+- [x] Szerveroldali Family Sync gate automatizált tesztje: Family+ fizető + Free tag aktív; az utolsó grant megszűnése pause-t ad és megőrzi a pending módosítást.
+- [ ] Ugyanez valódi két Google-accounttal az új internal Pages buildben elfogadva.
 
 ### Insights és adatminőség
 
@@ -148,7 +151,8 @@ Nem minden tervezett Insights-funkció szükséges az első belső RC-hez. Kül�
 - [x] Az `a43d936` commit GitHub CI és internal preview buildje sikeres (2026-09-13).
 - [x] A csomagnézet kártyazárolásának telefonos vizuális elfogadása a felhasználó visszajelzése alapján (2026-09-13; a telefonos build SHA nincs külön rögzítve).
 - [x] Internal Free nézetben a Family Sync zárolási előnézete, Family-előfizetéses magyarázata és hálózati leállítása elkészült (helyi, még nem publikált módosítás).
-- [ ] A családlétrehozás/tagság és a fizetős aktív szinkron valódi szerveroldali szétválasztása az account/entitlement implementációban.
+- [x] A családtagság és a fizetős aktív szinkron szerveroldali szétválasztása staging `MANUAL` entitlement forrással.
+- [ ] Apple és Google Play provider által hitelesített subscription események bekötése ugyanebbe az entitlement modellbe.
 
 **Javasolt első kiadási minimum:** Child Profile V4 + stabil Family Sync + wake window V1 + átlátható adatminőség. Prediction csak akkor legyen blokkoló, ha megfelelő saját tesztadat és érthető bizonytalansági kommunikáció áll rendelkezésre.
 

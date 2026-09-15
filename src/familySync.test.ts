@@ -135,4 +135,24 @@ describe('Family Sync offline queue', () => {
     expect(operations[0]).toMatchObject({ method: 'PATCH', path: '/v1/sessions/sleep-a', sessionId: 'sleep-a' })
     expect(JSON.stringify(operations[0])).not.toContain('sleep-b')
   })
+
+  it('keeps queued changes when the server pauses Family Sync', async () => {
+    const storage = new MemoryStorage()
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage })
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { onLine: true } })
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { dispatchEvent: vi.fn() } })
+    storage.setItem('solemiSleep:sync:v1', JSON.stringify({
+      connection: { familyId: 'family-1', familyName: 'Teszt', deviceId: 'device-1', deviceToken: 'token-1', revision: 1 },
+      pending: [{ id: 'op-paused', method: 'PATCH', path: '/v1/sessions/sleep-a',
+        sessionId: 'sleep-a', body: { operationId: 'mut-paused', patch: { note: 'Megőrzendő' } } }]
+    }))
+    Object.defineProperty(globalThis, 'fetch', { configurable: true, value: vi.fn(async () => new Response(JSON.stringify({
+      ok: false, error: { code: 'FAMILY_SYNC_PAUSED', message: 'Family Sync is paused.' }
+    }), { status: 403, headers: { 'Content-Type': 'application/json' } })) })
+
+    await flushPending()
+
+    expect(getSyncStore().pending).toHaveLength(1)
+    expect(getSyncStore().pending[0].id).toBe('op-paused')
+  })
 })

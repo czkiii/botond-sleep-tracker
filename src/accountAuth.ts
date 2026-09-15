@@ -9,6 +9,11 @@ export const ACCOUNT_STATE_EVENT = 'solemi-account-state'
 
 export type SignedInAccount = { id: string; email: string | null; name: string | null }
 export type AccountDevice = { id: string; name: string | null; platform: 'WEB' | 'IOS' | 'ANDROID' | 'OTHER' | null; last_seen_at: number }
+export type AccountAccessState = {
+  features: Array<'FAMILY_SYNC' | 'PDF_EXPORT' | 'FAMILY_PLUS_INSIGHTS'>
+  membership: null | { familyId: string; role: 'ADMIN' | 'MEMBER' }
+  familySync: { status: 'NO_ACTIVE_MEMBERSHIP' | 'ACTIVE' | 'PAUSED'; canSync: boolean; familyId?: string }
+}
 type AccessResponse = { account: SignedInAccount; deviceId: string; sessionId?: string;
   accessToken: string; accessExpiresAt: number; expiresAt: number }
 type ApiEnvelope<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string }; data?: unknown }
@@ -140,6 +145,16 @@ export async function accountRequest<T>(path: string, options: RequestInit = {})
   headers.set('Authorization', `Bearer ${access.accessToken}`)
   if (options.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
   return request<T>(path, { ...options, headers })
+}
+
+export function getAccountAccess() {
+  return accountRequest<AccountAccessState>('/v1/auth/access')
+}
+
+export function setInternalTestPlan(plan: 'free' | 'family' | 'familyPlus') {
+  return accountRequest<AccountAccessState>('/v1/auth/test/plan', {
+    method: 'POST', body: JSON.stringify({ plan })
+  })
 }
 
 export function accountDeviceName() { return browserDeviceName() }

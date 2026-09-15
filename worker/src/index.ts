@@ -1,4 +1,6 @@
 import { AuthError, AuthService, SESSION_MS } from './authService'
+import { EntitlementService } from './entitlementService'
+import type { TestPlan } from './entitlementService'
 
 interface Env {
   DB: D1Database
@@ -7,6 +9,8 @@ interface Env {
   GOOGLE_CLIENT_ID?: string
   AUTH_SECRET?: string
   ACCOUNT_FAMILY_BRIDGE?: string
+  ENTITLEMENT_ENFORCEMENT?: string
+  ENTITLEMENT_TEST_MODE?: string
 }
 
 type DeviceAuth = {
@@ -76,7 +80,7 @@ function corsHeaders(request: Request, env: Env) {
   if (origin && allowed.includes(origin)) {
     headers.set('Access-Control-Allow-Origin', origin)
     headers.set('Access-Control-Allow-Credentials', 'true')
-    headers.set('Access-Control-Allow-Headers', 'Authorization, Content-Type')
+    headers.set('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Solemi-Family-Token')
     headers.set('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS')
     headers.set('Access-Control-Max-Age', '86400')
   }
@@ -225,7 +229,8 @@ async function requireActiveChild(env: Env, familyId: string, childId: string) {
 }
 
 async function authenticate(request: Request, env: Env): Promise<DeviceAuth> {
-  const authorization = request.headers.get('Authorization')
+  const familyToken = request.headers.get('X-Solemi-Family-Token')
+  const authorization = familyToken ? `Bearer ${familyToken}` : request.headers.get('Authorization')
   if (!authorization?.startsWith('Bearer ')) throw new ApiError(401, 'INVALID_DEVICE_TOKEN', 'Device token required.')
 
   const token = authorization.slice(7).trim()
@@ -798,6 +803,28 @@ function requireAccountFamilyBridge(env: Env) {
 
 type AccountAccess = Awaited<ReturnType<AuthService['authenticate']>>
 
+function entitlementService(env: Env) {
+  return new EntitlementService(env.DB)
+}
+
+async function requireFamilySyncEntitlement(request: Request, env: Env, auth: DeviceAuth) {
+  if (env.ENTITLEMENT_ENFORCEMENT !== 'true') return
+  const service = entitlementService(env)
+  // Families without an account membership remain accessible during the
+  // legacy transition. Once claimed, the server becomes the authority.
+  if (!await service.familyHasAccountMembers(auth.familyId)) return
+  if (!request.headers.get('X-Solemi-Family-Token')) throw new ApiError(401, 'SESSION_INVALID')
+  const access = await accountAuth(env).authenticate(accountBearer(request))
+  const mapping = await env.DB.prepare(`SELECT 1 AS linked FROM account_family_devices
+    WHERE account_device_id = ? AND account_id = ? AND family_id = ? AND legacy_device_id = ?`)
+    .bind(access.deviceId, access.account.id, auth.familyId, auth.deviceId)
+    .first<{ linked: number }>()
+  if (!mapping) throw new ApiError(403, 'FAMILY_MEMBERSHIP_REQUIRED')
+  if (!await service.familyCanSync(auth.familyId)) {
+    throw new ApiError(403, 'FAMILY_SYNC_PAUSED', 'Family Sync is paused.')
+  }
+}
+
 async function legacyFamilyByToken(env: Env, token: string) {
   const tokenHash = await hashSecret(token, env.TOKEN_PEPPER)
   return env.DB.prepare(`SELECT d.id AS device_id, d.family_id, d.revoked_at,
@@ -1026,6 +1053,21 @@ async function accountAuthRoute(request: Request, env: Env, path: string) {
     if (request.method === 'GET' && path === '/v1/auth/me') {
       return ok(request, env, await service.authenticate(accountBearer(request)))
     }
+    if (request.method === 'GET' && path === '/v1/auth/access') {
+      const access = await service.authenticate(accountBearer(request))
+      return ok(request, env, await entitlementService(env).accessState(access.account.id))
+    }
+    if (request.method === 'POST' && path === '/v1/auth/test/plan') {
+      requireAllowedAuthOrigin(request, env)
+      if (env.ENTITLEMENT_TEST_MODE !== 'true') throw new ApiError(404, 'NOT_FOUND')
+      const access = await service.authenticate(accountBearer(request))
+      const body = await readJson(request)
+      if (!['free', 'family', 'familyPlus'].includes(String(body.plan))) {
+        throw new ApiError(400, 'INVALID_REQUEST', 'Invalid plan.')
+      }
+      return ok(request, env, await entitlementService(env)
+        .setManualTestPlan(access.account.id, body.plan as TestPlan))
+    }
     if (request.method === 'POST' && path === '/v1/auth/family/claim') {
       requireAccountFamilyBridge(env)
       requireAllowedAuthOrigin(request, env)
@@ -1078,6 +1120,13 @@ async function route(request: Request, env: Env) {
   const auth = await authenticate(request, env)
 
   if (request.method === 'POST' && path === '/v1/invites') return createInvite(request, env, auth)
+  const isRawFamilyData = (request.method === 'GET' && path === '/v1/sync')
+    || (request.method === 'POST' && (path === '/v1/children' || path === '/v1/sessions' || path === '/v1/sessions/start'))
+    || (request.method === 'POST' && /^\/v1\/sessions\/[^/]+\/end$/.test(path))
+    || ((request.method === 'PATCH' || request.method === 'DELETE')
+      && (/^\/v1\/children\/[^/]+$/.test(path) || /^\/v1\/sessions\/[^/]+$/.test(path)))
+  if (isRawFamilyData) await requireFamilySyncEntitlement(request, env, auth)
+
   if (request.method === 'GET' && path === '/v1/sync') return sync(request, env, auth)
   if (request.method === 'GET' && path === '/v1/device') return getDevice(request, env, auth)
   if (request.method === 'POST' && path === '/v1/device/leave') return leaveDevice(request, env, auth)

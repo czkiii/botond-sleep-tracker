@@ -195,3 +195,24 @@ exports, foreign-key checks and full legacy content hashes. See
 client ID are configured, and the auth Worker version is deployed to staging.
 The internal account UI and real Google-account smoke test are still pending;
 follow the repository-root `GOOGLE_AUTH_SETUP.md`.
+
+## Subscription and entitlement enforcement
+
+`migrations/006_subscriptions_and_entitlements.sql` adds provider-neutral
+subscriptions, idempotent provider events and account feature grants. Family
+Sync access is derived at request time: one active member with a current
+`FAMILY_SYNC` grant enables raw sync for every active member of that family.
+`FAMILY_PLUS_INSIGHTS` remains personal to the entitled account.
+
+Claimed families require both a current Solemi account session and the family
+device token mapped to that account device. The internal client sends the
+family token in `X-Solemi-Family-Token`; the account access token remains the
+Authorization bearer. Families not yet claimed retain the legacy bearer flow
+only during the transition.
+
+Staging enables `/v1/auth/test/plan` with a `MANUAL` provider so Free, Family,
+Family+, expiry and reactivation can be tested before Apple and Google Play
+adapters exist. Both `ENTITLEMENT_TEST_MODE` and `ENTITLEMENT_ENFORCEMENT` are
+explicit staging flags; the manual endpoint is unavailable without the former.
+See `STAGING_ENTITLEMENT_MIGRATION_2026-09-15.md` for the staging migration and
+verification record.

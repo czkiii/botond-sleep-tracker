@@ -1,9 +1,9 @@
 # Solemi Sleep — Codex projektállapot
 
-**Utolsó frissítés:** 2026-09-14
+**Utolsó frissítés:** 2026-09-15
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
-**A munkamenet elején ellenőrzött fejlesztési HEAD:** `fee7a64` (`Remove empty profile after family sync and fix CI`)
+**A munkamenet elején ellenőrzött fejlesztési HEAD:** `3c42497` (`Add account-based family invitations`)
 
 Ez a fájl az új Codex-beszélgetések rövid belépési pontja. A pillanatnyi pontos commit mindig az a commit, amely ezt a fájlt tartalmazza; ellenőrzéshez futtasd a `git log -1 --oneline` parancsot.
 
@@ -132,21 +132,53 @@ Az aktuális, még nem commitolt accountos meghívóbeváltási szelet:
 - teljes helyi tesztcsomag: 120/120; frontend és Worker typecheck, internal build és Worker dry-run sikeres;
 - staging Worker verzió: `7835a861-a785-4c69-9c4d-5810352f1778`; a teljes legacy staging smoke teszt sikeres.
 
+A felhasználó és a felesége két külön Google-fiókkal sikeresen végigtesztelte az
+accountos meghívást és a kétirányú Family Syncet. A próba feltárta, hogy a régi
+internal csomagkapcsoló a Free családtag saját böngészőjében leállította a
+szinkront akkor is, amikor egy másik aktív tag Family+ nézetben volt.
+
+Az aktuális, még nem commitolt szerveroldali entitlement szelet:
+
+- a `006_subscriptions_and_entitlements.sql` providerfüggetlen `subscriptions`,
+  `subscription_events` és `account_entitlements` táblákat hoz létre Apple,
+  Google Play, Stripe és staging `MANUAL` forrás támogatásával;
+- a Worker a Family Syncet a család összes aktív tagjának érvényes grantjai
+  alapján engedélyezi, ezért Family/Family+ fizető + Free tag esetén mindketten
+  szinkronizálhatnak;
+- a Family+ Insights továbbra is csak a fizető account személyes joga;
+- claimelt család raw sync kérése account sessiont és az adott account-eszközhöz
+  rendelt családi kulcsot is igényel; kijelentkezett vagy eltérő account tiltott;
+- pause esetén a kliens nem törli a helyi pending módosításokat, és 15 másodpercenként,
+  illetve fókuszba visszatéréskor észleli egy másik családtag reaktiválását;
+- a `MANUAL` csomagváltás kizárólag stagingben engedélyezett; production
+  konfigurációhoz és adatbázishoz nem nyúltunk;
+- teljes helyi ellenőrzés: frontend és Worker typecheck, 123/123 teszt, internal
+  build és Worker dry-run sikeres;
+- a 006 staging D1 migráció teljes before/after exporttal, változatlan legacy
+  hash-ekkel és tiszta FK-ellenőrzéssel sikeres;
+- staging Worker verzió: `4ff4309f-537d-43e5-8a39-d64de6a83b0a`; a teljes
+  legacy staging smoke teszt sikeres.
+
 ## Fő nyitott blokkok a `main` migráció előtt
 
-1. Az accountos családtag-meghívás valódi két Google-fiókos böngészős elfogadása.
-2. A helyben elkészült account/session rendszer valódi Google-belépési staging próbája és eszközkezelő UI-ja.
-3. Szerveroldali entitlement-ellenőrzés.
-4. App Store / Google Play előfizetés és visszaállítás.
-5. Paywall és upgrade/downgrade folyamat.
-6. Reprodukálható frontend- és Worker-lockfájlok.
-7. Staging backup/restore és dokumentált rollback.
-8. Privacy Policy, adatmegőrzés/törlés és support folyamat.
-9. Production D1 mentés, V4 migráció, Worker deploy és csak ezután kontrollált `main` merge.
+1. Az új szerveroldali entitlement szelet valódi két-accountos staging elfogadása.
+2. Az account/session eszközkezelő harmadik böngészős staging próbája.
+3. App Store / Google Play vásárlás-ellenőrzés és visszaállítás provider adapterei.
+4. Paywall és upgrade/downgrade folyamat.
+5. Reprodukálható frontend- és Worker-lockfájlok.
+6. Staging backup/restore és dokumentált rollback.
+7. Privacy Policy, adatmegőrzés/törlés és support folyamat.
+8. Production D1 mentés, V4 migráció, Worker deploy és csak ezután kontrollált `main` merge.
 
 ## Következő konkrét feladat
 
-Commitold és pushold az accountos meghívóbeváltási szeletet. Az új internal buildben az admin account hozzon létre új meghívókódot; egy külön böngészőben egy másik Google-fiók lépjen be, majd váltsa be a kódot. Ellenőrizd, hogy a családi profilok és alvások megjelennek, újratöltés után megmaradnak, és ugyanaz a kód másodszor nem használható. Ezután következhet a valódi szerveroldali entitlement enforcement.
+Commitold és pushold a szerveroldali entitlement szeletet, majd várd meg az
+internal Pages buildet. Az egyik account legyen Family+, a másik Free. Mindkét
+böngészőben frissítsd az oldalt, és ellenőrizd a kétirányú syncet. Ezután az
+utolsó fizető accountot állítsd Free-re: a syncnek szünetelnie kell, a helyi
+módosításnak meg kell maradnia. Visszaállítás Familyre vagy Family+-ra után a
+másik böngésző legfeljebb 15 másodpercen belül vagy fókuszba visszatéréskor
+észlelje az újraaktiválást.
 
 ## Munkamegosztás
 

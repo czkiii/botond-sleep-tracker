@@ -1,6 +1,6 @@
 # Solemi Sleep — végleges account, membership, subscription és entitlement D1 architektúra
 
-Státusz: **ARCHITEKTÚRA LEZÁRVA — account/session és Google-auth alap helyben implementálva**
+Státusz: **ARCHITEKTÚRA LEZÁRVA — account/session, Google-auth és staging entitlement enforcement implementálva**
 
 Dátum: 2026-08-24
 Ellenőrzött GitHub-alap: `main` / `37d1728` (`Lock Free Family Family+ feature matrix`)
@@ -9,7 +9,7 @@ Ez a dokumentum a következő backend-implementáció normatív terve. Nem migr�
 
 Kapcsolódó lezárt döntések: `FEATURE_ENTITLEMENT_MATRIX.md`, `PRODUCT_DESIGN_LOCK.md`, `TECHNICAL_COLLISION_AUDIT.md`.
 
-### Implementációs állapot — 2026-09-14
+### Implementációs állapot — 2026-09-15
 
 A `worker/migrations/003_accounts_and_sessions.sql` az identity séma additív
 implementációja; a 002-es sorszámot már a Child Profile V4 migráció használja.
@@ -26,8 +26,13 @@ hivatkozhat. Az új szöveges elsődleges kulcsok explicit `NOT NULL` mezők.
 A helyi SQLite-tesztek ellenőrzik a legacy adatok/séma változatlanságát, a
 jogosultsági határokat és a tranzakciós visszaállást. A 003/004 staging D1
 migráció before/after exporttal és változatlan legacy hash-ekkel sikeres volt.
-Worker deploy és valódi Google-login próba még nem történt, mert a Google OAuth
-Web client ID még hiányzik.
+Az account/session, Google-login, accountos family claim/bootstrap és két külön
+Google-accountos meghívás staging próbája sikeres. A
+`006_subscriptions_and_entitlements.sql` implementálja a providerfüggetlen
+billing- és granttáblákat. A staging Worker a család összes aktív tagja alapján
+ellenőrzi a `FAMILY_SYNC` hozzáférést, miközben a személyes Family+ Insights
+jogosultságot account-szinten tartja. A staging `MANUAL` forrás a bolti
+életciklusokat szimulálja; valódi Apple/Google provider adapter még nincs.
 
 ## 1. Lezárt termékszabályok
 

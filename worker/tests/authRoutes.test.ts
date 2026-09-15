@@ -6,12 +6,14 @@ import { sqliteBinding } from './sqliteD1'
 import { SignJWT } from 'jose'
 
 const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8')
-const migrations = ['003_accounts_and_sessions.sql', '004_auth_challenges_and_refresh_history.sql', '005_family_memberships.sql']
+const migrations = ['003_accounts_and_sessions.sql', '004_auth_challenges_and_refresh_history.sql',
+  '005_family_memberships.sql', '006_subscriptions_and_entitlements.sql']
   .map((name) => readFileSync(new URL(`../migrations/${name}`, import.meta.url), 'utf8')).join('\n')
 const origin = 'https://solemi-sleep-internal.pages.dev'
 let sqlite: DatabaseSync
 let env: { DB: D1Database; TOKEN_PEPPER: string; ALLOWED_ORIGINS: string;
-  GOOGLE_CLIENT_ID?: string; AUTH_SECRET?: string; ACCOUNT_FAMILY_BRIDGE?: string }
+  GOOGLE_CLIENT_ID?: string; AUTH_SECRET?: string; ACCOUNT_FAMILY_BRIDGE?: string;
+  ENTITLEMENT_ENFORCEMENT?: string; ENTITLEMENT_TEST_MODE?: string }
 
 beforeEach(() => {
   sqlite = new DatabaseSync(':memory:')
@@ -206,5 +208,82 @@ describe('account auth routes', () => {
     expect(response.status).toBe(409)
     expect(await response.json()).toMatchObject({ error: { code: 'FAMILY_OWNER_ACCOUNT_REQUIRED' } })
     expect(sqlite.prepare('SELECT used_at FROM invite_codes').get()).toEqual({ used_at: null })
+  })
+
+  it('lets a Free member sync through a Family+ payer and pauses after the last grant ends', async () => {
+    env.ENTITLEMENT_ENFORCEMENT = 'true'
+    env.ENTITLEMENT_TEST_MODE = 'true'
+    const legacyToken = 'ss_dv_entitlement-owner-token'
+    const inviteCode = 'SOLEMI9'
+    await seedLegacyFamily(legacyToken)
+    const owner = await accountAccess('acc_owner', 'adev_owner', 'ent_owner')
+    expect((await fetch('/v1/auth/family/claim', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${owner}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyDeviceToken: legacyToken })
+    })).status).toBe(200)
+    await seedInvite(inviteCode)
+
+    const member = await accountAccess('acc_member', 'adev_member', 'ent_member')
+    const joined = await fetch('/v1/auth/family/join', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${member}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: inviteCode, deviceName: 'Chrome · Android' })
+    })
+    const joinedBody = await joined.json() as { data: { connection: { deviceToken: string } } }
+
+    const setPlan = (access: string, plan: 'free' | 'familyPlus') => fetch('/v1/auth/test/plan', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${access}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan })
+    })
+    expect((await setPlan(owner, 'familyPlus')).status).toBe(200)
+    const freeMember = await setPlan(member, 'free')
+    expect(freeMember.status).toBe(200)
+    expect(await freeMember.json()).toMatchObject({ data: {
+      features: [], familySync: { status: 'ACTIVE', canSync: true, familyId: 'fam_test' }
+    } })
+
+    const memberSync = await fetch('/v1/sync?after=0', {
+      headers: { Authorization: `Bearer ${member}`,
+        'X-Solemi-Family-Token': joinedBody.data.connection.deviceToken }
+    })
+    expect(memberSync.status).toBe(200)
+
+    const signedOutSync = await fetch('/v1/sync?after=0', {
+      headers: { Authorization: `Bearer ${joinedBody.data.connection.deviceToken}` }
+    })
+    expect(signedOutSync.status).toBe(401)
+    expect(await signedOutSync.json()).toMatchObject({ error: { code: 'SESSION_INVALID' } })
+
+    const mismatchedAccount = await fetch('/v1/sync?after=0', {
+      headers: { Authorization: `Bearer ${owner}`,
+        'X-Solemi-Family-Token': joinedBody.data.connection.deviceToken }
+    })
+    expect(mismatchedAccount.status).toBe(403)
+    expect(await mismatchedAccount.json()).toMatchObject({ error: { code: 'FAMILY_MEMBERSHIP_REQUIRED' } })
+
+    const ownerAccess = await fetch('/v1/auth/access', {
+      headers: { Authorization: `Bearer ${owner}` }
+    })
+    expect(await ownerAccess.json()).toMatchObject({ data: {
+      features: ['FAMILY_PLUS_INSIGHTS', 'FAMILY_SYNC', 'PDF_EXPORT'],
+      familySync: { status: 'ACTIVE', canSync: true }
+    } })
+
+    expect((await setPlan(owner, 'free')).status).toBe(200)
+    const paused = await fetch('/v1/sync?after=0', {
+      headers: { Authorization: `Bearer ${member}`,
+        'X-Solemi-Family-Token': joinedBody.data.connection.deviceToken }
+    })
+    expect(paused.status).toBe(403)
+    expect(await paused.json()).toMatchObject({ error: { code: 'FAMILY_SYNC_PAUSED' } })
+  })
+
+  it('does not expose the manual plan endpoint outside the staging test mode', async () => {
+    const access = await accountAccess('acc_owner', 'adev_owner', 'no_test_mode')
+    const response = await fetch('/v1/auth/test/plan', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${access}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan: 'familyPlus' })
+    })
+    expect(response.status).toBe(404)
+    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM subscriptions').get()).toEqual({ count: 0 })
   })
 })
