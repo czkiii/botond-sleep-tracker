@@ -62,6 +62,15 @@ async function seedLegacyFamily(token: string) {
     .run(await sha256(`${env.TOKEN_PEPPER}:${token}`), now, now)
 }
 
+async function seedInvite(code: string) {
+  const now = new Date()
+  sqlite.prepare(`INSERT INTO invite_codes
+    (code_hash, family_id, created_by_device_id, created_at, expires_at, used_at)
+    VALUES (?, 'fam_test', 'dev_legacy', ?, ?, NULL)`)
+    .run(await sha256(`${env.TOKEN_PEPPER}:${code}`), now.toISOString(),
+      new Date(now.getTime() + 30 * 60 * 1000).toISOString())
+}
+
 describe('account auth routes', () => {
   it('returns a stored one-use challenge and public client ID with credentialed CORS', async () => {
     const response = await fetch('/v1/auth/challenge', { headers: { Origin: origin } })
@@ -144,5 +153,58 @@ describe('account auth routes', () => {
     const rejected = await request(other)
     expect(rejected.status).toBe(409)
     expect(await rejected.json()).toMatchObject({ error: { code: 'ACCOUNT_INVITE_REQUIRED' } })
+  })
+
+  it('redeems an invite as a member account and returns a working family connection', async () => {
+    const legacyToken = 'ss_dv_existing-family-token'
+    const inviteCode = 'SOLEMI7'
+    await seedLegacyFamily(legacyToken)
+    const owner = await accountAccess('acc_owner', 'adev_owner', 'owner')
+    const claim = await fetch('/v1/auth/family/claim', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${owner}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyDeviceToken: legacyToken })
+    })
+    expect(claim.status).toBe(200)
+    await seedInvite(inviteCode)
+
+    const member = await accountAccess('acc_member', 'adev_member', 'member')
+    const joined = await fetch('/v1/auth/family/join', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${member}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: inviteCode, deviceName: 'Chrome · Android' })
+    })
+    expect(joined.status).toBe(201)
+    const body = await joined.json() as { data: { membership: { role: string }; connection: { deviceToken: string } } }
+    expect(body.data.membership.role).toBe('MEMBER')
+    expect(sqlite.prepare(`SELECT role, status FROM legacy_family_memberships
+      WHERE account_id = 'acc_member'`).get()).toEqual({ role: 'MEMBER', status: 'ACTIVE' })
+    expect(sqlite.prepare(`SELECT family_id FROM account_family_devices
+      WHERE account_device_id = 'adev_member'`).get()).toEqual({ family_id: 'fam_test' })
+
+    const sync = await fetch('/v1/sync?after=0', {
+      headers: { Authorization: `Bearer ${body.data.connection.deviceToken}` }
+    })
+    expect(sync.status).toBe(200)
+
+    const reused = await fetch('/v1/auth/family/join', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${member}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: inviteCode, deviceName: 'Chrome · Android' })
+    })
+    expect(reused.status).toBe(409)
+    expect(await reused.json()).toMatchObject({ error: { code: 'INVITE_ALREADY_USED' } })
+  })
+
+  it('requires the family creator to claim the family before an account invite can be redeemed', async () => {
+    const legacyToken = 'ss_dv_existing-family-token'
+    const inviteCode = 'SOLEMI8'
+    await seedLegacyFamily(legacyToken)
+    await seedInvite(inviteCode)
+    const member = await accountAccess('acc_member', 'adev_member', 'unclaimed')
+    const response = await fetch('/v1/auth/family/join', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${member}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: inviteCode, deviceName: 'Firefox · Windows' })
+    })
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({ error: { code: 'FAMILY_OWNER_ACCOUNT_REQUIRED' } })
+    expect(sqlite.prepare('SELECT used_at FROM invite_codes').get()).toEqual({ used_at: null })
   })
 })

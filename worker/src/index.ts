@@ -917,6 +917,84 @@ async function bootstrapAccountFamily(request: Request, env: Env, access: Accoun
   })
 }
 
+async function joinAccountFamily(request: Request, env: Env, access: AccountAccess) {
+  const body = await readJson(request)
+  const code = requireString(body.code, 'code', 20).toUpperCase().replace(/[^A-Z0-9]/g, '')
+  const deviceName = typeof body.deviceName === 'string' ? body.deviceName.trim().slice(0, 80) : null
+  const codeHash = await hashSecret(code, env.TOKEN_PEPPER)
+  const invite = await env.DB.prepare(`SELECT i.family_id, i.expires_at, i.used_at, f.name AS family_name
+    FROM invite_codes i JOIN families f ON f.id = i.family_id
+    WHERE i.code_hash = ?`).bind(codeHash).first<{
+      family_id: string; family_name: string; expires_at: string; used_at: string | null
+    }>()
+  if (!invite) throw new ApiError(404, 'INVITE_NOT_FOUND', 'Invite code not found.')
+  if (invite.used_at) throw new ApiError(409, 'INVITE_ALREADY_USED', 'Invite code has already been used.')
+  if (Date.parse(invite.expires_at) <= Date.now()) {
+    throw new ApiError(410, 'INVITE_EXPIRED', 'Invite code has expired.')
+  }
+
+  const existingMembership = await env.DB.prepare(`SELECT family_id FROM legacy_family_memberships
+    WHERE account_id = ? AND status = 'ACTIVE'`).bind(access.account.id)
+    .first<{ family_id: string }>()
+  if (existingMembership) {
+    throw new ApiError(409, existingMembership.family_id === invite.family_id
+      ? 'ACCOUNT_ALREADY_IN_FAMILY' : 'ACCOUNT_ALREADY_IN_OTHER_FAMILY')
+  }
+  const owner = await env.DB.prepare(`SELECT id FROM legacy_family_memberships
+    WHERE family_id = ? AND role = 'ADMIN' AND status = 'ACTIVE' LIMIT 1`)
+    .bind(invite.family_id).first<{ id: string }>()
+  if (!owner) throw new ApiError(409, 'FAMILY_OWNER_ACCOUNT_REQUIRED')
+
+  const membershipId = newId('mem')
+  const deviceId = newId('dev')
+  const token = randomToken()
+  const tokenHash = await hashSecret(token, env.TOKEN_PEPPER)
+  const now = Date.now()
+  const joinedAt = nowIso()
+  try {
+    const results = await env.DB.batch([
+      env.DB.prepare(`INSERT INTO legacy_family_memberships
+        (id, family_id, account_id, role, status, joined_at, ended_at)
+        SELECT ?, i.family_id, ?, 'MEMBER', 'ACTIVE', ?, NULL
+        FROM invite_codes i
+        WHERE i.code_hash = ? AND i.used_at IS NULL AND i.expires_at > ?`)
+        .bind(membershipId, access.account.id, now, codeHash, joinedAt),
+      env.DB.prepare(`INSERT INTO devices
+        (id, family_id, token_hash, name, created_at, last_seen_at, revoked_at)
+        SELECT ?, i.family_id, ?, ?, ?, ?, NULL
+        FROM invite_codes i
+        WHERE i.code_hash = ? AND i.used_at IS NULL AND i.expires_at > ?
+          AND EXISTS (SELECT 1 FROM legacy_family_memberships WHERE id = ?)`)
+        .bind(deviceId, tokenHash, deviceName, joinedAt, joinedAt, codeHash, joinedAt, membershipId),
+      env.DB.prepare(`INSERT INTO account_family_devices
+        (account_device_id, account_id, family_id, legacy_device_id, created_at, updated_at)
+        SELECT ?, ?, i.family_id, ?, ?, ? FROM invite_codes i
+        WHERE i.code_hash = ? AND i.used_at IS NULL AND i.expires_at > ?
+          AND EXISTS (SELECT 1 FROM devices WHERE id = ?)`)
+        .bind(access.deviceId, access.account.id, deviceId, now, now, codeHash, joinedAt, deviceId),
+      env.DB.prepare(`UPDATE invite_codes SET used_at = ?
+        WHERE code_hash = ? AND used_at IS NULL AND expires_at > ?
+          AND EXISTS (SELECT 1 FROM account_family_devices WHERE account_device_id = ?)`)
+        .bind(joinedAt, codeHash, joinedAt, access.deviceId)
+    ])
+    if (results[3].meta.changes !== 1) throw new ApiError(409, 'INVITE_ALREADY_USED')
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+      throw new ApiError(409, 'INVITE_ALREADY_USED')
+    }
+    throw error
+  }
+
+  const revision = await currentRevision(env, invite.family_id)
+  return ok(request, env, {
+    membership: { familyId: invite.family_id, familyName: invite.family_name, role: 'MEMBER' },
+    connection: { familyId: invite.family_id, familyName: invite.family_name,
+      deviceId, deviceToken: token, revision: 0 },
+    familyRevision: revision
+  }, 201)
+}
+
 async function accountAuthRoute(request: Request, env: Env, path: string) {
   const service = accountAuth(env)
   try {
@@ -959,6 +1037,12 @@ async function accountAuthRoute(request: Request, env: Env, path: string) {
       requireAllowedAuthOrigin(request, env)
       const access = await service.authenticate(accountBearer(request))
       return bootstrapAccountFamily(request, env, access)
+    }
+    if (request.method === 'POST' && path === '/v1/auth/family/join') {
+      requireAccountFamilyBridge(env)
+      requireAllowedAuthOrigin(request, env)
+      const access = await service.authenticate(accountBearer(request))
+      return joinAccountFamily(request, env, access)
     }
     if (request.method === 'POST' && path === '/v1/auth/logout') {
       requireAllowedAuthOrigin(request, env)

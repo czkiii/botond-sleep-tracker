@@ -95,6 +95,10 @@ export class AuthService {
       statements.push(
         this.db.prepare('UPDATE account_sessions SET revoked_at = ? WHERE account_id = ? AND device_id = ? AND revoked_at IS NULL')
           .bind(now, account.id, input.replaceDeviceId),
+        this.db.prepare(`UPDATE devices SET revoked_at = ? WHERE id IN (
+          SELECT legacy_device_id FROM account_family_devices
+          WHERE account_id = ? AND account_device_id = ?
+        ) AND revoked_at IS NULL`).bind(new Date(now).toISOString(), account.id, input.replaceDeviceId),
         this.db.prepare(`UPDATE account_devices SET revoked_at = ?, revoke_reason = 'USER_REPLACED'
           WHERE account_id = ? AND id = ? AND revoked_at IS NULL`).bind(now, account.id, input.replaceDeviceId)
       )

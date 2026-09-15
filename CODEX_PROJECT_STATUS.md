@@ -3,7 +3,7 @@
 **Utolsó frissítés:** 2026-09-14
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
-**A munkamenet elején ellenőrzött fejlesztési HEAD:** `6433608` (`Clarify family sharing and add device replacement`)
+**A munkamenet elején ellenőrzött fejlesztési HEAD:** `fee7a64` (`Remove empty profile after family sync and fix CI`)
 
 Ez a fájl az új Codex-beszélgetések rövid belépési pontja. A pillanatnyi pontos commit mindig az a commit, amely ezt a fájlt tartalmazza; ellenőrzéshez futtasd a `git log -1 --oneline` parancsot.
 
@@ -116,15 +116,25 @@ Az aktuális, még nem commitolt account–legacy family bridge szelet:
 
 A bridge a `807081f` commitban felkerült az internal Pages oldalra. A valós kétböngészős próba igazolta az account-eszköz választót és a családi adatok meghívókód nélküli átvitelét ugyanazzal a Google-fiókkal. Feltárt klienshiba: a friss Chrome automatikusan létrehozott, névtelen kezdőprofilja a családi profil mellett megmaradt.
 
-Az aktuális, még nem commitolt javítás a teljesen érintetlen, névtelen és alvásadat nélküli kezdőprofilt eltávolítja, amikor valódi családi profil érkezik. A már hibásan a családi profil mellett maradt üres kezdőprofilt a következő családi frissítés is kitakarítja. Elnevezett, kitöltött vagy alvásadattal rendelkező helyi profilt továbbra is megőriz. Három regressziós teszt fedi a friss, a már kialakult hibás és a megőrzendő helyi állapotot.
+A `fee7a64` javítás a teljesen érintetlen, névtelen és alvásadat nélküli kezdőprofilt eltávolítja, amikor valódi családi profil érkezik. A már hibásan a családi profil mellett maradt üres kezdőprofilt a következő családi frissítés is kitakarítja. Elnevezett, kitöltött vagy alvásadattal rendelkező helyi profilt továbbra is megőriz.
 
-A `807081f` GitHub frontend checkjeinek hibája külön CI-konfigurációs probléma volt: a gyökérből futó Vitest a Worker teszteket is betöltötte, de a frontend job nem telepítette a Worker `jose` függőségét. A CI és az internal preview workflow most ezt külön telepíti. Helyben 118/118 teszt, frontend és Worker typecheck, internal és normál frontend build sikeres.
+A `807081f` GitHub frontend checkjeinek hibája külön CI-konfigurációs probléma volt: a gyökérből futó Vitest a Worker teszteket is betöltötte, de a frontend job nem telepítette a Worker `jose` függőségét. A `fee7a64` CI és internal preview workflow ezt külön telepíti; mindkét GitHub frontend check és build sikeres.
 
-A Cloudflare Git-integráció `Workers Builds: solemi-sleep-sync-staging` checkje több korábbi commiton is elbukott, miközben a kézi staging build és deploy sikeres. A dashboard build-konfigurációját külön kell javítani: a root directory legyen `worker`, a staging deploy parancs pedig `npm run deploy:staging`. Ez nem blokkolta a sikeres Pages buildet vagy a kézzel deployolt staging Workert.
+A Cloudflare Git-integráció `Workers Builds: solemi-sleep-sync-staging` hibáját a dashboard build-konfigurációjának javítása lezárta: root directory `/worker`, build command üres, deploy command `npm run deploy:staging`, production branch `feat/child-profile-v4`. A `fee7a64` újrafuttatott Workers Builds checkje sikeres; a commit minden ellenőrzése zöld.
+
+Az aktuális, még nem commitolt accountos meghívóbeváltási szelet:
+
+- az internal accountos környezetben a meghívókódot csak bejelentkezett Google-account válthatja be;
+- a család létrehozójának előbb claimelnie kell a családot; a meghívott külön account `MEMBER` tagságot és saját családi eszközkulcsot kap;
+- a meghívókód egyszer használható, és másik account már meglévő aktív családtagsága blokkolja a csatlakozást;
+- a HU / EN / DE súgószöveg kimondja, hogy a másik családtag a saját Google-fiókjával lépjen be;
+- account-eszköz cseréjekor a lecserélt böngésző legacy családi kulcsa is visszavonódik;
+- teljes helyi tesztcsomag: 120/120; frontend és Worker typecheck, internal build és Worker dry-run sikeres;
+- staging Worker verzió: `7835a861-a785-4c69-9c4d-5810352f1778`; a teljes legacy staging smoke teszt sikeres.
 
 ## Fő nyitott blokkok a `main` migráció előtt
 
-1. Az accountos családtagság és a legacy Family Sync átmeneti összekötésének böngészős elfogadása, majd az accountos meghívóbeváltás elkészítése.
+1. Az accountos családtag-meghívás valódi két Google-fiókos böngészős elfogadása.
 2. A helyben elkészült account/session rendszer valódi Google-belépési staging próbája és eszközkezelő UI-ja.
 3. Szerveroldali entitlement-ellenőrzés.
 4. App Store / Google Play előfizetés és visszaállítás.
@@ -136,7 +146,7 @@ A Cloudflare Git-integráció `Workers Builds: solemi-sleep-sync-staging` checkj
 
 ## Következő konkrét feladat
 
-Commitold és pushold a névtelen kezdőprofil és a frontend CI javítását. Az új internal buildet egy friss böngészőprofilban ellenőrizd: ugyanazzal a Google-fiókkal a családi profil jelenjen meg, a névtelen kezdőprofil pedig ne maradjon mellette. Ezután állítsd helyre a staging Worker Git-buildjének `worker` root directory és `npm run deploy:staging` beállítását, majd következhet a külön családtag saját accountos meghívóbeváltása és a valódi entitlement enforcement.
+Commitold és pushold az accountos meghívóbeváltási szeletet. Az új internal buildben az admin account hozzon létre új meghívókódot; egy külön böngészőben egy másik Google-fiók lépjen be, majd váltsa be a kódot. Ellenőrizd, hogy a családi profilok és alvások megjelennek, újratöltés után megmaradnak, és ugyanaz a kód másodszor nem használható. Ezután következhet a valódi szerveroldali entitlement enforcement.
 
 ## Munkamegosztás
 

@@ -223,10 +223,20 @@ function applyAuthoritativeChild(child?: RemoteChild | null) {
 }
 
 export async function joinFamily(code: string, deviceName: string) {
-  const joined = await request<{ familyId: string; familyName: string; device: { id: string; name: string | null }; deviceToken: string; revision: number }>('/v1/join', {
-    method: 'POST', body: JSON.stringify({ code: code.trim().toUpperCase(), deviceName })
-  })
-  const connection: SyncConnection = { familyId: joined.familyId, familyName: joined.familyName, deviceId: joined.device.id, deviceToken: joined.deviceToken, revision: 0 }
+  const normalizedCode = code.trim().toUpperCase()
+  let connection: SyncConnection
+  if (import.meta.env.VITE_ACCOUNT_AUTH === 'true') {
+    const joined = await accountRequest<{ connection: SyncConnection }>('/v1/auth/family/join', {
+      method: 'POST', body: JSON.stringify({ code: normalizedCode, deviceName: accountDeviceName() })
+    })
+    connection = joined.connection
+  } else {
+    const joined = await request<{ familyId: string; familyName: string; device: { id: string; name: string | null }; deviceToken: string; revision: number }>('/v1/join', {
+      method: 'POST', body: JSON.stringify({ code: normalizedCode, deviceName })
+    })
+    connection = { familyId: joined.familyId, familyName: joined.familyName,
+      deviceId: joined.device.id, deviceToken: joined.deviceToken, revision: 0 }
+  }
   writeStore({ connection, pending: [] })
 
   // Merge the cloud family into the device without silently discarding an

@@ -27,7 +27,7 @@ const copy = {
     intro: 'Kapcsold össze a család telefonjait, hogy ugyanazokat az alvásadatokat lássátok.', create: 'Új család létrehozása', join: 'Csatlakozás kóddal',
     familyName: 'Család neve', familyNamePlaceholder: 'Pl. Kovács család', createButton: 'Család létrehozása',
     codePlaceholder: 'Meghívókód', joinButton: 'Csatlakozás', cancel: 'Mégse', close: 'Bezárás',
-    inviteTitle: 'Meghívókód', inviteHelp: 'Ezt a kódot írd be a másik telefonon. 30 percig érvényes.',
+    inviteTitle: 'Meghívókód', inviteHelp: 'A másik családtag lépjen be a saját Google-fiókjával, majd írja be ezt a kódot. 30 percig érvényes.',
     newInvite: 'Új meghívókód', copyCode: 'Kód másolása', copied: 'Másolva ✓', leave: 'Eszköz leválasztása',
     leaveConfirm: 'Leválasztod ezt a telefont a közös családi adatokról?', syncing: 'Adatok frissítése…', offline: 'Offline', error: 'Nem sikerült frissíteni a családi adatokat.',
     settingsHintConnected: 'A család eszközei ugyanazokat az alvásadatokat látják.', settingsHintDisconnected: 'Párosíts egy másik telefont meghívókóddal.', familyConnected: 'Család összekapcsolva',
@@ -35,7 +35,7 @@ const copy = {
     offlineHint: 'A módosításokat elmentjük, és internetkapcsolatnál elküldjük.', syncIssue: 'Szinkron ellenőrzése szükséges',
     lastSyncNow: 'Utolsó szinkron: most', lastSyncMinutes: (minutes: number) => `Utolsó szinkron: ${minutes} perce`, lastSyncLongAgo: 'Utolsó szinkron: régebben',
     inviteNotFound: 'A meghívókód nem található. Ellenőrizd a kódot, vagy kérj újat.', inviteUsed: 'Ezt a meghívókódot már felhasználták. Kérj egy új kódot.', inviteExpired: 'A meghívókód lejárt. Kérj egy új kódot.',
-    deviceRevoked: 'Ez a telefon már le lett választva a családról.', invalidToken: 'A készülék kapcsolata már nem érvényes. Párosítsd újra a telefont.', networkError: 'Nincs kapcsolat a Solemi Sleep szerverével. Próbáld újra később.',
+    deviceRevoked: 'Ez a telefon már le lett választva a családról.', invalidToken: 'A készülék kapcsolata már nem érvényes. Párosítsd újra a telefont.', accountRequired: 'A meghívókód használatához előbb lépj be a saját Google-fiókoddal.', ownerAccountRequired: 'A család létrehozójának előbb össze kell kapcsolnia a családot a Solemi-fiókjával.', alreadyInFamily: 'Ez a Google-fiók már egy családhoz tartozik.', networkError: 'Nincs kapcsolat a Solemi Sleep szerverével. Próbáld újra később.',
     locked: 'Zárolva', lockedHint: 'Ehhez a funkcióhoz Family előfizetés szükséges.', lockedDescription: 'A Family csomaggal összekapcsolhatod a család telefonjait, hogy ugyanazokat az alvásadatokat lássátok.'
   },
   en: {
@@ -43,7 +43,7 @@ const copy = {
     intro: 'Connect the family’s phones so everyone sees the same sleep data.', create: 'Create a new family', join: 'Join with a code',
     familyName: 'Family name', familyNamePlaceholder: 'e.g. Smith family', createButton: 'Create family',
     codePlaceholder: 'Invite code', joinButton: 'Join', cancel: 'Cancel', close: 'Close',
-    inviteTitle: 'Invite code', inviteHelp: 'Enter this code on the other phone. It is valid for 30 minutes.',
+    inviteTitle: 'Invite code', inviteHelp: 'The other family member should sign in with their own Google account, then enter this code. It is valid for 30 minutes.',
     newInvite: 'New invite code', copyCode: 'Copy code', copied: 'Copied ✓', leave: 'Disconnect this device',
     leaveConfirm: 'Disconnect this phone from the shared family data?', syncing: 'Updating family data…', offline: 'Offline', error: 'Could not update family data.',
     settingsHintConnected: 'Family devices see the same sleep data.', settingsHintDisconnected: 'Pair another phone with an invite code.', familyConnected: 'Family connected',
@@ -51,7 +51,7 @@ const copy = {
     offlineHint: 'Changes are saved and will be sent when the internet connection returns.', syncIssue: 'Sync needs attention',
     lastSyncNow: 'Last sync: now', lastSyncMinutes: (minutes: number) => `Last sync: ${minutes} min ago`, lastSyncLongAgo: 'Last sync: earlier',
     inviteNotFound: 'Invite code not found. Check the code or request a new one.', inviteUsed: 'This invite code has already been used. Request a new code.', inviteExpired: 'This invite code has expired. Request a new code.',
-    deviceRevoked: 'This phone has already been disconnected from the family.', invalidToken: 'This device connection is no longer valid. Pair the phone again.', networkError: 'Cannot reach the Solemi Sleep server. Try again later.',
+    deviceRevoked: 'This phone has already been disconnected from the family.', invalidToken: 'This device connection is no longer valid. Pair the phone again.', accountRequired: 'Sign in with your own Google account before using an invite code.', ownerAccountRequired: 'The family creator must connect the family to their Solemi account first.', alreadyInFamily: 'This Google account already belongs to a family.', networkError: 'Cannot reach the Solemi Sleep server. Try again later.',
     locked: 'Locked', lockedHint: 'A Family subscription is required for this feature.', lockedDescription: 'With the Family plan, you can connect the family’s phones so everyone sees the same sleep data.'
   },
   de: {
@@ -59,7 +59,7 @@ const copy = {
     intro: 'Verbinde die Telefone der Familie, damit alle dieselben Schlafdaten sehen.', create: 'Neue Familie erstellen', join: 'Mit Code beitreten',
     familyName: 'Familienname', familyNamePlaceholder: 'z. B. Familie Müller', createButton: 'Familie erstellen',
     codePlaceholder: 'Einladungscode', joinButton: 'Beitreten', cancel: 'Abbrechen', close: 'Schließen',
-    inviteTitle: 'Einladungscode', inviteHelp: 'Gib diesen Code auf dem anderen Telefon ein. Er ist 30 Minuten gültig.',
+    inviteTitle: 'Einladungscode', inviteHelp: 'Das andere Familienmitglied meldet sich mit dem eigenen Google-Konto an und gibt dann diesen Code ein. Er ist 30 Minuten gültig.',
     newInvite: 'Neuer Einladungscode', copyCode: 'Code kopieren', copied: 'Kopiert ✓', leave: 'Dieses Gerät trennen',
     leaveConfirm: 'Dieses Telefon von den gemeinsamen Familiendaten trennen?', syncing: 'Familiendaten werden aktualisiert…', offline: 'Offline', error: 'Familiendaten konnten nicht aktualisiert werden.',
     settingsHintConnected: 'Familiengeräte sehen dieselben Schlafdaten.', settingsHintDisconnected: 'Verbinde ein weiteres Telefon per Einladungscode.', familyConnected: 'Familie verbunden',
@@ -67,7 +67,7 @@ const copy = {
     offlineHint: 'Änderungen werden gespeichert und bei Internetverbindung übertragen.', syncIssue: 'Sync muss geprüft werden',
     lastSyncNow: 'Letzter Sync: gerade eben', lastSyncMinutes: (minutes: number) => `Letzter Sync: vor ${minutes} Min.`, lastSyncLongAgo: 'Letzter Sync: vor längerer Zeit',
     inviteNotFound: 'Einladungscode nicht gefunden. Prüfe den Code oder fordere einen neuen an.', inviteUsed: 'Dieser Einladungscode wurde bereits verwendet. Fordere einen neuen an.', inviteExpired: 'Dieser Einladungscode ist abgelaufen. Fordere einen neuen an.',
-    deviceRevoked: 'Dieses Telefon wurde bereits von der Familie getrennt.', invalidToken: 'Diese Geräteverbindung ist nicht mehr gültig. Kopple das Telefon erneut.', networkError: 'Der Solemi-Sleep-Server ist nicht erreichbar. Versuche es später erneut.',
+    deviceRevoked: 'Dieses Telefon wurde bereits von der Familie getrennt.', invalidToken: 'Diese Geräteverbindung ist nicht mehr gültig. Kopple das Telefon erneut.', accountRequired: 'Melde dich mit deinem eigenen Google-Konto an, bevor du einen Einladungscode verwendest.', ownerAccountRequired: 'Der Ersteller der Familie muss die Familie zuerst mit dem Solemi-Konto verbinden.', alreadyInFamily: 'Dieses Google-Konto gehört bereits zu einer Familie.', networkError: 'Der Solemi-Sleep-Server ist nicht erreichbar. Versuche es später erneut.',
     locked: 'Gesperrt', lockedHint: 'Für diese Funktion ist ein Family-Abo erforderlich.', lockedDescription: 'Mit dem Family-Abo kannst du die Telefone der Familie verbinden, damit alle dieselben Schlafdaten sehen.'
   }
 } as const
@@ -110,6 +110,9 @@ export default function FamilySyncLayer() {
     if (apiError?.code === 'INVITE_EXPIRED') return text.inviteExpired
     if (apiError?.code === 'DEVICE_REVOKED') return text.deviceRevoked
     if (apiError?.code === 'INVALID_DEVICE_TOKEN') return text.invalidToken
+    if (apiError?.code === 'SESSION_INVALID') return text.accountRequired
+    if (apiError?.code === 'FAMILY_OWNER_ACCOUNT_REQUIRED') return text.ownerAccountRequired
+    if (apiError?.code === 'ACCOUNT_ALREADY_IN_FAMILY' || apiError?.code === 'ACCOUNT_ALREADY_IN_OTHER_FAMILY') return text.alreadyInFamily
     if (!navigator.onLine || err instanceof TypeError) return text.networkError
     return text.error
   }

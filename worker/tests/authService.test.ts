@@ -6,7 +6,7 @@ import type { GoogleIdentity } from '../src/googleAuth'
 import { sqliteBinding } from './sqliteD1'
 
 const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8')
-const migrations = ['003_accounts_and_sessions.sql', '004_auth_challenges_and_refresh_history.sql']
+const migrations = ['003_accounts_and_sessions.sql', '004_auth_challenges_and_refresh_history.sql', '005_family_memberships.sql']
   .map((name) => readFileSync(new URL(`../migrations/${name}`, import.meta.url), 'utf8')).join('\n')
 const now = 1_800_000_000_000
 const config = { clientId: 'solemi.apps.googleusercontent.com', secret: 'test-secret-with-at-least-32-characters' }
@@ -70,12 +70,28 @@ describe('account authentication service', () => {
 
   it('atomically replaces a selected device after fresh Google proof', async () => {
     const first = await login('a'.repeat(64))
+    const createdAt = new Date(now).toISOString()
+    sqlite.prepare(`INSERT INTO families (id, name, revision, created_at)
+      VALUES ('fam_linked', 'Linked family', 0, ?)`).run(createdAt)
+    sqlite.prepare(`INSERT INTO devices (id, family_id, token_hash, name, created_at, last_seen_at, revoked_at)
+      VALUES ('legacy_first', 'fam_linked', 'legacy_hash', 'Old browser', ?, ?, NULL)`)
+      .run(createdAt, createdAt)
+    sqlite.prepare(`INSERT INTO legacy_family_memberships
+      (id, family_id, account_id, role, status, joined_at, ended_at)
+      VALUES ('mem_owner', 'fam_linked', ?, 'ADMIN', 'ACTIVE', ?, NULL)`)
+      .run(first.account.id, now)
+    sqlite.prepare(`INSERT INTO account_family_devices
+      (account_device_id, account_id, family_id, legacy_device_id, created_at, updated_at)
+      VALUES (?, ?, 'fam_linked', 'legacy_first', ?, ?)`)
+      .run(first.deviceId, first.account.id, now, now)
     await login('b'.repeat(64))
     const third = await login('c'.repeat(64), { replaceDeviceId: first.deviceId })
     expect(third.deviceId).not.toBe(first.deviceId)
     expect(sqlite.prepare('SELECT revoke_reason FROM account_devices WHERE id = ?').get(first.deviceId))
       .toEqual({ revoke_reason: 'USER_REPLACED' })
     expect(sqlite.prepare('SELECT count(*) AS n FROM account_devices WHERE revoked_at IS NULL').get()).toEqual({ n: 2 })
+    expect(sqlite.prepare(`SELECT revoked_at FROM devices WHERE id = 'legacy_first'`).get())
+      .toEqual({ revoked_at: new Date(now).toISOString() })
   })
 
   it('rotates refresh tokens and revokes the browser on reuse', async () => {
