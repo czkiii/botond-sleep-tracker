@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { flushPending, getSyncStore, makeOperations, mergeRemote, queueLocalChange } from './familySync'
+import { flushPending, getSyncStore, isEmptyStarterData, makeOperations, mergeRemote, queueLocalChange } from './familySync'
 import type { AppData, ChildProfile, SleepSession } from './types'
 
 const at = '2026-08-26T10:00:00.000Z'
@@ -55,6 +55,40 @@ describe('Family Sync child deletion', () => {
     expect(merged.children.map((item) => item.id)).toEqual(['a'])
     expect(merged.sessions.map((item) => item.id)).toEqual(['sleep-a'])
     expect(merged.settings.activeChildId).toBe('a')
+  })
+})
+
+describe('Family Sync first family download', () => {
+  const starter: AppData = {
+    version: 4,
+    settings: { locale: 'hu', activeChildId: 'starter', longSleepReminderEnabled: false },
+    children: [{ ...child('starter'), name: '' }],
+    sessions: []
+  }
+
+  it('replaces the untouched unnamed starter profile with the family profile', () => {
+    expect(isEmptyStarterData(starter)).toBe(true)
+    const merged = mergeRemote(starter, [], [{ ...child('family-child'), deletedAt: null, revision: 1 }])
+    expect(merged.children.map((item) => item.id)).toEqual(['family-child'])
+    expect(merged.settings.activeChildId).toBe('family-child')
+  })
+
+  it('keeps a real local profile when family data arrives', () => {
+    const named = { ...starter, children: [{ ...starter.children[0], name: 'Helyi baba' }] }
+    expect(isEmptyStarterData(named)).toBe(false)
+    const merged = mergeRemote(named, [], [{ ...child('family-child'), deletedAt: null, revision: 1 }])
+    expect(merged.children.map((item) => item.id)).toEqual(['starter', 'family-child'])
+  })
+
+  it('cleans up a starter profile left beside an already downloaded family profile', () => {
+    const previouslyMerged = {
+      ...starter,
+      children: [starter.children[0], child('family-child')],
+      settings: { ...starter.settings, activeChildId: 'family-child' }
+    }
+    const merged = mergeRemote(previouslyMerged, [], [{ ...child('family-child'), deletedAt: null, revision: 2 }])
+    expect(merged.children.map((item) => item.id)).toEqual(['family-child'])
+    expect(merged.settings.activeChildId).toBe('family-child')
   })
 })
 

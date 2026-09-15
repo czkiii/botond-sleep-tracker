@@ -114,6 +114,14 @@ Az aktuális, még nem commitolt account–legacy family bridge szelet:
 - a staging migráció before/after exporttal, változatlan legacy hash-ekkel és tiszta idegenkulcs-ellenőrzéssel sikeres;
 - staging Worker verzió: `3a1853ad-02c5-4ee3-b06e-b1371b095d94`; a teljes legacy staging smoke teszt sikeres.
 
+A bridge a `807081f` commitban felkerült az internal Pages oldalra. A valós kétböngészős próba igazolta az account-eszköz választót és a családi adatok meghívókód nélküli átvitelét ugyanazzal a Google-fiókkal. Feltárt klienshiba: a friss Chrome automatikusan létrehozott, névtelen kezdőprofilja a családi profil mellett megmaradt.
+
+Az aktuális, még nem commitolt javítás a teljesen érintetlen, névtelen és alvásadat nélküli kezdőprofilt eltávolítja, amikor valódi családi profil érkezik. A már hibásan a családi profil mellett maradt üres kezdőprofilt a következő családi frissítés is kitakarítja. Elnevezett, kitöltött vagy alvásadattal rendelkező helyi profilt továbbra is megőriz. Három regressziós teszt fedi a friss, a már kialakult hibás és a megőrzendő helyi állapotot.
+
+A `807081f` GitHub frontend checkjeinek hibája külön CI-konfigurációs probléma volt: a gyökérből futó Vitest a Worker teszteket is betöltötte, de a frontend job nem telepítette a Worker `jose` függőségét. A CI és az internal preview workflow most ezt külön telepíti. Helyben 118/118 teszt, frontend és Worker typecheck, internal és normál frontend build sikeres.
+
+A Cloudflare Git-integráció `Workers Builds: solemi-sleep-sync-staging` checkje több korábbi commiton is elbukott, miközben a kézi staging build és deploy sikeres. A dashboard build-konfigurációját külön kell javítani: a root directory legyen `worker`, a staging deploy parancs pedig `npm run deploy:staging`. Ez nem blokkolta a sikeres Pages buildet vagy a kézzel deployolt staging Workert.
+
 ## Fő nyitott blokkok a `main` migráció előtt
 
 1. Az accountos családtagság és a legacy Family Sync átmeneti összekötésének böngészős elfogadása, majd az accountos meghívóbeváltás elkészítése.
@@ -128,7 +136,7 @@ Az aktuális, még nem commitolt account–legacy family bridge szelet:
 
 ## Következő konkrét feladat
 
-Commitold és pushold az account–legacy family bridge szeletet. Az új internal Pages buildben először a családot már tartalmazó Safariban nyisd meg a Beállításokat, hogy a belépett account claimelje a családot; utána ugyanazzal a Google-fiókkal a Chrome Beállítások oldalán a családnak és az adatoknak meghívókód nélkül meg kell jelenniük. Ezután következik a külön családtag saját accountos meghívóbeváltása és a valódi entitlement enforcement. Production előtt az API számára továbbra is azonos webhely alatti saját domain javasolt.
+Commitold és pushold a névtelen kezdőprofil és a frontend CI javítását. Az új internal buildet egy friss böngészőprofilban ellenőrizd: ugyanazzal a Google-fiókkal a családi profil jelenjen meg, a névtelen kezdőprofil pedig ne maradjon mellette. Ezután állítsd helyre a staging Worker Git-buildjének `worker` root directory és `npm run deploy:staging` beállítását, majd következhet a külön családtag saját accountos meghívóbeváltása és a valódi entitlement enforcement.
 
 ## Munkamegosztás
 

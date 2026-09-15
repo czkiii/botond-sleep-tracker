@@ -114,7 +114,11 @@ function toLocalChild(child: RemoteChild, existing?: ChildProfile): ChildProfile
 }
 
 export function mergeRemote(data: AppData, sessions: RemoteSession[], children: RemoteChild[] = []) {
-  const childMap = new Map(data.children.map((child) => [child.id, child]))
+  const remoteChildIds = new Set(children.filter((child) => !child.deletedAt).map((child) => child.id))
+  const sessionChildIds = new Set(data.sessions.map((session) => session.childId))
+  const localChildren = remoteChildIds.size ? data.children.filter((child) =>
+    remoteChildIds.has(child.id) || !isEmptyLocalProfile(child) || sessionChildIds.has(child.id)) : data.children
+  const childMap = new Map(localChildren.map((child) => [child.id, child]))
   const deletedChildIds = new Set<string>()
   for (const remote of children) {
     if (remote.deletedAt) {
@@ -178,6 +182,15 @@ export async function reconcileAccountFamily() {
   writeStore({ connection: result.connection, pending: [] })
   const changed = await pullRemote(true)
   return { claimed: false, connected: true, changed }
+}
+
+export function isEmptyStarterData(data: AppData) {
+  if (data.sessions.length !== 0 || data.children.length !== 1) return false
+  return isEmptyLocalProfile(data.children[0])
+}
+
+function isEmptyLocalProfile(child: ChildProfile) {
+  return child.name.trim() === '' && child.birthDate === null && child.photoRef === null
 }
 
 export async function createFamily(familyName: string, deviceName: string) {
