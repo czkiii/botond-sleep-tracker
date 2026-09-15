@@ -1,6 +1,6 @@
 # Solemi Sleep — végleges account, membership, subscription és entitlement D1 architektúra
 
-Státusz: **ARCHITEKTÚRA LEZÁRVA — implementáció előtt**
+Státusz: **ARCHITEKTÚRA LEZÁRVA — account/session, Google-auth és staging entitlement enforcement implementálva**
 
 Dátum: 2026-08-24
 Ellenőrzött GitHub-alap: `main` / `37d1728` (`Lock Free Family Family+ feature matrix`)
@@ -9,8 +9,34 @@ Ez a dokumentum a következő backend-implementáció normatív terve. Nem migr�
 
 Kapcsolódó lezárt döntések: `FEATURE_ENTITLEMENT_MATRIX.md`, `PRODUCT_DESIGN_LOCK.md`, `TECHNICAL_COLLISION_AUDIT.md`.
 
+### Implementációs állapot — 2026-09-15
+
+A `worker/migrations/003_accounts_and_sessions.sql` az identity séma additív
+implementációja; a 002-es sorszámot már a Child Profile V4 migráció használja.
+A `worker/src/accountStore.ts` az új táblák adatelérési alapja. A még nem
+deployolt Worker-kód Google-tokenellenőrzést, session-tokenkiadást,
+refresh-rotációt és két aktív eszközös korlátot használó auth-végpontokat ad.
+Az interaktív eszközcsere-folyamat még nincs bekötve a kliensbe.
+
+A normatív sémához képest két integritási pontosítás került a migrációba:
+az eszközlimit UPDATE-ellenőrzése accountváltásra is kiterjed, a session pedig
+összetett `(account_id, device_id)` idegen kulccsal csak a saját account eszközére
+hivatkozhat. Az új szöveges elsődleges kulcsok explicit `NOT NULL` mezők.
+
+A helyi SQLite-tesztek ellenőrzik a legacy adatok/séma változatlanságát, a
+jogosultsági határokat és a tranzakciós visszaállást. A 003/004 staging D1
+migráció before/after exporttal és változatlan legacy hash-ekkel sikeres volt.
+Az account/session, Google-login, accountos family claim/bootstrap és két külön
+Google-accountos meghívás staging próbája sikeres. A
+`006_subscriptions_and_entitlements.sql` implementálja a providerfüggetlen
+billing- és granttáblákat. A staging Worker a család összes aktív tagja alapján
+ellenőrzi a `FAMILY_SYNC` hozzáférést, miközben a személyes Family+ Insights
+jogosultságot account-szinten tartja. A staging `MANUAL` forrás a bolti
+életciklusokat szimulálja; valódi Apple/Google provider adapter még nincs.
+
 ## 1. Lezárt termékszabályok
 
+- A Free csomag fiók nélkül, local-first módon használható. Fiók csak Family Synchez, vásárláshoz és előfizetés-visszaállításhoz kötelező.
 - V1-ben kizárólag Google-belépés van. A Google csak identitásszolgáltató, nem alvásadat-tároló.
 - Egy embernek egy Solemi accountja van; egy accountnak legfeljebb 2 aktív eszköze lehet.
 - Egy account egyszerre legfeljebb 1 aktív Family tagja lehet. A korábbi tagságok historyként megmaradnak.

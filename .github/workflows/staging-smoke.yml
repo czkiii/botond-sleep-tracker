@@ -1,0 +1,35 @@
+name: Family Sync staging smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/child-profile-v4
+    paths:
+      - worker/**
+      - .github/workflows/staging-smoke.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: family-sync-staging-smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Exercise staging API
+        run: node worker/scripts/staging-smoke.mjs
+        env:
+          SOLEMI_STAGING_API_BASE: https://solemi-sleep-sync-staging.czki-adam.workers.dev
