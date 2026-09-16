@@ -1,9 +1,9 @@
 # Solemi Sleep — Codex projektállapot
 
-**Utolsó frissítés:** 2026-09-15
+**Utolsó frissítés:** 2026-09-16
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
-**A munkamenet elején ellenőrzött fejlesztési HEAD:** `9e5a381` (`Enforce family entitlements on the server`)
+**A munkamenet elején ellenőrzött fejlesztési HEAD:** `fec5393` (`Handle family sync conflicts safely`); a munkafa tiszta volt.
 
 Ez a fájl az új Codex-beszélgetések rövid belépési pontja. A pillanatnyi pontos commit mindig az a commit, amely ezt a fájlt tartalmazza; ellenőrzéshez futtasd a `git log -1 --oneline` parancsot.
 
@@ -189,9 +189,32 @@ Teljes helyi ellenőrzés: frontend és Worker typecheck, 127/127 teszt, interna
 frontend build és staging Worker dry-run sikeres. Új D1-migráció nincs. A
 staging deploy a commit/push utáni azonos verziójú Pages- és Worker-buildre vár.
 
+## Nyitott hiba — kéttelefonos konfliktusteszt, 2026-09-15
+
+**Nem elfogadott; a következő kódolási feladat elsőbbséget élvez.** A felhasználó
+beszámolója szerint a Family+ telefon előzményeiben az eredeti alvás, a saját
+módosított időpontja és a másik telefon módosított időpontja külön bejegyzésként
+jelent meg. A másik telefonon csak a saját módosítása látszott. A pontos okot
+még nem vizsgáltuk; nem bizonyított, hogy azonos session ID-k duplikálódtak,
+új azonosítók keletkeztek, vagy a megjelenítés/összefésülés hibás. A két telefon
+pontos buildverzióját és a konfliktusválasztó megjelenését is ellenőrizni kell.
+
+Folytatás: helyi és szerveroldali sessionazonosítók, pending műveletek és
+időrendi lefutás összevetése; reprodukció; célzott regressziós teszt; csak ezután
+javítás és kéttelefonos újrateszt. A meglévő tesztadatokat ne töröljük a diagnózis
+előtt. A 127 sikeres automatizált teszt nem helyettesíti ezt az elbukott élő próbát.
+
+A 2026-09-16-i felhasználói kérés előbb monetizációs auditot kér, kódmódosítás
+nélkül. A Free / Family / Family+ újracsomagolása egyelőre csak javaslat;
+a meglévő funkciómátrix és jogosultsági szabályok nem módosultak.
+A részletes forrásolt audit és a döntésre váró javaslatok:
+`MONETIZATION_AUDIT_2026-09-16.md`. Fő javaslat: induláskor Free + egy családi
+prémiumcsomag; a jelenlegi középső Family értékének és a személyes Family+
+korlátozásnak az újragondolása. Még nincs jóváhagyott csomagváltás.
+
 ## Fő nyitott blokkok a `main` migráció előtt
 
-1. Az alvásszintű reconciliation valódi kéttelefonos staging elfogadása.
+1. A kéttelefonos konfliktusteszt során jelzett duplikáció és eltérő előzmények kivizsgálása, javítása, majd staging elfogadása.
 2. Az account/session eszközkezelő harmadik böngészős staging próbája.
 3. App Store / Google Play vásárlás-ellenőrzés és visszaállítás provider adapterei.
 4. Paywall és upgrade/downgrade folyamat.
@@ -202,13 +225,10 @@ staging deploy a commit/push utáni azonos verziójú Pages- és Worker-buildre 
 
 ## Következő konkrét feladat
 
-Commitold és pushold az alvásszintű konfliktuskezelési szeletet, majd várd meg a
-Pages és Workers Builds sikerét. Free + Free szünet alatt mindkét telefonon
-módosítsd ugyanannak a lezárt alvásnak a megjegyzését eltérően. Egyik accountot
-állítsd Family vagy Family+ csomagra. Az elsőként felküldött változat legyen a
-családi példány, a másik telefon pedig mutassa a két választási lehetőséget.
-Mindkét választást külön körben ellenőrizd. Ezután két különböző alvást
-módosítsatok szünet alatt; reaktiválás után mindkettő automatikusan jelenjen meg.
+Most: a jelenlegi csomagok versenytársalapú monetizációs auditja, javaslatokkal,
+alkalmazáskód módosítása nélkül. A következő fejlesztési kör elején a fenti
+duplikációs hibát kell kivizsgálni; a konfliktuskezelés még nincs élőben elfogadva.
+A `fec5393` már commitolt fejlesztési HEAD; nem kell újra commitolni az előző szeletet.
 
 ## Munkamegosztás
 
