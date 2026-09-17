@@ -3,6 +3,8 @@
 Státusz: **ARCHITEKTÚRA LEZÁRVA — account/session, Google-auth és staging entitlement enforcement implementálva**
 
 Dátum: 2026-08-24
+
+**Termékdöntés-változás — 2026-09-17:** a `PRODUCT_DIRECTION.md` és a frissített `FEATURE_ENTITLEMENT_MATRIX.md` irányadó. Bármely aktív tag érvényes előfizetése az egész aktív családnak biztosítja az adott csomag funkcióit, Family+ Insights esetén is. A létrehozó/admin szerepe nem feltétel. A subscription és grant továbbra is a vásárló account tulajdona; az effektív használati jog családi tagságon keresztül származik. Az alábbi személyes-only Insights szabályok korábbi tervek, ezzel felülírva; a kódban még személyes ellenőrzés működik, átállítása külön feladat a szinkronhiba után. A történeti implementációleírásokat emiatt nem tekintjük már kész családi prémiumhozzáférésnek.
 Ellenőrzött GitHub-alap: `main` / `37d1728` (`Lock Free Family Family+ feature matrix`)
 
 Ez a dokumentum a következő backend-implementáció normatív terve. Nem migráció és nem módosítja a live Cloudflare D1-et vagy Workert. A jelenlegi prototípus `worker/schema.sql` és `worker/src/index.ts` fájljait a célarchitektúrára való átálláskor, külön ellenőrzött migrációkkal kell módosítani.

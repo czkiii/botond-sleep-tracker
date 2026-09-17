@@ -1,9 +1,9 @@
 # Solemi Sleep — Codex projektállapot
 
-**Utolsó frissítés:** 2026-09-16
+**Utolsó frissítés:** 2026-09-17
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
-**A munkamenet elején ellenőrzött fejlesztési HEAD:** `fec5393` (`Handle family sync conflicts safely`); a munkafa tiszta volt.
+**A munkamenet elején ellenőrzött fejlesztési HEAD:** `8de2928` (`Document monetization audit and sync bug checkpoint`); a munkafában a korábbi, untracked `PRODUCT_STRATEGY_AUDIT_2026-09-16.md` volt. A mostani helyi módosítások még nincsenek commitolva.
 
 Ez a fájl az új Codex-beszélgetések rövid belépési pontja. A pillanatnyi pontos commit mindig az a commit, amely ezt a fájlt tartalmazza; ellenőrzéshez futtasd a `git log -1 --oneline` parancsot.
 
@@ -32,7 +32,15 @@ Elsőként:
 - HU / EN / DE lokalizáció.
 - Free / Family / Family+ funkciómátrix lezárva.
 - Free fiók nélkül, local-first módon használható.
-- Family Sync családi jogosultság; Family+ Insights az előfizető személyes jogosultsága.
+- Family Sync már családi jogosultság. Az elfogadott új termékszabály szerint a Family+ Insights is az egész aktív családé; ez utóbbi kódátállítása még hátravan.
+
+## Elfogadott termékirány — 2026-09-17
+
+A döntések forrása: `PRODUCT_DIRECTION.md`; a korábbi auditok alternatív javaslatok, nem jóváhagyott csomagváltások. Megmarad a Free / Family / Family+ felosztás, havi 0 / 990 / 1 490 Ft tervezett árral. Alvásra összpontosító, gyors, sötét felületű napló; nincs teljes babakövető, AI, kéretlen altatási tanács vagy eredményígéret. A Family közös napló, a Family+ leíró statisztika és visszatekinthető jelentések.
+
+Bármely aktív családtag érvényes előfizetése az egész aktív családnak biztosítja az adott csomagot, a létrehozó személyétől függetlenül. A számlázás továbbra is a vásárló accounté. A funkciómátrix aktualizálva; a személyes Insights-jogot családi jogra kell átállítani a szinkronhiba elfogadása után. App Store és Google Play induláskor szükséges; a vásárlási adapterek még hiányoznak.
+
+Az alábbi korábbi fejlesztési szeletek történeti ellenőrzési eredmények; az aktuális helyi ellenőrzés és következő feladat a fájl végén található.
 
 ## Aktuális fejlesztési csomag
 
@@ -204,31 +212,67 @@ időrendi lefutás összevetése; reprodukció; célzott regressziós teszt; csa
 javítás és kéttelefonos újrateszt. A meglévő tesztadatokat ne töröljük a diagnózis
 előtt. A 127 sikeres automatizált teszt nem helyettesíti ezt az elbukott élő próbát.
 
-A 2026-09-16-i felhasználói kérés előbb monetizációs auditot kér, kódmódosítás
-nélkül. A Free / Family / Family+ újracsomagolása egyelőre csak javaslat;
-a meglévő funkciómátrix és jogosultsági szabályok nem módosultak.
-A részletes forrásolt audit és a döntésre váró javaslatok:
-`MONETIZATION_AUDIT_2026-09-16.md`. Fő javaslat: induláskor Free + egy családi
-prémiumcsomag; a jelenlegi középső Family értékének és a személyes Family+
-korlátozásnak az újragondolása. Még nincs jóváhagyott csomagváltás.
+A 2026-09-16-i audit elkészült: `MONETIZATION_AUDIT_2026-09-16.md` és
+`PRODUCT_STRATEGY_AUDIT_2026-09-16.md`. A 2026-09-17-i beszélgetés megtartotta
+a három csomagot és elfogadta a teljes családi prémiumhozzáférést; a hatályos
+döntések a `PRODUCT_DIRECTION.md` fájlban vannak.
+
+## Helyi szinkronjavítás — 2026-09-17
+
+Reprodukált, célzott teszttel ellenőrzött klienshibák javítva:
+
+- Az egyidejű feltöltés/letöltés/konfliktusfeloldás most sorban fut; ugyanaz a pending művelet nem indul kétszer ugyanazon az oldalon.
+- Lassú feltöltési válasz nem írja rá a régebbi értéket az azóta helyben szerkesztett alvásra/profilra.
+- Letöltés közben érkező helyi módosítás megmarad; a letöltési cursor sem lép előre az el nem fogadott snapshot alapján.
+- Korábbi családi kapcsolat későn befutó válaszát a kliens elutasítja.
+- A szerveradat az alkalmazás állapotát helyben frissíti; a rutin szinkron és konfliktusfeloldás nem tölti újra az oldalt. A nyitott szerkesztő megtartja a beírt, még el nem mentett értéket.
+- A szerkesztő megjegyzi a megnyitáskor ismert revisiont; a háttérben frissült szerveradatot egy régi űrlap mentése sem írhatja felül csendben.
+- A kliens alvásonként megjegyzi saját sikeresen feltöltött revisionjét, a globális letöltési cursort nem lépteti át más telefon változásain. Így a következő saját korrekció nem okoz téves önütközést.
+- Párhuzamos Start elutasításakor a kliens átveszi az aktuális családi alvást, a visszautasított draft későbbi pending módosításait is eltávolítja.
+
+Új tesztek: 6 kliens-egységteszt és 5 integrációs teszt a tényleges klienssel,
+tényleges Workerrel és memóriabeli SQLite-tal. Két független készülékállapot
+offline szerkesztése, mindkét konfliktusválasztás, azonos session ID és egyetlen
+szerverrekord, régi űrlap, párhuzamos Start és saját feltöltés utáni korrekció
+ellenőrizve. Több külön böngészőlap közötti zárolást ez a javítás nem vezet be.
+
+Végső helyi ellenőrzés: **138/138 teszt**, frontend és Worker typecheck,
+production és auth-enabled internal build sikeres. A build meglévő 500 kB-os
+chunkméret-figyelmeztetése megmaradt. Helyi böngészőben a nyitott űrlap értéke
+távoli frissítéskor megmaradt, mentése konfliktust adott; a javított gyors
+Start → visszaállítás → Stop folyamat téves konfliktus nélkül ment végig,
+és reload után egy új bejegyzés maradt a korábbi tesztsor mellett.
+
+**Az eredeti három bejegyzés pontos oka továbbra sem bizonyított.** Azonos időpont
+alapján nem deduplikálunk, meglévő családi adatot nem töröltünk. A telefonos
+elfogadás továbbra is release-blokkoló. Részletes következő próba:
+`SYNC_RETEST_CHECKPOINT_2026-09-17.md`.
+
+Csak helyi munka történt: nincs commit/push, deploy vagy távoli D1-módosítás;
+nincs új séma/migráció és nincs Worker-forrásváltozás. A kliens új sync-metadata
+mezője hiányzó régi értékekből biztonságosan indul; régi konfliktusok explicit
+feloldása továbbra is szükséges lehet.
 
 ## Fő nyitott blokkok a `main` migráció előtt
 
 1. A kéttelefonos konfliktusteszt során jelzett duplikáció és eltérő előzmények kivizsgálása, javítása, majd staging elfogadása.
-2. Az account/session eszközkezelő harmadik böngészős staging próbája.
-3. App Store / Google Play vásárlás-ellenőrzés és visszaállítás provider adapterei.
-4. Paywall és upgrade/downgrade folyamat.
-5. Reprodukálható frontend- és Worker-lockfájlok.
-6. Staging backup/restore és dokumentált rollback.
-7. Privacy Policy, adatmegőrzés/törlés és support folyamat.
-8. Production D1 mentés, V4 migráció, Worker deploy és csak ezután kontrollált `main` merge.
+2. Az elfogadott teljes családi Family+ Insights-jog implementálása és tesztelése.
+3. Az account/session eszközkezelő harmadik böngészős staging próbája.
+4. App Store / Google Play vásárlás-ellenőrzés és visszaállítás provider adapterei.
+5. Paywall és upgrade/downgrade folyamat.
+6. Reprodukálható frontend- és Worker-lockfájlok.
+7. Staging backup/restore és dokumentált rollback.
+8. Privacy Policy, adatmegőrzés/törlés és support folyamat.
+9. Production D1 mentés, V4 migráció, Worker deploy és csak ezután kontrollált `main` merge.
 
 ## Következő konkrét feladat
 
-Most: a jelenlegi csomagok versenytársalapú monetizációs auditja, javaslatokkal,
-alkalmazáskód módosítása nélkül. A következő fejlesztési kör elején a fenti
-duplikációs hibát kell kivizsgálni; a konfliktuskezelés még nincs élőben elfogadva.
-A `fec5393` már commitolt fejlesztési HEAD; nem kell újra commitolni az előző szeletet.
+A felhasználó commitolja/pusholja a helyi csomagot, majd a hozzá tartozó internal
+Pages build azonos SHA-ját ellenőrizve következik a kéttelefonos újrateszt a
+checkpoint szerint. Codex ebben a munkamenetben nem indított deployt. A jelenlegi
+Worker már kezeli a revision-conflictet; ehhez a kliensjavításhoz nincs új migráció
+vagy Worker-kód. Ha a telefonos próba elfogadott, következő fejlesztés a Family+
+Insights teljes aktív családra kiterjesztése; előbb nem kezdünk vásárlási integrációt.
 
 ## Munkamegosztás
 

@@ -4,7 +4,7 @@ import { languageOptions, localeTag, t } from './i18n'
 import type { Locale } from './i18n'
 import type { AppData, ChildProfile, DayNightOverride, Page, SleepSession } from './types'
 import type { DataQualityIssueKind } from './utils'
-import { createChild, createSession, exportData, importData, inspectBackup, loadData, saveData } from './storage'
+import { REMOTE_DATA_EVENT, createChild, createSession, exportData, importData, inspectBackup, loadData, saveData } from './storage'
 import type { ImportDiagnostic, ImportInspection } from './storage'
 import { deleteChildPhoto, loadChildPhoto, prepareChildPhoto, saveChildPhoto } from './photoStore'
 import type { AvatarCrop } from './photoStore'
@@ -22,6 +22,7 @@ import { INTERNAL_PLAN_PREVIEW_EVENT, INTERNAL_PLAN_PREVIEW_KEY, canUsePremiumIn
 import type { PremiumInsightFeature, ProductPlan } from './entitlements'
 import { DEFAULT_DAY_START_MINUTES, DEFAULT_NIGHT_START_MINUTES, LONG_SLEEP_GUARDRAIL_MS, awakeSince, durationOf, formatDateHeader, formatDuration, formatTime, formatTimer, getDataQualityWarnings, todaySessions, totalToday } from './utils'
 import SleepTimeline from './SleepTimeline'
+import { getSessionSyncRevision, getSyncStore } from './familySync'
 import SwipeHistoryRow from './SwipeHistoryRow'
 import AccountCard from './AccountCard'
 
@@ -83,11 +84,22 @@ export default function App() {
   const [page, setPage] = useState<Page>('today')
   const [now, setNow] = useState(Date.now())
   const [editor, setEditor] = useState<SleepSession | 'new' | null>(null)
+  const editorRevision = useRef<number | undefined>(undefined)
+  const saveRevision = useRef<number | undefined>(undefined)
   const locale = data.settings.locale
   const activeChild = data.children.find((child) => child.id === data.settings.activeChildId) ?? data.children[0]
   const activeSessions = useMemo(() => data.sessions.filter((session) => session.childId === activeChild.id), [data.sessions, activeChild.id])
 
-  useEffect(() => saveData(data), [data])
+  useEffect(() => {
+    const baseRevision = saveRevision.current
+    saveRevision.current = undefined
+    saveData(data, baseRevision)
+  }, [data])
+  useEffect(() => {
+    const onRemoteData = () => setData(loadData())
+    window.addEventListener(REMOTE_DATA_EVENT, onRemoteData)
+    return () => window.removeEventListener(REMOTE_DATA_EVENT, onRemoteData)
+  }, [])
   useEffect(() => {
     if (!internalPreview) return
     try { window.localStorage.setItem(INTERNAL_PLAN_PREVIEW_KEY, previewPlan) } catch { /* preview preference is non-critical */ }
@@ -111,19 +123,27 @@ export default function App() {
     updateSessions(data.sessions.map((session) => session.id === current.id ? { ...session, startTime, updatedAt } : session))
   }
   const saveEditor = (session: SleepSession) => {
+    saveRevision.current = editor === 'new' ? undefined : editorRevision.current
     if (editor === 'new') updateSessions([session, ...data.sessions])
     else updateSessions(data.sessions.map((item) => item.id === session.id ? session : item))
     setEditor(null)
   }
   const deleteSession = (id: string) => {
     if (!window.confirm(t(locale, 'deleteConfirm'))) return
+    saveRevision.current = editor && editor !== 'new' && editor.id === id ? editorRevision.current : undefined
     updateSessions(data.sessions.filter((session) => session.id !== id)); setEditor(null)
+  }
+  const openEditor = (session: SleepSession | 'new') => {
+    // An open form still represents the version seen when it was opened, even
+    // if background synchronization updates the diary in the meantime.
+    editorRevision.current = session === 'new' ? getSyncStore().connection?.revision : getSessionSyncRevision(session.id)
+    setEditor(session)
   }
 
   return <div className="app-shell">
     <main className="app-main">
-      {page === 'today' && <TodayPage data={data} child={activeChild} sessions={activeSessions} now={now} locale={locale} current={current} onSelectChild={(childId) => setData((previous) => ({ ...previous, settings: { ...previous.settings, activeChildId: childId } }))} onStart={startNow} onEnd={endNow} onAdjustStart={adjustCurrentStart} onOpenEditor={setEditor} onHistory={() => setPage('history')} onSettings={() => setPage('settings')} />}
-      {page === 'history' && <HistoryPage sessions={activeSessions} locale={locale} onEdit={setEditor} onDelete={deleteSession} onNew={() => setEditor('new')} />}
+      {page === 'today' && <TodayPage data={data} child={activeChild} sessions={activeSessions} now={now} locale={locale} current={current} onSelectChild={(childId) => setData((previous) => ({ ...previous, settings: { ...previous.settings, activeChildId: childId } }))} onStart={startNow} onEnd={endNow} onAdjustStart={adjustCurrentStart} onOpenEditor={openEditor} onHistory={() => setPage('history')} onSettings={() => setPage('settings')} />}
+      {page === 'history' && <HistoryPage sessions={activeSessions} locale={locale} onEdit={openEditor} onDelete={deleteSession} onNew={() => openEditor('new')} />}
       {page === 'stats' && <StatsPage sessions={activeSessions} now={now} locale={locale} childName={activeChild.name} productPlan={previewPlan} onPreviewPlanChange={internalPreview ? setPreviewPlan : undefined} />}
       {page === 'settings' && <SettingsPage data={data} setData={setData} onBack={() => setPage('today')} />}
     </main>

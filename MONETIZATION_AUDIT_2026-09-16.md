@@ -1,5 +1,7 @@
 # Solemi Sleep — monetizációs audit
 
+**2026-09-17-i döntési pontosítás:** lásd `PRODUCT_DIRECTION.md`. Free / Family 990 Ft/hó / Family+ 1490 Ft/hó marad; az adott csomag funkcióit bármely aktív előfizető az egész aktív családnak biztosítja. Az alábbi csomagösszevonási/árjavaslatok nem elfogadott döntések. A valós igényfeltárás és a jelentések visszatekintő szerepe a későbbi beszélgetésben tisztázódott.
+
 Dátum: 2026-09-16. Ág: `feat/child-profile-v4`; ellenőrzött HEAD: `fec5393`.
 Státusz: **döntési javaslat, nem jóváhagyott új termékszabály**.
 Alkalmazáskód, konfiguráció, funkciómátrix és jogosultság nem változott.

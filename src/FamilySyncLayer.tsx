@@ -171,7 +171,6 @@ export default function FamilySyncLayer() {
           setConnected(Boolean(next))
           setConnectionName(next?.familyName || '')
           markSynced()
-          if (result.changed) window.location.reload()
         }
       } catch {
         setSyncIssue(true)
@@ -207,9 +206,9 @@ export default function FamilySyncLayer() {
       setConflictCount(store.conflicts.length)
     }
     const onSaved = (event: Event) => {
-      const detail = (event as CustomEvent<{ previous: AppData; next: AppData }>).detail
+      const detail = (event as CustomEvent<{ previous: AppData; next: AppData; baseRevision?: number }>).detail
       if (detail?.previous && detail?.next) {
-        queueLocalChange(detail.previous, detail.next)
+        queueLocalChange(detail.previous, detail.next, detail.baseRevision)
         setPendingCount(getSyncStore().pending.length)
       }
     }
@@ -274,10 +273,9 @@ export default function FamilySyncLayer() {
     const run = async () => {
       if (!navigator.onLine || stopped) return
       try {
-        const changed = await pullRemote()
+        await pullRemote()
         if (stopped) return
         markSynced()
-        if (changed) window.location.reload()
       } catch (error) {
         if (!stopped) {
           const apiError = error as SyncError
@@ -394,11 +392,11 @@ export default function FamilySyncLayer() {
     setBusy(true); setError('')
     try {
       await resolveSyncConflict(conflict.operationId, resolution)
-      window.location.reload()
+      markSynced()
     } catch (err) {
       setError(friendlyError(err))
-      setBusy(false)
     }
+    finally { setBusy(false) }
   }
 
   const openPanel = () => { setOpen(true); setMode(inviteCode ? 'invite' : 'home'); setError('') }

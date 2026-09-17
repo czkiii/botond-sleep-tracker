@@ -1,6 +1,6 @@
 # Solemi Sleep — belső verziótól a kiadásig
 
-Utolsó frissítés: 2026-09-13
+Utolsó frissítés: 2026-09-17
 
 Ez az operatív lista a `SOLEMI_EXECUTION_PLAN.md` és a `SOLEMI_MASTER_ROADMAP.md` kiadási pontjait rendezi végrehajtási sorrendbe.
 
@@ -120,6 +120,9 @@ A fejlesztés ugyanabban a repóban és ugyanazon a fő alkalmazáson folytatód
 - [x] Kliensoldali választás: ezen a telefonon lévő vagy családi alvásváltozat megtartása.
 - [x] Külön alvásokat érintő stale módosítások automatizált tesztje konfliktus nélkül sikeres.
 - [ ] Az alvásszintű konfliktusészlelés és mindkét feloldás valódi kéttelefonos staging elfogadása.
+- [x] Kliens–Worker helyi integrációs próba: két készülék offline ugyanazt az alvást szerkeszti, mindkét konfliktusválasztás után egy rekord és egyező adat marad.
+- [x] Lassú/párhuzamos szinkronválaszok és saját feltöltés utáni téves konfliktus célzott regressziós tesztjei.
+- [ ] A jelzett három előzménysor és eltérő telefonállapot újratesztje az új internal buildben (`SYNC_RETEST_CHECKPOINT_2026-09-17.md`).
 
 ### Insights és adatminőség
 
@@ -158,6 +161,8 @@ Nem minden tervezett Insights-funkció szükséges az első belső RC-hez. Kül�
 - [x] Internal Free nézetben a Family Sync zárolási előnézete, Family-előfizetéses magyarázata és hálózati leállítása elkészült (helyi, még nem publikált módosítás).
 - [x] A családtagság és a fizetős aktív szinkron szerveroldali szétválasztása staging `MANUAL` entitlement forrással.
 - [ ] Apple és Google Play provider által hitelesített subscription események bekötése ugyanebbe az entitlement modellbe.
+- [x] Letisztult alvásnapló-termékirány és havi Free / Family 990 Ft / Family+ 1 490 Ft terv rögzítése (`PRODUCT_DIRECTION.md`).
+- [ ] Bármely aktív tag Family+ joga az összes aktív családtagnak biztosítsa az Insights funkciókat is; a jelenlegi személyes gate átállítása még hátravan.
 
 **Javasolt első kiadási minimum:** Child Profile V4 + stabil Family Sync + wake window V1 + átlátható adatminőség. Prediction csak akkor legyen blokkoló, ha megfelelő saját tesztadat és érthető bizonytalansági kommunikáció áll rendelkezésre.
 
@@ -194,6 +199,8 @@ Nem minden tervezett Insights-funkció szükséges az első belső RC-hez. Kül�
 ---
 
 ## Következő konkrét munkamenet
+
+**Elsőbbség:** a 2026-09-17-i helyi kliensjavítás commit/push utáni internal buildjének kéttelefonos elfogadása a `SYNC_RETEST_CHECKPOINT_2026-09-17.md` alapján. Utána teljes családi Family+ Insights-jog; az alábbi korábbi tételek történeti és további release-feladatok.
 
 1. Account- és entitlement-állapotmodell előkészítése: személyes funkciók és családi sync külön döntésként — elkészült.
 2. Free családtag, fizető családtag, lejáró jogosultság, másik megmaradó fizető és reaktiválási egyeztetés tesztesetei — elkészültek.

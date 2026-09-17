@@ -2,6 +2,8 @@ import { detectLocale, t } from './i18n'
 import type { Locale } from './i18n'
 import type { AppData, ChildProfile, DayNightOverride, LegacyAppDataV3, SleepBackupV3, SleepBackupV4, SleepSession } from './types'
 
+export const REMOTE_DATA_EVENT = 'solemi-remote-data-applied'
+
 export type ImportDiagnostic = {
   kind: 'migrated-v3' | 'active-child-reset' | 'identical-children-removed' | 'identical-sessions-removed' | 'local-photos-not-included'
   count: number
@@ -148,11 +150,11 @@ export function loadData(): AppData {
   return createDefaultData()
 }
 
-export function saveData(data: AppData) {
+export function saveData(data: AppData, baseRevision?: number) {
   const previous = loadData()
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
   if (typeof window !== 'undefined' && JSON.stringify(previous) !== JSON.stringify(data)) {
-    window.dispatchEvent(new CustomEvent('solemi-data-saved', { detail: { previous, next: data } }))
+    window.dispatchEvent(new CustomEvent('solemi-data-saved', { detail: { previous, next: data, baseRevision } }))
   }
 }
 

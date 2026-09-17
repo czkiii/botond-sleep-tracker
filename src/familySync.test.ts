@@ -59,6 +59,133 @@ describe('Family Sync child deletion', () => {
   })
 })
 
+describe('Family Sync slow responses', () => {
+  function setup(pending: unknown[] = []) {
+    const storage = new MemoryStorage()
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage })
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { onLine: true, language: 'hu-HU' } })
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { dispatchEvent: vi.fn() } })
+    storage.setItem(STORAGE_KEY, JSON.stringify(previous))
+    storage.setItem('solemiSleep:sync:v1', JSON.stringify({
+      connection: { familyId: 'family-1', familyName: 'Teszt', deviceId: 'device-1', deviceToken: 'token-1', revision: 4 },
+      pending, conflicts: []
+    }))
+    return storage
+  }
+
+  const patch = { id: 'op-slow', method: 'PATCH', path: '/v1/sessions/sleep-a', sessionId: 'sleep-a',
+    body: { operationId: 'mut-slow', baseRevision: 4, patch: { note: 'Első mentés' } } }
+  const remote = { ...previous.sessions[0], note: 'Első mentés', deletedAt: null, revision: 5 }
+  const ok = (data: unknown) => new Response(JSON.stringify({ ok: true, data }), {
+    status: 200, headers: { 'Content-Type': 'application/json' }
+  })
+
+  it('sends a queued mutation only once when two flushes overlap', async () => {
+    setup([patch])
+    let release!: (response: Response) => void
+    const fetchMock = vi.fn(() => new Promise<Response>((resolve) => { release = resolve }))
+    Object.defineProperty(globalThis, 'fetch', { configurable: true, value: fetchMock })
+    const first = flushPending()
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    // Keep separate releases so the pre-fix implementation can finish too.
+    const releaseFirst = release
+    const second = flushPending()
+    await Promise.resolve()
+    const calls = fetchMock.mock.calls.length
+    releaseFirst(ok({ revision: 5, session: remote }))
+    if (calls > 1) release(ok({ revision: 5, session: remote }))
+    await Promise.all([first, second])
+    expect(calls).toBe(1)
+    expect(getSyncStore().pending).toEqual([])
+  })
+
+  it('does not replace a newer local edit with an older mutation response', async () => {
+    const storage = setup([patch])
+    let release!: (response: Response) => void
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => { release = resolve }))
+      .mockRejectedValue(new Error('Temporarily offline'))
+    Object.defineProperty(globalThis, 'fetch', { configurable: true, value: fetchMock })
+    const running = flushPending()
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { onLine: false } })
+    const next = { ...previous, sessions: previous.sessions.map((item) => item.id === 'sleep-a'
+      ? { ...item, note: 'Újabb mentés' } : item) }
+    storage.setItem(STORAGE_KEY, JSON.stringify(next))
+    queueLocalChange(previous, next)
+    release(ok({ revision: 5, session: remote }))
+    await running
+    expect(JSON.parse(storage.getItem(STORAGE_KEY)!).sessions.find((item: SleepSession) => item.id === 'sleep-a').note)
+      .toBe('Újabb mentés')
+    expect(getSyncStore().pending).toHaveLength(1)
+    expect(getSyncStore().pending[0].body.baseRevision).toBe(5)
+  })
+
+  it('reports data changed by flushing even when the following download is empty', async () => {
+    setup([patch])
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(ok({ revision: 5, session: remote }))
+      .mockResolvedValueOnce(ok({ revision: 5, sessions: [], children: [] }))
+    Object.defineProperty(globalThis, 'fetch', { configurable: true, value: fetchMock })
+    expect(await pullRemote()).toBe(true)
+  })
+
+  it('keeps edits made during a download and leaves the cursor available for reconciliation', async () => {
+    const storage = setup()
+    let release!: (response: Response) => void
+    const fetchMock = vi.fn(() => new Promise<Response>((resolve) => { release = resolve }))
+    Object.defineProperty(globalThis, 'fetch', { configurable: true, value: fetchMock })
+    const running = pullRemote()
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { onLine: false } })
+    const next = { ...previous, sessions: previous.sessions.map((item) => item.id === 'sleep-a'
+      ? { ...item, note: 'Letöltés közben javítottam' } : item) }
+    storage.setItem(STORAGE_KEY, JSON.stringify(next))
+    queueLocalChange(previous, next)
+    release(ok({ revision: 5, sessions: [{ ...remote, note: 'Másik telefon' }], children: [] }))
+    await running
+    expect(JSON.parse(storage.getItem(STORAGE_KEY)!).sessions.find((item: SleepSession) => item.id === 'sleep-a').note)
+      .toBe('Letöltés közben javítottam')
+    expect(getSyncStore().connection?.revision).toBe(4)
+    expect(getSyncStore().pending).toHaveLength(1)
+  })
+
+  it('serializes overlapping downloads so an older response cannot roll the diary back', async () => {
+    const storage = setup()
+    let release!: (response: Response) => void
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => { release = resolve }))
+      .mockResolvedValueOnce(ok({ revision: 6, sessions: [{ ...remote, note: 'Legújabb', revision: 6 }], children: [] }))
+    Object.defineProperty(globalThis, 'fetch', { configurable: true, value: fetchMock })
+    const first = pullRemote()
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    const second = pullRemote()
+    await Promise.resolve()
+    const callsBeforeRelease = fetchMock.mock.calls.length
+    release(ok({ revision: 5, sessions: [remote], children: [] }))
+    await Promise.all([first, second])
+    expect(callsBeforeRelease).toBe(1)
+    expect(getSyncStore().connection?.revision).toBe(6)
+    expect(JSON.parse(storage.getItem(STORAGE_KEY)!).sessions.find((item: SleepSession) => item.id === 'sleep-a').note)
+      .toBe('Legújabb')
+  })
+
+  it('does not apply an old family response after the connection changes', async () => {
+    const storage = setup([patch])
+    let release!: (response: Response) => void
+    const fetchMock = vi.fn(() => new Promise<Response>((resolve) => { release = resolve }))
+    Object.defineProperty(globalThis, 'fetch', { configurable: true, value: fetchMock })
+    const running = flushPending()
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    const newStore = { ...getSyncStore(), connection: { ...getSyncStore().connection!, familyId: 'family-2', deviceToken: 'token-2' }, pending: [] }
+    storage.setItem('solemiSleep:sync:v1', JSON.stringify(newStore))
+    release(ok({ revision: 5, session: remote }))
+    await running
+    expect(getSyncStore().connection?.familyId).toBe('family-2')
+    expect(JSON.parse(storage.getItem(STORAGE_KEY)!).sessions[0].note).toBe('')
+  })
+})
+
 describe('Family Sync first family download', () => {
   const starter: AppData = {
     version: 4,
