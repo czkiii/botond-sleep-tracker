@@ -3,7 +3,7 @@
 **Utolsó frissítés:** 2026-09-17
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
-**Aktuálisan ellenőrzött fejlesztési HEAD:** `6ba91fa` (`Preserve failed sync operations and surface upload errors`); a munkamenet elején a munkafa tiszta volt. A tulajdonos az új hibajelzésből `SESSION_NOT_FOUND` választ jelzett. A hiányzó alvások alább dokumentált új helyi szelete még nincs commitolva.
+**Aktuálisan ellenőrzött fejlesztési HEAD:** `dec9987` (`Isolate missing sleep operations and restore them explicitly`); a munkamenet elején a munkafa tiszta volt. A tulajdonos az új telefonos próbán működő szinkront és jó visszajelzést jelzett. A mostani módosítás kizárólag ezt a checkpointot dokumentálja.
 
 Ez a fájl az új Codex-beszélgetések rövid belépési pontja. A pillanatnyi pontos commit mindig az a commit, amely ezt a fájlt tartalmazza; ellenőrzéshez futtasd a `git log -1 --oneline` parancsot.
 
@@ -327,31 +327,52 @@ ellenőrizve, kizárólag eldobható helyi SQLite és tesztadat használatával.
 Nincs Worker-forrás/sémaváltozás, távoli D1-írás, deploy, commit vagy push.
 Az eredeti telefonos teszt továbbra is nyitott; az új kliens élő elfogadásra vár.
 
+## Telefonos visszajelzés — normál szinkron működik, 2026-09-17
+
+A tulajdonos: „Most szuper a szinkron és nagyon jó a visszajelzés is szerintem”.
+A normál szinkron működését és a jelzés érthetőségét felhasználói visszajelzés
+alapján elfogadottnak rögzítjük. A pontos Start/−5/Stop/reload lépések eredményét
+nem részletezte. A repository HEAD `dec9987`; az új fotón a buildbanner/SHA nem
+látható, így a két telefon futó SHA-jának azonosságát ebből nem igazoltuk.
+
+A fotón a kéttelefonos ütközés választója és egy korábbi hiányzó helyi alvás
+együtt látszott. A tulajdonos később a **családi változat megtartását** választotta,
+majd a korábban csak nála meglevő alvást is megosztotta. Visszajelzése:
+„most full jó a szinkron és minden egyezik”. A családi feloldási ág és az
+egyedi hiányzóalvás-megosztás élőben elfogadva, egyező készülékadatokkal.
+A pontos darabszámot és a reload utáni eredményt nem részletezte külön.
+A tulajdonos ezután az **ezen a telefonon lévő változat megtartása** próbát
+pontos lépéssorral végigvégezte, és visszajelezte: „Ahogy írtad úgy történt
+tökéletesen működött a teszt”. Ugyanazon lezárt alvás két nyitott szerkesztője,
+eltérő A/B jegyzet, második mentéskor explicit konfliktus, B helyi választása,
+mindkét készüléken egy sor és B jegyzet, majd frissítés utáni egyezés elfogadva.
+**A kéttelefonos szinkron-/konfliktus-regressziós kör lezárva**, mindkét
+választási ággal és egyedi hiányzóalvás-megosztással. Az eredeti három régi
+rekord pontos történeti oka nem bizonyított, azokat nem deduplikáltuk automatikusan.
+Ebben a körben nincs alkalmazáskód-módosítás vagy új teszt/build/deploy.
+
 ## Fő nyitott blokkok a `main` migráció előtt
 
-1. A kéttelefonos konfliktusteszt során jelzett duplikáció és eltérő előzmények kivizsgálása, javítása, majd staging elfogadása.
-2. Az elfogadott teljes családi Family+ Insights-jog implementálása és tesztelése.
-3. Az account/session eszközkezelő harmadik böngészős staging próbája.
-4. App Store / Google Play vásárlás-ellenőrzés és visszaállítás provider adapterei.
-5. Paywall és upgrade/downgrade folyamat.
-6. Reprodukálható frontend- és Worker-lockfájlok.
-7. Staging backup/restore és dokumentált rollback.
-8. Privacy Policy, adatmegőrzés/törlés és support folyamat.
-9. Production D1 mentés, V4 migráció, Worker deploy és csak ezután kontrollált `main` merge.
+1. Az elfogadott teljes családi Family+ Insights-jog implementálása és tesztelése.
+2. Az account/session eszközkezelő harmadik böngészős staging próbája.
+3. App Store / Google Play vásárlás-ellenőrzés és visszaállítás provider adapterei.
+4. Paywall és upgrade/downgrade folyamat.
+5. Reprodukálható frontend- és Worker-lockfájlok.
+6. Staging backup/restore és dokumentált rollback.
+7. Privacy Policy, adatmegőrzés/törlés és support folyamat.
+8. Production D1 mentés, V4 migráció, Worker deploy és csak ezután kontrollált `main` merge.
 
 ## Következő konkrét feladat
 
-A `6ba91fa` hibajelzése feltárta a `SESSION_NOT_FOUND` elakadást. A fenti helyi
-elkülönítési/javítási szeletet a tulajdonos commitolja/pusholja. Javasolt Summary:
-`Isolate missing sleep operations and restore them explicitly`.
-Az új internal buildben mindkét telefon SHA-jának ellenőrzése után először
-a már elindított normál alvás megjelenését nézzük a másik telefonon. A régi
-hiányzó alvást csak exportmentés és időpontellenőrzés után, az egyedi megosztási
-gombbal osztjuk meg, ha a tulajdonos szeretné. Ha más hiba marad, leolvassuk
-a panelt; nincs törlés vagy vak újrapárosítás. Utána a konfliktuskörök a
-checkpoint szerint. Worker-kód/migráció nincs ehhez a szelethez, Codex nem
-deployolt. Telefonos elfogadás után következő fejlesztés a Family+ Insights
-teljes aktív családra kiterjesztése; előbb nem kezdünk vásárlási integrációt.
+A `dec9987` csomag szinkron-/konfliktus-újratesztje sikeres; normál szinkron,
+mindkét konfliktusválasztás és egyedi hiányzóalvás-megosztás élőben elfogadva.
+A következő fejlesztés a Family+ Insights teljes aktív családra kiterjesztése:
+bármely aktív tag érvényes Plus joga biztosítsa a prémium elemzéseket minden
+aktív tagnak, létrehozó/fizető személyétől függetlenül. A sync-jog már családi,
+az Insights jelenleg még személyes. Tesztelendő: Family+ + Free, Family+ tag
+kilépése/lejárata, másik megmaradó Plus tag, illetve csak Family tag megmaradása.
+Előbb ez következik, utána vásárlási integráció. Éles művelet külön jóváhagyással;
+commit/push a tulajdonos feladata. Most csak az elfogadási dokumentáció változott.
 
 ## Munkamegosztás
 

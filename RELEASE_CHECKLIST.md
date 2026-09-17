@@ -119,12 +119,15 @@ A fejlesztés ugyanabban a repóban és ugyanazon a fő alkalmazáson folytatód
 - [x] Pause alatt két eszközön ugyanazt az alvást érintő eltérő módosítás szerveroldali revision-conflictet ad, és egyik változatot sem írja felül csendben.
 - [x] Kliensoldali választás: ezen a telefonon lévő vagy családi alvásváltozat megtartása.
 - [x] Külön alvásokat érintő stale módosítások automatizált tesztje konfliktus nélkül sikeres.
-- [ ] Az alvásszintű konfliktusészlelés és mindkét feloldás valódi kéttelefonos staging elfogadása.
+- [x] Az alvásszintű konfliktusészlelés és mindkét feloldás valódi kéttelefonos staging elfogadása (2026-09-17).
+  - [x] Családi változat megtartása: felhasználói választás után mindkét telefon adatai egyeznek (2026-09-17).
+  - [x] Ezen a telefonon lévő változat megtartása: egyező adatok, egyetlen bejegyzés és reload utáni ellenőrzés (a teljes A/B jegyzetes lépéssor felhasználói visszaigazolása).
 - [x] Kliens–Worker helyi integrációs próba: két készülék offline ugyanazt az alvást szerkeszti, mindkét konfliktusválasztás után egy rekord és egyező adat marad.
 - [x] Lassú/párhuzamos szinkronválaszok és saját feltöltés utáni téves konfliktus célzott regressziós tesztjei.
 - [x] `SESSION_NOT_FOUND` helyi integrációs próbája: régi hiányzó alvás elkülönítése után a normál kétirányú szinkron folytatódik, a helyi sor/pending megmarad; egyedi, idempotens megosztás explicit választással.
-- [ ] A telefonon jelzett 6 várakozó módosítás melletti normál Start és az opcionális hiányzóalvás-megosztás élő elfogadása az új internal buildben.
-- [ ] A jelzett három előzménysor és eltérő telefonállapot újratesztje az új internal buildben (`SYNC_RETEST_CHECKPOINT_2026-09-17.md`).
+- [x] A beragadt feltöltés javítása utáni normál szinkron és visszajelzés telefonos elfogadása (2026-09-17; pozitív felhasználói visszajelzés, a konkrét Start/korrekció/Stop/reload lépések nincsenek külön részletezve).
+- [x] Az opcionális hiányzóalvás-megosztás élő elfogadása a konfliktus rendezése után (2026-09-17; családi változat, majd korábbi helyi alvás megosztása után minden egyezik).
+- [x] A jelzett duplikáció/eltérő telefonállapot miatti regressziós újrateszt az új internal buildben: mindkét konfliktusválasztás után egyező készülékadatok, helyi választás után egy sor és reload utáni egyezés elfogadva (`SYNC_RETEST_CHECKPOINT_2026-09-17.md`). Az eredeti régi rekordok történeti eredete nem bizonyított; automatikus deduplikáció nem történt.
 
 ### Insights és adatminőség
 

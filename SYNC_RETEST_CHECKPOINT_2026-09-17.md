@@ -1,6 +1,40 @@
 # Solemi — szinkron újrateszt és folytatási pont
 
-Dátum: 2026-09-17. A helyi javítás 138/138 teszten átment, de az eredeti telefonos duplikáció **még nincs elfogadva**. Ez a fájl segít a következő esti tesztet ugyanonnan folytatni.
+Dátum: 2026-09-17. **A telefonos szinkron-/konfliktus-újrateszt sikeresen lezárva.** A legutóbbi helyi kódellenőrzés 154/154 teszt, sikeres typecheck és két helyi build. Ez a fájl az elfogadást és a korábbi körök történetét őrzi.
+
+## Aktuális telefonos checkpoint — szinkron működik
+
+A `dec9987` fejlesztési HEAD mellett a tulajdonos pozitív visszajelzése:
+„Most szuper a szinkron és nagyon jó a visszajelzés is szerintem”. Normál szinkron
+és a visszajelzés érthetősége elfogadva; a konkrét korrekció/lezárás/reload
+lépések nem lettek külön részletezve. A fotón SHA nem látszik, mindkét futó
+verzió egyezését még külön ellenőrizzük.
+
+A képen látható konfliktusnál a tulajdonos a **családi változatot** választotta,
+majd az alatta látható, korábban csak nála meglevő alvást is megosztotta.
+Visszajelzés: „most full jó a szinkron és minden egyezik”. Családi feloldási
+ág és egyedi hiányzóalvás-megosztás élőben elfogadva, egyező telefonadatokkal.
+Ebben az első visszajelzésben darabszám/reload nem volt külön részletezve.
+
+Az ezt követő helyi feloldási próba lépései:
+
+1. Mindkét telefonon ugyanazt a közös lezárt alvást nyissátok meg szerkesztésre.
+2. A-n legyen a jegyzet „A próba”, B-n „B próba”; B még ne mentsen.
+3. A mentse, várjatok kb. 15 másodpercet; B nyitott űrlapja maradjon meg.
+4. B mentse a régebben megnyitott űrlapot. Konfliktusnál az **ezen a telefonon lévő** változatot válassza.
+5. Mindkét telefonon egyetlen érintett alvás maradjon, „B próba” jegyzettel; oldalfrissítés után is egyezzen.
+
+A tulajdonos a teljes fenti lépéssort sikeresnek igazolta: „Ahogy írtad úgy
+történt tökéletesen működött a teszt”. A helyi feloldási ág, egyetlen közös
+bejegyzés, B jegyzet és oldalfrissítés utáni egyezés elfogadva.
+
+**Mindkét konfliktusválasztás, normál szinkron és egyedi hiányzóalvás-megosztás
+élőben elfogadva; a regressziós kör lezárva.** Az eredeti régi három bejegyzés
+pontos eredete nincs bizonyítva, automatikus deduplikáció/törlés nem történt.
+Következő fejlesztési feladat a Family+ Insights teljes aktív családra kiterjesztése.
+
+Az alábbi részek az előző körök történetét őrzik; a következő lépést ez az
+aktuális checkpoint rögzíti.
 
 ## Élő újrateszt — bbac40b
 
