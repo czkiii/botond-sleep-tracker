@@ -35,6 +35,16 @@ type PendingOperation = {
   body: Record<string, unknown>
   sessionId?: string
   childId?: string
+  repairsMissingSession?: string
+  replacesOperationIds?: string[]
+}
+
+export type MissingSession = {
+  sessionId: string
+  localValue: SleepSession | null
+  repairOperationIds?: string[]
+  repairEnabled?: boolean
+  errorCode?: string
 }
 
 export type SyncConflict = {
@@ -52,6 +62,7 @@ type SyncStore = {
   conflicts: SyncConflict[]
   sessionRevisions?: Record<string, number>
   failure?: { code: string; status?: number }
+  missingSessions: MissingSession[]
 }
 
 type RemoteSession = Omit<SleepSession, 'childId' | 'dayNightOverride'> & {
@@ -74,7 +85,7 @@ type MutationResult = {
 
 type ApiEnvelope<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string }; data?: any }
 
-const defaultStore = (): SyncStore => ({ connection: null, pending: [], conflicts: [] })
+const defaultStore = (): SyncStore => ({ connection: null, pending: [], conflicts: [], missingSessions: [] })
 
 function readStore(): SyncStore {
   try {
@@ -94,7 +105,9 @@ function readStore(): SyncStore {
       .filter(([, revision]) => Number.isInteger(revision) && revision >= 0))
     const failure = parsed.failure && /^[A-Z_0-9]{1,64}$/.test(parsed.failure.code)
       ? { code: parsed.failure.code, status: parsed.failure.status } : undefined
-    return { connection, pending, conflicts: Array.isArray(parsed.conflicts) ? parsed.conflicts : [], sessionRevisions, failure }
+    const missingSessions = Array.isArray(parsed.missingSessions)
+      ? parsed.missingSessions.filter((item) => item && typeof item.sessionId === 'string') : []
+    return { connection, pending, conflicts: Array.isArray(parsed.conflicts) ? parsed.conflicts : [], sessionRevisions, failure, missingSessions }
   } catch {
     return defaultStore()
   }
@@ -226,7 +239,7 @@ export async function reconcileAccountFamily() {
     method: 'POST', body: JSON.stringify({ deviceName: accountDeviceName() })
   })
   if (!result.membership || !result.connection) return { claimed: false, connected: false, changed: false }
-  writeStore({ connection: result.connection, pending: [], conflicts: [] })
+  writeStore({ connection: result.connection, pending: [], conflicts: [], missingSessions: [] })
   const changed = await pullRemote(true)
   return { claimed: false, connected: true, changed }
 }
@@ -255,7 +268,7 @@ export async function createFamily(familyName: string, deviceName: string) {
   })
   const connection: SyncConnection = { familyId: created.familyId, familyName: created.familyName, deviceId: created.device.id, deviceToken: created.deviceToken, revision: created.revision }
   const baseline = { ...local, children: primaryChild ? [primaryChild] : [], sessions: [] }
-  writeStore({ connection, pending: makeOperations(baseline, local, connection.revision), conflicts: [] })
+  writeStore({ connection, pending: makeOperations(baseline, local, connection.revision), conflicts: [], missingSessions: [] })
   await flushPending()
   return createInvite()
 }
@@ -284,7 +297,7 @@ export async function joinFamily(code: string, deviceName: string) {
     connection = { familyId: joined.familyId, familyName: joined.familyName,
       deviceId: joined.device.id, deviceToken: joined.deviceToken, revision: 0 }
   }
-  writeStore({ connection, pending: [], conflicts: [] })
+  writeStore({ connection, pending: [], conflicts: [], missingSessions: [] })
 
   // Merge the cloud family into the device without silently discarding an
   // existing local diary. A dedicated, confirmed import flow can resolve any
@@ -421,12 +434,56 @@ export function flushPending() {
   return serializeSync(flushPendingNow)
 }
 
+function blockedByMissingSession(store: SyncStore, operation: PendingOperation) {
+  const missing = store.missingSessions.find((item) => item.sessionId === operation.sessionId)
+  if (!missing) return false
+  if (operation.method === 'DELETE' && !loadData().sessions.some((item) => item.id === operation.sessionId)) return false
+  return !(missing.repairEnabled && missing.repairOperationIds?.includes(operation.id))
+}
+
+// Sharing an unacknowledged local sleep is an explicit action, never a blanket
+// upload of pre-pairing history. Persist its operation IDs before sending it.
+export function restoreMissingSession(sessionId: string) {
+  return serializeSync(async () => {
+    const store = readStore()
+    const missing = store.missingSessions.find((item) => item.sessionId === sessionId)
+    if (!store.connection || !missing) return false
+    const data = loadData()
+    const session = data.sessions.find((item) => item.id === sessionId)
+    if (!session) throw new Error('LOCAL_SESSION_NOT_FOUND')
+    if (missing.repairOperationIds?.some((id) => store.pending.some((op) => op.id === id))) {
+      missing.repairEnabled = true
+      missing.errorCode = undefined
+    } else {
+      const baseline = { ...data, sessions: data.sessions.filter((item) => item.id !== sessionId) }
+      const operations: PendingOperation[] = makeOperations(baseline, data, store.connection.revision)
+        .map((operation) => ({ ...operation, repairsMissingSession: sessionId }))
+      if (!session.endTime && (session.note || session.dayNightOverride)) {
+        operations.push({ id: opId('op_repair_patch'), method: 'PATCH',
+          path: `/v1/sessions/${encodeURIComponent(sessionId)}`, sessionId, repairsMissingSession: sessionId,
+          body: { operationId: opId('mut'), baseRevision: store.connection.revision,
+            patch: { note: session.note, dayNightOverride: session.dayNightOverride } } })
+      }
+      operations[operations.length - 1].replacesOperationIds = store.pending
+        .filter((op) => op.sessionId === sessionId).map((op) => op.id)
+      missing.localValue = session
+      missing.repairOperationIds = operations.map((op) => op.id)
+      missing.repairEnabled = true
+      missing.errorCode = undefined
+      store.pending = [...operations, ...store.pending]
+    }
+    writeStore(store)
+    return pullRemoteNow()
+  })
+}
+
 async function flushPendingNow() {
   let store = readStore()
   if (!store.connection || !store.pending.length || store.conflicts.length || !navigator.onLine) return false
   let changedLocal = false
   while (store.connection && store.pending.length && !store.conflicts.length && navigator.onLine) {
-    const operation = store.pending[0]
+    const operation = store.pending.find((item) => !blockedByMissingSession(store, item))
+    if (!operation) break
     try {
       const result = await request<MutationResult>(operation.path, { method: operation.method, body: JSON.stringify(operation.body) }, store.connection.deviceToken)
       const resultRevision = result?.session?.revision ?? result?.child?.revision ?? result?.revision
@@ -434,7 +491,8 @@ async function flushPendingNow() {
       if (!sameConnection(store.connection, latest.connection)) return changedLocal
       store = latest
       if (!store.pending.some((item) => item.id === operation.id)) return changedLocal
-      const hasLaterSameEntity = store.pending.filter((item) => item.id !== operation.id).some((item) =>
+      const hasLaterSameEntity = store.pending.filter((item) => item.id !== operation.id
+        && !operation.replacesOperationIds?.includes(item.id)).some((item) =>
         (operation.sessionId && item.sessionId === operation.sessionId)
         || (operation.childId && item.childId === operation.childId))
       if (!hasLaterSameEntity && applyAuthoritativeSession(result?.session)) changedLocal = true
@@ -444,7 +502,11 @@ async function flushPendingNow() {
       if (!store.connection) return changedLocal
       // Mutation responses can have a newer family revision than this device has pulled.
       // Advancing the cursor here would skip intervening changes from another phone.
-      store.pending = store.pending.filter((item) => item.id !== operation.id)
+      store.pending = store.pending.filter((item) => item.id !== operation.id
+        && !operation.replacesOperationIds?.includes(item.id))
+      if (operation.replacesOperationIds) {
+        store.missingSessions = store.missingSessions.filter((item) => item.sessionId !== operation.repairsMissingSession)
+      }
       store.failure = undefined
       if (Number.isInteger(resultRevision)) {
         if (operation.sessionId) {
@@ -463,6 +525,35 @@ async function flushPendingNow() {
     } catch (error) {
       const apiError = error as Error & { code?: string; data?: any; status?: number }
       if (!sameConnection(store.connection, readStore().connection)) return changedLocal
+      if (apiError.code === 'SESSION_NOT_FOUND' && operation.sessionId && !operation.repairsMissingSession) {
+        store = readStore()
+        const localValue = loadData().sessions.find((item) => item.id === operation.sessionId) ?? null
+        if (operation.method === 'DELETE' && !localValue) {
+          // Both sides already agree on absence. This acknowledges a deletion,
+          // it does not discard a local edit or recreate a deleted record.
+          const deleteIndex = store.pending.findIndex((item) => item.id === operation.id)
+          store.pending = store.pending.filter((item, index) => item.sessionId !== operation.sessionId || index > deleteIndex)
+          if (!store.pending.some((item) => item.sessionId === operation.sessionId)) {
+            store.missingSessions = store.missingSessions.filter((item) => item.sessionId !== operation.sessionId)
+          }
+        } else if (!store.missingSessions.some((item) => item.sessionId === operation.sessionId)) {
+          store.missingSessions.push({ sessionId: operation.sessionId, localValue })
+        }
+        store.failure = undefined
+        writeStore(store)
+        continue
+      }
+      if (operation.repairsMissingSession && apiError.code !== 'FAMILY_SYNC_PAUSED' && apiError.code !== 'SYNC_CONFLICT') {
+        store = readStore()
+        const missing = store.missingSessions.find((item) => item.sessionId === operation.repairsMissingSession)
+        if (missing) {
+          missing.repairEnabled = false
+          missing.errorCode = apiError.code && /^[A-Z_0-9]{1,64}$/.test(apiError.code) ? apiError.code : 'NETWORK_ERROR'
+          writeStore(store)
+          // A rejected repair must not re-block unrelated new sleep data.
+          continue
+        }
+      }
       if (apiError.code === 'ACTIVE_SLEEP_EXISTS') {
         removeLocalSession(operation.sessionId)
         changedLocal = true
@@ -519,6 +610,7 @@ async function resolveSyncConflictNow(operationId: string, resolution: 'local' |
   } else {
     store.pending = store.pending.filter((item) => item.sessionId !== conflict.entityId)
     store.conflicts = store.conflicts.filter((item) => item.entityId !== conflict.entityId)
+    store.missingSessions = store.missingSessions.filter((item) => item.sessionId !== conflict.entityId)
     store.sessionRevisions = { ...store.sessionRevisions, [conflict.entityId]: conflict.serverRevision }
     writeStore(store)
     changedLocal = applyAuthoritativeSession(conflict.serverValue)
@@ -537,16 +629,20 @@ async function pullRemoteNow(forceFromZero = false) {
   const changedLocal = await flushPendingNow()
   const fresh = readStore()
   if (!sameConnection(store.connection, fresh.connection) || !fresh.connection
-    || fresh.conflicts.length || fresh.pending.length || !navigator.onLine) return changedLocal
+    || fresh.conflicts.length || fresh.pending.some((op) => !blockedByMissingSession(fresh, op)) || !navigator.onLine) return changedLocal
   const after = forceFromZero ? 0 : fresh.connection.revision
   const result = await request<{ revision: number; familyName?: string; children?: RemoteChild[]; sessions: RemoteSession[] }>(`/v1/sync?after=${after}`, {}, fresh.connection.deviceToken)
   const latest = readStore()
   // Edits made while this snapshot was in flight must be uploaded/conflicted
   // against the old cursor before any downloaded values replace them.
   if (!sameConnection(fresh.connection, latest.connection) || !latest.connection
-    || latest.pending.length || latest.conflicts.length) return changedLocal
+    || latest.pending.some((op) => !blockedByMissingSession(latest, op)) || latest.conflicts.length
+    || fresh.pending.map((op) => op.id).join() !== latest.pending.map((op) => op.id).join()) return changedLocal
   const current = loadData()
-  const merged = mergeRemote(current, result.sessions, result.children ?? [])
+  const protectedIds = new Set(latest.missingSessions.map((item) => item.sessionId))
+  const protectedChildIds = new Set(current.sessions.filter((item) => protectedIds.has(item.id)).map((item) => item.childId))
+  const merged = mergeRemote(current, result.sessions.filter((item) => !protectedIds.has(item.id)),
+    (result.children ?? []).filter((item) => !item.deletedAt || !protectedChildIds.has(item.id)))
   const changed = JSON.stringify(merged) !== JSON.stringify(current)
   if (changed) writeRemoteData(merged)
   // /v1/sync is the only authoritative place allowed to advance the cursor.

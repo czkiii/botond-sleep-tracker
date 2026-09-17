@@ -3,7 +3,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { readFileSync } from 'node:fs'
 import worker from '../src/index'
 import { sqliteBinding } from './sqliteD1'
-import { flushPending, getSyncStore, pullRemote, queueLocalChange, resolveSyncConflict } from '../../src/familySync'
+import { flushPending, getSyncStore, pullRemote, queueLocalChange, resolveSyncConflict, restoreMissingSession } from '../../src/familySync'
 import { REMOTE_DATA_EVENT, STORAGE_KEY, loadData, saveData } from '../../src/storage'
 import type { AppData } from '../../src/types'
 
@@ -92,6 +92,167 @@ async function editOffline(index: number, startTime: string, note: string) {
 }
 
 describe('two device client + Worker reconciliation', () => {
+  it.each(['local', 'family'] as const)('requires an explicit %s choice if another phone changes an active repair', async (choice) => {
+    sqlite.prepare("DELETE FROM sleep_sessions WHERE id = 'shared-sleep'").run()
+    useDevice(0, false)
+    saveData({ ...loadData(), sessions: initial.sessions.map((row) => ({ ...row, endTime: null, note: 'Helyi jegyzet' })) })
+    await pullRemote()
+    useDevice(0, true)
+    await pullRemote()
+    vi.stubGlobal('fetch', async (url: string, options: RequestInit) => {
+      const response = await worker.fetch(new Request(url, options), env)
+      if (url.endsWith('/v1/sessions/start') && response.status === 201) {
+        sqlite.prepare("UPDATE families SET revision = revision + 1 WHERE id = 'family-a'").run()
+        sqlite.prepare(`UPDATE sleep_sessions SET note = 'Másik telefon jegyzete',
+          revision = (SELECT revision FROM families WHERE id = 'family-a') WHERE id = 'shared-sleep'`).run()
+      }
+      return response
+    })
+    await restoreMissingSession('shared-sleep')
+    expect(getSyncStore().conflicts).toHaveLength(1)
+    await resolveSyncConflict(getSyncStore().conflicts[0].operationId, choice)
+    expect(getSyncStore().conflicts).toEqual([])
+    expect(getSyncStore().missingSessions).toEqual([])
+    expect(getSyncStore().pending).toEqual([])
+    expect(sqlite.prepare("SELECT note FROM sleep_sessions WHERE id = 'shared-sleep'").get())
+      .toEqual({ note: choice === 'local' ? 'Helyi jegyzet' : 'Másik telefon jegyzete' })
+  })
+
+  it('retries a repair with the same operation after the server committed but the response was lost', async () => {
+    sqlite.prepare("DELETE FROM sleep_sessions WHERE id = 'shared-sleep'").run()
+    await editOffline(0, '2026-08-26T09:50:00.000Z', 'Megőrzendő')
+    useDevice(0, true)
+    await pullRemote()
+    const sent: string[] = []
+    let loseResponse = true
+    vi.stubGlobal('fetch', async (url: string, options: RequestInit) => {
+      const response = await worker.fetch(new Request(url, options), env)
+      if (url.endsWith('/v1/sessions') && options.method === 'POST') {
+        sent.push(String(options.body))
+        if (loseResponse) { loseResponse = false; throw new TypeError('Response lost') }
+      }
+      return response
+    })
+    await restoreMissingSession('shared-sleep')
+    expect(getSyncStore().missingSessions[0].repairEnabled).toBe(false)
+    expect(getSyncStore().pending).toHaveLength(2)
+    await restoreMissingSession('shared-sleep')
+    expect(sent).toHaveLength(2)
+    expect(sent[0]).toBe(sent[1])
+    expect(getSyncStore().missingSessions).toEqual([])
+    expect(getSyncStore().pending).toEqual([])
+    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM sleep_sessions').get()).toEqual({ count: 1 })
+  })
+
+  it('keeps a rejected repair isolated when its ID belongs to another family', async () => {
+    sqlite.prepare("INSERT INTO families (id, name, revision, created_at) VALUES ('other-family', 'Other', 1, ?)").run(at)
+    sqlite.prepare(`INSERT INTO children (id, family_id, name, created_at, updated_at, revision)
+      VALUES ('other-child', 'other-family', 'Other', ?, ?, 1)`).run(at, at)
+    sqlite.prepare("UPDATE sleep_sessions SET family_id = 'other-family', child_id = 'other-child' WHERE id = 'shared-sleep'").run()
+    await editOffline(0, '2026-08-26T09:50:00.000Z', 'Másik családban levő ID')
+    useDevice(0, true)
+    await pullRemote()
+    await restoreMissingSession('shared-sleep')
+    expect(getSyncStore().missingSessions[0].errorCode).toBe('SESSION_CREATE_CONFLICT')
+    useDevice(0, false)
+    const local = loadData()
+    saveData({ ...local, sessions: [...local.sessions, { ...local.sessions[0], id: 'independent-start', endTime: null }] })
+    await pullRemote()
+    useDevice(0, true)
+    await pullRemote()
+    expect(sqlite.prepare("SELECT family_id, note FROM sleep_sessions WHERE id = 'shared-sleep'").get())
+      .toEqual({ family_id: 'other-family', note: '' })
+    expect(sqlite.prepare("SELECT family_id FROM sleep_sessions WHERE id = 'independent-start'").get()).toEqual({ family_id: 'family-a' })
+  })
+
+  it('acknowledges an explicit later local deletion of an already missing sleep', async () => {
+    sqlite.prepare("DELETE FROM sleep_sessions WHERE id = 'shared-sleep'").run()
+    await editOffline(0, '2026-08-26T09:50:00.000Z', 'Régi helyi javítás')
+    useDevice(0, true)
+    await pullRemote()
+    useDevice(0, false)
+    saveData({ ...loadData(), sessions: [] })
+    await pullRemote()
+    useDevice(0, true)
+    await pullRemote()
+    expect(getSyncStore().missingSessions).toEqual([])
+    expect(getSyncStore().pending).toEqual([])
+    expect(loadData().sessions).toEqual([])
+  })
+
+  it('quarantines a missing old sleep without blocking a newer start or other phone changes', async () => {
+    sqlite.prepare("DELETE FROM sleep_sessions WHERE id = 'shared-sleep'").run()
+    await editOffline(0, '2026-08-26T09:50:00.000Z', 'Csak helyben meglevő alvás')
+    useDevice(0, false)
+    const local = loadData()
+    saveData({ ...local, sessions: [...local.sessions, { ...local.sessions[0], id: 'new-start', endTime: null, note: '' }] })
+    await pullRemote()
+    useDevice(0, true)
+    await pullRemote()
+    expect(getSyncStore().missingSessions).toHaveLength(1)
+    expect(getSyncStore().pending.map((op) => op.sessionId)).toEqual(['shared-sleep'])
+    expect(loadData().sessions.find((row) => row.id === 'shared-sleep')?.note).toBe('Csak helyben meglevő alvás')
+    expect(sqlite.prepare("SELECT COUNT(*) AS count FROM sleep_sessions WHERE id = 'shared-sleep'").get()).toEqual({ count: 0 })
+    useDevice(1, true)
+    await pullRemote()
+    expect(loadData().sessions.find((row) => row.id === 'new-start')?.endTime).toBeNull()
+    useDevice(1, false)
+    const other = loadData()
+    saveData({ ...other, sessions: other.sessions.map((row) => row.id === 'new-start' ? { ...row, note: 'Másik telefon' } : row) })
+    await pullRemote()
+    useDevice(1, true)
+    await pullRemote()
+    useDevice(0, true)
+    await pullRemote()
+    expect(loadData().sessions.find((row) => row.id === 'new-start')?.note).toBe('Másik telefon')
+    expect(loadData().sessions.find((row) => row.id === 'shared-sleep')?.note).toBe('Csak helyben meglevő alvás')
+  })
+
+  it('shares only the reviewed missing sleep with its original ID and latest local values', async () => {
+    sqlite.prepare("DELETE FROM sleep_sessions WHERE id = 'shared-sleep'").run()
+    await editOffline(0, '2026-08-26T09:50:00.000Z', 'Első helyi változat')
+    await editOffline(0, '2026-08-26T09:40:00.000Z', 'Legújabb helyi változat')
+    useDevice(0, true)
+    await pullRemote()
+    expect(getSyncStore().pending).toHaveLength(2)
+    await restoreMissingSession('shared-sleep')
+    expect(getSyncStore().missingSessions).toEqual([])
+    expect(getSyncStore().pending).toEqual([])
+    expect(sqlite.prepare("SELECT id, start_time, note FROM sleep_sessions").all()).toEqual([
+      { id: 'shared-sleep', start_time: '2026-08-26T09:40:00.000Z', note: 'Legújabb helyi változat' }
+    ])
+    useDevice(1, true)
+    await pullRemote()
+    expect(loadData().sessions).toHaveLength(1)
+    expect(loadData().sessions[0].note).toBe('Legújabb helyi változat')
+  })
+
+  it('restores an explicitly reviewed active sleep including its note and override', async () => {
+    sqlite.prepare("DELETE FROM sleep_sessions WHERE id = 'shared-sleep'").run()
+    useDevice(0, false)
+    const data = loadData()
+    saveData({ ...data, sessions: data.sessions.map((row) => ({ ...row, endTime: null, note: 'Aktív helyi alvás', dayNightOverride: 'night' })) })
+    await pullRemote()
+    useDevice(0, true)
+    await pullRemote()
+    await restoreMissingSession('shared-sleep')
+    expect(getSyncStore().pending).toEqual([])
+    expect(getSyncStore().missingSessions).toEqual([])
+    expect(sqlite.prepare("SELECT id, end_time, note, day_night_override FROM sleep_sessions").get())
+      .toEqual({ id: 'shared-sleep', end_time: null, note: 'Aktív helyi alvás', day_night_override: 'night' })
+  })
+
+  it('does not resurrect a server tombstone as a missing sleep', async () => {
+    sqlite.prepare("UPDATE sleep_sessions SET deleted_at = ?, revision = 3 WHERE id = 'shared-sleep'").run(at)
+    sqlite.prepare('UPDATE families SET revision = 3').run()
+    await editOffline(0, '2026-08-26T09:50:00.000Z', 'Régi űrlap')
+    useDevice(0, true)
+    await pullRemote()
+    expect(getSyncStore().conflicts).toHaveLength(1)
+    expect(getSyncStore().missingSessions).toEqual([])
+    expect(sqlite.prepare("SELECT deleted_at FROM sleep_sessions WHERE id = 'shared-sleep'").get()).toEqual({ deleted_at: at })
+  })
+
   it('accepts a second edit after this device uploaded the first edit but has not polled yet', async () => {
     await editOffline(0, '2026-08-26T09:50:00.000Z', 'Első saját javítás')
     useDevice(0, true)

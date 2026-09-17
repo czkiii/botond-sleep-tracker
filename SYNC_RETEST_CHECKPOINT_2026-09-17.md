@@ -14,6 +14,26 @@ Javasolt következő Summary: `Preserve failed sync operations and surface uploa
 
 ## Előkészítés
 
+**Legfrissebb checkpoint:** a `6ba91fa` után a telefon `SESSION_NOT_FOUND`
+hibát jelzett. Új helyi szelet külön kezeli a hiányzó régi alvás műveleteit,
+megőrzi a helyi adatot és folytatja a többi alvás feltöltését/letöltését.
+154/154 teszt, frontend typecheck és mindkét helyi build sikeres; új Worker-kód
+vagy migráció nincs. A hiány pontos előzménye és az eredeti duplikáció nem bizonyított.
+
+Aktuális Summary: `Isolate missing sleep operations and restore them explicitly`.
+Commit/push és új internal build után mindkét telefonon az új SHA legyen.
+Először várjátok meg, hogy a **már elindított** normál tesztalvás átjut-e a másik
+telefonra. Az Opo panel most a korábbi hiányzó alvásokat külön mutatja; ezek
+felülvizsgálati jelzése önmagában nem akadályozza a többi sor szinkronját.
+Ne töröljetek adatot és ne párosítsatok újra. Exportmentés után az időpontok
+és jegyzet alapján egyenként eldönthető, hogy egy régi helyi alvás megosztandó-e.
+Az `Ezt az alvást is megosztom` gomb csak azt az egy sort küldi el, eredeti ID-val;
+ha sikertelen, a művelet megmarad és a panel hibát mutat. Nem kell az összes régi
+helyi előzményt megosztani a normál Start-teszt folytatásához.
+
+Az alábbi korábbi Summary-k a korábbi csomagokra vonatkoznak; új commitnál a
+legfrissebbet használd.
+
 1. Commit/push a tulajdonos GitHub Desktopjából. Javasolt Summary: `Document product direction and fix family sync races`.
 2. Várd meg az internal Pages buildet és a zöld ellenőrzéseket. Mindkét telefonon az internal oldalt nyisd meg, ugyanazzal az új commit SHA-val; az alkalmazás frissítése után ellenőrizd a verziót. Production oldal nem része a próbának.
 3. Mindkét telefon adatait exportáld mentésként. **Ne töröld a korábbi hibás előzményeket.** A mentések személyes adatot tartalmazhatnak; ne töltsd fel őket nyilvános issue-ba.

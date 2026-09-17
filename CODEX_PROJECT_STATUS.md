@@ -3,7 +3,7 @@
 **Utolsó frissítés:** 2026-09-17
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
-**Aktuálisan ellenőrzött fejlesztési HEAD:** `bbac40b` (`Document product direction and fix family sync races`). A tulajdonos commitolta/pusholta és sikeres deployt jelzett. A feltöltési hibajelzés alább dokumentált új helyi szelete még nincs commitolva.
+**Aktuálisan ellenőrzött fejlesztési HEAD:** `6ba91fa` (`Preserve failed sync operations and surface upload errors`); a munkamenet elején a munkafa tiszta volt. A tulajdonos az új hibajelzésből `SESSION_NOT_FOUND` választ jelzett. A hiányzó alvások alább dokumentált új helyi szelete még nincs commitolva.
 
 Ez a fájl az új Codex-beszélgetések rövid belépési pontja. A pillanatnyi pontos commit mindig az a commit, amely ezt a fájlt tartalmazza; ellenőrzéshez futtasd a `git log -1 --oneline` parancsot.
 
@@ -283,6 +283,50 @@ megőrzését/jelzését, az azonos művelet biztonságos újrapróbálását, a
 feltöltés utáni sorfolytatást, a request/body időkorlátot és a nem JSON választ.
 A Worker forrása és sémája ebben a szeletben nem változott. Élő elfogadás nyitott.
 
+## SESSION_NOT_FOUND — hiányzó alvás elkülönítése, 2026-09-17
+
+A tulajdonos az új internal hibajelzésből ezt olvasta le:
+„Nem sikerült frissíteni a családi adatokat. · SESSION_NOT_FOUND”. Ez azt
+igazolja, hogy egy pending művelet a család szerveroldali naplójából hiányzó
+alvásra hivatkozik. Az érintett ID/kérés törzse még nem ismert; az eredeti
+duplikáció és a rekord hiányának történeti oka továbbra sem bizonyított.
+Lehetséges előzmény a családhoz csatlakozás előtt megmaradt helyi sor vagy
+korábban elvesztett létrehozási művelet; ezeket nem kezeljük tényként.
+
+Helyi reprodukció igazolta a FIFO elakadást: régi hiányzó alvásra mutató PATCH
+feltartotta az utána sorba állított új Startot és a másik telefon letöltését.
+Új kliensjavítás megőrzi a hibás műveleteket és helyi alvást `missingSessions`
+állapotban, és az érintett alváson kívül folytatja a feltöltést/letöltést.
+A panel HU/EN/DE szöveggel, gyermekkel, időponttal és jegyzettel bemutatja az
+érintett sort; elsőbbsége van a régi meghívókód nézetével szemben. Több elemnél
+a panel görgethető. Nem állítjuk sikeresnek a teljes szinkront, amíg van
+ellenőrizendő alvás.
+
+A felhasználó külön `Ezt az alvást is megosztom` választására a kliens csak
+az adott helyi alvás aktuális értékeit osztja meg az eredeti session ID-val.
+A korábbi pending műveleteit csak a helyettesítő mentés szerveres nyugtája
+után veszi ki. Aktív alvás jegyzete/típusfelülírása is megmarad. Elveszett
+válasz után ugyanaz a persisted operation ID és body próbálható újra.
+Elutasított helyreállítás megőrzi a sorát, de nem állítja le a többi alvást.
+Más családhoz tartozó ID-t nem írunk át; nem készítünk helyette új azonosítót.
+Szerveres tombstone nem válik hiányzó rekorddá vagy automatikus visszaállítássá.
+Helyreállítás közbeni másik telefonos változás a meglévő explicit
+helyi/családi konfliktusválasztást igényli. Ha a felhasználó később maga törli
+a helyi hiányzó sort, a szerveren is igazolt hiány lezárja a törlését; ez nem
+automatikus adatjavítás. Helyben sem elérhető alvást nem állítunk vissza.
+
+Új ellenőrzés: **154/154 helyi teszt**, frontend typecheck, production és
+auth-enabled internal helyi build sikeres. 9 új tényleges kliens–Worker–SQLite
+integrációs teszt: hiányzó sor melletti kétirányú működés, lezárt/aktív
+helyreállítás, elveszett válasz idempotens újrapróbálása, idegen családi ID,
+tombstone, explicit későbbi törlés és helyreállítás közbeni mindkét
+konfliktusválasztás. Böngészőben a hiányzó sor jelzése, a megosztási gomb,
+a siker utáni megszűnő jelzés és egyetlen bejegyzéssel megmaradó reload
+ellenőrizve, kizárólag eldobható helyi SQLite és tesztadat használatával.
+
+Nincs Worker-forrás/sémaváltozás, távoli D1-írás, deploy, commit vagy push.
+Az eredeti telefonos teszt továbbra is nyitott; az új kliens élő elfogadásra vár.
+
 ## Fő nyitott blokkok a `main` migráció előtt
 
 1. A kéttelefonos konfliktusteszt során jelzett duplikáció és eltérő előzmények kivizsgálása, javítása, majd staging elfogadása.
@@ -297,19 +341,17 @@ A Worker forrása és sémája ebben a szeletben nem változott. Élő elfogadá
 
 ## Következő konkrét feladat
 
-A helyi csomag a `bbac40b` commitban van; a tulajdonos sikeres deployt jelzett.
-Az élő újrateszt már a normál Start másik telefonon való megjelenésénél elakadt.
-Első feladat a két telefon családi panelállapotának, pending/conflict számának,
-account-jogosultságának és futó build SHA-jának egyeztetése, majd a feltöltés vagy
-letöltés hibájának elkülönítése. Konfliktustesztet egyelőre nem folytatunk;
-korábbi adatot nem törlünk. Részletek a checkpoint fájlban.
-Az új helyi hibajelzési szelet commit/push utáni internal buildje segít a 6
-várakozó módosítás elutasításának megismerésében. Javasolt Summary:
-`Preserve failed sync operations and surface upload errors`.
-Codex nem indított deployt. A jelenlegi
-Worker már kezeli a revision-conflictet; ehhez a kliensjavításhoz nincs új migráció
-vagy Worker-kód. Ha a telefonos próba elfogadott, következő fejlesztés a Family+
-Insights teljes aktív családra kiterjesztése; előbb nem kezdünk vásárlási integrációt.
+A `6ba91fa` hibajelzése feltárta a `SESSION_NOT_FOUND` elakadást. A fenti helyi
+elkülönítési/javítási szeletet a tulajdonos commitolja/pusholja. Javasolt Summary:
+`Isolate missing sleep operations and restore them explicitly`.
+Az új internal buildben mindkét telefon SHA-jának ellenőrzése után először
+a már elindított normál alvás megjelenését nézzük a másik telefonon. A régi
+hiányzó alvást csak exportmentés és időpontellenőrzés után, az egyedi megosztási
+gombbal osztjuk meg, ha a tulajdonos szeretné. Ha más hiba marad, leolvassuk
+a panelt; nincs törlés vagy vak újrapárosítás. Utána a konfliktuskörök a
+checkpoint szerint. Worker-kód/migráció nincs ehhez a szelethez, Codex nem
+deployolt. Telefonos elfogadás után következő fejlesztés a Family+ Insights
+teljes aktív családra kiterjesztése; előbb nem kezdünk vásárlási integrációt.
 
 ## Munkamegosztás
 

@@ -81,6 +81,8 @@
 }
 .family-sync-sheet {
   width: min(100%, 520px);
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
   padding: 8px 18px calc(20px + env(safe-area-inset-bottom));
   border: 1px solid rgba(111, 171, 255, .18);
   border-bottom: none;
@@ -95,6 +97,7 @@
 .family-sync-sheet h2 { margin: 0; font-size: 22px; line-height: 1.1; }
 .family-sync-sheet header > button { width: 34px; height: 34px; border: 0; border-radius: 50%; background: rgba(255,255,255,.06); color: #cfe3fa; font-size: 24px; line-height: 1; }
 .family-sync-content { display: grid; gap: 11px; }
+.family-sync-missing { margin-top: 18px; padding-top: 18px; border-top: 1px solid rgba(137, 179, 225, .2); }
 .family-sync-content p { margin: 2px 0 6px; color: #9fb4cd; font-size: 13px; line-height: 1.45; }
 .family-sync-primary,
 .family-sync-secondary,

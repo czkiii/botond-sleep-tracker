@@ -122,6 +122,8 @@ A fejlesztés ugyanabban a repóban és ugyanazon a fő alkalmazáson folytatód
 - [ ] Az alvásszintű konfliktusészlelés és mindkét feloldás valódi kéttelefonos staging elfogadása.
 - [x] Kliens–Worker helyi integrációs próba: két készülék offline ugyanazt az alvást szerkeszti, mindkét konfliktusválasztás után egy rekord és egyező adat marad.
 - [x] Lassú/párhuzamos szinkronválaszok és saját feltöltés utáni téves konfliktus célzott regressziós tesztjei.
+- [x] `SESSION_NOT_FOUND` helyi integrációs próbája: régi hiányzó alvás elkülönítése után a normál kétirányú szinkron folytatódik, a helyi sor/pending megmarad; egyedi, idempotens megosztás explicit választással.
+- [ ] A telefonon jelzett 6 várakozó módosítás melletti normál Start és az opcionális hiányzóalvás-megosztás élő elfogadása az új internal buildben.
 - [ ] A jelzett három előzménysor és eltérő telefonállapot újratesztje az új internal buildben (`SYNC_RETEST_CHECKPOINT_2026-09-17.md`).
 
 ### Insights és adatminőség
