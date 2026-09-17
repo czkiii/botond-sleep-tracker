@@ -2,6 +2,16 @@
 
 Dátum: 2026-09-17. A helyi javítás 138/138 teszten átment, de az eredeti telefonos duplikáció **még nincs elfogadva**. Ez a fájl segít a következő esti tesztet ugyanonnan folytatni.
 
+## Élő újrateszt — bbac40b
+
+A tulajdonos jelezte a sikeres deployt. Az első rövid próba már az alvás indításának másik telefonon való megjelenésénél elakadt. A két telefon családi panelállapota, pending/conflict száma, jogosultsága és mindkét futó build SHA-ja még egyeztetésre vár. A feltöltés és a fogadó oldali letöltés hibáját ebből a beszámolóból nem lehet megkülönböztetni. A teszt nem elfogadott; előbb ezt a normál Start-megosztást diagnosztizáljuk, a konfliktuskör még nem kezdődik. Korábbi adatot nem törlünk, nem párosítunk újra diagnózis nélkül.
+
+Későbbi pontosítás: tulajdonos Family+, fotón `bbac40b`, Opo, 6 várakozó módosítás, „Adatok frissítése…”. Feleség Free és „szinkron most”. A fotó a beállítások kártyáját mutatja, nem a megnyitott családi panelt. A pontos feltöltési hiba még nem ismert.
+
+Új, még nem commitolt hibajelzési szelet készült; 145/145 teszt, frontend typecheck és mindkét helyi build sikeres. A nem nyugtázott feltöltési hibát nem nyeli el és nem törli a pending műveletet; az internal családi panel hibakódot mutat. 15 másodperces teljes request/body határ védi a szinkronsort. Ez diagnózist és biztonságos újrapróbálást ad, a telefonos gyökérokot még nem bizonyítja.
+
+Javasolt következő Summary: `Preserve failed sync operations and surface upload errors`. Az új internal build után nálad nyisd meg az Opo családi kártyát és olvasd le az esetleges hibakódot. Ne indíts újabb alvásokat a várakozó sor mellé és ne törölj adatot. Ha a sor kiürül, a már elindított alvás másik telefonon való megjelenését ellenőrizzük először. Nincs új Worker-kód vagy migráció, Codex nem deployolt.
+
 ## Előkészítés
 
 1. Commit/push a tulajdonos GitHub Desktopjából. Javasolt Summary: `Document product direction and fix family sync races`.

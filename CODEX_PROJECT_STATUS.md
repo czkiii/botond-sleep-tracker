@@ -3,7 +3,7 @@
 **Utolsó frissítés:** 2026-09-17
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
-**A munkamenet elején ellenőrzött fejlesztési HEAD:** `8de2928` (`Document monetization audit and sync bug checkpoint`); a munkafában a korábbi, untracked `PRODUCT_STRATEGY_AUDIT_2026-09-16.md` volt. A mostani helyi módosítások még nincsenek commitolva.
+**Aktuálisan ellenőrzött fejlesztési HEAD:** `bbac40b` (`Document product direction and fix family sync races`). A tulajdonos commitolta/pusholta és sikeres deployt jelzett. A feltöltési hibajelzés alább dokumentált új helyi szelete még nincs commitolva.
 
 Ez a fájl az új Codex-beszélgetések rövid belépési pontja. A pillanatnyi pontos commit mindig az a commit, amely ezt a fájlt tartalmazza; ellenőrzéshez futtasd a `git log -1 --oneline` parancsot.
 
@@ -253,6 +253,36 @@ nincs új séma/migráció és nincs Worker-forrásváltozás. A kliens új sync
 mezője hiányzó régi értékekből biztonságosan indul; régi konfliktusok explicit
 feloldása továbbra is szükséges lehet.
 
+## Élő Start-elakadás és helyi hibajelzés — 2026-09-17
+
+A `bbac40b` élő próbáján az indított alvás nem jelent meg a másik telefonon.
+A tulajdonos Family+ nézetet jelzett; a fotón `bbac40b`, Opo család, 6 várakozó
+módosítás és „Adatok frissítése…” látszik, konfliktus nem látható ezen a képen.
+A feleség Free nézetben „szinkron most” állapotot jelzett. A megnyitott családi
+panel és a fogadó készülék buildazonosítója még egyeztetésre vár.
+
+A kódvizsgálat és két előbb elbukó reprodukáló teszt igazolta: feltöltési 500-as
+hiba után a kliens sikert jelző visszatérést adott, 401-es hibánál pedig kivette
+a nem nyugtázott műveletet a sorból. **Ez nem bizonyítja a 6 várakozó tétel okát.**
+A staging élő napló olvasása sikerült, a megfigyelési időben nem érkezett esemény;
+ebből nem következtetünk a szerver egészségére vagy a telefon kérésének okára.
+A naplókövetés leállítva. Távoli írás/deploy nem történt.
+
+Új helyi kliensszelet: a nem nyugtázott feltöltési hibák megőrzik a pending
+műveletet és felszínre kerülnek; a családi panel belső buildben biztonságos
+hibakódot mutat (nincs token vagy személyes adat). Várakozó művelet/konfliktus
+mellett nem frissül az utolsó sikeres szinkron időpontja. Az account- és sync
+kérés, a JSON-válasz beolvasásával együtt, 15 másodperces határt kap; beragadt
+kérés után a sor folytatható azonos operation ID-val. Nincs automatikus
+eldobás vagy korábbi sorok adatjavítása. Permanens hibánál a sor megállhat és
+diagnózist igényel; nem írjuk át vakon a visszautasított műveletet.
+
+Ellenőrzés: **145/145 helyi teszt**, frontend typecheck, production és
+auth-enabled internal helyi build sikeres. 7 új teszt ellenőrzi a hiba
+megőrzését/jelzését, az azonos művelet biztonságos újrapróbálását, a beragadt
+feltöltés utáni sorfolytatást, a request/body időkorlátot és a nem JSON választ.
+A Worker forrása és sémája ebben a szeletben nem változott. Élő elfogadás nyitott.
+
 ## Fő nyitott blokkok a `main` migráció előtt
 
 1. A kéttelefonos konfliktusteszt során jelzett duplikáció és eltérő előzmények kivizsgálása, javítása, majd staging elfogadása.
@@ -267,9 +297,16 @@ feloldása továbbra is szükséges lehet.
 
 ## Következő konkrét feladat
 
-A felhasználó commitolja/pusholja a helyi csomagot, majd a hozzá tartozó internal
-Pages build azonos SHA-ját ellenőrizve következik a kéttelefonos újrateszt a
-checkpoint szerint. Codex ebben a munkamenetben nem indított deployt. A jelenlegi
+A helyi csomag a `bbac40b` commitban van; a tulajdonos sikeres deployt jelzett.
+Az élő újrateszt már a normál Start másik telefonon való megjelenésénél elakadt.
+Első feladat a két telefon családi panelállapotának, pending/conflict számának,
+account-jogosultságának és futó build SHA-jának egyeztetése, majd a feltöltés vagy
+letöltés hibájának elkülönítése. Konfliktustesztet egyelőre nem folytatunk;
+korábbi adatot nem törlünk. Részletek a checkpoint fájlban.
+Az új helyi hibajelzési szelet commit/push utáni internal buildje segít a 6
+várakozó módosítás elutasításának megismerésében. Javasolt Summary:
+`Preserve failed sync operations and surface upload errors`.
+Codex nem indított deployt. A jelenlegi
 Worker már kezeli a revision-conflictet; ehhez a kliensjavításhoz nincs új migráció
 vagy Worker-kód. Ha a telefonos próba elfogadott, következő fejlesztés a Family+
 Insights teljes aktív családra kiterjesztése; előbb nem kezdünk vásárlási integrációt.

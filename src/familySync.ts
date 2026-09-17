@@ -1,6 +1,7 @@
 import type { AppData, ChildProfile, SleepSession } from './types'
 import { REMOTE_DATA_EVENT, STORAGE_KEY, loadData } from './storage'
 import { accountDeviceName, accountRequest } from './accountAuth'
+import { fetchJson } from './apiTransport'
 
 const API_BASE = (import.meta.env.VITE_SYNC_API_BASE || 'https://solemi-sleep-sync.czki-adam.workers.dev').replace(/\/$/, '')
 const SYNC_KEY = 'solemiSleep:sync:v1'
@@ -50,6 +51,7 @@ type SyncStore = {
   pending: PendingOperation[]
   conflicts: SyncConflict[]
   sessionRevisions?: Record<string, number>
+  failure?: { code: string; status?: number }
 }
 
 type RemoteSession = Omit<SleepSession, 'childId' | 'dayNightOverride'> & {
@@ -90,7 +92,9 @@ function readStore(): SyncStore {
     })) : []
     const sessionRevisions = Object.fromEntries(Object.entries(parsed.sessionRevisions ?? {})
       .filter(([, revision]) => Number.isInteger(revision) && revision >= 0))
-    return { connection, pending, conflicts: Array.isArray(parsed.conflicts) ? parsed.conflicts : [], sessionRevisions }
+    const failure = parsed.failure && /^[A-Z_0-9]{1,64}$/.test(parsed.failure.code)
+      ? { code: parsed.failure.code, status: parsed.failure.status } : undefined
+    return { connection, pending, conflicts: Array.isArray(parsed.conflicts) ? parsed.conflicts : [], sessionRevisions, failure }
   } catch {
     return defaultStore()
   }
@@ -109,8 +113,9 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
     return accountRequest<T>(path, { ...options, headers })
   }
   if (token) headers.set('Authorization', `Bearer ${token}`)
-  const response = await fetch(`${API_BASE}${path}`, { ...options, headers, cache: 'no-store' })
-  const payload = await response.json() as ApiEnvelope<T>
+  const { response, body: payload } = await fetchJson<ApiEnvelope<T>>(`${API_BASE}${path}`, {
+    ...options, headers, cache: 'no-store'
+  })
   if (!response.ok || !payload.ok) {
     const error = new Error(!payload.ok ? payload.error.message : `HTTP ${response.status}`) as Error & { code?: string; data?: any; status?: number }
     if (!payload.ok) { error.code = payload.error.code; error.data = payload.data }
@@ -401,7 +406,9 @@ export function queueLocalChange(previous: AppData, next: AppData, baseRevision?
   }))
   if (!operations.length) return
   writeStore({ ...store, pending: [...store.pending, ...operations] })
-  void flushPending()
+  // The failure is persisted and announced by the flush; automatic polling
+  // will retry. Do not leave an unhandled rejection from a local save.
+  void flushPending().catch(() => {})
 }
 
 function removeLocalSession(sessionId?: string) {
@@ -438,6 +445,7 @@ async function flushPendingNow() {
       // Mutation responses can have a newer family revision than this device has pulled.
       // Advancing the cursor here would skip intervening changes from another phone.
       store.pending = store.pending.filter((item) => item.id !== operation.id)
+      store.failure = undefined
       if (Number.isInteger(resultRevision)) {
         if (operation.sessionId) {
           // Remember our acknowledged write without skipping changes to other
@@ -460,6 +468,7 @@ async function flushPendingNow() {
         changedLocal = true
         store = readStore()
         store.pending = store.pending.filter((item) => item.sessionId !== operation.sessionId)
+        store.failure = undefined
         writeStore(store)
         if (applyAuthoritativeSession(apiError.data?.activeSession)) changedLocal = true
         continue
@@ -469,19 +478,22 @@ async function flushPendingNow() {
         const conflict = apiError.data?.conflict as Omit<SyncConflict, 'operationId'> | undefined
         if (conflict) {
           store = readStore()
+          store.failure = undefined
           store.conflicts = [...store.conflicts.filter((item) => item.operationId !== operation.id),
             { ...conflict, operationId: operation.id }]
           writeStore(store)
         }
         break
       }
-      if (apiError.status && apiError.status >= 400 && apiError.status < 500 && apiError.code !== 'INTERNAL_ERROR') {
-        store = readStore()
-        store.pending = store.pending.filter((item) => item.id !== operation.id)
-        writeStore(store)
-        continue
+      // Authentication, proxy and server failures are not acknowledgements.
+      // Keep the exact mutation for a safe retry and surface the actual failure.
+      store = readStore()
+      store.failure = {
+        code: apiError.code && /^[A-Z_0-9]{1,64}$/.test(apiError.code) ? apiError.code : 'NETWORK_ERROR',
+        ...(apiError.status ? { status: apiError.status } : {})
       }
-      break
+      writeStore(store)
+      throw error
     }
   }
   return changedLocal

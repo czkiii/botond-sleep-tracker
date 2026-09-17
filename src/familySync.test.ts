@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { flushPending, getSyncStore, isEmptyStarterData, makeOperations, mergeRemote, pullRemote, queueLocalChange, resolveSyncConflict } from './familySync'
 import { STORAGE_KEY } from './storage'
+import { API_TIMEOUT_MS } from './apiTransport'
 import type { AppData, ChildProfile, SleepSession } from './types'
 
 const at = '2026-08-26T10:00:00.000Z'
@@ -42,6 +43,7 @@ afterEach(() => {
   restoreGlobal('window')
   restoreGlobal('fetch')
   vi.restoreAllMocks()
+  vi.useRealTimers()
 })
 
 describe('Family Sync child deletion', () => {
@@ -183,6 +185,53 @@ describe('Family Sync slow responses', () => {
     await running
     expect(getSyncStore().connection?.familyId).toBe('family-2')
     expect(JSON.parse(storage.getItem(STORAGE_KEY)!).sessions[0].note).toBe('')
+  })
+
+  it.each([500, 401])('preserves and surfaces a failed upload (HTTP %s) instead of claiming success', async (status) => {
+    setup([patch])
+    const code = status === 401 ? 'SESSION_INVALID' : 'INTERNAL_ERROR'
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      ok: false, error: { code, message: 'Test failure' }
+    }), { status, headers: { 'Content-Type': 'application/json' } }))
+    Object.defineProperty(globalThis, 'fetch', { configurable: true, value: fetchMock })
+    await expect(pullRemote()).rejects.toMatchObject({ code })
+    expect(getSyncStore().pending).toHaveLength(1)
+    expect(getSyncStore().connection?.revision).toBe(4)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('retries the exact failed operation and clears the failure only after acknowledgement', async () => {
+    setup([patch])
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: false,
+        error: { code: 'INTERNAL_ERROR', message: 'Test failure' } }), { status: 500 }))
+      .mockResolvedValueOnce(ok({ revision: 5, session: remote }))
+    Object.defineProperty(globalThis, 'fetch', { configurable: true, value: fetchMock })
+    await expect(flushPending()).rejects.toMatchObject({ code: 'INTERNAL_ERROR' })
+    expect(getSyncStore().failure?.code).toBe('INTERNAL_ERROR')
+    await flushPending()
+    expect(fetchMock.mock.calls[0][1].body).toBe(fetchMock.mock.calls[1][1].body)
+    expect(getSyncStore().pending).toEqual([])
+    expect(getSyncStore().failure).toBeUndefined()
+  })
+
+  it('releases the serialized queue after a hung upload and safely retries it', async () => {
+    vi.useFakeTimers()
+    setup([patch])
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(() => new Promise(() => {}))
+      .mockResolvedValueOnce(ok({ revision: 5, session: remote }))
+    Object.defineProperty(globalThis, 'fetch', { configurable: true, value: fetchMock })
+    const checked = expect(flushPending()).rejects.toMatchObject({ code: 'API_TIMEOUT' })
+    const retry = flushPending()
+    await vi.advanceTimersByTimeAsync(API_TIMEOUT_MS)
+    await checked
+    await retry
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock.mock.calls[0][1].body).toBe(fetchMock.mock.calls[1][1].body)
+    expect(getSyncStore().pending).toEqual([])
+    expect(getSyncStore().failure).toBeUndefined()
+    expect(vi.getTimerCount()).toBe(0)
   })
 })
 

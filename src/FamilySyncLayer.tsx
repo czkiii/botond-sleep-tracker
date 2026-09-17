@@ -105,6 +105,7 @@ export default function FamilySyncLayer() {
   const [online, setOnline] = useState(() => navigator.onLine)
   const [lastSyncAt, setLastSyncAt] = useState(() => Number(localStorage.getItem(LAST_SYNC_KEY) || 0))
   const [syncIssue, setSyncIssue] = useState(false)
+  const [uploadFailure, setUploadFailure] = useState(() => getSyncStore().failure?.code || '')
   const [, setClock] = useState(0)
   const [settingsTarget, setSettingsTarget] = useState<Element | null>(() => document.querySelector('.settings-screen'))
   const [connectionName, setConnectionName] = useState(() => getSyncStore().connection?.familyName || '')
@@ -125,17 +126,21 @@ export default function FamilySyncLayer() {
     if (apiError?.code === 'SESSION_INVALID') return text.accountRequired
     if (apiError?.code === 'FAMILY_OWNER_ACCOUNT_REQUIRED') return text.ownerAccountRequired
     if (apiError?.code === 'ACCOUNT_ALREADY_IN_FAMILY' || apiError?.code === 'ACCOUNT_ALREADY_IN_OTHER_FAMILY') return text.alreadyInFamily
-    if (!navigator.onLine || err instanceof TypeError) return text.networkError
+    if (!navigator.onLine || err instanceof TypeError || apiError?.code === 'API_TIMEOUT' || apiError?.code === 'NETWORK_ERROR') return text.networkError
     return text.error
   }
 
   const markSynced = () => {
+    const store = getSyncStore()
+    setPendingCount(store.pending.length)
+    setConflictCount(store.conflicts.length)
+    setUploadFailure(store.failure?.code || '')
+    setSyncIssue(Boolean(store.failure))
+    if (store.pending.length || store.conflicts.length || store.failure) return
     const now = Date.now()
     localStorage.setItem(LAST_SYNC_KEY, String(now))
     setLastSyncAt(now)
     setSyncIssue(false)
-    setPendingCount(getSyncStore().pending.length)
-    setConflictCount(getSyncStore().conflicts.length)
   }
 
   useEffect(() => {
@@ -204,6 +209,8 @@ export default function FamilySyncLayer() {
       setConnectionName(next?.familyName || '')
       setPendingCount(store.pending.length)
       setConflictCount(store.conflicts.length)
+      setUploadFailure(store.failure?.code || '')
+      setSyncIssue(Boolean(store.failure))
     }
     const onSaved = (event: Event) => {
       const detail = (event as CustomEvent<{ previous: AppData; next: AppData; baseRevision?: number }>).detail
@@ -316,8 +323,8 @@ export default function FamilySyncLayer() {
     if (!connected) return text.disconnected
     if (!online) return text.offline
     if (conflictCount) return text.syncIssue
-    if (pendingCount) return text.syncing
     if (syncIssue) return text.syncIssue
+    if (pendingCount) return text.syncing
     return text.connected
   }, [serverPaused, familySyncAvailable, connected, online, conflictCount, pendingCount, syncIssue, text])
 
@@ -462,6 +469,10 @@ export default function FamilySyncLayer() {
           {connected && <button className="family-sync-link" onClick={() => { setInviteCode(''); setMode('home') }}>{text.close}</button>}
         </div>}
         {error && <div className="family-sync-error">{error}</div>}
+        {uploadFailure && !error && <div className="family-sync-error">
+          {friendlyError({ code: uploadFailure })}
+          {internalPreview && <small> · {uploadFailure}</small>}
+        </div>}
       </section>
     </div>}
   </>

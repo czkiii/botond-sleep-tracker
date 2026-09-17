@@ -1,3 +1,5 @@
+import { fetchJson } from './apiTransport'
+
 const internalAccountProxy = import.meta.env.VITE_INTERNAL_PREVIEW === 'true'
   && import.meta.env.VITE_ACCOUNT_AUTH === 'true' ? '/api' : ''
 const API_BASE = (import.meta.env.VITE_ACCOUNT_API_BASE || internalAccountProxy
@@ -23,8 +25,9 @@ export class AccountAuthError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}) {
-  const response = await fetch(`${API_BASE}${path}`, { ...options, credentials: 'include', cache: 'no-store' })
-  const envelope = await response.json() as ApiEnvelope<T>
+  const { response, body: envelope } = await fetchJson<ApiEnvelope<T>>(`${API_BASE}${path}`, {
+    ...options, credentials: 'include', cache: 'no-store'
+  })
   if (!response.ok || !envelope.ok) {
     const failure = envelope as Extract<ApiEnvelope<T>, { ok: false }>
     throw new AccountAuthError(failure.error?.code || 'ACCOUNT_AUTH_FAILED', failure.data)
