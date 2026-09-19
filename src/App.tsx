@@ -25,9 +25,12 @@ import SleepTimeline from './SleepTimeline'
 import { getSessionSyncRevision, getSyncStore } from './familySync'
 import SwipeHistoryRow from './SwipeHistoryRow'
 import AccountCard from './AccountCard'
+import { ACCOUNT_ACCESS_EVENT, ACCOUNT_STATE_EVENT, getAccountAccess, restoreAccount } from './accountAuth'
+import type { AccountAccessState } from './accountAuth'
 
 const pad = (value: number) => String(value).padStart(2, '0')
 const internalPreview = import.meta.env.VITE_INTERNAL_PREVIEW === 'true'
+const accountAuthEnabled = import.meta.env.VITE_ACCOUNT_AUTH === 'true'
 
 function loadInternalPlanPreview(): ProductPlan {
   if (!internalPreview) return 'familyPlus'
@@ -81,6 +84,7 @@ function dateOptions(locale: Locale) {
 export default function App() {
   const [data, setData] = useState<AppData>(() => loadData())
   const [previewPlan, setPreviewPlan] = useState<ProductPlan>(() => loadInternalPlanPreview())
+  const [accountAccess, setAccountAccess] = useState<AccountAccessState | null>(null)
   const [page, setPage] = useState<Page>('today')
   const [now, setNow] = useState(Date.now())
   const [editor, setEditor] = useState<SleepSession | 'new' | null>(null)
@@ -105,6 +109,30 @@ export default function App() {
     try { window.localStorage.setItem(INTERNAL_PLAN_PREVIEW_KEY, previewPlan) } catch { /* preview preference is non-critical */ }
     window.dispatchEvent(new CustomEvent<ProductPlan>(INTERNAL_PLAN_PREVIEW_EVENT, { detail: previewPlan }))
   }, [previewPlan])
+  useEffect(() => {
+    if (!accountAuthEnabled) return
+    let stopped = false
+    const refreshAccess = () => {
+      void getAccountAccess()
+        .then((access) => { if (!stopped) setAccountAccess(access) })
+        .catch(() => { if (!stopped) setAccountAccess(null) })
+    }
+    const onAccess = (event: Event) => {
+      if (!stopped) setAccountAccess((event as CustomEvent<{ access: AccountAccessState | null }>).detail?.access ?? null)
+    }
+    const onAccount = (event: Event) => {
+      if (!(event as CustomEvent<{ account?: unknown }>).detail?.account) setAccountAccess(null)
+      else refreshAccess()
+    }
+    window.addEventListener(ACCOUNT_ACCESS_EVENT, onAccess)
+    window.addEventListener(ACCOUNT_STATE_EVENT, onAccount)
+    void restoreAccount()
+    return () => {
+      stopped = true
+      window.removeEventListener(ACCOUNT_ACCESS_EVENT, onAccess)
+      window.removeEventListener(ACCOUNT_STATE_EVENT, onAccount)
+    }
+  }, [])
   useEffect(() => { document.documentElement.lang = locale }, [locale])
   useEffect(() => { const id = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(id) }, [])
 
@@ -144,7 +172,7 @@ export default function App() {
     <main className="app-main">
       {page === 'today' && <TodayPage data={data} child={activeChild} sessions={activeSessions} now={now} locale={locale} current={current} onSelectChild={(childId) => setData((previous) => ({ ...previous, settings: { ...previous.settings, activeChildId: childId } }))} onStart={startNow} onEnd={endNow} onAdjustStart={adjustCurrentStart} onOpenEditor={openEditor} onHistory={() => setPage('history')} onSettings={() => setPage('settings')} />}
       {page === 'history' && <HistoryPage sessions={activeSessions} locale={locale} onEdit={openEditor} onDelete={deleteSession} onNew={() => openEditor('new')} />}
-      {page === 'stats' && <StatsPage sessions={activeSessions} now={now} locale={locale} childName={activeChild.name} productPlan={previewPlan} onPreviewPlanChange={internalPreview ? setPreviewPlan : undefined} />}
+      {page === 'stats' && <StatsPage sessions={activeSessions} now={now} locale={locale} childName={activeChild.name} productPlan={previewPlan} premiumInsightsAvailable={accountAuthEnabled ? Boolean(accountAccess?.features.includes('FAMILY_PLUS_INSIGHTS')) : canUsePremiumInsights(previewPlan)} onPreviewPlanChange={internalPreview ? setPreviewPlan : undefined} />}
       {page === 'settings' && <SettingsPage data={data} setData={setData} onBack={() => setPage('today')} />}
     </main>
     {page !== 'settings' && <BottomNav page={page} locale={locale} onChange={setPage} />}
@@ -220,7 +248,7 @@ function dateKeyTime(value: string) {
   return new Date(year, month - 1, day, 0, 0, 0, 0).getTime()
 }
 
-function StatsPage({ sessions, now, locale, childName, productPlan, onPreviewPlanChange }: { sessions: SleepSession[]; now: number; locale: Locale; childName: string; productPlan: ProductPlan; onPreviewPlanChange?: (plan: ProductPlan) => void }) {
+function StatsPage({ sessions, now, locale, childName, productPlan, premiumInsightsAvailable, onPreviewPlanChange }: { sessions: SleepSession[]; now: number; locale: Locale; childName: string; productPlan: ProductPlan; premiumInsightsAvailable: boolean; onPreviewPlanChange?: (plan: ProductPlan) => void }) {
   const availableStart = sessions.length > 0 ? dateKeyAt(Math.min(...sessions.map((session) => new Date(session.startTime).getTime()))) : dateKeyAt(now)
   const availableEnd = dateKeyAt(now)
   const [range, setRange] = useState<'day' | 'week' | 'month' | 'custom'>('week')
@@ -328,8 +356,6 @@ function StatsPage({ sessions, now, locale, childName, productPlan, onPreviewPla
   const primaryWakeMs = relevantWakeWindow?.typicalMs ?? wakeWindow.typicalMs
   const primaryWakeRange = relevantWakeWindow ? { lowMs: relevantWakeWindow.lowMs, highMs: relevantWakeWindow.highMs } : wakeWindow.typicalRange
   const primaryWakeLabel = relevantWakeWindow ? wakeBucketLabel(locale, relevantWakeWindow.key) : t(locale, 'typicalWakeWindow')
-  const premiumInsightsAvailable = canUsePremiumInsights(productPlan)
-
   return <section className="screen stats-screen"><header className="page-header centered-header"><h1>{t(locale, 'statistics')}</h1></header>
     {onPreviewPlanChange && <InternalPlanPreview locale={locale} plan={productPlan} onChange={onPreviewPlanChange} />}
     <div className="segmented four-options"><button className={range === 'day' ? 'active' : ''} onClick={() => changeRange('day')}>{t(locale, 'day')}</button><button className={range === 'week' ? 'active' : ''} onClick={() => changeRange('week')}>{t(locale, 'week')}</button><button className={range === 'month' ? 'active' : ''} onClick={() => changeRange('month')}>{t(locale, 'month')}</button><button className={range === 'custom' ? 'active' : ''} onClick={() => changeRange('custom')}>{t(locale, 'customRange')}</button></div>

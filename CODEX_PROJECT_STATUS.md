@@ -1,9 +1,9 @@
 # Solemi Sleep — Codex projektállapot
 
-**Utolsó frissítés:** 2026-09-17
+**Utolsó frissítés:** 2026-09-19
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
-**Aktuálisan ellenőrzött fejlesztési HEAD:** `dec9987` (`Isolate missing sleep operations and restore them explicitly`); a munkamenet elején a munkafa tiszta volt. A tulajdonos az új telefonos próbán működő szinkront és jó visszajelzést jelzett. A mostani módosítás kizárólag ezt a checkpointot dokumentálja.
+**Aktuálisan ellenőrzött fejlesztési HEAD:** `34d8b55` (`Document successful two-phone sync acceptance and next steps`); a munkamenet elején a munkafa tiszta volt. A jelenlegi, még nem commitolt csomag a teljes családi Family+ Insights-jog helyi implementációja és dokumentációja.
 
 Ez a fájl az új Codex-beszélgetések rövid belépési pontja. A pillanatnyi pontos commit mindig az a commit, amely ezt a fájlt tartalmazza; ellenőrzéshez futtasd a `git log -1 --oneline` parancsot.
 
@@ -32,13 +32,13 @@ Elsőként:
 - HU / EN / DE lokalizáció.
 - Free / Family / Family+ funkciómátrix lezárva.
 - Free fiók nélkül, local-first módon használható.
-- Family Sync már családi jogosultság. Az elfogadott új termékszabály szerint a Family+ Insights is az egész aktív családé; ez utóbbi kódátállítása még hátravan.
+- Family Sync és Family+ Insights effektív hozzáférése is az egész aktív család érvényes grantjaiból számolódik a helyi kódban; staging elfogadás még hátravan.
 
 ## Elfogadott termékirány — 2026-09-17
 
 A döntések forrása: `PRODUCT_DIRECTION.md`; a korábbi auditok alternatív javaslatok, nem jóváhagyott csomagváltások. Megmarad a Free / Family / Family+ felosztás, havi 0 / 990 / 1 490 Ft tervezett árral. Alvásra összpontosító, gyors, sötét felületű napló; nincs teljes babakövető, AI, kéretlen altatási tanács vagy eredményígéret. A Family közös napló, a Family+ leíró statisztika és visszatekinthető jelentések.
 
-Bármely aktív családtag érvényes előfizetése az egész aktív családnak biztosítja az adott csomagot, a létrehozó személyétől függetlenül. A számlázás továbbra is a vásárló accounté. A funkciómátrix aktualizálva; a személyes Insights-jogot családi jogra kell átállítani a szinkronhiba elfogadása után. App Store és Google Play induláskor szükséges; a vásárlási adapterek még hiányoznak.
+Bármely aktív családtag érvényes előfizetése az egész aktív családnak biztosítja az adott csomagot, a létrehozó személyétől függetlenül. A számlázás továbbra is a vásárló accounté. A helyi Worker és kliens már ezt a szabályt követi; App Store és Google Play induláskor szükséges, a vásárlási adapterek még hiányoznak.
 
 Az alábbi korábbi fejlesztési szeletek történeti ellenőrzési eredmények; az aktuális helyi ellenőrzés és következő feladat a fájl végén található.
 
@@ -351,9 +351,29 @@ választási ággal és egyedi hiányzóalvás-megosztással. Az eredeti három 
 rekord pontos történeti oka nem bizonyított, azokat nem deduplikáltuk automatikusan.
 Ebben a körben nincs alkalmazáskód-módosítás vagy új teszt/build/deploy.
 
+### Teljes családi Family+ hozzáférés — helyi csomag, 2026-09-19
+
+A Worker `/v1/auth/access` válasza külön adja vissza a bejelentkezett account
+saját grantjait (`accountFeatures`), az aktív családból származó feature-öket
+(`familyFeatures`) és a kettő uniójaként használható effektív `features` listát.
+Csak aktív tagságú, nem visszavont és időben érvényes grant számít. A
+létrehozó/admin szerep nem feltétel. A kliens az effektív
+`FAMILY_PLUS_INSIGHTS` jogból nyitja vagy zárja az elemzési kártyákat, és a
+15 másodperces hozzáférés-frissítés ugyanazt az állapotot továbbítja az appnak.
+A Google-sessiont az app induláskor helyreállítja; a párhuzamos helyreállítás
+egy közös kérést használ.
+
+Automatizált esetek: Family+ + Free megosztott Insights; kilépett vagy másik
+családhoz tartozó fizető figyelmen kívül hagyása; megmaradó Family esetén sync
+és PDF marad, Plus lezár; másik megmaradó Plus esetén Plus marad; utolsó
+fizető megszűnésekor sync pause. A frontend és Worker typecheck sikeres, mind a
+156 teszt átment, a production build sikeres. A build csak a korábban ismert
+500 kB feletti chunk-figyelmeztetést adta. D1-sémamódosítás nem kellett, deploy
+nem történt.
+
 ## Fő nyitott blokkok a `main` migráció előtt
 
-1. Az elfogadott teljes családi Family+ Insights-jog implementálása és tesztelése.
+1. A helyileg elkészült teljes családi Family+ Insights-jog staging kéttelefonos elfogadása.
 2. Az account/session eszközkezelő harmadik böngészős staging próbája.
 3. App Store / Google Play vásárlás-ellenőrzés és visszaállítás provider adapterei.
 4. Paywall és upgrade/downgrade folyamat.
@@ -364,15 +384,15 @@ Ebben a körben nincs alkalmazáskód-módosítás vagy új teszt/build/deploy.
 
 ## Következő konkrét feladat
 
-A `dec9987` csomag szinkron-/konfliktus-újratesztje sikeres; normál szinkron,
-mindkét konfliktusválasztás és egyedi hiányzóalvás-megosztás élőben elfogadva.
-A következő fejlesztés a Family+ Insights teljes aktív családra kiterjesztése:
-bármely aktív tag érvényes Plus joga biztosítsa a prémium elemzéseket minden
-aktív tagnak, létrehozó/fizető személyétől függetlenül. A sync-jog már családi,
-az Insights jelenleg még személyes. Tesztelendő: Family+ + Free, Family+ tag
-kilépése/lejárata, másik megmaradó Plus tag, illetve csak Family tag megmaradása.
-Előbb ez következik, utána vásárlási integráció. Éles művelet külön jóváhagyással;
-commit/push a tulajdonos feladata. Most csak az elfogadási dokumentáció változott.
+A teljes családi Family+ Insights-jog helyi implementációja és automatizált
+ellenőrzése elkészült. A tulajdonos következő lépése a csomag commitja és push-a.
+Ezután külön jóváhagyással staging Worker- és internal Pages build szükséges,
+majd két Google-accounttal ellenőrizendő: Family+ + Free esetén mindkét telefonon
+nyitott Insights; másik megmaradó Plus esetén továbbra is nyitott; csak Family
+megmaradásakor sync aktív, Insights zárt; utolsó fizető megszűnésekor mindkét
+telefonon Insights zárt és sync pause. Sikeres elfogadás után a következő nagy
+fejlesztés az Apple/Google vásárlási provider adapterek megtervezése. Éles
+művelet külön jóváhagyással; commit/push a tulajdonos feladata.
 
 ## Munkamegosztás
 

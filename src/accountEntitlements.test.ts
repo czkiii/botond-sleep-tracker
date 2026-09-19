@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { accountCanUse, familyCanSync, resolveFamilySyncAccess } from './accountEntitlements'
+import { accountCanUse, familyCanSync, familyCanUse, memberCanUse, resolveFamilySyncAccess } from './accountEntitlements'
 import type { AccountAccessState, FamilyMembershipState } from './accountEntitlements'
 
 const familyId = 'fam_one'
@@ -49,7 +49,7 @@ describe('account and family entitlement state', () => {
     })
   })
 
-  it('keeps Family+ Insights personal while sharing funded Family Sync', () => {
+  it('shares Family+ Insights with every active family member', () => {
     const freeAccount = account('acc_free')
     const familyPlusAccount = account('acc_plus', ['FAMILY_SYNC', 'PDF_EXPORT', 'FAMILY_PLUS_INSIGHTS'])
     const freeMembership = member(freeAccount.accountId)
@@ -58,6 +58,30 @@ describe('account and family entitlement state', () => {
     expect(resolveFamilySyncAccess({ account: freeAccount, membership: freeMembership, familyMembers }).canSync).toBe(true)
     expect(accountCanUse('FAMILY_PLUS_INSIGHTS', freeAccount)).toBe(false)
     expect(accountCanUse('FAMILY_PLUS_INSIGHTS', familyPlusAccount)).toBe(true)
+    expect(familyCanUse('FAMILY_PLUS_INSIGHTS', familyId, familyMembers)).toBe(true)
+    expect(memberCanUse('FAMILY_PLUS_INSIGHTS', freeAccount, freeMembership, familyMembers)).toBe(true)
+  })
+
+  it('does not inherit Family+ Insights from an inactive or unrelated payer', () => {
+    const current = account('acc_free')
+    const currentMembership = member(current.accountId)
+    const formerPayer = member('acc_left', ['FAMILY_SYNC', 'PDF_EXPORT', 'FAMILY_PLUS_INSIGHTS'], { status: 'LEFT' })
+    const otherFamilyPayer = member('acc_other', ['FAMILY_SYNC', 'PDF_EXPORT', 'FAMILY_PLUS_INSIGHTS'], { familyId: 'fam_other' })
+
+    expect(memberCanUse('FAMILY_PLUS_INSIGHTS', current, currentMembership,
+      [currentMembership, formerPayer, otherFamilyPayer])).toBe(false)
+  })
+
+  it('keeps Family access but removes Plus when the last active Plus contribution ends', () => {
+    const current = account('acc_free')
+    const currentMembership = member(current.accountId)
+    const familyPayer = member('acc_family', ['FAMILY_SYNC', 'PDF_EXPORT'])
+    const formerPlusPayer = member('acc_plus', ['FAMILY_SYNC', 'PDF_EXPORT', 'FAMILY_PLUS_INSIGHTS'], { status: 'LEFT' })
+    const familyMembers = [currentMembership, familyPayer, formerPlusPayer]
+
+    expect(memberCanUse('FAMILY_SYNC', current, currentMembership, familyMembers)).toBe(true)
+    expect(memberCanUse('PDF_EXPORT', current, currentMembership, familyMembers)).toBe(true)
+    expect(memberCanUse('FAMILY_PLUS_INSIGHTS', current, currentMembership, familyMembers)).toBe(false)
   })
 
   it('pauses sync when the last paying entitlement expires while retaining members', () => {

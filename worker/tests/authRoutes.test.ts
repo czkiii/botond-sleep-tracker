@@ -211,7 +211,7 @@ describe('account auth routes', () => {
     expect(sqlite.prepare('SELECT used_at FROM invite_codes').get()).toEqual({ used_at: null })
   })
 
-  it('lets a Free member sync through a Family+ payer and pauses after the last grant ends', async () => {
+  it('shares the highest active family plan and pauses after the last grant ends', async () => {
     env.ENTITLEMENT_ENFORCEMENT = 'true'
     env.ENTITLEMENT_TEST_MODE = 'true'
     const legacyToken = 'ss_dv_entitlement-owner-token'
@@ -231,7 +231,7 @@ describe('account auth routes', () => {
     })
     const joinedBody = await joined.json() as { data: { connection: { deviceToken: string } } }
 
-    const setPlan = (access: string, plan: 'free' | 'familyPlus') => fetch('/v1/auth/test/plan', {
+    const setPlan = (access: string, plan: 'free' | 'family' | 'familyPlus') => fetch('/v1/auth/test/plan', {
       method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${access}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ plan })
     })
@@ -239,7 +239,10 @@ describe('account auth routes', () => {
     const freeMember = await setPlan(member, 'free')
     expect(freeMember.status).toBe(200)
     expect(await freeMember.json()).toMatchObject({ data: {
-      features: [], familySync: { status: 'ACTIVE', canSync: true, familyId: 'fam_test' }
+      features: ['FAMILY_PLUS_INSIGHTS', 'FAMILY_SYNC', 'PDF_EXPORT'],
+      accountFeatures: [],
+      familyFeatures: ['FAMILY_PLUS_INSIGHTS', 'FAMILY_SYNC', 'PDF_EXPORT'],
+      familySync: { status: 'ACTIVE', canSync: true, familyId: 'fam_test' }
     } })
 
     const memberSync = await fetch('/v1/sync?after=0', {
@@ -266,10 +269,31 @@ describe('account auth routes', () => {
     })
     expect(await ownerAccess.json()).toMatchObject({ data: {
       features: ['FAMILY_PLUS_INSIGHTS', 'FAMILY_SYNC', 'PDF_EXPORT'],
+      accountFeatures: ['FAMILY_PLUS_INSIGHTS', 'FAMILY_SYNC', 'PDF_EXPORT'],
+      familyFeatures: ['FAMILY_PLUS_INSIGHTS', 'FAMILY_SYNC', 'PDF_EXPORT'],
       familySync: { status: 'ACTIVE', canSync: true }
     } })
 
+    expect((await setPlan(member, 'familyPlus')).status).toBe(200)
     expect((await setPlan(owner, 'free')).status).toBe(200)
+    const inheritedFromMember = await fetch('/v1/auth/access', {
+      headers: { Authorization: `Bearer ${owner}` }
+    })
+    expect(await inheritedFromMember.json()).toMatchObject({ data: {
+      features: ['FAMILY_PLUS_INSIGHTS', 'FAMILY_SYNC', 'PDF_EXPORT'],
+      accountFeatures: [],
+      familyFeatures: ['FAMILY_PLUS_INSIGHTS', 'FAMILY_SYNC', 'PDF_EXPORT']
+    } })
+
+    const downgradedMember = await setPlan(member, 'family')
+    expect(await downgradedMember.json()).toMatchObject({ data: {
+      features: ['FAMILY_SYNC', 'PDF_EXPORT'],
+      accountFeatures: ['FAMILY_SYNC', 'PDF_EXPORT'],
+      familyFeatures: ['FAMILY_SYNC', 'PDF_EXPORT'],
+      familySync: { status: 'ACTIVE', canSync: true }
+    } })
+
+    expect((await setPlan(member, 'free')).status).toBe(200)
     const paused = await fetch('/v1/sync?after=0', {
       headers: { Authorization: `Bearer ${member}`,
         'X-Solemi-Family-Token': joinedBody.data.connection.deviceToken }

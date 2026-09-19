@@ -35,12 +35,12 @@ A közös szinkron önálló fizetős érték a terméktervben. Konkurens ingyen
 - Ha nincs aktív fizető tag, a korábban rögzített megőrzési szabály szerint a család és adatai megmaradnak, az aktív szinkron szünetel; a helyi napló tovább vezethető.
 - A számlázási előfizetés tulajdonosa továbbra is a vásárló account; a családi használati jog ebből, az aktív tagságon keresztül származik. Ez nem azonos az Apple Family Sharing szolgáltatással.
 
-**Implementációs eltérés:** a mostani backend már családi alapon engedélyezi a szinkront, de a Family+ Insights még személyes jogként szerepel a kódban. A teljes családi prémiumhozzáférés külön következő implementációs feladat; a dokumentáció rögzítése nem jelenti, hogy elkészült. Elsőbbség a nyitott szinkronhibáé.
+**Implementációs állapot — 2026-09-19:** a helyi Worker és kliens már külön tartja a vásárló saját grantjait, és az aktív család legmagasabb jogosultságából számolja az effektív funkciókat. A Family+ Insights így minden aktív családtagnak elérhető, ha bármelyik aktív tag Family+ jogosultsága érvényes. Staging deploy és kéttelefonos elfogadás még szükséges.
 
 ## Indulás és következő munka
 
 Cél: rendszeresen használó családok és kis, fenntartható mellékbevétel; heti 5–8 órás fejlesztési/tesztelői kapacitással. Nyilvános induláskor App Store és Google Play jelenlét is szükséges. Az egyszerűséget és a csomagok értékét további családokkal ellenőrizzük, új funkciók automatikus hozzáadása nélkül.
 
-A következő fejlesztési feladat a kéttelefonos konfliktusteszt duplikációja és eltérő előzményei. A pontos ok nem bizonyított; a korábbi adatokat nem töröljük diagnózis előtt. Későbbi kutatási feladat: szülői Reddit-beszélgetések és más közösségi visszajelzések áttekintése arról, miért kezdenek naplózni, mikor válik teherré, és miért hagyják abba. Kutatás ebben a munkamenetben nem indul.
+A következő elfogadási feladat a teljes családi Family+ hozzáférés staging kéttelefonos próbája. Későbbi kutatási feladat: szülői Reddit-beszélgetések és más közösségi visszajelzések áttekintése arról, miért kezdenek naplózni, mikor válik teherré, és miért hagyják abba. Kutatás ebben a munkamenetben nem indul.
 
 Commit/push a tulajdonos feladata. Éles deploy, main merge és production adatbázis-módosítás külön engedélyhez kötött.

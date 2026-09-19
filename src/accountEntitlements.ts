@@ -27,12 +27,33 @@ export function accountCanUse(feature: EntitlementFeature, account: AccountAcces
   return Boolean(account?.activeFeatures.includes(feature))
 }
 
-export function familyCanSync(familyId: string, members: readonly FamilyMembershipState[]) {
+export function familyCanUse(
+  feature: EntitlementFeature,
+  familyId: string,
+  members: readonly FamilyMembershipState[]
+) {
   return members.some((member) =>
     member.familyId === familyId
     && member.status === 'ACTIVE'
-    && member.activeFeatures.includes('FAMILY_SYNC')
+    && member.activeFeatures.includes(feature)
   )
+}
+
+export function familyCanSync(familyId: string, members: readonly FamilyMembershipState[]) {
+  return familyCanUse('FAMILY_SYNC', familyId, members)
+}
+
+export function memberCanUse(
+  feature: EntitlementFeature,
+  account: AccountAccessState | null,
+  membership: FamilyMembershipState | null,
+  familyMembers: readonly FamilyMembershipState[]
+) {
+  if (accountCanUse(feature, account)) return true
+  return Boolean(account && membership
+    && membership.accountId === account.accountId
+    && membership.status === 'ACTIVE'
+    && familyCanUse(feature, membership.familyId, familyMembers))
 }
 
 export function resolveFamilySyncAccess({

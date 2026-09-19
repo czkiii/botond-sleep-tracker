@@ -22,15 +22,18 @@ export class EntitlementService {
       WHERE account_id = ? AND status = 'ACTIVE'`).bind(accountId).first<MembershipRow>()
   }
 
-  async familyCanSync(familyId: string, now = Date.now()) {
-    const row = await this.db.prepare(`SELECT EXISTS (
-      SELECT 1 FROM legacy_family_memberships m
+  async familyFeatures(familyId: string, now = Date.now()) {
+    const result = await this.db.prepare(`SELECT DISTINCT e.feature_key
+      FROM legacy_family_memberships m
       JOIN account_entitlements e ON e.account_id = m.account_id
       WHERE m.family_id = ? AND m.status = 'ACTIVE'
-        AND e.feature_key = 'FAMILY_SYNC' AND e.revoked_at IS NULL
-        AND e.valid_from <= ? AND e.valid_until > ?
-    ) AS allowed`).bind(familyId, now, now).first<{ allowed: number }>()
-    return row?.allowed === 1
+        AND e.revoked_at IS NULL AND e.valid_from <= ? AND e.valid_until > ?
+      ORDER BY e.feature_key`).bind(familyId, now, now).all<FeatureRow>()
+    return result.results.map((row) => row.feature_key)
+  }
+
+  async familyCanSync(familyId: string, now = Date.now()) {
+    return (await this.familyFeatures(familyId, now)).includes('FAMILY_SYNC')
   }
 
   async familyHasAccountMembers(familyId: string) {
@@ -42,13 +45,17 @@ export class EntitlementService {
   }
 
   async accessState(accountId: string, now = Date.now()) {
-    const [features, membership] = await Promise.all([
+    const [accountFeatures, membership] = await Promise.all([
       this.accountFeatures(accountId, now),
       this.activeMembership(accountId)
     ])
-    const familySync = membership ? await this.familyCanSync(membership.family_id, now) : false
+    const familyFeatures = membership ? await this.familyFeatures(membership.family_id, now) : []
+    const features = [...new Set([...accountFeatures, ...familyFeatures])].sort()
+    const familySync = familyFeatures.includes('FAMILY_SYNC')
     return {
       features,
+      accountFeatures,
+      familyFeatures,
       membership: membership ? { familyId: membership.family_id, role: membership.role } : null,
       familySync: {
         status: !membership ? 'NO_ACTIVE_MEMBERSHIP' : familySync ? 'ACTIVE' : 'PAUSED',

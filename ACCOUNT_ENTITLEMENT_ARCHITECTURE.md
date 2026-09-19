@@ -4,7 +4,7 @@ Státusz: **ARCHITEKTÚRA LEZÁRVA — account/session, Google-auth és staging 
 
 Dátum: 2026-08-24
 
-**Termékdöntés-változás — 2026-09-17:** a `PRODUCT_DIRECTION.md` és a frissített `FEATURE_ENTITLEMENT_MATRIX.md` irányadó. Bármely aktív tag érvényes előfizetése az egész aktív családnak biztosítja az adott csomag funkcióit, Family+ Insights esetén is. A létrehozó/admin szerepe nem feltétel. A subscription és grant továbbra is a vásárló account tulajdona; az effektív használati jog családi tagságon keresztül származik. Az alábbi személyes-only Insights szabályok korábbi tervek, ezzel felülírva; a kódban még személyes ellenőrzés működik, átállítása külön feladat a szinkronhiba után. A történeti implementációleírásokat emiatt nem tekintjük már kész családi prémiumhozzáférésnek.
+**Termékdöntés-változás — 2026-09-17; helyi implementáció — 2026-09-19:** a `PRODUCT_DIRECTION.md` és a frissített `FEATURE_ENTITLEMENT_MATRIX.md` irányadó. Bármely aktív tag érvényes előfizetése az egész aktív családnak biztosítja az adott csomag funkcióit, Family+ Insights esetén is. A létrehozó/admin szerepe nem feltétel. A subscription és grant továbbra is a vásárló account tulajdona; az effektív használati jog családi tagságon keresztül származik. A Worker és a kliens helyi kódja már ezt számolja, a staging deploy és kéttelefonos elfogadás még hátravan.
 Ellenőrzött GitHub-alap: `main` / `37d1728` (`Lock Free Family Family+ feature matrix`)
 
 Ez a dokumentum a következő backend-implementáció normatív terve. Nem migráció és nem módosítja a live Cloudflare D1-et vagy Workert. A jelenlegi prototípus `worker/schema.sql` és `worker/src/index.ts` fájljait a célarchitektúrára való átálláskor, külön ellenőrzött migrációkkal kell módosítani.
@@ -31,9 +31,9 @@ migráció before/after exporttal és változatlan legacy hash-ekkel sikeres vol
 Az account/session, Google-login, accountos family claim/bootstrap és két külön
 Google-accountos meghívás staging próbája sikeres. A
 `006_subscriptions_and_entitlements.sql` implementálja a providerfüggetlen
-billing- és granttáblákat. A staging Worker a család összes aktív tagja alapján
-ellenőrzi a `FAMILY_SYNC` hozzáférést, miközben a személyes Family+ Insights
-jogosultságot account-szinten tartja. A staging `MANUAL` forrás a bolti
+billing- és granttáblákat. A Worker a család összes aktív tagja alapján
+számolja a fizetős funkciók effektív hozzáférését, miközben a vásárló saját
+grantjait külön megőrzi. A staging `MANUAL` forrás a bolti
 életciklusokat szimulálja; valódi Apple/Google provider adapter még nincs.
 
 ## 1. Lezárt termékszabályok
@@ -51,7 +51,7 @@ jogosultságot account-szinten tartja. A staging `MANUAL` forrás a bolti
 - A Family végleges törlését csak admin indíthatja, friss újraazonosítás és erős megerősítés után.
 - Family Sync akkor aktív, ha legalább egy aktív tag rendelkezik érvényes Family vagy Family+ eredetű `FAMILY_SYNC` entitlementtel.
 - Ha az utolsó fizető tag kilép vagy az entitlementje lejár, a sync azonnal szünetel. A cloud adat és a Family-kapcsolat megmarad.
-- Family+ Insights account-szintű, személyes jogosultság. Nem öröklődik a többi családtagra.
+- Bármely aktív tag Family+ grantja minden aktív családtagnak Family+ Insights-hozzáférést ad. A vásárlás és a grant tulajdonosa ettől továbbra is a fizető account.
 - Trial: 7 nap Family+. Offline entitlement cache: legfeljebb 30 nap, de soha nem nyúlhat túl a szerver által engedélyezett hozzáférési időn.
 - A Free account alvásadata local-first. Az account önmagában nem jelent automatikus cloud backupot.
 
@@ -66,8 +66,8 @@ Google ID token
 Billing provider event
   -> subscription (billing truth)
   -> account entitlement grants
-     -> személyes feature gate
-     -> aktív membershipen keresztül Family Sync hozzájárulás
+     -> a vásárló saját grantjai
+     -> aktív membershipen keresztül családi effektív feature-hozzáférés
 
 Sleep data
   Free: local-first
@@ -459,10 +459,17 @@ accountCanUse(accountId, featureKey, now)
 familyCanSync(familyId, now)
   = van aktív membershipű account,
     amelyre accountCanUse(FAMILY_SYNC) igaz
+
+familyCanUse(familyId, featureKey, now)
+  = van aktív membershipű account,
+    amelyre accountCanUse(featureKey) igaz
+
+effectiveFeatures(accountId, now)
+  = saját account feature-ök uniója az aktív család family feature-jeivel
 ```
 
-- Family+ Insights mindig a bejelentkezett account saját `FAMILY_PLUS_INSIGHTS` grantját ellenőrzi.
-- Egy Free account aktív syncű Family tagjaként megkaphatja a kanonikus raw adatot, de PDF-et és Family+ view-kat csak saját entitlementtel használhat.
+- Family+ Insights az aktív család `FAMILY_PLUS_INSIGHTS` hozzájárulását ellenőrzi; a létrehozó/admin és a fizető személye nem feltétel.
+- Egy Free account aktív Family tagjaként megkapja a család legmagasabb aktív csomagjának effektív funkcióit, miközben saját billing/grant listája üres maradhat.
 - A sync API minden read és write kérésnél szerveroldalon számolja a `familyCanSync` értéket. A kliens UI cache nem jogosít szerverírásra.
 
 ### 30 napos offline cache
@@ -586,8 +593,8 @@ Minimum stabil hibakódok:
 - Member invite-ot készíthet és a kód admin-jóváhagyás nélkül, pontosan egyszer váltható be.
 - Nem-admin más tagot nem távolíthat el; admin igen; mindenki saját magát kiléptetheti.
 - Family végleges törlés admin + friss reauth nélkül tiltott, és nem törli az accountot/subscriptiont.
-- Family subscriber + Free member esetén mindkettő szinkronizálhat, de a Free member PDF/Insights gate-je zárt.
-- Family+ subscriber mellett csak a subscriber account kap `FAMILY_PLUS_INSIGHTS` hozzáférést.
+- Family subscriber + Free member esetén mindkettő szinkronizálhat és mindkettő megkapja a Family képességeket, Family+ Insights nélkül.
+- Family+ subscriber mellett minden aktív családtag megkapja a `FAMILY_PLUS_INSIGHTS` hozzáférést.
 - Az utolsó entitlement lejárata és a fizető kilépése azonnal pause-olja a syncet, adat- és membership-törlés nélkül.
 - Másik aktív fizető tag mellett az első fizető kilépése nem állítja le a syncet.
 - Trial pontosan a provider által igazolt végéig aktív; cancellation a `access_until` végéig nem vesz el hozzáférést; revoke azonnal igen.

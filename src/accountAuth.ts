@@ -8,11 +8,14 @@ const API_BASE = (import.meta.env.VITE_ACCOUNT_API_BASE || internalAccountProxy
 const ACCESS_KEY = 'solemiSleep:accountAccess'
 const INSTALLATION_KEY = 'solemiSleep:installationSecret'
 export const ACCOUNT_STATE_EVENT = 'solemi-account-state'
+export const ACCOUNT_ACCESS_EVENT = 'solemi-account-access'
 
 export type SignedInAccount = { id: string; email: string | null; name: string | null }
 export type AccountDevice = { id: string; name: string | null; platform: 'WEB' | 'IOS' | 'ANDROID' | 'OTHER' | null; last_seen_at: number }
 export type AccountAccessState = {
   features: Array<'FAMILY_SYNC' | 'PDF_EXPORT' | 'FAMILY_PLUS_INSIGHTS'>
+  accountFeatures: Array<'FAMILY_SYNC' | 'PDF_EXPORT' | 'FAMILY_PLUS_INSIGHTS'>
+  familyFeatures: Array<'FAMILY_SYNC' | 'PDF_EXPORT' | 'FAMILY_PLUS_INSIGHTS'>
   membership: null | { familyId: string; role: 'ADMIN' | 'MEMBER' }
   familySync: { status: 'NO_ACTIVE_MEMBERSHIP' | 'ACTIVE' | 'PAUSED'; canSync: boolean; familyId?: string }
 }
@@ -39,6 +42,10 @@ function announceAccount(account: SignedInAccount | null) {
   window.dispatchEvent(new CustomEvent(ACCOUNT_STATE_EVENT, { detail: { account } }))
 }
 
+function announceAccess(access: AccountAccessState | null) {
+  window.dispatchEvent(new CustomEvent(ACCOUNT_ACCESS_EVENT, { detail: { access } }))
+}
+
 function saveAccess(data: AccessResponse) {
   sessionStorage.setItem(ACCESS_KEY, JSON.stringify(data))
   announceAccount(data.account)
@@ -61,7 +68,16 @@ function installationSecret() {
   return value
 }
 
-export async function restoreAccount() {
+let restorePromise: Promise<SignedInAccount | null> | null = null
+
+export function restoreAccount() {
+  if (!restorePromise) {
+    restorePromise = restoreAccountOnce().finally(() => { restorePromise = null })
+  }
+  return restorePromise
+}
+
+async function restoreAccountOnce() {
   const saved = readAccess()
   if (saved && saved.accessExpiresAt > Date.now() + 5_000) {
     try {
@@ -74,7 +90,11 @@ export async function restoreAccount() {
   }
   try {
     return saveAccess(await request<AccessResponse>('/v1/auth/refresh', { method: 'POST' }))
-  } catch { return null }
+  } catch {
+    announceAccess(null)
+    announceAccount(null)
+    return null
+  }
 }
 
 export async function beginGoogleSignIn(
@@ -123,6 +143,7 @@ function browserDeviceName() {
 export async function signOutAccount() {
   await request('/v1/auth/logout', { method: 'POST' })
   sessionStorage.removeItem(ACCESS_KEY)
+  announceAccess(null)
   announceAccount(null)
   window.google?.accounts.id.disableAutoSelect()
 }
@@ -151,12 +172,18 @@ export async function accountRequest<T>(path: string, options: RequestInit = {})
 }
 
 export function getAccountAccess() {
-  return accountRequest<AccountAccessState>('/v1/auth/access')
+  return accountRequest<AccountAccessState>('/v1/auth/access').then((access) => {
+    announceAccess(access)
+    return access
+  })
 }
 
 export function setInternalTestPlan(plan: 'free' | 'family' | 'familyPlus') {
   return accountRequest<AccountAccessState>('/v1/auth/test/plan', {
     method: 'POST', body: JSON.stringify({ plan })
+  }).then((access) => {
+    announceAccess(access)
+    return access
   })
 }
 
