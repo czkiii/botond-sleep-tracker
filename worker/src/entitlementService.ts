@@ -1,3 +1,5 @@
+import { featuresForSubscriptionProduct } from './billingContract'
+
 export const entitlementFeatures = ['FAMILY_SYNC', 'PDF_EXPORT', 'FAMILY_PLUS_INSIGHTS'] as const
 export type EntitlementFeature = typeof entitlementFeatures[number]
 export type TestPlan = 'free' | 'family' | 'familyPlus'
@@ -81,9 +83,7 @@ export class EntitlementService {
     }
 
     const product = plan === 'familyPlus' ? 'FAMILY_PLUS' : 'FAMILY'
-    const wanted: EntitlementFeature[] = plan === 'familyPlus'
-      ? ['FAMILY_SYNC', 'PDF_EXPORT', 'FAMILY_PLUS_INSIGHTS']
-      : ['FAMILY_SYNC', 'PDF_EXPORT']
+    const wanted: EntitlementFeature[] = featuresForSubscriptionProduct(product)
     const statements: D1PreparedStatement[] = [
       this.db.prepare(`INSERT INTO subscriptions
         (id, account_id, provider, provider_subscription_id, product, status, auto_renews,

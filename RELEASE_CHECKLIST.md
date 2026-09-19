@@ -166,6 +166,13 @@ Nem minden tervezett Insights-funkció szükséges az első belső RC-hez. Kül�
 - [x] Internal Free nézetben a Family Sync zárolási előnézete, Family-előfizetéses magyarázata és hálózati leállítása elkészült (helyi, még nem publikált módosítás).
 - [x] A családtagság és a fizetős aktív szinkron szerveroldali szétválasztása staging `MANUAL` entitlement forrással.
 - [ ] Apple és Google Play provider által hitelesített subscription események bekötése ugyanebbe az entitlement modellbe.
+  - [x] Közös proof-only provider contract, állapotmátrix és célzott helyi tesztek.
+  - [x] Apple/Google/Capacitor integrációs sorrend és kötelező tesztmátrix dokumentálása (`STORE_BILLING_INTEGRATION_PLAN.md`).
+  - [x] Additív billing account-link és store-state D1 persistence helyben (`007_store_billing_state.sql`; távoli D1-en még nincs alkalmazva).
+  - [x] Idempotens, időrendvédett snapshot-alkalmazás és entitlement-frissítés helyi tesztekkel.
+  - [ ] StoreKit 2 adapter és App Store Server Notifications V2.
+  - [ ] Play Billing 9.x adapter, acknowledgement és RTDN.
+  - [ ] Vásárlás-visszaállítás és sandbox/closed-test elfogadás.
 - [x] Letisztult alvásnapló-termékirány és havi Free / Family 990 Ft / Family+ 1 490 Ft terv rögzítése (`PRODUCT_DIRECTION.md`).
 - [x] Bármely aktív tag Family+ joga az összes aktív családtagnak biztosítja az Insights funkciókat is; saját grant és családi effektív jog külön marad (helyi kód és automatizált tesztek, 2026-09-19).
 - [x] A teljes családi Family+ Insights-jog staging buildjének kéttelefonos elfogadása: Family+ + Free, Free + Free pause, Free + Family és fordított fizetőjű Free + Family+ esetek sikeresek (2026-09-19, `da4fef4`).

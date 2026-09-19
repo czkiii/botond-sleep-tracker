@@ -3,7 +3,7 @@
 **Utolsó frissítés:** 2026-09-19
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
-**Aktuálisan ellenőrzött fejlesztési HEAD:** `da4fef4` (`Share Family+ Insights across active family`); az ág szinkronban van az originnal. A jelenlegi, még nem commitolt módosítás kizárólag a sikeres staging elfogadás dokumentációja.
+**Aktuális fejlesztési HEAD:** `dc41d7f` (`Document successful Family+ staging acceptance`); az ág szinkronban van az originnal. A munkafán helyben elkészült az App Store / Google Play közös billing contract, a store-persistence első szelete és az integrációs terv.
 
 Ez a fájl az új Codex-beszélgetések rövid belépési pontja. A pillanatnyi pontos commit mindig az a commit, amely ezt a fájlt tartalmazza; ellenőrzéshez futtasd a `git log -1 --oneline` parancsot.
 
@@ -389,6 +389,37 @@ nem feltétel; a legmagasabb aktív családi csomag érvényesül. A 15 másodpe
 hozzáférés-frissítés és a downgrade/pause viselkedés is élőben elfogadva.
 Production erőforrás nem módosult.
 
+### Store billing contract és persistence — helyben elkészült, 2026-09-19
+
+A `worker/src/billingContract.ts` egységes Apple/Google szerződést vezet be:
+provider és környezet, Family/Family+ termék, normalizált subscription státusz,
+ellenőrzött store snapshot, eseményforrás és adapter interfész. A vásárlási
+kérés proof-only: Apple esetén aláírt tranzakciót, Google Play esetén purchase
+tokent fogad. A kliens által küldött account, csomag, fizetett állapot, státusz
+vagy lejárat hibát ad, ezért ezekből nem keletkezhet jogosultság.
+
+A közös termék-feature térképet a belső `MANUAL` tesztcsomag is használja.
+Próbaidő, aktív, türelmi idő és a periódus végéig még érvényes lemondás adhat
+hozzáférést; `PAST_DUE`, lejárt és visszavont állapot nem. Apple account linkhez
+UUID, Google Playhez személyes adatot nem tartalmazó base64url alias szükséges.
+
+A `007_store_billing_state.sql` additív migráció külön account-link és store
+subscription state táblát ad a meglévő `006` adatai mellé. A
+`StoreBillingService` aktív accounthoz stabil aliast készít, ellenőrzi a store
+account-kapcsolatot és a subscription tulajdonosát, majd egy D1 batchben írja a
+subscriptiont, provider state-et, eseményt és grantokat. Azonos esemény
+idempotens; eltérő payload ugyanazzal az event ID-val hibás; régebbi provider
+snapshot nem írhat felül frissebbet. Downgrade eltávolítja a Plus grantot,
+refund/revoke minden subscription grantot azonnal visszavon. A Google purchase
+acknowledgement külön `PENDING`/`ACKNOWLEDGED` állapotban követhető.
+
+A `STORE_BILLING_INTEGRATION_PLAN.md` rögzíti a D1 persistence, idempotens
+snapshot-alkalmazás, StoreKit 2, Play Billing 9.x, notification, restore,
+Capacitor mobilhéj és sandbox elfogadás sorrendjét. A contract és persistence
+célzott 29 tesztje és a teljes **185/185** helyi teszt sikeres; frontend és
+Worker typecheck, valamint a diff whitespace-ellenőrzés is sikeres. Nem történt
+távoli D1-módosítás, deploy, store-fiókbeállítás, commit vagy push.
+
 ## Fő nyitott blokkok a `main` migráció előtt
 
 1. App Store / Google Play vásárlás-ellenőrzés és visszaállítás provider adapterei.
@@ -401,14 +432,20 @@ Production erőforrás nem módosult.
 
 ## Következő konkrét feladat
 
-A teljes családi Family+ hozzáférés implementációja, automatizált ellenőrzése,
-staging buildje és kéttelefonos elfogadása lezárva. A következő nagy fejlesztési
-feladat az App Store és Google Play vásárlási provider adapterek megtervezése:
-a store által igazolt vásárlás és visszaállítás a meglévő account-entitlement
-modellbe kerüljön, a kliens által bemondott csomag ne adhasson jogosultságot.
-Először a közös provider contract, állapotátmenetek és tesztmátrix készítendő el,
-majd külön StoreKit és Play Billing adapter. Éles művelet külön jóváhagyással;
-commit/push a tulajdonos feladata.
+A teljes családi Family+ hozzáférés staging elfogadása lezárva. Helyben elkészült
+az App Store / Google Play közös billing contract első szelete: proof-only
+klienskérés, normalizált subscription snapshot, termék-feature térkép,
+hozzáférési állapotmátrix és provider-specifikus account alias ellenőrzés. A
+részletes végrehajtási sorrend és tesztmátrix a
+`STORE_BILLING_INTEGRATION_PLAN.md` fájlban található.
+
+Következő konkrét fejlesztés: mock Apple/Google adapterekkel bekötni a
+bejelentkezett billing context, verify és reconcile HTTP-végpontokat úgy, hogy
+store secret és külső hálózat nélkül végigtesztelhető legyen a teljes szerveres
+folyamat. Ezután következik a Capacitor mobilhéj-próba, majd külön StoreKit 2 és
+Play Billing 9.x adapter. A `007` migráció távoli staging alkalmazása csak
+előzetes export/restore és külön ellenőrzött munkamenetben történhet. Éles
+művelet külön jóváhagyással; commit/push a tulajdonos feladata.
 
 ## Munkamegosztás
 
