@@ -4,7 +4,7 @@ Státusz: **ARCHITEKTÚRA LEZÁRVA — account/session, Google-auth és staging 
 
 Dátum: 2026-08-24
 
-**Termékdöntés-változás — 2026-09-17; helyi implementáció — 2026-09-19:** a `PRODUCT_DIRECTION.md` és a frissített `FEATURE_ENTITLEMENT_MATRIX.md` irányadó. Bármely aktív tag érvényes előfizetése az egész aktív családnak biztosítja az adott csomag funkcióit, Family+ Insights esetén is. A létrehozó/admin szerepe nem feltétel. A subscription és grant továbbra is a vásárló account tulajdona; az effektív használati jog családi tagságon keresztül származik. A Worker és a kliens helyi kódja már ezt számolja, a staging deploy és kéttelefonos elfogadás még hátravan.
+**Termékdöntés-változás — 2026-09-17; staging elfogadás — 2026-09-19:** a `PRODUCT_DIRECTION.md` és a frissített `FEATURE_ENTITLEMENT_MATRIX.md` irányadó. Bármely aktív tag érvényes előfizetése az egész aktív családnak biztosítja az adott csomag funkcióit, Family+ Insights esetén is. A létrehozó/admin szerepe nem feltétel. A subscription és grant továbbra is a vásárló account tulajdona; az effektív használati jog családi tagságon keresztül származik. A Worker és a kliens ezt számolja, és a teljes Free/Family/Family+ kétaccountos staging mátrixot két telefonon elfogadtuk.
 Ellenőrzött GitHub-alap: `main` / `37d1728` (`Lock Free Family Family+ feature matrix`)
 
 Ez a dokumentum a következő backend-implementáció normatív terve. Nem migráció és nem módosítja a live Cloudflare D1-et vagy Workert. A jelenlegi prototípus `worker/schema.sql` és `worker/src/index.ts` fájljait a célarchitektúrára való átálláskor, külön ellenőrzött migrációkkal kell módosítani.

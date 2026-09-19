@@ -168,7 +168,7 @@ Nem minden tervezett Insights-funkció szükséges az első belső RC-hez. Kül�
 - [ ] Apple és Google Play provider által hitelesített subscription események bekötése ugyanebbe az entitlement modellbe.
 - [x] Letisztult alvásnapló-termékirány és havi Free / Family 990 Ft / Family+ 1 490 Ft terv rögzítése (`PRODUCT_DIRECTION.md`).
 - [x] Bármely aktív tag Family+ joga az összes aktív családtagnak biztosítja az Insights funkciókat is; saját grant és családi effektív jog külön marad (helyi kód és automatizált tesztek, 2026-09-19).
-- [ ] A teljes családi Family+ Insights-jog staging buildjének kéttelefonos elfogadása.
+- [x] A teljes családi Family+ Insights-jog staging buildjének kéttelefonos elfogadása: Family+ + Free, Free + Free pause, Free + Family és fordított fizetőjű Free + Family+ esetek sikeresek (2026-09-19, `da4fef4`).
 
 **Javasolt első kiadási minimum:** Child Profile V4 + stabil Family Sync + wake window V1 + átlátható adatminőség. Prediction csak akkor legyen blokkoló, ha megfelelő saját tesztadat és érthető bizonytalansági kommunikáció áll rendelkezésre.
 
@@ -206,7 +206,7 @@ Nem minden tervezett Insights-funkció szükséges az első belső RC-hez. Kül�
 
 ## Következő konkrét munkamenet
 
-**Elsőbbség:** a 2026-09-19-i teljes családi Family+ Insights-jog commit/push utáni Worker- és internal Pages buildje, majd kéttelefonos elfogadása. Az alábbi korábbi tételek történeti és további release-feladatok.
+**Elsőbbség:** App Store és Google Play vásárlás-ellenőrzési/visszaállítási provider contract, állapotátmenetek és tesztmátrix megtervezése a meglévő entitlement modellhez. Az alábbi korábbi tételek történeti és további release-feladatok.
 
 1. Account- és entitlement-állapotmodell előkészítése: személyes funkciók és családi sync külön döntésként — elkészült.
 2. Free családtag, fizető családtag, lejáró jogosultság, másik megmaradó fizető és reaktiválási egyeztetés tesztesetei — elkészültek.

@@ -3,7 +3,7 @@
 Status: **LOCKED FOR ARCHITECTURE**  
 Date: 2026-08-24
 
-**Product decision update — 2026-09-17; local implementation — 2026-09-19:** `PRODUCT_DIRECTION.md` is authoritative. Keep Free / Family (990 HUF/month) / Family+ (1490 HUF/month). Every active family member inherits the paid capabilities granted by any active member's valid subscription, regardless of creator/admin role. Family+ analytics are no longer subscriber-only. Worker and client implementation is complete locally; staging deployment and two-phone acceptance are pending.
+**Product decision update — 2026-09-17; staging accepted — 2026-09-19:** `PRODUCT_DIRECTION.md` is authoritative. Keep Free / Family (990 HUF/month) / Family+ (1490 HUF/month). Every active family member inherits the paid capabilities granted by any active member's valid subscription, regardless of creator/admin role. Family+ analytics are no longer subscriber-only. Worker and client implementation plus the two-account, two-phone staging matrix are accepted.
 
 This file records the agreed commercial/feature split for the three-plan model. Raw child/session data stays on one canonical schema; plans gate product capabilities, not data formats.
 

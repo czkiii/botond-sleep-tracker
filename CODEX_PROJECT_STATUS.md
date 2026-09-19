@@ -3,7 +3,7 @@
 **Utolsó frissítés:** 2026-09-19
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
-**Aktuálisan ellenőrzött fejlesztési HEAD:** `34d8b55` (`Document successful two-phone sync acceptance and next steps`); a munkamenet elején a munkafa tiszta volt. A jelenlegi, még nem commitolt csomag a teljes családi Family+ Insights-jog helyi implementációja és dokumentációja.
+**Aktuálisan ellenőrzött fejlesztési HEAD:** `da4fef4` (`Share Family+ Insights across active family`); az ág szinkronban van az originnal. A jelenlegi, még nem commitolt módosítás kizárólag a sikeres staging elfogadás dokumentációja.
 
 Ez a fájl az új Codex-beszélgetések rövid belépési pontja. A pillanatnyi pontos commit mindig az a commit, amely ezt a fájlt tartalmazza; ellenőrzéshez futtasd a `git log -1 --oneline` parancsot.
 
@@ -32,7 +32,7 @@ Elsőként:
 - HU / EN / DE lokalizáció.
 - Free / Family / Family+ funkciómátrix lezárva.
 - Free fiók nélkül, local-first módon használható.
-- Family Sync és Family+ Insights effektív hozzáférése is az egész aktív család érvényes grantjaiból számolódik a helyi kódban; staging elfogadás még hátravan.
+- Family Sync és Family+ Insights effektív hozzáférése is az egész aktív család érvényes grantjaiból számolódik; a kétaccountos staging elfogadás sikeres.
 
 ## Elfogadott termékirány — 2026-09-17
 
@@ -153,7 +153,7 @@ A `9e5a381` commit szerveroldali entitlement szelete:
 - a Worker a Family Syncet a család összes aktív tagjának érvényes grantjai
   alapján engedélyezi, ezért Family/Family+ fizető + Free tag esetén mindketten
   szinkronizálhatnak;
-- a Family+ Insights továbbra is csak a fizető account személyes joga;
+- a `9e5a381` commit akkori állapotában a Family+ Insights még csak a fizető account személyes joga volt; ezt a későbbi `da4fef4` családi effektív jogosultságra váltotta;
 - claimelt család raw sync kérése account sessiont és az adott account-eszközhöz
   rendelt családi kulcsot is igényel; kijelentkezett vagy eltérő account tiltott;
 - pause esetén a kliens nem törli a helyi pending módosításokat, és 15 másodpercenként,
@@ -351,7 +351,7 @@ választási ággal és egyedi hiányzóalvás-megosztással. Az eredeti három 
 rekord pontos történeti oka nem bizonyított, azokat nem deduplikáltuk automatikusan.
 Ebben a körben nincs alkalmazáskód-módosítás vagy új teszt/build/deploy.
 
-### Teljes családi Family+ hozzáférés — helyi csomag, 2026-09-19
+### Teljes családi Family+ hozzáférés — stagingben elfogadva, 2026-09-19
 
 A Worker `/v1/auth/access` válasza külön adja vissza a bejelentkezett account
 saját grantjait (`accountFeatures`), az aktív családból származó feature-öket
@@ -368,31 +368,47 @@ családhoz tartozó fizető figyelmen kívül hagyása; megmaradó Family eseté
 és PDF marad, Plus lezár; másik megmaradó Plus esetén Plus marad; utolsó
 fizető megszűnésekor sync pause. A frontend és Worker typecheck sikeres, mind a
 156 teszt átment, a production build sikeres. A build csak a korábban ismert
-500 kB feletti chunk-figyelmeztetést adta. D1-sémamódosítás nem kellett, deploy
-nem történt.
+500 kB feletti chunk-figyelmeztetést adta. D1-sémamódosítás nem kellett.
+
+A `da4fef4` commit automatikus internal Pages buildje és staging Worker buildje
+sikeres. Az internal oldal mind a kanonikus, mind a commit-deployment URL-en a
+`da4fef4` buildet szolgálta ki; a staging Worker health ellenőrzése 200-as
+választ adott. Staging Worker verzió:
+`a79b69b7-ee17-40eb-8c46-02254cea3464`.
+
+A tulajdonos és a felesége két külön Google-accounttal, két telefonon elfogadta
+az alábbi mátrixot:
+
+- tulajdonos Family+ + másik tag Free: sync aktív, Insights mindkét telefonon nyitott;
+- Free + Free: Insights mindkét telefonon zárt, sync szünetel, adatok megmaradnak;
+- tulajdonos Free + másik tag Family: sync mindkét telefonon újracsatlakozás nélkül aktív, Insights zárt;
+- tulajdonos Free + másik tag Family+: sync aktív és Insights mindkét telefonon nyitott.
+
+Az utolsó eset igazolja, hogy a család létrehozója/adminja és a fizető személye
+nem feltétel; a legmagasabb aktív családi csomag érvényesül. A 15 másodperces
+hozzáférés-frissítés és a downgrade/pause viselkedés is élőben elfogadva.
+Production erőforrás nem módosult.
 
 ## Fő nyitott blokkok a `main` migráció előtt
 
-1. A helyileg elkészült teljes családi Family+ Insights-jog staging kéttelefonos elfogadása.
-2. Az account/session eszközkezelő harmadik böngészős staging próbája.
-3. App Store / Google Play vásárlás-ellenőrzés és visszaállítás provider adapterei.
-4. Paywall és upgrade/downgrade folyamat.
-5. Reprodukálható frontend- és Worker-lockfájlok.
-6. Staging backup/restore és dokumentált rollback.
-7. Privacy Policy, adatmegőrzés/törlés és support folyamat.
-8. Production D1 mentés, V4 migráció, Worker deploy és csak ezután kontrollált `main` merge.
+1. App Store / Google Play vásárlás-ellenőrzés és visszaállítás provider adapterei.
+2. Paywall és upgrade/downgrade folyamat.
+3. Az account/session eszközkezelő harmadik böngészős staging próbája.
+4. Reprodukálható frontend- és Worker-lockfájlok.
+5. Staging backup/restore és dokumentált rollback.
+6. Privacy Policy, adatmegőrzés/törlés és support folyamat.
+7. Production D1 mentés, V4 migráció, Worker deploy és csak ezután kontrollált `main` merge.
 
 ## Következő konkrét feladat
 
-A teljes családi Family+ Insights-jog helyi implementációja és automatizált
-ellenőrzése elkészült. A tulajdonos következő lépése a csomag commitja és push-a.
-Ezután külön jóváhagyással staging Worker- és internal Pages build szükséges,
-majd két Google-accounttal ellenőrizendő: Family+ + Free esetén mindkét telefonon
-nyitott Insights; másik megmaradó Plus esetén továbbra is nyitott; csak Family
-megmaradásakor sync aktív, Insights zárt; utolsó fizető megszűnésekor mindkét
-telefonon Insights zárt és sync pause. Sikeres elfogadás után a következő nagy
-fejlesztés az Apple/Google vásárlási provider adapterek megtervezése. Éles
-művelet külön jóváhagyással; commit/push a tulajdonos feladata.
+A teljes családi Family+ hozzáférés implementációja, automatizált ellenőrzése,
+staging buildje és kéttelefonos elfogadása lezárva. A következő nagy fejlesztési
+feladat az App Store és Google Play vásárlási provider adapterek megtervezése:
+a store által igazolt vásárlás és visszaállítás a meglévő account-entitlement
+modellbe kerüljön, a kliens által bemondott csomag ne adhasson jogosultságot.
+Először a közös provider contract, állapotátmenetek és tesztmátrix készítendő el,
+majd külön StoreKit és Play Billing adapter. Éles művelet külön jóváhagyással;
+commit/push a tulajdonos feladata.
 
 ## Munkamegosztás
 
