@@ -3,6 +3,8 @@
 Status: **LOCKED FOR ARCHITECTURE**  
 Date: 2026-08-24
 
+**Product decision update — 2026-09-17; staging accepted — 2026-09-19:** `PRODUCT_DIRECTION.md` is authoritative. Keep Free / Family (990 HUF/month) / Family+ (1490 HUF/month). Every active family member inherits the paid capabilities granted by any active member's valid subscription, regardless of creator/admin role. Family+ analytics are no longer subscriber-only. Worker and client implementation plus the two-account, two-phone staging matrix are accepted.
+
 This file records the agreed commercial/feature split for the three-plan model. Raw child/session data stays on one canonical schema; plans gate product capabilities, not data formats.
 
 ## Plans
@@ -13,16 +15,16 @@ This file records the agreed commercial/feature split for the three-plan model. 
 
 ## Core rules
 
-1. All plans require a Solemi account; V1 identity provider is Google.
-2. Login itself is free and is never a paid feature.
+1. Free can be used local-first without a Solemi account. The V1 identity provider for account-based features is Google.
+2. Login itself is free but optional for the Free plan; account required only for sync/restoration/commerce.
 3. Free sleep history remains local-first; account does not imply automatic cloud backup.
-4. Family Sync is enabled for the whole family while at least one member supplies an active Family or Family+ entitlement.
-5. Family+ advanced Insights are personal entitlements; they are not gifted to other family members merely because shared sync is active.
-6. Raw synchronized family data may exist on a Free member's device while paid views remain locked by entitlement.
+4. One active family subscription enables whole-family sync for that family; at least one member must hold Family or Family+ entitlement for sync to be active.
+5. Family+ advanced Insights are available to every active family member when any active member holds a valid Family+ subscription.
+6. Raw synchronized family data and the corresponding paid capabilities are available to every active member; their own billing plan may remain Free.
 7. If the last Family/Family+ entitlement lapses, cloud data and family membership are retained but active cross-device sync pauses. Reactivation resumes via safe reconciliation.
 8. Server is entitlement authority; client may use a 30-day validated offline entitlement cache.
 9. One account: maximum 2 active devices in the current product decision. No family-wide hard-coded device cap in the architecture.
-10. One subscription applies to one family.
+10. A subscription belongs to its purchaser account and contributes paid capabilities through that account's active family membership. The family creator need not be the purchaser.
 
 ## Feature matrix
 
@@ -116,20 +118,18 @@ If another family member still has an active Family/Family+ entitlement, family 
 
 - family sync: **active**;
 - both devices receive the canonical shared raw data;
-- Parent B remains on Free feature visibility;
-- neither account gets Family+ Insights unless personally entitled.
+- both accounts get Family capabilities;
+- neither account gets Family+ Insights without an active Family+ contribution.
 
 ### Parent A = Family+, Parent B = Free
 
 - family sync: **active**;
-- Parent A gets Family+ Insights;
-- Parent B gets Free UI/features over the synchronized canonical data.
+- both accounts get Family+ Insights and other Family+ capabilities.
 
 ### Parent A = Family+, Parent B = Family
 
 - family sync: **active**;
-- Parent A gets Family+ Insights;
-- Parent B gets Family feature set.
+- both accounts get Family+ Insights and other Family+ capabilities.
 
 ## Architectural consequence
 
@@ -137,9 +137,9 @@ Entitlements must expose at least two separate decisions:
 
 ```text
 familyCanSync(familyId)
-accountCanUse(featureKey, accountId)
+memberCanUse(featureKey, accountId, activeFamilyId)
 ```
 
 Do not reduce the model to a single `plan` check on the current device.
 
-Raw data synchronization and personal feature visibility are intentionally separate.
+Raw data synchronization and capability visibility remain separate decisions, but both must reflect the valid contributions of all active members. Subscription ownership is not the same as effective family access.
