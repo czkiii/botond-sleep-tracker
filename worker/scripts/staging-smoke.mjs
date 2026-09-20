@@ -98,6 +98,10 @@ await api('/v1/sessions/start', {
 let synced = (await api('/v1/sync?after=0', { token: primaryToken })).data
 assert.equal(synced.children.filter((child) => !child.deletedAt).length, 2)
 assert.equal(synced.sessions.filter((session) => !session.endTime && !session.deletedAt).length, 2)
+let sessionARevision = synced.sessions.find((session) => session.id === sessionA)?.revision
+let sessionBRevision = synced.sessions.find((session) => session.id === sessionB)?.revision
+assert.ok(Number.isInteger(sessionARevision))
+assert.ok(Number.isInteger(sessionBRevision))
 
 await api(`/v1/children/${childB}`, {
   method: 'PATCH', token: primaryToken,
@@ -105,30 +109,32 @@ await api(`/v1/children/${childB}`, {
 })
 
 const endTime = new Date().toISOString()
-await Promise.all([
-  api(`/v1/sessions/${sessionA}/end`, {
-    method: 'POST', token: primaryToken,
-    body: { operationId: operationId('end_a'), endTime }
-  }),
-  api(`/v1/sessions/${sessionB}/end`, {
-    method: 'POST', token: primaryToken,
-    body: { operationId: operationId('end_b'), endTime }
-  })
-])
+const endedA = await api(`/v1/sessions/${sessionA}/end`, {
+  method: 'POST', token: primaryToken,
+  body: { operationId: operationId('end_a'), endTime, baseRevision: sessionARevision }
+})
+sessionARevision = endedA.data.session.revision
+const endedB = await api(`/v1/sessions/${sessionB}/end`, {
+  method: 'POST', token: primaryToken,
+  body: { operationId: operationId('end_b'), endTime, baseRevision: sessionBRevision }
+})
+sessionBRevision = endedB.data.session.revision
 
 const doubleStop = await api(`/v1/sessions/${sessionA}/end`, {
   method: 'POST', token: primaryToken,
-  body: { operationId: operationId('double_stop_a'), endTime }
+  body: { operationId: operationId('double_stop_a'), endTime, baseRevision: sessionARevision }
 })
 assert.equal(doubleStop.data.alreadyEnded, true)
 
-await api(`/v1/sessions/${sessionA}`, {
+const patchedA = await api(`/v1/sessions/${sessionA}`, {
   method: 'PATCH', token: primaryToken,
-  body: { operationId: operationId('patch_sleep'), patch: { note: 'staging smoke verified', dayNightOverride: 'day' } }
+  body: { operationId: operationId('patch_sleep'), baseRevision: sessionARevision,
+    patch: { note: 'staging smoke verified', dayNightOverride: 'day' } }
 })
+sessionARevision = patchedA.data.session.revision
 await api(`/v1/sessions/${sessionB}`, {
   method: 'DELETE', token: primaryToken,
-  body: { operationId: operationId('delete_sleep') }
+  body: { operationId: operationId('delete_sleep'), baseRevision: sessionBRevision }
 })
 
 const invite = await api('/v1/invites', { method: 'POST', token: primaryToken, body: {} })
@@ -138,14 +144,25 @@ const joined = await api('/v1/join', {
 })
 assert.ok(joined.data.deviceToken)
 
-await api(`/v1/sessions/${sessionA}`, {
+const competingBaseRevision = sessionARevision
+const primaryEdit = await api(`/v1/sessions/${sessionA}`, {
   method: 'PATCH', token: primaryToken,
-  body: { operationId: operationId('conflict_primary'), patch: { note: 'primary edit' } }
+  body: { operationId: operationId('conflict_primary'), baseRevision: competingBaseRevision,
+    patch: { note: 'primary edit' } }
 })
-await api(`/v1/sessions/${sessionA}`, {
+sessionARevision = primaryEdit.data.session.revision
+const conflict = await expectedApiError(`/v1/sessions/${sessionA}`, 409, 'SYNC_CONFLICT', {
   method: 'PATCH', token: joined.data.deviceToken,
-  body: { operationId: operationId('conflict_secondary'), patch: { note: 'secondary edit wins' } }
+  body: { operationId: operationId('conflict_secondary'), baseRevision: competingBaseRevision,
+    patch: { note: 'secondary edit wins' } }
 })
+assert.equal(conflict.data?.conflict?.serverRevision, sessionARevision)
+const secondaryEdit = await api(`/v1/sessions/${sessionA}`, {
+  method: 'PATCH', token: joined.data.deviceToken,
+  body: { operationId: operationId('conflict_secondary_retry'), baseRevision: sessionARevision,
+    patch: { note: 'secondary edit wins' } }
+})
+sessionARevision = secondaryEdit.data.session.revision
 
 synced = (await api('/v1/sync?after=0', { token: joined.data.deviceToken })).data
 const syncedA = synced.sessions.find((session) => session.id === sessionA)
@@ -187,7 +204,7 @@ console.log('PASS: health + CORS')
 console.log('PASS: two child profiles + parallel active sleeps')
 console.log('PASS: edit + delete tombstone')
 console.log('PASS: duplicate start rejected + duplicate stop idempotent')
-console.log('PASS: server revision order resolves competing edits')
+console.log('PASS: competing edit is rejected, then explicit retry wins')
 console.log('PASS: child delete cascades to its sleep data')
 console.log('PASS: one child mutation leaves the other child untouched')
 console.log('PASS: invite + second-device sync')
