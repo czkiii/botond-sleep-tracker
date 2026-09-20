@@ -19,6 +19,15 @@
 - `solemi-sleep.app` domain megvásárolva a tulajdonos közlése alapján; bekötés, e-mail, OAuth/origin és adatmigráció még nincs igazolva.
 - Commit/push/deploy/adatbázis-módosítás ebben a lépésben nem történt.
 
+### Production V3 adatok mentése és V4 migrációs próba
+
+Részletes jegyzőkönyv: [PRODUCTION_V4_MIGRATION_READINESS_2026-09-20.md](PRODUCTION_V4_MIGRATION_READINESS_2026-09-20.md).
+
+- Az `Opoczki-Klima` production család csak olvasási ellenőrzése megtörtént: revision 263, 102 aktív és 8 törölt alvás az export előtt és után is.
+- A teljes production D1 SQL-export és a család Solemi V4 JSON-mentése a Gitből kizárt `.private-backups/production/` mappában van, SHA-256 értékük rögzítve.
+- Az offline V3→V4 próba minden 113 adatbázis-szintű alvást értékazonosan vitt át; védett legacy táblák változatlanok, idegenkulcshiba 0. A családi JSON-t az app saját importálója elfogadta.
+- A production adatbázis továbbra is V3 és változatlan. V4 Worker/main kiadás előtt friss export, kontrollált `002` migráció és ugyanabban az ablakban Worker-váltás kell; régi Worker és V4 DB együtt nem írható biztonságosan.
+
 ## Legfrissebb ellenőrzés — teljes kiadás előtti audit
 
 **Elsőként olvasandó:** [FULL_RELEASE_AUDIT_2026-09-20.md](FULL_RELEASE_AUDIT_2026-09-20.md).

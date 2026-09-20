@@ -270,7 +270,7 @@ engedélyez automatikus halasztást. A meglévő Prediction kommunikációját i
 ## G. Éles kiadás — csak külön jóváhagyással
 
 - [ ] Release commit SHA véglegesítése és megjelölése.
-- [ ] Távoli production D1 mentése.
+- [ ] Távoli production D1 mentése. 2026-09-20-i ellenőrzött pillanatfelvétel elkészült; a tényleges migráció előtt friss export kötelező.
 - [ ] `worker/migrations/002_children_v4.sql` alkalmazása production D1-en.
 - [ ] Az aktuális production séma alapján az account/billing 003–007 szükséges migrációinak jóváhagyott sorrendje; előbb staging restore és kompatibilitási próba (A25).
 - [ ] Worker deploy pontosan a release commitból.
