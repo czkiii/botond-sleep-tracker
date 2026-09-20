@@ -3,12 +3,13 @@
 **Utolsó frissítés:** 2026-09-20
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
-**Auditált fejlesztési HEAD:** `e9374f4` (`Add verified store billing foundation`); az auditkor a helyi origin-refhez képest 0 ahead / 0 behind. A billing alap és integrációs terv már commitolva. A mostani munkafaváltozások kizárólag auditdokumentumok és archivált auditpróbák; alkalmazáskód-javítás, deploy, commit/push nem történt.
+**Teljes audit alapja:** `e9374f4` (`Add verified store billing foundation`); az akkori helyi origin-refhez képest 0 ahead / 0 behind.
+**Family+ kiegészítéskor ellenőrzött HEAD:** `3a0a687` (`Document full release audit and pre-launch blockers`), változatlan alkalmazáskóddal. A mostani munkafaváltozások kizárólag auditdokumentumok és archivált auditpróbák; alkalmazáskód-javítás, deploy, commit/push nem történt.
 
 ## Legfrissebb ellenőrzés — teljes kiadás előtti audit
 
 **Elsőként olvasandó:** [FULL_RELEASE_AUDIT_2026-09-20.md](FULL_RELEASE_AUDIT_2026-09-20.md).
-A jelentés A01–A26 pontja és a `RELEASE_CHECKLIST.md` új auditkapuja felülírja
+A jelentés A01–A27 pontja és a `RELEASE_CHECKLIST.md` új auditkapuja felülírja
 az alábbi történeti következő-feladat javaslatokat. A termékirány/csomagok változatlanok.
 
 - 185/185 meglévő teszt és frontend/Worker typecheck sikeres; production és
@@ -25,6 +26,24 @@ az alábbi történeti következő-feladat javaslatokat. A termékirány/csomago
   Nincs automatikusan első frissítésre halasztott tétel.
 - Bizonyíték és reprodukció: `audit/2026-09-20/README.md`. A `.ts.txt` próbaarchívum
   nem a normál tesztcsomag része; a hibás eredményt rögzíti, nem regressziós elvárás.
+
+### Family+ számítási audit — 2026-09-20 kiegészítés
+
+A teljes auditot a tulajdonos commitolta: `3a0a687`. A statisztikai kiegészítés
+ezen a HEAD-en, az `e9374f4` óta változatlan alkalmazáskódon készült.
+Jelentés: [FAMILY_PLUS_STATISTICS_AUDIT_2026-09-20.md](FAMILY_PLUS_STATISTICS_AUDIT_2026-09-20.md).
+
+- Mind a hét Family+ kártya képlete, időszaka, mintája és megjelenítése átvizsgálva.
+- 50 kapcsolódó meglévő teszt + 22 auditpróba = **72/72 sikeres**. Az auditpróbák
+  7 kontrollt és 15 jelenlegi eltérést/értelmezési korlátot igazolnak, nem javítások.
+- S01–S15: megszakított éjszakák ébredése/esti ablaka, eltérő havi nevező,
+  aktív alvás és elavult becslés, hiányos napló, óraidő-medián, időszak,
+  adatminőség, mintaszám/felirat és időzóna. Az A27 alatt külön kiadási kapu.
+- A korábbi 5 perces alvás → heti 0 perc magyarázata javítva: 5/7 perc
+  lefelé kerekítése, nem a rekord kiszűrése. A tényleges minimum 2 perc.
+- A próbák `audit/2026-09-20/family-plus-statistics.probe.ts.txt` néven archiválva;
+  nem részei a normál tesztcsomagnak. Csak dokumentáció és bizonyíték változott.
+- Javítás, commit/push, deploy és adatbázis-módosítás nem történt.
 
 **Következő konkrét fejlesztési szelet: A01 — sérült helyi napló megőrzése.**
 Különítsük el a hiányzó és a sérült tárolót; ne írjuk vissza automatikusan az
@@ -449,7 +468,7 @@ távoli D1-módosítás, deploy, store-fiókbeállítás, commit vagy push.
 
 ## Fő nyitott blokkok a `main` migráció előtt
 
-**2026-09-20 kiegészítés:** az alábbi korábbi lista nem teljes; az A01–A26
+**2026-09-20 kiegészítés:** az alábbi korábbi lista nem teljes; az A01–A27
 auditkapu az irányadó, különösen az adatmegőrzési és hozzáférési hibák miatt.
 
 1. App Store / Google Play vásárlás-ellenőrzés és visszaállítás provider adapterei.

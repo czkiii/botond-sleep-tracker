@@ -53,8 +53,10 @@ elérhetetlensége itt várható, nem staginghibának minősített eredmény.
 - Indítás → −5 perc → reload: aktív alvás és korrigált kezdés megmaradt.
 - Lezárás → Előzmények: egy lezárt sor jelent meg.
 - Friss indításkor röviden téves „Az alvás időpontjai hibásak” jelzés jelent meg.
-- A kb. 5 perces alvás a főoldali összegben szerepelt, a statisztikában 0 perc
-  látszott; az elemzési minimum minta/szűrés hatása nincs itt megmagyarázva.
+- A kb. 5 perces alvás a főoldali összegben szerepelt, a heti statisztikában
+  0 perc látszott. A későbbi statisztikai próba pontosította az okot:
+  az 5/7 perces napi átlag lefelé kerekítése ad 0-t, nem a rekord kiszűrése.
+  Az 5 perces alvás megmarad; az elemzési minimum külön szabály, 2 perc.
 - Statisztika és beállítások megnyithatók, a vizsgált mobilméretű statisztika
   felső részén nem látszott vízszintes szétesés. Ez nem teljes képernyőmátrix.
 - „Profil szerkesztése” fókuszált vezérlőn Enter nem nyitott szerkesztőt;
@@ -65,3 +67,33 @@ elérhetetlensége itt várható, nem staginghibának minősített eredmény.
 A helyi preview folyamatát és az ideiglenes böngészőlapot lezártuk, a viewportot
 visszaállítottuk. A valódi iPhone/Android/native/store és staging restore
 elfogadások külön, nyitott kiadási kapuk.
+
+## Family+ számítási kiegészítés
+
+Jelentés: [FAMILY_PLUS_STATISTICS_AUDIT_2026-09-20.md](../../FAMILY_PLUS_STATISTICS_AUDIT_2026-09-20.md).
+HEAD `3a0a687`, változatlan alkalmazáskód az `e9374f4` audit óta.
+Az archív `family-plus-statistics.probe.ts.txt` 7 független kontrollt és
+15 jelenlegi eltérést/értelmezési korlátot igazoló próbát tartalmaz.
+**Nem javítási regressziós teszt:** S01–S15 a jelenlegi eredményt várja;
+javításkor a kívánt viselkedés legyen az új elvárás.
+
+2026-09-20, a végső együttes futás: **9 fájl / 72 teszt sikeres**,
+ebből 22 auditpróba és 50 meglévő statisztikai/adatminőségi/időhatár teszt.
+Az uniókontroll 50 rögzített véletlenmagú adathalmazt ellenőriz egyetlen
+teszten belül. A próbakészítés közbeni korábbi futásban a UTC/Budapest
+elvárt napszám felcserélése teszthibát okozott; ezt a próbában javítottuk.
+Alkalmazáskód nem változott. A végső futás időtartama 515 ms volt;
+ez tesztfutási idő, nem telefonos teljesítménymérés.
+
+A repository gyökeréből, nem létező ideiglenes célfájllal:
+
+```powershell
+Copy-Item -LiteralPath audit/2026-09-20/family-plus-statistics.probe.ts.txt -Destination family-stats-audit.test.ts
+node node_modules/vitest/dist/cli.js run family-stats-audit.test.ts src/insights.test.ts src/prediction.test.ts src/similarDays.test.ts src/sleepDevelopment.test.ts src/sleepChange.test.ts src/monthlyReport.test.ts src/dataQuality.test.ts src/timeBoundaries.test.ts
+Remove-Item -LiteralPath family-stats-audit.test.ts
+```
+
+A próbák mesterséges, egygyermekes adatokon futnak; a `TZ` környezeti értéket
+próbánként visszaállítják. Nincs hálózati hívás, valódi alvásadat vagy távoli
+adatmódosítás. Az ideiglenes futtatható teszt archiválva lett; a normál
+tesztcsomag és az alkalmazás forrása nem módosult.

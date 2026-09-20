@@ -28,6 +28,13 @@ hozzáférési hibát vagy kötelező áruházi hiányt nem helyettesít egy elf
 
 ## Módszer, bizonyíték és korlát
 
+**Family+ kiegészítés, 2026-09-20:** a `3a0a687` dokumentációs commit után,
+változatlan alkalmazáskódon elkészült a
+[részletes statisztikai audit](FAMILY_PLUS_STATISTICS_AUDIT_2026-09-20.md).
+Az A27 alatt kapcsolt S01–S15 tételek a hét kártya számításait vizsgálják.
+Külön 22 auditpróba és a kapcsolódó 50 meglévő teszt sikeres; a próbák között
+hibareprodukciók is vannak, ez nem jelenti a számítási hibák javítását.
+
 Áttekintett területek: termékdöntések és funkciómátrix; React felület és
 HU/EN/DE szövegek; helyi tárolás/import/export/fotó; szinkron és konfliktusok;
 Google-account/session; családi tagság és entitlement; billing contract,
@@ -84,7 +91,7 @@ Nem indokolt teljes újraírás vagy további babagondozási funkciók hozzáad�
 | Alvás start/stop, kézi javítás, több gyermek | Megvan; alapfolyamat működik | A01–A05, A13–A15 adatbiztonság |
 | Alapstatisztika, nap/hét/hónap/egyedi nézet | Megvan | A21 egységes számlálási szabály és magyarázat |
 | Family közös napló | Stagingben kipróbált | A04–A07, A15–A16, A25 |
-| Family+ elemzések, fejlődés, havi jelentés | Számítás és megjelenítés megvan | Valódi entitlement, offline viselkedés, minőség/teljesítmény |
+| Family+ elemzések, fejlődés, havi jelentés | Számítás és megjelenítés megvan | A27/S01–S15 számítási audit; valódi entitlement, offline viselkedés, minőség/teljesítmény |
 | Fizetős hozzáférés az egész aktív családnak | MANUAL staging-forrással működik | Tagsági életciklus + valódi store-forrás |
 | Vásárlás, visszaállítás, lemondáskezelés | Contract/persistence alap; end-to-end nincs | A08–A12 |
 | Paywall, bolti árak, éves opció, 7 nap trial | Terv; a belső csomagváltó nem paywall | Valódi bolti termékek, trial jogosultság, megújulási tájékoztatás |
@@ -375,8 +382,10 @@ kis kijelző HU/EN/DE próbája; teljes vizuális megfelelőséget most nem áll
 **Forrás:** `src/utils.ts:80`, `:114`; `src/sleepDevelopment.ts:121`;
 `src/App.tsx:136`, `:313`.
 Reprodukció: 12:00–13:00 és 12:30–13:30 bejegyzésnél a főoldal 120 percet,
-a statisztika uniója 90 percet számol. A rövid alvások szűrése miatt a helyi
-böngészőteszt 5 perces alvása a főoldalon megvolt, statisztikában 0-nak látszott.
+a statisztika uniója 90 percet számol. A helyi böngészőteszt 5 perces alvása
+a főoldalon megvolt, a heti statisztikában 0-nak látszott. **Pontosítás a
+Family+ audit alapján:** ez nem kiszűrés, hanem az 5/7 perces napi átlag
+lefelé kerekítése. Az elemzési minimum 2 perc, az 5 perces rekord megmarad.
 Közvetlen startkor az előző timer-tick miatt pillanatnyi „hibás időpont” jelzés
 is reprodukálható. Az egyik elemzés kizár, másik összevon; ezt a felület nem
 mindenütt magyarázza meg.
@@ -461,6 +470,19 @@ kiszivárogtató riport, lezárt store beadási ellenőrzés. Ha a Play-fiók
 kérelmezéséhez; a felhasználó fióktípusa nem ismert.
 [Google hivatalos tesztelési feltételek](https://support.google.com/googleplay/android-developer/answer/14151465?hl=en).
 
+### A27 — P1/P2 / R+K — Family+ számítások és a mutatók jelentése
+
+A [Family+ statisztikai audit](FAMILY_PLUS_STATISTICS_AUDIT_2026-09-20.md)
+S01–S15 pontja részletezi a bizonyítékokat és a lezárást. Megszakított
+éjszakák hibás ébredési/ébrenléti mintát adnak; eltér a leghosszabb alvás
+átlagának nevezője; aktív alvás és elavult ébredés mellett is képződhet
+félrevezető eredmény. Hiányos naplóból nem igazolható teljes napi alvásváltozás.
+További tételek: időhatár, óraidő-medián, mintavételi ablak, adatminőségi
+politika, időzóna, mintaszám és jelentésfeliratok.
+**Lezárás:** mind a 15 tételhez javítás vagy explicit, ellenőrzött számítási
+szabály és a kívánt viselkedést rögzítő próba. Az A01 elsőbbsége változatlan;
+a statisztikai problémák sem halasztódnak automatikusan kiadás utánra.
+
 ## Kiadás előtti végrehajtási sorrend
 
 1. **Adatmegőrzés és helyi mentés:** A01, A02, A03, A13, A14. Első konkrét
@@ -471,7 +493,7 @@ kérelmezéséhez; a felhasználó fióktípusa nem ismert.
    production konfiguráció. A24 reproducible build már ekkor rendezendő.
 4. **Fizetés:** A08–A11 domainhibák → mock end-to-end → hiteles provider → restore
    és notification életciklus. MANUAL entitlement nem bizonyít store vásárlást.
-5. **Mobil és termékfelület:** A12, A17, A20–A23. Natív technikai próba korán
+5. **Mobil és termékfelület:** A12, A17, A20–A23, A27/S01–S15. Natív technikai próba korán
    is indulhat, de nyilvános csomag csak a stabil adatrétegen készüljön.
 6. **Kiadási főpróba:** A24–A26, két platform, teljes elfogadási mátrix,
    backup/restore, üzemi beállítások, pontos SHA. Ezután külön production döntés.

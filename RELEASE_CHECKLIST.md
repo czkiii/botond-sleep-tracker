@@ -38,11 +38,39 @@ vagy kifejezett, indokolt termékdöntés kell; a puszta priorizálás nem lezá
 - [ ] A24 — Lockfile, CI-hez kötött release, pontos SHA és PWA upgrade.
 - [ ] A25 — Teljes sémaleltár, migrációs terv, staging restore és rollback főpróba.
 - [ ] A26 — Support/monitoring, staging adatkezelés és két store beadási bizonyíték.
+- [ ] A27 — Family+ számítási audit S01–S15 lezárása az alábbi bontásban.
 
 **Jelenlegi döntés: nyilvános fizetős kiadás még nem engedhető tovább.**
 Az audit 185 meglévő tesztje és buildjei sikeresek, de a fenti feladatok nyitottak.
 A részletes jelentés megkülönbözteti a bizonyított hibát a további próbát igénylő
 kockázattól. A történeti pipák nem jelentik az auditpontok lezárását.
+
+## Family+ számítási kapu — A27 / S01–S15
+
+Részletes bemenet, jelenlegi eredmény és elfogadási feltétel:
+[FAMILY_PLUS_STATISTICS_AUDIT_2026-09-20.md](FAMILY_PLUS_STATISTICS_AUDIT_2026-09-20.md).
+Vizsgált HEAD `3a0a687`, az alkalmazás forrása változatlan. A 72 sikeres helyi
+próba az audit bizonyítéka, nem a hibák lezárása. Minden alábbi tétel nyitott.
+
+- [ ] S01 — Másodpercpontos nappal/éjjel bontás, közös időhatár-kezelés.
+- [ ] S02 — Megszakított éjszaka és valódi reggeli ébredés megkülönböztetése.
+- [ ] S03 — Éjfél körüli óraidők körkörös statisztikája.
+- [ ] S04 — Minimum mintaszám és kiemelt tipikus érték egyezése.
+- [ ] S05 — Adatokhoz igazodó bizonyossági címke és pontos Q1–Q3 magyarázat.
+- [ ] S06 — Becsléstípus és kiválasztott mintavételi időszak egyezése.
+- [ ] S07 — Elavult ébredés/hiányos aktuális kontextus becslésének kezelése.
+- [ ] S08 — Hasonló napok aktív alvás alatti állapotának javítása.
+- [ ] S09 — Hasonlóság vagy legközelebbi elérhető nap következetes jelentése.
+- [ ] S10 — Leghosszabb szakasz közös nevezője, nap-/hónap-hozzárendelése és felirata.
+- [ ] S11 — Hiányos napló, teljes nap és nulla megkülönböztetése; 4/5 nap eltérés.
+- [ ] S12 — Havi riport és összehasonlítás tényleges időszakának jelzése.
+- [ ] S13 — Átfedés, duplikátum és ellentétes kézi típus egységes szabálya.
+- [ ] S14 — Időzóna szerinti csoportosítás dokumentált döntése és próbája.
+- [ ] S15 — Esti lefekvés és éjszakai visszaalvás külön mintacsoportja.
+
+Javítás után közös tesztnapló minden kártyán, HU/EN/DE szövegek és célzott
+kéttelefonos elfogadás szükséges. Nincs automatikus kiadás utáni halasztás;
+az első alkalmazásjavítás továbbra is A01.
 
 ## Célállapotok
 
