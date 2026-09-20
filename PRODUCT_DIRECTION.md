@@ -41,6 +41,6 @@ A közös szinkron önálló fizetős érték a terméktervben. Konkurens ingyen
 
 Cél: rendszeresen használó családok és kis, fenntartható mellékbevétel; heti 5–8 órás fejlesztési/tesztelői kapacitással. Nyilvános induláskor App Store és Google Play jelenlét is szükséges. Az egyszerűséget és a csomagok értékét további családokkal ellenőrizzük, új funkciók automatikus hozzáadása nélkül.
 
-A következő fejlesztési feladat az App Store és Google Play vásárlás-ellenőrzési és visszaállítási adaptereinek megtervezése a meglévő entitlement modellhez. Későbbi kutatási feladat: szülői Reddit-beszélgetések és más közösségi visszajelzések áttekintése arról, miért kezdenek naplózni, mikor válik teherré, és miért hagyják abba. Kutatás ebben a munkamenetben nem indul.
+A 2026-09-20-i teljes audit után a következő fejlesztési feladat a sérült helyi napló megőrzése (A01), majd a jelentés adatbiztonsági, családi és billing sorrendje. Lásd `FULL_RELEASE_AUDIT_2026-09-20.md` és `CODEX_PROJECT_STATUS.md`. A termékirány és a havi csomagok nem változtak; nincs automatikusan első frissítésre halasztott tétel. Későbbi kutatási feladat: szülői Reddit-beszélgetések és más közösségi visszajelzések áttekintése arról, miért kezdenek naplózni, mikor válik teherré, és miért hagyják abba. Kutatás ebben a munkamenetben nem indul.
 
 Commit/push a tulajdonos feladata. Éles deploy, main merge és production adatbázis-módosítás külön engedélyhez kötött.

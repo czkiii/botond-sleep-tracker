@@ -1,9 +1,36 @@
 # Solemi Sleep — Codex projektállapot
 
-**Utolsó frissítés:** 2026-09-19
+**Utolsó frissítés:** 2026-09-20
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
-**Aktuális fejlesztési HEAD:** `dc41d7f` (`Document successful Family+ staging acceptance`); az ág szinkronban van az originnal. A munkafán helyben elkészült az App Store / Google Play közös billing contract, a store-persistence első szelete és az integrációs terv.
+**Auditált fejlesztési HEAD:** `e9374f4` (`Add verified store billing foundation`); az auditkor a helyi origin-refhez képest 0 ahead / 0 behind. A billing alap és integrációs terv már commitolva. A mostani munkafaváltozások kizárólag auditdokumentumok és archivált auditpróbák; alkalmazáskód-javítás, deploy, commit/push nem történt.
+
+## Legfrissebb ellenőrzés — teljes kiadás előtti audit
+
+**Elsőként olvasandó:** [FULL_RELEASE_AUDIT_2026-09-20.md](FULL_RELEASE_AUDIT_2026-09-20.md).
+A jelentés A01–A26 pontja és a `RELEASE_CHECKLIST.md` új auditkapuja felülírja
+az alábbi történeti következő-feladat javaslatokat. A termékirány/csomagok változatlanok.
+
+- 185/185 meglévő teszt és frontend/Worker typecheck sikeres; production és
+  auth-enabled internal helyi build sikeres.
+- 14/14 külön auditpróba lefutott: 13 jelenlegi hibás vagy korlátozandó
+  viselkedést igazoló próba, 1 teljesítménymérés. Ezek nem kijavított hibák.
+- Bizonyított problémák többek között: sérült napló felülírása, többlapos
+  adatvesztés, megmaradó tagság kilépés után, legacy entitlement-kivétel,
+  billing eseményverseny/linked-token/környezeti kerítés, aktív alvás mezőinek
+  kihagyása, utolsó gyermek párhuzamos törlése, proxy-origin átírás.
+- A korábbi billing „idempotens/időrendvédett” állítás csak az akkori soros
+  tesztesetekre igazolt. A08–A10 javítása nélkül ne kerüljön vásárlási HTTP API mögé.
+- A működő staging alapfolyamat nem jelent production/store kiadási készültséget.
+  Nincs automatikusan első frissítésre halasztott tétel.
+- Bizonyíték és reprodukció: `audit/2026-09-20/README.md`. A `.ts.txt` próbaarchívum
+  nem a normál tesztcsomag része; a hibás eredményt rögzíti, nem regressziós elvárás.
+
+**Következő konkrét fejlesztési szelet: A01 — sérült helyi napló megőrzése.**
+Különítsük el a hiányzó és a sérült tárolót; ne írjuk vissza automatikusan az
+üres alapállapotot; legyen eredetimentés és érthető helyreállítás. Ezután A02/A03
+mentési/outbox/import biztonság, majd a jelentés szerinti tagság/jogosultság és billing.
+Az auditban még nincs alkalmazáskód-javítás. Éles lépések külön engedéllyel.
 
 Ez a fájl az új Codex-beszélgetések rövid belépési pontja. A pillanatnyi pontos commit mindig az a commit, amely ezt a fájlt tartalmazza; ellenőrzéshez futtasd a `git log -1 --oneline` parancsot.
 
@@ -422,6 +449,9 @@ távoli D1-módosítás, deploy, store-fiókbeállítás, commit vagy push.
 
 ## Fő nyitott blokkok a `main` migráció előtt
 
+**2026-09-20 kiegészítés:** az alábbi korábbi lista nem teljes; az A01–A26
+auditkapu az irányadó, különösen az adatmegőrzési és hozzáférési hibák miatt.
+
 1. App Store / Google Play vásárlás-ellenőrzés és visszaállítás provider adapterei.
 2. Paywall és upgrade/downgrade folyamat.
 3. Az account/session eszközkezelő harmadik böngészős staging próbája.
@@ -432,20 +462,15 @@ távoli D1-módosítás, deploy, store-fiókbeállítás, commit vagy push.
 
 ## Következő konkrét feladat
 
-A teljes családi Family+ hozzáférés staging elfogadása lezárva. Helyben elkészült
-az App Store / Google Play közös billing contract első szelete: proof-only
-klienskérés, normalizált subscription snapshot, termék-feature térkép,
-hozzáférési állapotmátrix és provider-specifikus account alias ellenőrzés. A
-részletes végrehajtási sorrend és tesztmátrix a
-`STORE_BILLING_INTEGRATION_PLAN.md` fájlban található.
+A01: a sérült helyi napló betöltéskori felülírásának megszüntetése, az eredeti
+adat megőrzésével és célzott hibainjektálásos regressziós tesztekkel.
+Ezt A02/A03 helyi mentés/outbox/import követi, majd a teljes audit végrehajtási
+sorrendje. A normál kéttelefonos staging-elfogadás továbbra is érvényes a
+korábban kipróbált esetekre; az új audit más határeseteket talált.
 
-Következő konkrét fejlesztés: mock Apple/Google adapterekkel bekötni a
-bejelentkezett billing context, verify és reconcile HTTP-végpontokat úgy, hogy
-store secret és külső hálózat nélkül végigtesztelhető legyen a teljes szerveres
-folyamat. Ezután következik a Capacitor mobilhéj-próba, majd külön StoreKit 2 és
-Play Billing 9.x adapter. A `007` migráció távoli staging alkalmazása csak
-előzetes export/restore és külön ellenőrzött munkamenetben történhet. Éles
-művelet külön jóváhagyással; commit/push a tulajdonos feladata.
+A billing HTTP-bekötés az A08–A10 domainhibák javítása után következik.
+A `007` távoli staging migráció előtt export/restore és ellenőrzött munkamenet
+kell. Éles művelet külön jóváhagyással; commit/push a tulajdonos feladata.
 
 ## Munkamegosztás
 

@@ -1,8 +1,48 @@
 # Solemi Sleep — belső verziótól a kiadásig
 
-Utolsó frissítés: 2026-09-17
+Utolsó frissítés: 2026-09-20
 
 Ez az operatív lista a `SOLEMI_EXECUTION_PLAN.md` és a `SOLEMI_MASTER_ROADMAP.md` kiadási pontjait rendezi végrehajtási sorrendbe.
+
+## Elsődleges kiadási kapu — teljes audit, 2026-09-20
+
+Részletes bizonyíték, súlyosság és lezárási feltétel:
+[FULL_RELEASE_AUDIT_2026-09-20.md](FULL_RELEASE_AUDIT_2026-09-20.md), auditált SHA `e9374f4`.
+Az alábbi lista a korábbi szakaszoknál elsőbbséget élvez. Nincs automatikus
+„első frissítésben” halasztás. Minden tételhez javítási commit, sikeres próba
+vagy kifejezett, indokolt termékdöntés kell; a puszta priorizálás nem lezárás.
+
+- [ ] A01 — Sérült helyi napló megőrzése, automatikus felülírás megakadályozása. **Következő munka.**
+- [ ] A02 — Többlapos mentés, quota/crash és tartós napló–outbox egység.
+- [ ] A03 — Import/törlés családi hatása és visszaállítható biztonsági mentés.
+- [ ] A04 — Valódi account-szintű családi kilépés, pending adatok védelme.
+- [ ] A05 — Fiókváltás/guest kapcsolat és helyi adatok elkülönítése.
+- [ ] A06 — Legacy API fizetős sync-megkerülés lezárása, kompatibilis átállás.
+- [ ] A07 — Production config/auth-proxy/entitlement és tesztkapcsolók elkülönítése.
+- [ ] A08 — Billing eseményverseny és sorrend javítása.
+- [ ] A09 — Google linked-token csere és régi grantok visszavonása.
+- [ ] A10 — Store sandbox/production környezeti kerítés.
+- [ ] A11 — Hiteles store verify/restore/webhook/acknowledgement és paywall.
+- [ ] A12 — Valós natív iOS/Android kiadás és megfelelő iOS-login.
+- [ ] A13 — Új aktív alvás jegyzetének és kézi típusának szinkronja.
+- [ ] A14 — Utolsó gyermek párhuzamos törlésének atomi védelme.
+- [ ] A15 — Nem üres helyi napló csatlakozása, gyermekkonfliktus és pull-határesetek.
+- [ ] A16 — Offline fizetős hozzáférés, refresh race, harmadik eszköz próba.
+- [ ] A17 — Accounttörlés, megőrzés, privacy és store adatkezelési tájékoztatás.
+- [ ] A18 — Proxy eredeti Origin ellenőrzése és auth CSRF-határ.
+- [ ] A19 — Rate/body/resource limitek, security headerek és függőségvizsgálat.
+- [ ] A20 — Összehasonlítható konfliktusválasztás, akadálymentes és mobilos UX.
+- [ ] A21 — Statisztikai összegek/szűrés és időpontjelzések egyeztetése.
+- [ ] A22 — Telefonos teljesítményprofil, másodpercenkénti elemzés újraszámolás rendezése.
+- [ ] A23 — Terv–funkciómátrix–ár/paywall ígéretek tételes lezárása a tulajdonossal.
+- [ ] A24 — Lockfile, CI-hez kötött release, pontos SHA és PWA upgrade.
+- [ ] A25 — Teljes sémaleltár, migrációs terv, staging restore és rollback főpróba.
+- [ ] A26 — Support/monitoring, staging adatkezelés és két store beadási bizonyíték.
+
+**Jelenlegi döntés: nyilvános fizetős kiadás még nem engedhető tovább.**
+Az audit 185 meglévő tesztje és buildjei sikeresek, de a fenti feladatok nyitottak.
+A részletes jelentés megkülönbözteti a bizonyított hibát a további próbát igénylő
+kockázattól. A történeti pipák nem jelentik az auditpontok lezárását.
 
 ## Célállapotok
 
@@ -143,7 +183,9 @@ A fejlesztés ugyanabban a repóban és ugyanazon a fő alkalmazáson folytatód
 
 ## E. Kiadási funkcióscope lezárása
 
-Nem minden tervezett Insights-funkció szükséges az első belső RC-hez. Külön döntés kell arról, mi blokkolja a nyilvános kiadást.
+A belső RC és a nyilvános kiadás külön kapu. A felhasználó döntése szerint nincs
+automatikus első frissítésre halasztás. A régi terv és az elfogadott termékirány
+eltéréseit az A23 pontban, tételes döntéssel kell lezárni.
 
 - [x] Wake window teljes V1 scope: 7/14/30 nap, medián, tipikus tartomány, megfelelő minimum minta és alvássorrend szerinti bontás.
 - [x] Rutinminták V1: tipikus esti elalvás, reggeli ébredés, ±30 perces konzisztencia és nappali alvásszám legalább 3 tiszta megfigyelt napból.
@@ -169,7 +211,7 @@ Nem minden tervezett Insights-funkció szükséges az első belső RC-hez. Kül�
   - [x] Közös proof-only provider contract, állapotmátrix és célzott helyi tesztek.
   - [x] Apple/Google/Capacitor integrációs sorrend és kötelező tesztmátrix dokumentálása (`STORE_BILLING_INTEGRATION_PLAN.md`).
   - [x] Additív billing account-link és store-state D1 persistence helyben (`007_store_billing_state.sql`; távoli D1-en még nincs alkalmazva).
-  - [x] Idempotens, időrendvédett snapshot-alkalmazás és entitlement-frissítés helyi tesztekkel.
+  - [ ] Teljesen idempotens, időrendvédett snapshot-alkalmazás: a soros tesztek sikeresek, de A08–A10 auditjavítás szükséges a párhuzamosság, linked token és környezeti kerítés miatt.
   - [ ] StoreKit 2 adapter és App Store Server Notifications V2.
   - [ ] Play Billing 9.x adapter, acknowledgement és RTDN.
   - [ ] Vásárlás-visszaállítás és sandbox/closed-test elfogadás.
@@ -177,7 +219,9 @@ Nem minden tervezett Insights-funkció szükséges az első belső RC-hez. Kül�
 - [x] Bármely aktív tag Family+ joga az összes aktív családtagnak biztosítja az Insights funkciókat is; saját grant és családi effektív jog külön marad (helyi kód és automatizált tesztek, 2026-09-19).
 - [x] A teljes családi Family+ Insights-jog staging buildjének kéttelefonos elfogadása: Family+ + Free, Free + Free pause, Free + Family és fordított fizetőjű Free + Family+ esetek sikeresek (2026-09-19, `da4fef4`).
 
-**Javasolt első kiadási minimum:** Child Profile V4 + stabil Family Sync + wake window V1 + átlátható adatminőség. Prediction csak akkor legyen blokkoló, ha megfelelő saját tesztadat és érthető bizonytalansági kommunikáció áll rendelkezésre.
+**Nyilvános kiadási feltétel:** az elfogadott funkciómátrix és az A01–A26 kapuk
+lezárása; mindkét store indulási feltétel. A korábbi minimum-scope javaslat nem
+engedélyez automatikus halasztást. A meglévő Prediction kommunikációját is auditálni kell.
 
 ## F. Release engineering, privacy és support
 
@@ -198,6 +242,7 @@ Nem minden tervezett Insights-funkció szükséges az első belső RC-hez. Kül�
 - [ ] Release commit SHA véglegesítése és megjelölése.
 - [ ] Távoli production D1 mentése.
 - [ ] `worker/migrations/002_children_v4.sql` alkalmazása production D1-en.
+- [ ] Az aktuális production séma alapján az account/billing 003–007 szükséges migrációinak jóváhagyott sorrendje; előbb staging restore és kompatibilitási próba (A25).
 - [ ] Worker deploy pontosan a release commitból.
 - [ ] Production Worker smoke test.
 - [ ] PR review és draft állapot megszüntetése.
@@ -213,7 +258,10 @@ Nem minden tervezett Insights-funkció szükséges az első belső RC-hez. Kül�
 
 ## Következő konkrét munkamenet
 
-**Elsőbbség:** App Store és Google Play vásárlás-ellenőrzési/visszaállítási provider contract, állapotátmenetek és tesztmátrix megtervezése a meglévő entitlement modellhez. Az alábbi korábbi tételek történeti és további release-feladatok.
+**Elsőbbség:** A01 — sérült helyi tároló megőrzése, majd A02/A03
+mentési/outbox/import biztonság. Ezután a teljes audit végrehajtási sorrendje.
+A billing HTTP/adapterszelet előtt A08–A10 javítás kötelező. Az alábbi korábbi
+tételek történeti és további release-feladatok.
 
 1. Account- és entitlement-állapotmodell előkészítése: személyes funkciók és családi sync külön döntésként — elkészült.
 2. Free családtag, fizető családtag, lejáró jogosultság, másik megmaradó fizető és reaktiválási egyeztetés tesztesetei — elkészültek.

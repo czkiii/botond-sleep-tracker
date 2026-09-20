@@ -1,8 +1,17 @@
 # Solemi Sleep — App Store és Google Play vásárlási integráció
 
-**Állapot:** a közös contract és a helyi persistence-szelet elkészült  
-**Dátum:** 2026-09-19  
+**Állapot:** a közös contract és a helyi persistence első implementációja megvan; kiadás előtt auditjavítás szükséges
+
+**Dátum:** 2026-09-20
+
 **Érintett csomagok:** Family (990 Ft/hó), Family+ (1 490 Ft/hó)
+
+**Auditkapu:** a [teljes audit](FULL_RELEASE_AUDIT_2026-09-20.md) A08–A10 pontja
+reprodukálta az egyidejű eseménykezelés/időrend, Google linked-token csere és
+sandbox/production kerítés hiányait. A korábbi 29 célzott teszt soros esetekben
+sikeres; ez nem teljes fizetési biztonsági elfogadás. Előbb ezek javítása és
+regressziós tesztje, csak utána vásárlási HTTP-bekötés. A11/A12 tartalmazza a
+provider és natív kiadás további kapuit. A teljes projekt következő munkája A01.
 
 ## Cél
 
