@@ -1,10 +1,12 @@
 import type { AppData, ChildProfile, SleepSession } from './types'
-import { loadData, saveRemoteData } from './storage'
+import { getLocalMetadata, loadData, saveDataWithMetadata, saveLocalMetadata, saveRemoteData } from './storage'
 import { accountDeviceName, accountRequest } from './accountAuth'
 import { fetchJson } from './apiTransport'
 
 const API_BASE = (import.meta.env.VITE_SYNC_API_BASE || 'https://solemi-sleep-sync.czki-adam.workers.dev').replace(/\/$/, '')
 const SYNC_KEY = 'solemiSleep:sync:v1'
+const SYNC_METADATA_KEY = 'familySyncV1'
+const CORRUPT_SYNC_STORE = 'LOCAL_SYNC_STORE_CORRUPT'
 
 // Local edits can queue immediately, but upload, download and conflict resolution
 // must not apply competing server responses to the same device at the same time.
@@ -63,6 +65,7 @@ type SyncStore = {
   sessionRevisions?: Record<string, number>
   failure?: { code: string; status?: number }
   missingSessions: MissingSession[]
+  corrupt?: boolean
 }
 
 type RemoteSession = Omit<SleepSession, 'childId' | 'dayNightOverride'> & {
@@ -87,34 +90,65 @@ type ApiEnvelope<T> = { ok: true; data: T } | { ok: false; error: { code: string
 
 const defaultStore = (): SyncStore => ({ connection: null, pending: [], conflicts: [], missingSessions: [] })
 
+function corruptStore(): SyncStore {
+  return { ...defaultStore(), corrupt: true, failure: { code: CORRUPT_SYNC_STORE } }
+}
+
+function validPendingOperation(value: unknown): value is PendingOperation {
+  if (!value || typeof value !== 'object') return false
+  const operation = value as Partial<PendingOperation>
+  return typeof operation.id === 'string' && Boolean(operation.id)
+    && (operation.method === 'POST' || operation.method === 'PATCH' || operation.method === 'DELETE')
+    && typeof operation.path === 'string' && operation.path.startsWith('/')
+    && Boolean(operation.body) && typeof operation.body === 'object' && !Array.isArray(operation.body)
+}
+
+function parseStore(value: unknown): SyncStore {
+  if (!value || typeof value !== 'object') return corruptStore()
+  const parsed = value as SyncStore
+  if (parsed.connection !== null && parsed.connection !== undefined) {
+    if (typeof parsed.connection !== 'object'
+      || typeof parsed.connection.familyId !== 'string'
+      || typeof parsed.connection.deviceId !== 'string'
+      || typeof parsed.connection.deviceToken !== 'string'
+      || !Number.isInteger(parsed.connection.revision)) return corruptStore()
+  }
+  if (!Array.isArray(parsed.pending) || !parsed.pending.every(validPendingOperation)
+    || (parsed.conflicts !== undefined && !Array.isArray(parsed.conflicts))
+    || (parsed.missingSessions !== undefined && !Array.isArray(parsed.missingSessions))) return corruptStore()
+  const connection = parsed.connection && typeof parsed.connection.deviceToken === 'string'
+    ? { ...parsed.connection, familyName: typeof parsed.connection.familyName === 'string' ? parsed.connection.familyName : '' }
+    : null
+  const pending = parsed.pending.map((operation) => ({
+    ...operation,
+    body: { ...operation.body, baseRevision: Number.isInteger(operation.body?.baseRevision)
+      ? operation.body.baseRevision : (connection?.revision ?? 0) }
+  }))
+  const sessionRevisions = Object.fromEntries(Object.entries(parsed.sessionRevisions ?? {})
+    .filter(([, revision]) => Number.isInteger(revision) && revision >= 0))
+  const failure = parsed.failure && /^[A-Z_0-9]{1,64}$/.test(parsed.failure.code)
+    ? { code: parsed.failure.code, status: parsed.failure.status } : undefined
+  const missingSessions = (parsed.missingSessions ?? []).filter((item) => item && typeof item.sessionId === 'string')
+  return { connection, pending, conflicts: parsed.conflicts ?? [], sessionRevisions, failure, missingSessions }
+}
+
 function readStore(): SyncStore {
   try {
+    const embedded = getLocalMetadata(SYNC_METADATA_KEY)
+    if (embedded !== undefined) return parseStore(embedded)
     const raw = localStorage.getItem(SYNC_KEY)
     if (!raw) return defaultStore()
-    const parsed = JSON.parse(raw) as SyncStore
-    if (!parsed || typeof parsed !== 'object') return defaultStore()
-    const connection = parsed.connection && typeof parsed.connection.deviceToken === 'string'
-      ? { ...parsed.connection, familyName: typeof parsed.connection.familyName === 'string' ? parsed.connection.familyName : '' }
-      : null
-    const pending = Array.isArray(parsed.pending) ? parsed.pending.map((operation) => ({
-      ...operation,
-      body: { ...operation.body, baseRevision: Number.isInteger(operation.body?.baseRevision)
-        ? operation.body.baseRevision : (connection?.revision ?? 0) }
-    })) : []
-    const sessionRevisions = Object.fromEntries(Object.entries(parsed.sessionRevisions ?? {})
-      .filter(([, revision]) => Number.isInteger(revision) && revision >= 0))
-    const failure = parsed.failure && /^[A-Z_0-9]{1,64}$/.test(parsed.failure.code)
-      ? { code: parsed.failure.code, status: parsed.failure.status } : undefined
-    const missingSessions = Array.isArray(parsed.missingSessions)
-      ? parsed.missingSessions.filter((item) => item && typeof item.sessionId === 'string') : []
-    return { connection, pending, conflicts: Array.isArray(parsed.conflicts) ? parsed.conflicts : [], sessionRevisions, failure, missingSessions }
+    return parseStore(JSON.parse(raw))
   } catch {
-    return defaultStore()
+    return corruptStore()
   }
 }
 
 function writeStore(store: SyncStore) {
-  localStorage.setItem(SYNC_KEY, JSON.stringify(store))
+  if (readStore().corrupt) throw new Error(CORRUPT_SYNC_STORE)
+  const { corrupt: _corrupt, ...persisted } = store
+  saveLocalMetadata(SYNC_METADATA_KEY, persisted)
+  try { localStorage.removeItem(SYNC_KEY) } catch { /* embedded copy is authoritative */ }
   window.dispatchEvent(new CustomEvent('solemi-sync-state'))
 }
 
@@ -408,19 +442,21 @@ export function makeOperations(previous: AppData, next: AppData, baseRevision = 
   }))
 }
 
-export function queueLocalChange(previous: AppData, next: AppData, baseRevision?: number) {
+export function saveLocalData(previous: AppData, next: AppData, baseRevision?: number) {
   const store = readStore()
-  if (!store.connection) return
-  const operations = makeOperations(previous, next, baseRevision ?? store.connection.revision).map((operation) => ({
+  if (store.corrupt) throw new Error(CORRUPT_SYNC_STORE)
+  const operations = store.connection ? makeOperations(previous, next, baseRevision ?? store.connection.revision).map((operation) => ({
     ...operation,
     body: { ...operation.body, baseRevision: baseRevision ?? Math.max(store.connection!.revision,
       operation.sessionId ? store.sessionRevisions?.[operation.sessionId] ?? 0 : 0) }
-  }))
-  if (!operations.length) return
-  writeStore({ ...store, pending: [...store.pending, ...operations] })
-  // The failure is persisted and announced by the flush; automatic polling
-  // will retry. Do not leave an unhandled rejection from a local save.
-  void flushPending().catch(() => {})
+  })) : []
+  const nextStore = operations.length ? { ...store, pending: [...store.pending, ...operations] } : store
+  // One localStorage replacement contains both the diary and its outbox.
+  // A quota failure therefore accepts neither half of the change.
+  saveDataWithMetadata(next, SYNC_METADATA_KEY, nextStore)
+  try { localStorage.removeItem(SYNC_KEY) } catch { /* embedded copy is authoritative */ }
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('solemi-sync-state'))
+  if (operations.length) void flushPending().catch(() => {})
 }
 
 function removeLocalSession(sessionId?: string) {

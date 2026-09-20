@@ -25,7 +25,7 @@ export const STORAGE_KEY = 'solemiSleep:v4'
 export const LEGACY_STORAGE_KEY = 'solemiSleep:v3'
 export const STORAGE_RECOVERED_EVENT = 'solemi-storage-recovered'
 
-export type DataStorageErrorCode = 'corrupt-v4' | 'corrupt-v3' | 'storage-unavailable' | 'migration-write-failed'
+export type DataStorageErrorCode = 'corrupt-v4' | 'corrupt-v3' | 'storage-unavailable' | 'migration-write-failed' | 'storage-write-failed'
 
 export class DataStorageError extends Error {
   constructor(public code: DataStorageErrorCode, public source: 'v4' | 'v3' | 'storage', public raw: string | null = null) {
@@ -39,6 +39,9 @@ export type DataLoadResult =
   | { status: 'recovery-required'; data: AppData; error: DataStorageError }
 
 const nowIso = () => new Date().toISOString()
+const LOCAL_METADATA_KEY = '__solemiLocal'
+
+type StoredEnvelope = AppData & { [LOCAL_METADATA_KEY]?: Record<string, unknown> }
 
 function newChildId() {
   return `child_${crypto.randomUUID().replaceAll('-', '')}`
@@ -202,13 +205,56 @@ export function recoverData(data: AppData) {
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(STORAGE_RECOVERED_EVENT))
 }
 
+function currentLocalMetadata() {
+  const raw = localStorage.getItem(STORAGE_KEY)
+  if (raw === null) return {}
+  const parsed = JSON.parse(raw) as StoredEnvelope
+  return parsed[LOCAL_METADATA_KEY] && typeof parsed[LOCAL_METADATA_KEY] === 'object'
+    ? parsed[LOCAL_METADATA_KEY] as Record<string, unknown> : {}
+}
+
+export function getLocalMetadata(key: string): unknown {
+  try {
+    // A fresh install has no envelope yet. Reading optional metadata must not
+    // create a different default child or depend on browser locale support.
+    if (localStorage.getItem(STORAGE_KEY) === null) return undefined
+    loadData()
+    return currentLocalMetadata()[key]
+  } catch {
+    throw new DataStorageError('corrupt-v4', 'v4', localStorage.getItem(STORAGE_KEY))
+  }
+}
+
+export function saveDataWithMetadata(data: AppData, key: string, value: unknown) {
+  loadData()
+  const normalized = normalizeAppData(data)
+  if (!normalized) throw new DataStorageError('corrupt-v4', 'v4')
+  const envelope: StoredEnvelope = { ...normalized, [LOCAL_METADATA_KEY]: { ...currentLocalMetadata(), [key]: value } }
+  try {
+    // The diary and its durable outbox are one localStorage value, so this
+    // browser operation either replaces both or neither.
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(envelope))
+  } catch {
+    throw new DataStorageError('storage-write-failed', 'storage')
+  }
+}
+
+export function saveLocalMetadata(key: string, value: unknown) {
+  saveDataWithMetadata(loadData(), key, value)
+}
+
 export function saveRemoteData(data: AppData) {
   // A remote merge must not become an implicit recovery action. Reading first
   // makes a damaged current diary block the write just like a local save.
   const normalized = normalizeAppData(data)
   if (!normalized) throw new DataStorageError('corrupt-v4', 'v4')
   loadData()
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized))
+  const metadata = currentLocalMetadata()
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...normalized, [LOCAL_METADATA_KEY]: metadata }))
+  } catch {
+    throw new DataStorageError('storage-write-failed', 'storage')
+  }
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(REMOTE_DATA_EVENT))
 }
 
@@ -225,11 +271,14 @@ export function exportDamagedData(error: DataStorageError) {
   return true
 }
 
-export function saveData(data: AppData, baseRevision?: number) {
-  const previous = loadData()
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-  if (typeof window !== 'undefined' && JSON.stringify(previous) !== JSON.stringify(data)) {
-    window.dispatchEvent(new CustomEvent('solemi-data-saved', { detail: { previous, next: data, baseRevision } }))
+export function saveData(data: AppData) {
+  loadData()
+  const normalized = normalizeAppData(data)
+  if (!normalized) throw new DataStorageError('corrupt-v4', 'v4')
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...normalized, [LOCAL_METADATA_KEY]: currentLocalMetadata() }))
+  } catch {
+    throw new DataStorageError('storage-write-failed', 'storage')
   }
 }
 

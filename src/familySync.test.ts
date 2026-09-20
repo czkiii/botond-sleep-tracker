@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { flushPending, getSyncStore, isEmptyStarterData, makeOperations, mergeRemote, pullRemote, queueLocalChange, resolveSyncConflict } from './familySync'
-import { STORAGE_KEY } from './storage'
+import { flushPending, getSyncStore, isEmptyStarterData, makeOperations, mergeRemote, pullRemote, resolveSyncConflict, saveLocalData } from './familySync'
+import { DataStorageError, STORAGE_KEY } from './storage'
 import { API_TIMEOUT_MS } from './apiTransport'
 import type { AppData, ChildProfile, SleepSession } from './types'
 
@@ -113,8 +113,7 @@ describe('Family Sync slow responses', () => {
     Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { onLine: false } })
     const next = { ...previous, sessions: previous.sessions.map((item) => item.id === 'sleep-a'
       ? { ...item, note: 'Újabb mentés' } : item) }
-    storage.setItem(STORAGE_KEY, JSON.stringify(next))
-    queueLocalChange(previous, next)
+    saveLocalData(previous, next)
     release(ok({ revision: 5, session: remote }))
     await running
     expect(JSON.parse(storage.getItem(STORAGE_KEY)!).sessions.find((item: SleepSession) => item.id === 'sleep-a').note)
@@ -142,8 +141,7 @@ describe('Family Sync slow responses', () => {
     Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { onLine: false } })
     const next = { ...previous, sessions: previous.sessions.map((item) => item.id === 'sleep-a'
       ? { ...item, note: 'Letöltés közben javítottam' } : item) }
-    storage.setItem(STORAGE_KEY, JSON.stringify(next))
-    queueLocalChange(previous, next)
+    saveLocalData(previous, next)
     release(ok({ revision: 5, sessions: [{ ...remote, note: 'Másik telefon' }], children: [] }))
     await running
     expect(JSON.parse(storage.getItem(STORAGE_KEY)!).sessions.find((item: SleepSession) => item.id === 'sleep-a').note)
@@ -281,10 +279,11 @@ describe('Family Sync offline queue', () => {
       connection: { familyId: 'family-1', familyName: 'Teszt', deviceId: 'device-1', deviceToken: 'token-1', revision: 1 },
       pending: []
     }))
+    storage.setItem(STORAGE_KEY, JSON.stringify(previous))
 
     const offlineSleep = { ...sleep('offline-sleep', 'a'), note: 'Offline teszt' }
     const next = { ...previous, sessions: [...previous.sessions, offlineSleep] }
-    queueLocalChange(previous, next)
+    saveLocalData(previous, next)
 
     expect(getSyncStore().pending).toHaveLength(1)
     expect(getSyncStore().pending[0]).toMatchObject({ method: 'POST', path: '/v1/sessions', sessionId: 'offline-sleep' })
@@ -344,6 +343,7 @@ describe('Family Sync offline queue', () => {
         sessionId: 'sleep-a', body: { operationId: 'mut-conflict', baseRevision: 4, patch: { note: 'Helyi változat' } } }],
       conflicts: []
     }))
+    storage.setItem(STORAGE_KEY, JSON.stringify(previous))
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({
       ok: false,
       error: { code: 'SYNC_CONFLICT', message: 'This sleep changed on another device.' },
@@ -426,5 +426,75 @@ describe('Family Sync offline queue', () => {
     expect(getSyncStore().conflicts).toEqual([])
     expect(JSON.parse(storage.getItem(STORAGE_KEY)!).sessions.find((item: SleepSession) => item.id === 'sleep-a').note)
       .toBe('Családi változat')
+  })
+})
+
+describe('Family Sync crash-safe local persistence', () => {
+  function install(storage: Storage, online = false) {
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage })
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { onLine: online, language: 'hu-HU' } })
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { dispatchEvent: vi.fn() } })
+  }
+
+  function connectedStore() {
+    return {
+      connection: { familyId: 'family-1', familyName: 'Teszt', deviceId: 'device-1', deviceToken: 'token-1', revision: 4 },
+      pending: [], conflicts: []
+    }
+  }
+
+  it('commits the diary change and its durable outbox in one storage value', () => {
+    const storage = new MemoryStorage()
+    install(storage)
+    storage.setItem(STORAGE_KEY, JSON.stringify(previous))
+    storage.setItem('solemiSleep:sync:v1', JSON.stringify(connectedStore()))
+    const added = { ...sleep('sleep-new', 'a'), note: 'Atomi mentés' }
+    const next = { ...previous, sessions: [...previous.sessions, added] }
+
+    saveLocalData(previous, next)
+
+    const envelope = JSON.parse(storage.getItem(STORAGE_KEY)!)
+    expect(envelope.sessions.some((item: SleepSession) => item.id === 'sleep-new')).toBe(true)
+    expect(envelope.__solemiLocal.familySyncV1.pending).toHaveLength(1)
+    expect(envelope.__solemiLocal.familySyncV1.pending[0]).toMatchObject({ method: 'POST', sessionId: 'sleep-new' })
+    expect(storage.getItem('solemiSleep:sync:v1')).toBeNull()
+  })
+
+  it('accepts neither the diary edit nor the outbox operation when quota rejects the atomic write', () => {
+    const backing = new MemoryStorage()
+    backing.setItem(STORAGE_KEY, JSON.stringify(previous))
+    const legacy = JSON.stringify(connectedStore())
+    backing.setItem('solemiSleep:sync:v1', legacy)
+    const quotaStorage: Storage = {
+      get length() { return backing.length },
+      clear: () => backing.clear(),
+      getItem: (key) => backing.getItem(key),
+      key: (index) => backing.key(index),
+      removeItem: (key) => backing.removeItem(key),
+      setItem: (key, value) => {
+        if (key === STORAGE_KEY) throw new Error('quota')
+        backing.setItem(key, value)
+      }
+    }
+    install(quotaStorage)
+    const next = { ...previous, sessions: [...previous.sessions, sleep('sleep-rejected', 'a')] }
+
+    expect(() => saveLocalData(previous, next)).toThrow(DataStorageError)
+    expect(JSON.parse(backing.getItem(STORAGE_KEY)!).sessions).toEqual(previous.sessions)
+    expect(backing.getItem('solemiSleep:sync:v1')).toBe(legacy)
+  })
+
+  it('blocks saving when the durable outbox is damaged instead of silently discarding it', () => {
+    const storage = new MemoryStorage()
+    install(storage)
+    const originalDiary = JSON.stringify(previous)
+    storage.setItem(STORAGE_KEY, originalDiary)
+    storage.setItem('solemiSleep:sync:v1', '{broken')
+    const next = { ...previous, sessions: [...previous.sessions, sleep('sleep-blocked', 'a')] }
+
+    expect(getSyncStore().failure?.code).toBe('LOCAL_SYNC_STORE_CORRUPT')
+    expect(() => saveLocalData(previous, next)).toThrow('LOCAL_SYNC_STORE_CORRUPT')
+    expect(storage.getItem(STORAGE_KEY)).toBe(originalDiary)
+    expect(storage.getItem('solemiSleep:sync:v1')).toBe('{broken')
   })
 })

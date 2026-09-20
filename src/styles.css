@@ -664,6 +664,8 @@ svg { display: block; }
 .storage-recovery-actions .file-button { display: grid !important; place-items: center; }
 .storage-recovery-actions .file-button input { display: none; }
 .storage-recovery-actions .danger { color: #ffabb4; border-color: rgba(255, 139, 151, .2); background: rgba(99, 27, 38, .16); }
+.tab-access-card { border-color: rgba(105, 168, 235, .25); }
+.tab-access-card .storage-recovery-mark { color: #cfe7ff; background: rgba(53, 111, 174, .24); }
 .settings-section-head { margin: 24px 2px -7px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .settings-section-head h2 { margin: 0; font-size: 17px; }
 .settings-section-head p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }

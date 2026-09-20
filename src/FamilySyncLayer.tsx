@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { AppData } from './types'
 import type { Locale } from './i18n'
 import { loadData } from './storage'
-import { createFamily, createInvite, getSyncStore, joinFamily, leaveFamily, pullRemote, queueLocalChange, reconcileAccountFamily, refreshFamilyInfo, resolveSyncConflict, restoreMissingSession } from './familySync'
+import { createFamily, createInvite, getSyncStore, joinFamily, leaveFamily, pullRemote, reconcileAccountFamily, refreshFamilyInfo, resolveSyncConflict, restoreMissingSession } from './familySync'
 import { ACCOUNT_STATE_EVENT, getAccountAccess, setInternalTestPlan } from './accountAuth'
 import { INTERNAL_PLAN_PREVIEW_EVENT, INTERNAL_PLAN_PREVIEW_KEY, canUseFamilySync, parseProductPlan } from './entitlements'
 import type { ProductPlan } from './entitlements'
@@ -219,18 +218,9 @@ export default function FamilySyncLayer() {
       setUploadFailure(store.failure?.code || '')
       setSyncIssue(Boolean(store.failure))
     }
-    const onSaved = (event: Event) => {
-      const detail = (event as CustomEvent<{ previous: AppData; next: AppData; baseRevision?: number }>).detail
-      if (detail?.previous && detail?.next) {
-        queueLocalChange(detail.previous, detail.next, detail.baseRevision)
-        setPendingCount(getSyncStore().pending.length)
-      }
-    }
     window.addEventListener('solemi-sync-state', onState)
-    window.addEventListener('solemi-data-saved', onSaved)
     return () => {
       window.removeEventListener('solemi-sync-state', onState)
-      window.removeEventListener('solemi-data-saved', onSaved)
     }
   }, [])
 

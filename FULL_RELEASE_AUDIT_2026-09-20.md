@@ -145,6 +145,18 @@ egylapos írómodell; célszerű tranzakcióképes tárolást mérlegelni.
 **Lezárás:** két lap egyidejű start/edit/delete, quota és mentés közbeni megszakítás
 után minden elfogadott változás megvan vagy láthatóan visszautasított.
 
+**Lezárva a `5ac2913` utáni munkafában, 2026-09-20:** a napló és a Family Sync
+outbox ugyanabban a validált `solemiSleep:v4` envelope-ban, egyetlen
+`localStorage.setItem` művelettel íródik. Quota/íráshiba esetén egyik fél sem
+változik, az app visszatölti az utolsó biztos állapotot és blokkoló, exportot is
+engedő hibaképernyőt mutat. A hibás sync-store többé nem esik csendben üres
+állapotra. Web Locks alapján origin/böngészőprofilonként egy lap kap írójogot;
+a többi lap csak tájékoztat, majd az író lap bezárásakor automatikusan újratöltve
+átveszi a jogot. Célzott atomi/quota/sérülési tesztek, teljes **198/198** teszt,
+frontend és Worker typecheck, production és auth-enabled internal build sikeres.
+A helyi kétlapos böngészőpróbában az indított aktív alvás az íróvá előlépő második
+lapon változatlanul megjelent és lezárható volt. A02 kész; következik A03.
+
 ### A03 — P1 / K — Import és törlés félreérthető családi hatása
 
 **Forrás:** `src/App.tsx:533`, `:563`, `:579`; `src/familySync.ts:335`.
@@ -494,8 +506,8 @@ a statisztikai problémák sem halasztódnak automatikusan kiadás utánra.
 
 ## Kiadás előtti végrehajtási sorrend
 
-1. **Adatmegőrzés és helyi mentés:** A01 elkészült; következik A02, majd A03,
-   A13 és A14. Következő szelet: többlapos mentés és tartós napló–outbox egység.
+1. **Adatmegőrzés és helyi mentés:** A01–A02 elkészült; következik A03,
+   majd A13 és A14. Következő szelet: import/törlés családi hatása és visszaállítás.
 2. **Család és account életciklus:** A04–A06, A15–A16; A17 törlési adatmodell.
    Kilépés, fiókváltás, több lap, offline és pending egyszerre is tesztelt legyen.
 3. **Szerver/környezet:** A07, A18–A19; autentikált API, megfelelő origin és
@@ -530,7 +542,7 @@ minden dokumentációs változásnál. Adat-/auth-/sync-/billing-javítás után
 ## Amit most a tulajdonostól nem kérünk
 
 Nem szükséges most telefont tesztelni, fizetési adatot vagy secretet küldeni,
-productionre tenni az ágat. Az A01 helyi javítása elkészült; következik az A02
+productionre tenni az ágat. Az A01–A02 helyi javítása elkészült; következik az A03
 fejlesztési szelet. Később célzott döntés kell a régi funkcióígéretekről,
 offline jogról/megőrzésről, iOS-loginról és a store fiókok konkrét beállításáról.
 A jelentés ezeket nem dönti el a tulajdonos helyett.

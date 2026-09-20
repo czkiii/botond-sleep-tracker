@@ -4,7 +4,7 @@ import { languageOptions, localeTag, t } from './i18n'
 import type { Locale } from './i18n'
 import type { AppData, ChildProfile, DayNightOverride, Page, SleepSession } from './types'
 import type { DataQualityIssueKind } from './utils'
-import { DataStorageError, REMOTE_DATA_EVENT, createChild, createDefaultData, createSession, exportDamagedData, exportData, importData, inspectBackup, loadData, loadDataResult, recoverData, saveData } from './storage'
+import { DataStorageError, REMOTE_DATA_EVENT, createChild, createDefaultData, createSession, exportDamagedData, exportData, importData, inspectBackup, loadData, loadDataResult, recoverData } from './storage'
 import type { ImportDiagnostic, ImportInspection } from './storage'
 import { deleteChildPhoto, loadChildPhoto, prepareChildPhoto, saveChildPhoto } from './photoStore'
 import type { AvatarCrop } from './photoStore'
@@ -22,7 +22,7 @@ import { INTERNAL_PLAN_PREVIEW_EVENT, INTERNAL_PLAN_PREVIEW_KEY, canUsePremiumIn
 import type { PremiumInsightFeature, ProductPlan } from './entitlements'
 import { DEFAULT_DAY_START_MINUTES, DEFAULT_NIGHT_START_MINUTES, LONG_SLEEP_GUARDRAIL_MS, awakeSince, durationOf, formatDateHeader, formatDuration, formatTime, formatTimer, getDataQualityWarnings, todaySessions, totalToday } from './utils'
 import SleepTimeline from './SleepTimeline'
-import { getSessionSyncRevision, getSyncStore } from './familySync'
+import { getSessionSyncRevision, getSyncStore, saveLocalData } from './familySync'
 import SwipeHistoryRow from './SwipeHistoryRow'
 import AccountCard from './AccountCard'
 import { ACCOUNT_ACCESS_EVENT, ACCOUNT_STATE_EVENT, getAccountAccess, restoreAccount } from './accountAuth'
@@ -31,6 +31,7 @@ import type { AccountAccessState } from './accountAuth'
 const pad = (value: number) => String(value).padStart(2, '0')
 const internalPreview = import.meta.env.VITE_INTERNAL_PREVIEW === 'true'
 const accountAuthEnabled = import.meta.env.VITE_ACCOUNT_AUTH === 'true'
+type SaveFailure = 'write' | 'sync-store-corrupt'
 
 function loadInternalPlanPreview(): ProductPlan {
   if (!internalPreview) return 'familyPlus'
@@ -81,10 +82,13 @@ function dateOptions(locale: Locale) {
   return result
 }
 
-export default function App() {
+export type WriteAccess = 'checking' | 'writer' | 'secondary'
+
+export default function App({ writeAccess = 'writer' }: { writeAccess?: WriteAccess }) {
   const [initialLoad] = useState(() => loadDataResult())
   const [data, setData] = useState<AppData>(initialLoad.data)
   const [storageError, setStorageError] = useState<DataStorageError | null>(initialLoad.error)
+  const [saveFailure, setSaveFailure] = useState<SaveFailure | null>(null)
   const [previewPlan, setPreviewPlan] = useState<ProductPlan>(() => loadInternalPlanPreview())
   const [accountAccess, setAccountAccess] = useState<AccountAccessState | null>(null)
   const [page, setPage] = useState<Page>('today')
@@ -92,19 +96,31 @@ export default function App() {
   const [editor, setEditor] = useState<SleepSession | 'new' | null>(null)
   const editorRevision = useRef<number | undefined>(undefined)
   const saveRevision = useRef<number | undefined>(undefined)
+  const lastSavedData = useRef(initialLoad.data)
   const locale = data.settings.locale
   const activeChild = data.children.find((child) => child.id === data.settings.activeChildId) ?? data.children[0]
   const activeSessions = useMemo(() => data.sessions.filter((session) => session.childId === activeChild.id), [data.sessions, activeChild.id])
 
   useEffect(() => {
-    if (storageError) return
+    if (storageError || saveFailure || writeAccess !== 'writer') return
     const baseRevision = saveRevision.current
     saveRevision.current = undefined
-    saveData(data, baseRevision)
-  }, [data, storageError])
+    try {
+      saveLocalData(lastSavedData.current, data, baseRevision)
+      lastSavedData.current = data
+    } catch (error) {
+      const persisted = loadDataResult()
+      lastSavedData.current = persisted.data
+      setData(persisted.data)
+      setStorageError(persisted.error)
+      setSaveFailure(error instanceof Error && error.message === 'LOCAL_SYNC_STORE_CORRUPT'
+        ? 'sync-store-corrupt' : 'write')
+    }
+  }, [data, storageError, saveFailure, writeAccess])
   useEffect(() => {
     const onRemoteData = () => {
       const result = loadDataResult()
+      lastSavedData.current = result.data
       setData(result.data)
       setStorageError(result.error)
     }
@@ -112,12 +128,12 @@ export default function App() {
     return () => window.removeEventListener(REMOTE_DATA_EVENT, onRemoteData)
   }, [])
   useEffect(() => {
-    if (!internalPreview || storageError) return
+    if (!internalPreview || storageError || writeAccess !== 'writer') return
     try { window.localStorage.setItem(INTERNAL_PLAN_PREVIEW_KEY, previewPlan) } catch { /* preview preference is non-critical */ }
     window.dispatchEvent(new CustomEvent<ProductPlan>(INTERNAL_PLAN_PREVIEW_EVENT, { detail: previewPlan }))
-  }, [previewPlan, storageError])
+  }, [previewPlan, storageError, writeAccess])
   useEffect(() => {
-    if (!accountAuthEnabled || storageError) return
+    if (!accountAuthEnabled || storageError || writeAccess !== 'writer') return
     let stopped = false
     const refreshAccess = () => {
       void getAccountAccess()
@@ -139,7 +155,7 @@ export default function App() {
       window.removeEventListener(ACCOUNT_ACCESS_EVENT, onAccess)
       window.removeEventListener(ACCOUNT_STATE_EVENT, onAccount)
     }
-  }, [storageError])
+  }, [storageError, writeAccess])
   useEffect(() => { document.documentElement.lang = locale }, [locale])
   useEffect(() => { const id = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(id) }, [])
 
@@ -176,9 +192,12 @@ export default function App() {
   }
 
   if (storageError) return <StorageRecoveryScreen error={storageError} locale={locale} onRecovered={(next) => {
+    lastSavedData.current = next
     setData(next)
     setStorageError(null)
   }} />
+  if (writeAccess !== 'writer') return <TabAccessScreen locale={locale} checking={writeAccess === 'checking'} />
+  if (saveFailure) return <SaveFailureScreen data={data} locale={locale} kind={saveFailure} onRetry={() => setSaveFailure(null)} />
 
   return <div className="app-shell">
     <main className="app-main">
@@ -190,6 +209,32 @@ export default function App() {
     {page !== 'settings' && <BottomNav page={page} locale={locale} onChange={setPage} />}
     {editor && <SleepEditor childId={activeChild.id} session={editor === 'new' ? null : editor} locale={locale} currentExists={Boolean(current)} onClose={() => setEditor(null)} onSave={saveEditor} onDelete={deleteSession} />}
   </div>
+}
+
+function SaveFailureScreen({ data, locale, kind, onRetry }: { data: AppData; locale: Locale; kind: SaveFailure; onRetry: () => void }) {
+  const corrupt = kind === 'sync-store-corrupt'
+  return <div className="app-shell"><main className="app-main"><section className="screen storage-recovery-screen">
+    <div className="storage-recovery-card" role="alert">
+      <span className="storage-recovery-mark" aria-hidden="true">!</span>
+      <h1>{t(locale, corrupt ? 'localSyncStoreCorrupt' : 'localSaveFailed')}</h1>
+      <p>{t(locale, corrupt ? 'localSyncStoreCorruptHint' : 'localSaveFailedHint')}</p>
+      <div className="storage-recovery-actions">
+        <button type="button" className="primary-action" onClick={onRetry}>{t(locale, 'retry')}</button>
+        <button type="button" className="secondary-action" onClick={() => exportData(data)}>{t(locale, 'exportData')}</button>
+      </div>
+    </div>
+  </section></main></div>
+}
+
+function TabAccessScreen({ locale, checking }: { locale: Locale; checking: boolean }) {
+  return <div className="app-shell"><main className="app-main"><section className="screen storage-recovery-screen">
+    <div className="storage-recovery-card tab-access-card" role="status">
+      <span className="storage-recovery-mark" aria-hidden="true">{checking ? '…' : '2'}</span>
+      <h1>{t(locale, checking ? 'tabAccessChecking' : 'tabAccessTitle')}</h1>
+      <p>{t(locale, checking ? 'tabAccessCheckingHint' : 'tabAccessHint')}</p>
+      {!checking && <small>{t(locale, 'tabAccessAutomatic')}</small>}
+    </div>
+  </section></main></div>
 }
 
 function StorageRecoveryScreen({ error, locale, onRecovered }: { error: DataStorageError; locale: Locale; onRecovered: (data: AppData) => void }) {

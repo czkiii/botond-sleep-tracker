@@ -4,7 +4,7 @@
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
 **Teljes audit alapja:** `e9374f4` (`Add verified store billing foundation`); az akkori helyi origin-refhez képest 0 ahead / 0 behind.
-**A01 javítás alapja:** `5bfdcd6` (`Audit Family+ statistics and document calculation edge cases`). A mostani munkafában elkészült a sérült helyi napló védelme; commit/push és deploy nem történt.
+**A02 javítás alapja:** `5ac2913` (`Protect corrupted sleep data and add recovery flow`). A mostani munkafában elkészült a többlapos írókoordináció és az atomi napló–outbox mentés; commit/push és deploy nem történt.
 
 ## Legfrissebb ellenőrzés — teljes kiadás előtti audit
 
@@ -12,7 +12,7 @@
 A jelentés A01–A27 pontja és a `RELEASE_CHECKLIST.md` új auditkapuja felülírja
 az alábbi történeti következő-feladat javaslatokat. A termékirány/csomagok változatlanok.
 
-- A01 után 195/195 teszt és frontend/Worker typecheck sikeres; production és
+- A02 után 198/198 teszt és frontend/Worker typecheck sikeres; production és
   auth-enabled internal helyi build sikeres.
 - 14/14 külön auditpróba lefutott: 13 jelenlegi hibás vagy korlátozandó
   viselkedést igazoló próba, 1 teljesítménymérés. Ezek nem kijavított hibák.
@@ -45,9 +45,28 @@ Jelentés: [FAMILY_PLUS_STATISTICS_AUDIT_2026-09-20.md](FAMILY_PLUS_STATISTICS_A
   nem részei a normál tesztcsomagnak. Csak dokumentáció és bizonyíték változott.
 - Javítás, commit/push, deploy és adatbázis-módosítás nem történt.
 
-**A01 elkészült. Következő konkrét fejlesztési szelet: A02 — többlapos mentés
-és tartós napló–outbox egység.** Ezután A03 importbiztonság, majd a jelentés
+**A01–A02 elkészült. Következő konkrét fejlesztési szelet: A03 — az import és
+törlés családi hatásának, valamint a visszaállítható mentésnek a rendezése.** Ezután a jelentés
 szerinti tagság/jogosultság és billing. Éles lépések külön engedéllyel.
+
+### A02 lezárás — többlapos és atomi helyi mentés
+
+- A napló és a Family Sync pending sor ugyanabban a `solemiSleep:v4` tárolási
+  envelope-ban, egyetlen atomi helyi írással változik; a régi külön eseményes
+  mentési út kikerült a produkciós folyamatból.
+- Quota vagy más íráshiba sem a naplót, sem az outboxot nem fogadja el félig. Az
+  app visszatölti az utolsó biztos állapotot, blokkolja a további szerkesztést,
+  újrapróbálást és JSON-exportot kínál.
+- Sérült szinkronállapot nem válik csendben üres sorrá; a napló megmarad, a mentés
+  láthatóan leáll, és a felület figyelmeztet az oldaladatok megőrzésére.
+- Web Locks alapján egy böngészőprofilon belül egyszerre egy Solemi lap írhat.
+  A második lap csak tájékoztat, majd az első bezárásakor újratöltött állapottal
+  automatikusan átveszi az írójogot.
+- Helyi kétlapos böngészőpróba: első lap alvást indított, második lap zárolt maradt;
+  az első bezárása után a második ugyanazt az aktív alvást mutatta és lezárta.
+- Ellenőrzés: frontend és Worker typecheck; teljes **23 fájl / 198 teszt**;
+  production és auth-enabled internal build; diff whitespace-ellenőrzés sikeres.
+- Távoli környezet, adatbázis és production nem változott.
 
 ### A01 lezárás — sérült helyi napló védelme
 
@@ -495,9 +514,9 @@ auditkapu az irányadó, különösen az adatmegőrzési és hozzáférési hib�
 
 ## Következő konkrét feladat
 
-A02: a többlapos mentés, quota/crash és a napló–outbox tartósság rendezése
-célzott párhuzamossági és hibainjektálásos tesztekkel. Ezt A03 importbiztonság,
-majd a teljes audit végrehajtási sorrendje követi. A normál kéttelefonos
+A03: az import és az „összes alvásadat törlése” családi hatásának egyértelművé
+tétele, visszaállítható biztonsági mentéssel és két eszközös regressziós próbával.
+Ezt A13–A14, majd a teljes audit végrehajtási sorrendje követi. A normál kéttelefonos
 staging-elfogadás továbbra is érvényes a korábban kipróbált esetekre.
 
 A billing HTTP-bekötés az A08–A10 domainhibák javítása után következik.

@@ -3,8 +3,8 @@ import { DatabaseSync } from 'node:sqlite'
 import { readFileSync } from 'node:fs'
 import worker from '../src/index'
 import { sqliteBinding } from './sqliteD1'
-import { flushPending, getSyncStore, pullRemote, queueLocalChange, resolveSyncConflict, restoreMissingSession } from '../../src/familySync'
-import { REMOTE_DATA_EVENT, STORAGE_KEY, loadData, saveData } from '../../src/storage'
+import { flushPending, getSyncStore, pullRemote, resolveSyncConflict, restoreMissingSession, saveLocalData } from '../../src/familySync'
+import { REMOTE_DATA_EVENT, STORAGE_KEY, loadData } from '../../src/storage'
 import type { AppData } from '../../src/types'
 
 class DeviceStorage implements Storage {
@@ -56,10 +56,6 @@ beforeEach(async () => {
       connection: { familyId: 'family-a', familyName: 'Teszt', deviceId: `device-${index}`, deviceToken: token, revision: 2 },
       pending: [], conflicts: []
     }))
-    device.window.addEventListener('solemi-data-saved', (event) => {
-      const { previous, next, baseRevision } = (event as CustomEvent<{ previous: AppData; next: AppData; baseRevision?: number }>).detail
-      queueLocalChange(previous, next, baseRevision)
-    })
     device.window.addEventListener(REMOTE_DATA_EVENT, () => {
       device.displayed = loadData()
       device.updates += 1
@@ -86,7 +82,7 @@ async function editOffline(index: number, startTime: string, note: string) {
   useDevice(index, false)
   const data = loadData()
   devices[index].displayed = { ...data, sessions: data.sessions.map((sleep) => ({ ...sleep, startTime, note, updatedAt: new Date().toISOString() })) }
-  saveData(devices[index].displayed)
+  saveLocalData(data, devices[index].displayed)
   // Let the queued offline flush settle before switching the simulated browser globals.
   await pullRemote()
 }
@@ -95,7 +91,8 @@ describe('two device client + Worker reconciliation', () => {
   it.each(['local', 'family'] as const)('requires an explicit %s choice if another phone changes an active repair', async (choice) => {
     sqlite.prepare("DELETE FROM sleep_sessions WHERE id = 'shared-sleep'").run()
     useDevice(0, false)
-    saveData({ ...loadData(), sessions: initial.sessions.map((row) => ({ ...row, endTime: null, note: 'Helyi jegyzet' })) })
+    const local = loadData()
+    saveLocalData(local, { ...local, sessions: initial.sessions.map((row) => ({ ...row, endTime: null, note: 'Helyi jegyzet' })) })
     await pullRemote()
     useDevice(0, true)
     await pullRemote()
@@ -156,7 +153,7 @@ describe('two device client + Worker reconciliation', () => {
     expect(getSyncStore().missingSessions[0].errorCode).toBe('SESSION_CREATE_CONFLICT')
     useDevice(0, false)
     const local = loadData()
-    saveData({ ...local, sessions: [...local.sessions, { ...local.sessions[0], id: 'independent-start', endTime: null }] })
+    saveLocalData(local, { ...local, sessions: [...local.sessions, { ...local.sessions[0], id: 'independent-start', endTime: null }] })
     await pullRemote()
     useDevice(0, true)
     await pullRemote()
@@ -171,7 +168,8 @@ describe('two device client + Worker reconciliation', () => {
     useDevice(0, true)
     await pullRemote()
     useDevice(0, false)
-    saveData({ ...loadData(), sessions: [] })
+    const local = loadData()
+    saveLocalData(local, { ...local, sessions: [] })
     await pullRemote()
     useDevice(0, true)
     await pullRemote()
@@ -185,7 +183,7 @@ describe('two device client + Worker reconciliation', () => {
     await editOffline(0, '2026-08-26T09:50:00.000Z', 'Csak helyben meglevő alvás')
     useDevice(0, false)
     const local = loadData()
-    saveData({ ...local, sessions: [...local.sessions, { ...local.sessions[0], id: 'new-start', endTime: null, note: '' }] })
+    saveLocalData(local, { ...local, sessions: [...local.sessions, { ...local.sessions[0], id: 'new-start', endTime: null, note: '' }] })
     await pullRemote()
     useDevice(0, true)
     await pullRemote()
@@ -198,7 +196,7 @@ describe('two device client + Worker reconciliation', () => {
     expect(loadData().sessions.find((row) => row.id === 'new-start')?.endTime).toBeNull()
     useDevice(1, false)
     const other = loadData()
-    saveData({ ...other, sessions: other.sessions.map((row) => row.id === 'new-start' ? { ...row, note: 'Másik telefon' } : row) })
+    saveLocalData(other, { ...other, sessions: other.sessions.map((row) => row.id === 'new-start' ? { ...row, note: 'Másik telefon' } : row) })
     await pullRemote()
     useDevice(1, true)
     await pullRemote()
@@ -231,7 +229,7 @@ describe('two device client + Worker reconciliation', () => {
     sqlite.prepare("DELETE FROM sleep_sessions WHERE id = 'shared-sleep'").run()
     useDevice(0, false)
     const data = loadData()
-    saveData({ ...data, sessions: data.sessions.map((row) => ({ ...row, endTime: null, note: 'Aktív helyi alvás', dayNightOverride: 'night' })) })
+    saveLocalData(data, { ...data, sessions: data.sessions.map((row) => ({ ...row, endTime: null, note: 'Aktív helyi alvás', dayNightOverride: 'night' })) })
     await pullRemote()
     useDevice(0, true)
     await pullRemote()
@@ -280,7 +278,8 @@ describe('two device client + Worker reconciliation', () => {
     expect(getSyncStore().connection!.revision).toBeGreaterThan(openedRevision)
 
     useDevice(1, false)
-    saveData({ ...opened, sessions: opened.sessions.map((sleep) => ({ ...sleep, note: 'Régebben megnyitott űrlap' })) }, openedRevision)
+    const current = loadData()
+    saveLocalData(current, { ...opened, sessions: opened.sessions.map((sleep) => ({ ...sleep, note: 'Régebben megnyitott űrlap' })) }, openedRevision)
     await pullRemote()
     useDevice(1, true)
     await pullRemote()
@@ -321,7 +320,7 @@ describe('two device client + Worker reconciliation', () => {
       .toEqual({ count: 1 })
 
     // Re-saving the displayed authoritative data must not upload it as a fresh edit.
-    saveData(devices[0].displayed)
+    saveLocalData(loadData(), devices[0].displayed)
     expect(getSyncStore().pending).toEqual([])
   })
 
@@ -332,7 +331,7 @@ describe('two device client + Worker reconciliation', () => {
     useDevice(0, false)
     const data = loadData()
     devices[0].displayed = { ...data, sessions: [...data.sessions, { ...data.sessions[0], id: 'competing-start', endTime: null }] }
-    saveData(devices[0].displayed)
+    saveLocalData(data, devices[0].displayed)
     await pullRemote()
     useDevice(0, true)
     await pullRemote()
@@ -341,7 +340,7 @@ describe('two device client + Worker reconciliation', () => {
     expect(loadData().sessions[0]).toMatchObject({ id: 'shared-sleep', endTime: null })
     // The rendered state must forget the rejected draft too, otherwise the next
     // unrelated edit would save it again and queue a second creation.
-    saveData(devices[0].displayed)
+    saveLocalData(loadData(), devices[0].displayed)
     expect(getSyncStore().pending).toEqual([])
     expect(loadData().sessions).toHaveLength(1)
   })

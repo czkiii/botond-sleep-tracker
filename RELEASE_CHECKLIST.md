@@ -13,8 +13,8 @@ Az alábbi lista a korábbi szakaszoknál elsőbbséget élvez. Nincs automatiku
 vagy kifejezett, indokolt termékdöntés kell; a puszta priorizálás nem lezárás.
 
 - [x] A01 — Sérült helyi napló megőrzése, automatikus felülírás megakadályozása. 195/195 teszt, typecheck és két build sikeres.
-- [ ] A02 — Többlapos mentés, quota/crash és tartós napló–outbox egység. **Következő munka.**
-- [ ] A03 — Import/törlés családi hatása és visszaállítható biztonsági mentés.
+- [x] A02 — Többlapos mentés, quota/crash és tartós napló–outbox egység. Egyetlen böngészőlap írhat; az atomi helyi envelope, hibainjektálás és kétlapos átvételi próba sikeres (198/198 teszt).
+- [ ] A03 — Import/törlés családi hatása és visszaállítható biztonsági mentés. **Következő munka.**
 - [ ] A04 — Valódi account-szintű családi kilépés, pending adatok védelme.
 - [ ] A05 — Fiókváltás/guest kapcsolat és helyi adatok elkülönítése.
 - [ ] A06 — Legacy API fizetős sync-megkerülés lezárása, kompatibilis átállás.
@@ -70,7 +70,7 @@ próba az audit bizonyítéka, nem a hibák lezárása. Minden alábbi tétel ny
 
 Javítás után közös tesztnapló minden kártyán, HU/EN/DE szövegek és célzott
 kéttelefonos elfogadás szükséges. Nincs automatikus kiadás utáni halasztás;
-az adatmegőrzési sorrend az elkészült A01 után A02-vel folytatódik.
+az adatmegőrzési sorrend az elkészült A01–A02 után A03-mal folytatódik.
 
 ## Célállapotok
 
@@ -286,8 +286,8 @@ engedélyez automatikus halasztást. A meglévő Prediction kommunikációját i
 
 ## Következő konkrét munkamenet
 
-**Elsőbbség:** A02 — többlapos mentés és napló–outbox egység, majd A03
-importbiztonság. Ezután a teljes audit végrehajtási sorrendje.
+**Elsőbbség:** A03 — importbiztonság. Ezután A13–A14 és a teljes audit
+végrehajtási sorrendje.
 A billing HTTP/adapterszelet előtt A08–A10 javítás kötelező. Az alábbi korábbi
 tételek történeti és további release-feladatok.
 
