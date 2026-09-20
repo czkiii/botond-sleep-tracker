@@ -3,6 +3,8 @@
 Status: **LOCKED FOR ARCHITECTURE**  
 Date: 2026-08-24
 
+**V1 scope override — 2026-09-20:** see `OWNER_DECISIONS_REVIEW_2026-09-20.md` and its five owner-supplied sources. This matrix specifies the target product, not implementation readiness. Technical release gates remain open.
+
 **Product decision update — 2026-09-17; staging accepted — 2026-09-19:** `PRODUCT_DIRECTION.md` is authoritative. Keep Free / Family (990 HUF/month) / Family+ (1490 HUF/month). Every active family member inherits the paid capabilities granted by any active member's valid subscription, regardless of creator/admin role. Family+ analytics are no longer subscriber-only. Worker and client implementation plus the two-account, two-phone staging matrix are accepted.
 
 This file records the agreed commercial/feature split for the three-plan model. Raw child/session data stays on one canonical schema; plans gate product capabilities, not data formats.
@@ -15,7 +17,7 @@ This file records the agreed commercial/feature split for the three-plan model. 
 
 ## Core rules
 
-1. Free can be used local-first without a Solemi account. The V1 identity provider for account-based features is Google.
+1. Free can be used local-first without a Solemi account. V1 account-based features require Google and Sign in with Apple support with safe identity linking.
 2. Login itself is free but optional for the Free plan; account required only for sync/restoration/commerce.
 3. Free sleep history remains local-first; account does not imply automatic cloud backup.
 4. One active family subscription enables whole-family sync for that family; at least one member must hold Family or Family+ entitlement for sync to be active.
@@ -41,23 +43,23 @@ This file records the agreed commercial/feature split for the three-plan model. 
 | Compact time picker correction | ✅ | ✅ | ✅ |
 | Basic data-quality warnings | ✅ | ✅ | ✅ |
 | 12+ hour “Still sleeping?” guardrail | ✅ | ✅ | ✅ |
-| Fixed/manual reminder | ✅ | ✅ | ✅ |
+| Fixed/manual reminder (excluded from V1) | — | — | — |
 | Family / multi-device sync | — | ✅ | ✅ |
 | Shared family child profiles and raw history | — | ✅ | ✅ |
 | PDF export | — | ✅ | ✅ |
 | Personal Wake Window analytics | — | — | ✅ |
-| Age-reference Wake Window comparison | — | — | ✅ |
+| Age-reference Wake Window comparison (excluded from V1) | — | — | — |
 | Wake Window trend | — | — | ✅ |
 | Next-sleep prediction range + confidence | — | — | ✅ |
 | Routine/pattern recognition | — | — | ✅ |
 | Similar-day analysis | — | — | ✅ |
 | Custom date-range advanced trends | — | — | ✅ |
-| Adaptive reminder based on personal pattern | — | — | ✅ |
+| Adaptive reminder based on personal pattern (excluded from V1) | — | — | — |
 | Advanced Insights / Patterns | — | — | ✅ |
 
 ## Insights navigation
 
-The main app navigation is the same for every plan:
+The existing navigation may remain for V1; the following older layout is not a mandatory redesign:
 
 **Sleeps · History · Insights**
 
@@ -74,9 +76,9 @@ Family users see the same structure, with Family+ cards still locked where appli
 - Paywall is available from Settings.
 - Paywall also appears when a user intentionally opens a locked feature.
 - No random startup/interruption paywall.
-- 7-day trial targets **Family+**, so the user can evaluate the complete product.
+- One 7-day trial per user across both paid plans; the user chooses Family or Family+. Switching plans must not grant another trial.
 - Trial uses payment method / auto-renew where the platform flow supports it.
-- If trial ends without paid continuation, account returns to Free.
+- If trial ends without paid continuation, its personal grant expires; another active family member's valid subscription can still grant family access.
 - Monthly + annual options.
 - Annual target discount: roughly 2 months free.
 - No lifetime plan.

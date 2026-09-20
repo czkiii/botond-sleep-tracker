@@ -1,6 +1,6 @@
 # Solemi Sleep — elfogadott termékirány
 
-Elfogadva a tulajdonossal: **2026-09-17**. Ez a dokumentum a jelenlegi termékdöntések forrása; az auditok alternatívái nem írják felül. A végrehajtás állapotát a `CODEX_PROJECT_STATUS.md` követi.
+Elfogadva a tulajdonossal: **2026-09-17**, pontosítva **2026-09-20**. A legújabb öt tulajdonosi forrás és elsőbbségük: [OWNER_DECISIONS_REVIEW_2026-09-20.md](OWNER_DECISIONS_REVIEW_2026-09-20.md). Az auditok alternatívái nem írják felül a jóváhagyott termékdöntéseket. A végrehajtás állapotát a `CODEX_PROJECT_STATUS.md` követi.
 
 ## Cél és határok
 
@@ -22,7 +22,9 @@ Az elemzések saját feljegyzésekből származó leíró statisztikák és viss
 
 A közös szinkron önálló fizetős érték a terméktervben. Konkurens ingyenes megoldás létezése nem automatikus ok a csomag elhagyására. Family+ tényleges választható többlet; nem kizárólag árpszichológiai összehasonlító csomag. A csomagokat most megtartjuk; az auditok Free + egyetlen Plus ajánlata nem elfogadott döntés.
 
-Éves listaár, regionális árak, áruházi megjelenítés és a díjak/adók utáni gazdaságosság még nincs véglegesítve. A havi árak jóváhagyott termékterv, nem már működő bolti ajánlat vagy bizonyított fizetési hajlandóság. A PDF/értesítés és más korábbi tervek nem válnak ettől elkészült, értékesíthető funkcióvá.
+Induláskor havi és éves ajánlat lesz; az éves cél 10 havi díjért 12 hónap. Konkrét store árpontok, regionális árak, áruházi megjelenítés és a díjak/adók utáni gazdaságosság még nincs véglegesítve. Egyetlen 7 napos trial jár felhasználónként, Family vagy Family+ csomagra választhatóan. A havi árak jóváhagyott termékterv, nem már működő bolti ajánlat vagy bizonyított fizetési hajlandóság.
+
+V1-ben PDF export szükséges Family/Family+ jogosultsággal. Push, fix és adaptív emlékeztető, valamint életkori norma szerinti összehasonlítás nem része a V1-nek. A saját naplóadatok elemzése és a jelenlegi navigáció megmaradhat. Google és Apple belépés egyaránt szükséges. Ezek elfogadott scope-döntések, nem készültségi állítások.
 
 ## Családi hozzáférés — kötelező szabály
 
@@ -41,6 +43,6 @@ A közös szinkron önálló fizetős érték a terméktervben. Konkurens ingyen
 
 Cél: rendszeresen használó családok és kis, fenntartható mellékbevétel; heti 5–8 órás fejlesztési/tesztelői kapacitással. Nyilvános induláskor App Store és Google Play jelenlét is szükséges. Az egyszerűséget és a csomagok értékét további családokkal ellenőrizzük, új funkciók automatikus hozzáadása nélkül.
 
-A 2026-09-20-i teljes audit után a következő fejlesztési feladat a sérült helyi napló megőrzése (A01), majd a jelentés adatbiztonsági, családi és billing sorrendje. Lásd `FULL_RELEASE_AUDIT_2026-09-20.md` és `CODEX_PROJECT_STATUS.md`. A termékirány és a havi csomagok nem változtak; nincs automatikusan első frissítésre halasztott tétel. Későbbi kutatási feladat: szülői Reddit-beszélgetések és más közösségi visszajelzések áttekintése arról, miért kezdenek naplózni, mikor válik teherré, és miért hagyják abba. Kutatás ebben a munkamenetben nem indul.
+A01–A02 elkészült; a következő feladat a félkész A03 befejezése az új tulajdonosi törlési/import/mentési szabályokkal, majd a jelentés családi és billing sorrendje. Lásd `FULL_RELEASE_AUDIT_2026-09-20.md` és `CODEX_PROJECT_STATUS.md`. Nincs automatikusan első frissítésre halasztott tétel. Későbbi kutatási feladat: szülői Reddit-beszélgetések és más közösségi visszajelzések áttekintése arról, miért kezdenek naplózni, mikor válik teherré, és miért hagyják abba. Kutatás ebben a munkamenetben nem indul.
 
 Commit/push a tulajdonos feladata. Éles deploy, main merge és production adatbázis-módosítás külön engedélyhez kötött.

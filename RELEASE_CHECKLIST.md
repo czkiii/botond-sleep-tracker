@@ -4,6 +4,8 @@ Utolsó frissítés: 2026-09-20
 
 Ez az operatív lista a `SOLEMI_EXECUTION_PLAN.md` és a `SOLEMI_MASTER_ROADMAP.md` kiadási pontjait rendezi végrehajtási sorrendbe.
 
+**2026-09-20 tulajdonosi pontosítás:** [OWNER_DECISIONS_REVIEW_2026-09-20.md](OWNER_DECISIONS_REVIEW_2026-09-20.md) és az ott hivatkozott öt TXT elsőbbséget élvez az eltérő régi termékígéretekkel szemben. PDF/Google+Apple login/havi+éves/trial V1-ben; emlékeztetők és életkori norma nélkül. A03 helyi implementációja elkészült, staging elfogadása nyitott. A saját domain megvásárlása rögzítve, bekötése és a privacy/retention tényleges megvalósítása még nyitott. Ettől auditkapu nem válik automatikusan teljesítetté.
+
 ## Elsődleges kiadási kapu — teljes audit, 2026-09-20
 
 Részletes bizonyíték, súlyosság és lezárási feltétel:
@@ -14,7 +16,7 @@ vagy kifejezett, indokolt termékdöntés kell; a puszta priorizálás nem lezá
 
 - [x] A01 — Sérült helyi napló megőrzése, automatikus felülírás megakadályozása. 195/195 teszt, typecheck és két build sikeres.
 - [x] A02 — Többlapos mentés, quota/crash és tartós napló–outbox egység. Egyetlen böngészőlap írhat; az atomi helyi envelope, hibainjektálás és kétlapos átvételi próba sikeres (198/198 teszt).
-- [ ] A03 — Import/törlés családi hatása és visszaállítható biztonsági mentés. **Következő munka.**
+- [ ] A03 — Import/törlés családi hatása és visszaállítható biztonsági mentés. Helyi implementáció és 205/205 teszt kész; commit/push, staging kéttelefonos import/törlés/offline/pending/restore elfogadás hiányzik.
 - [ ] A04 — Valódi account-szintű családi kilépés, pending adatok védelme.
 - [ ] A05 — Fiókváltás/guest kapcsolat és helyi adatok elkülönítése.
 - [ ] A06 — Legacy API fizetős sync-megkerülés lezárása, kompatibilis átállás.
@@ -70,7 +72,7 @@ próba az audit bizonyítéka, nem a hibák lezárása. Minden alábbi tétel ny
 
 Javítás után közös tesztnapló minden kártyán, HU/EN/DE szövegek és célzott
 kéttelefonos elfogadás szükséges. Nincs automatikus kiadás utáni halasztás;
-az adatmegőrzési sorrend az elkészült A01–A02 után A03-mal folytatódik.
+az adatmegőrzési sorrend az A03 staging elfogadásával folytatódik.
 
 ## Célállapotok
 
@@ -286,7 +288,7 @@ engedélyez automatikus halasztást. A meglévő Prediction kommunikációját i
 
 ## Következő konkrét munkamenet
 
-**Elsőbbség:** A03 — importbiztonság. Ezután A13–A14 és a teljes audit
+**Elsőbbség:** A03 — staging import/törlés/restore elfogadás. Ezután A13–A14 és a teljes audit
 végrehajtási sorrendje.
 A billing HTTP/adapterszelet előtt A08–A10 javítás kötelező. Az alábbi korábbi
 tételek történeti és további release-feladatok.

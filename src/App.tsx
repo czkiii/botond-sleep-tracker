@@ -4,8 +4,8 @@ import { languageOptions, localeTag, t } from './i18n'
 import type { Locale } from './i18n'
 import type { AppData, ChildProfile, DayNightOverride, Page, SleepSession } from './types'
 import type { DataQualityIssueKind } from './utils'
-import { DataStorageError, REMOTE_DATA_EVENT, createChild, createDefaultData, createSession, exportDamagedData, exportData, importData, inspectBackup, loadData, loadDataResult, recoverData } from './storage'
-import type { ImportDiagnostic, ImportInspection } from './storage'
+import { DataStorageError, REMOTE_DATA_EVENT, createChild, createDefaultData, createSession, exportDamagedData, exportData, importData, inspectBackup, loadData, loadDataResult, loadSafetyBackup, recoverData, saveSafetyBackup } from './storage'
+import type { ImportDiagnostic, ImportInspection, SafetyBackup, SafetyBackupReason } from './storage'
 import { deleteChildPhoto, loadChildPhoto, prepareChildPhoto, saveChildPhoto } from './photoStore'
 import type { AvatarCrop } from './photoStore'
 import { removeChildProfile } from './childProfiles'
@@ -18,11 +18,13 @@ import { buildSleepChangeInsight } from './sleepChange'
 import type { SleepChangeMetric, SleepChangeSignal } from './sleepChange'
 import { buildMonthlyFamilyReport } from './monthlyReport'
 import type { MonthlyReportMetric, MonthlyReportMilestone, MonthlyReportTrend } from './monthlyReport'
-import { INTERNAL_PLAN_PREVIEW_EVENT, INTERNAL_PLAN_PREVIEW_KEY, canUsePremiumInsights, parseProductPlan, premiumInsightFeatures, productPlans } from './entitlements'
+import { INTERNAL_PLAN_PREVIEW_EVENT, INTERNAL_PLAN_PREVIEW_KEY, canUseFamilySync, canUsePremiumInsights, parseProductPlan, premiumInsightFeatures, productPlans } from './entitlements'
 import type { PremiumInsightFeature, ProductPlan } from './entitlements'
 import { DEFAULT_DAY_START_MINUTES, DEFAULT_NIGHT_START_MINUTES, LONG_SLEEP_GUARDRAIL_MS, awakeSince, durationOf, formatDateHeader, formatDuration, formatTime, formatTimer, getDataQualityWarnings, todaySessions, totalToday } from './utils'
 import SleepTimeline from './SleepTimeline'
-import { getSessionSyncRevision, getSyncStore, saveLocalData } from './familySync'
+import { clearFamilyDiary, clearLocalDiary, getFamilyReplacementReadiness, getSessionSyncRevision, getSyncStore, saveLocalData } from './familySync'
+import { prepareFamilyReplacement, summarizeReplacement } from './dataReplacement'
+import type { ReplacementSummary } from './dataReplacement'
 import SwipeHistoryRow from './SwipeHistoryRow'
 import AccountCard from './AccountCard'
 import { ACCOUNT_ACCESS_EVENT, ACCOUNT_STATE_EVENT, getAccountAccess, restoreAccount } from './accountAuth'
@@ -204,7 +206,9 @@ export default function App({ writeAccess = 'writer' }: { writeAccess?: WriteAcc
       {page === 'today' && <TodayPage data={data} child={activeChild} sessions={activeSessions} now={now} locale={locale} current={current} onSelectChild={(childId) => setData((previous) => ({ ...previous, settings: { ...previous.settings, activeChildId: childId } }))} onStart={startNow} onEnd={endNow} onAdjustStart={adjustCurrentStart} onOpenEditor={openEditor} onHistory={() => setPage('history')} onSettings={() => setPage('settings')} />}
       {page === 'history' && <HistoryPage sessions={activeSessions} locale={locale} onEdit={openEditor} onDelete={deleteSession} onNew={() => openEditor('new')} />}
       {page === 'stats' && <StatsPage sessions={activeSessions} now={now} locale={locale} childName={activeChild.name} productPlan={previewPlan} premiumInsightsAvailable={accountAuthEnabled ? Boolean(accountAccess?.features.includes('FAMILY_PLUS_INSIGHTS')) : canUsePremiumInsights(previewPlan)} onPreviewPlanChange={internalPreview ? setPreviewPlan : undefined} />}
-      {page === 'settings' && <SettingsPage data={data} setData={setData} onBack={() => setPage('today')} />}
+      {page === 'settings' && <SettingsPage data={data} setData={setData} onBack={() => setPage('today')}
+        familySyncAvailable={accountAuthEnabled ? Boolean(accountAccess?.features.includes('FAMILY_SYNC')) : canUseFamilySync(previewPlan)}
+        familyRole={accountAccess?.membership?.role ?? null} />}
     </main>
     {page !== 'settings' && <BottomNav page={page} locale={locale} onChange={setPage} />}
     {editor && <SleepEditor childId={activeChild.id} session={editor === 'new' ? null : editor} locale={locale} currentExists={Boolean(current)} onClose={() => setEditor(null)} onSave={saveEditor} onDelete={deleteSession} />}
@@ -626,18 +630,46 @@ function StatCard({ label, value, suffix, icon }: { label: string; value: string
   return <div className="stat-card"><div><span>{label}</span><strong>{value}</strong>{suffix && <small>{suffix}</small>}</div>{icon && <b><Icon name={icon} size={15} /></b>}</div>
 }
 
-function SettingsPage({ data, setData, onBack }: { data: AppData; setData: (data: AppData) => void; onBack: () => void }) {
+type ReplacementSource = 'import' | 'clear-local' | 'clear-family' | 'restore'
+type ReplacementScope = 'local' | 'family'
+type PendingReplacement = { incoming: AppData; source: ReplacementSource; scope: ReplacementScope;
+  familyName?: string; diagnostics: ImportDiagnostic[]; base: string }
+
+function SettingsPage({ data, setData, onBack, familySyncAvailable, familyRole }: { data: AppData; setData: (data: AppData) => void; onBack: () => void; familySyncAvailable: boolean; familyRole: 'ADMIN' | 'MEMBER' | null }) {
   const locale = data.settings.locale
   const [editingChild, setEditingChild] = useState<ChildProfile | 'new' | null>(null)
   const [loadingDemo, setLoadingDemo] = useState(false)
+  const [safetyBackup, setSafetyBackup] = useState<SafetyBackup | null>(() => loadSafetyBackup())
+  const [pendingReplacement, setPendingReplacement] = useState<PendingReplacement | null>(null)
+  const [replacementBusy, setReplacementBusy] = useState(false)
   const changeLocale = (event: ChangeEvent<HTMLSelectElement>) => setData({ ...data, settings: { ...data.settings, locale: event.target.value as Locale } })
+  const replacementReadiness = getFamilyReplacementReadiness()
+  const replacementBlocked = (source: ReplacementSource, scope: ReplacementScope) => {
+    const readiness = getFamilyReplacementReadiness()
+    if (scope === 'local') return false
+    if (readiness.scope !== 'family') return t(locale, 'replacementBlockedAttention')
+    if (source === 'clear-family' && familyRole !== 'ADMIN') return t(locale, 'familyClearAdminOnly')
+    if (source !== 'clear-family' && !familySyncAvailable) return t(locale, 'replacementNeedsSubscription')
+    if (readiness.ready) return false
+    return t(locale, readiness.reason === 'offline' ? 'replacementBlockedOffline'
+      : readiness.reason === 'pending' ? 'replacementBlockedPending' : 'replacementBlockedAttention')
+  }
+  const openReplacement = (incoming: AppData, source: ReplacementSource, diagnostics: ImportDiagnostic[] = []) => {
+    const readiness = getFamilyReplacementReadiness()
+    const scope: ReplacementScope = source === 'clear-local' ? 'local'
+      : source === 'clear-family' ? 'family' : readiness.scope
+    const blocked = replacementBlocked(source, scope)
+    if (blocked) return window.alert(blocked)
+    if (source !== 'clear-local' && source !== 'clear-family'
+      && (data.sessions.some((session) => !session.endTime) || incoming.sessions.some((session) => !session.endTime))) {
+      return window.alert(t(locale, 'replacementBlockedActive'))
+    }
+    setPendingReplacement({ incoming, source, scope,
+      familyName: scope === 'family' ? readiness.familyName : undefined,
+      diagnostics, base: JSON.stringify(data) })
+  }
   const applyImport = (inspection: ImportInspection) => {
-    const next = inspection.data
-    const diagnosticText = inspection.diagnostics.map((diagnostic) => `• ${importDiagnosticText(locale, diagnostic)}`).join('\n')
-    const summary = t(locale, 'importFound', { count: next.sessions.length, children: next.children.length })
-    if (!window.confirm(diagnosticText ? `${summary}\n\n${diagnosticText}\n\n${t(locale, 'importReplaceQuestion')}` : `${summary}\n\n${t(locale, 'importReplaceQuestion')}`)) return
-    exportData(data)
-    setData({ ...next, settings: { ...next.settings, locale } })
+    openReplacement(inspection.data, 'import', inspection.diagnostics)
   }
   const handleImport = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -661,9 +693,51 @@ function SettingsPage({ data, setData, onBack }: { data: AppData; setData: (data
       setLoadingDemo(false)
     }
   }
-  const clear = () => {
-    if (!window.confirm(t(locale, 'clearConfirm'))) return
-    setData({ ...data, sessions: [] })
+  const emptyDiary = () => createDefaultData(locale)
+  const removeCurrentPhotos = () => {
+    for (const child of data.children) if (child.photoRef) void deleteChildPhoto(child.photoRef).catch(() => {})
+  }
+  const applyReplacement = async () => {
+    if (!pendingReplacement) return
+    if (pendingReplacement.base !== JSON.stringify(data)) {
+      setPendingReplacement(null)
+      return window.alert(t(locale, 'replacementDataChanged'))
+    }
+    const blocked = replacementBlocked(pendingReplacement.source, pendingReplacement.scope)
+    if (blocked) return window.alert(blocked)
+    const incoming = { ...pendingReplacement.incoming,
+      settings: { ...pendingReplacement.incoming.settings, locale } }
+    setReplacementBusy(true)
+    try {
+      if (pendingReplacement.source === 'import' || pendingReplacement.source === 'restore') {
+        const reason: SafetyBackupReason = pendingReplacement.source === 'import' ? 'before-import' : 'before-restore'
+        const saved = saveSafetyBackup(data, reason)
+        setSafetyBackup(saved)
+      }
+      if (pendingReplacement.source === 'clear-local') {
+        await clearLocalDiary(incoming)
+        setSafetyBackup(null)
+        removeCurrentPhotos()
+      } else if (pendingReplacement.source === 'clear-family') {
+        await clearFamilyDiary(incoming, pendingReplacement.familyName || '')
+        setSafetyBackup(null)
+        removeCurrentPhotos()
+      } else {
+        const next = pendingReplacement.scope === 'family' ? prepareFamilyReplacement(data, incoming) : incoming
+        setData(next)
+      }
+      setPendingReplacement(null)
+    } catch (error) {
+      const key = error instanceof Error && error.message === 'FAMILY_ADMIN_REQUIRED'
+        ? 'familyClearAdminOnly'
+        : error instanceof Error && error.message === 'FAMILY_CLEAR_LOCAL_REFRESH_REQUIRED'
+          ? 'familyClearRefreshRequired'
+          : (pendingReplacement.source === 'import' || pendingReplacement.source === 'restore')
+              && error instanceof DataStorageError ? 'replacementBackupFailed' : 'replacementFailed'
+      window.alert(t(locale, key))
+    } finally {
+      setReplacementBusy(false)
+    }
   }
   return <><section className="screen settings-screen"><header className="page-header"><button className="back-button" onClick={onBack}>‹</button><h1>{t(locale, 'settings')}</h1><span className="header-spacer" /></header>
     {import.meta.env.VITE_ACCOUNT_AUTH === 'true' && <AccountCard locale={locale} />}
@@ -677,7 +751,10 @@ function SettingsPage({ data, setData, onBack }: { data: AppData; setData: (data
       const active = child.id === data.settings.activeChildId
       return <button key={child.id} className={`child-list-row ${active ? 'active' : ''}`} onClick={() => setData({ ...data, settings: { ...data.settings, activeChildId: child.id } })}><ChildAvatar child={child} className="child-list-avatar" /><span><strong>{child.name || t(locale, 'unnamedChild')}</strong><small>{child.birthDate || t(locale, 'birthDateMissing')} · {t(locale, 'sleepEntries', { count })}</small></span>{active && <b>{t(locale, 'active')}</b>}<span className="child-edit-button" role="button" tabIndex={0} aria-label={t(locale, 'editChild')} onClick={(event) => { event.stopPropagation(); setEditingChild(child) }}><Icon name="edit" size={15} /></span></button>
     })}</div>
-    <div className="settings-card action-stack"><button onClick={() => exportData(data)}>{t(locale, 'exportData')}</button><label className="file-button">{t(locale, 'importData')}<input type="file" accept="application/json" onChange={handleImport} /></label>{import.meta.env.VITE_INTERNAL_PREVIEW === 'true' && <button className="internal-demo-button" onClick={loadDemoData} disabled={loadingDemo}>{loadingDemo ? t(locale, 'loadingDemoData') : t(locale, 'loadDemoData')}</button>}<button className="danger" onClick={clear}>{t(locale, 'clearAll')}</button></div><p className="muted">{t(locale, 'localOnly')}</p></section>
+    <div className="settings-card action-stack"><button onClick={() => exportData(data)}>{t(locale, 'exportData')}</button><label className="file-button">{t(locale, replacementReadiness.scope === 'family' ? 'importFamilyData' : 'importData')}<input type="file" accept="application/json" onChange={handleImport} /></label>{safetyBackup && <button className="safety-restore-button" onClick={() => openReplacement(safetyBackup.data, 'restore')}>{t(locale, 'restoreSafetyBackup')}</button>}{import.meta.env.VITE_INTERNAL_PREVIEW === 'true' && <button className="internal-demo-button" onClick={loadDemoData} disabled={loadingDemo}>{loadingDemo ? t(locale, 'loadingDemoData') : t(locale, 'loadDemoData')}</button>}<button className="danger" onClick={() => openReplacement(emptyDiary(), 'clear-local')}>{t(locale, 'clearLocalData')}</button>{replacementReadiness.scope === 'family' && familyRole === 'ADMIN' && <button className="danger danger-family" onClick={() => openReplacement(emptyDiary(), 'clear-family')}>{t(locale, 'clearFamilyData')}</button>}</div>
+    {replacementReadiness.scope === 'family' && familyRole === 'MEMBER' && <p className="muted family-admin-hint">{t(locale, 'familyClearAdminOnly')}</p>}
+    {safetyBackup && <p className="muted safety-backup-hint">{t(locale, 'safetyBackupAvailable', { date: new Intl.DateTimeFormat(localeTag(locale), { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(safetyBackup.exportedAt)), count: safetyBackup.data.sessions.length })}</p>}
+    <p className="muted">{t(locale, replacementReadiness.scope === 'family' ? 'familyDataShared' : 'localOnly', { family: replacementReadiness.familyName || '' })}</p></section>
     {editingChild && <ChildEditor child={editingChild === 'new' ? null : editingChild as ChildProfile} locale={locale} onClose={() => setEditingChild(null)} onSave={(next) => {
       if (editingChild === 'new') setData({ ...data, children: [...data.children, next], settings: { ...data.settings, activeChildId: next.id } })
       else setData({ ...data, children: data.children.map((child) => child.id === next.id ? next : child) })
@@ -692,7 +769,38 @@ function SettingsPage({ data, setData, onBack }: { data: AppData; setData: (data
       if (child.photoRef) void deleteChildPhoto(child.photoRef).catch(() => {})
       setData(next)
       setEditingChild(null)
-    }} />}</>
+    }} />}
+    {pendingReplacement && <DataReplacementDialog locale={locale} source={pendingReplacement.source}
+      scope={pendingReplacement.scope} familyName={pendingReplacement.familyName}
+      summary={summarizeReplacement(data, pendingReplacement.incoming)} diagnostics={pendingReplacement.diagnostics}
+      busy={replacementBusy} onExport={() => exportData(data)}
+      onClose={() => setPendingReplacement(null)} onConfirm={applyReplacement} />}</>
+}
+
+function DataReplacementDialog({ locale, source, scope, familyName, summary, diagnostics, busy, onExport, onClose, onConfirm }: {
+  locale: Locale; source: ReplacementSource; scope: ReplacementScope; familyName?: string; summary: ReplacementSummary
+  diagnostics: ImportDiagnostic[]; busy: boolean; onExport: () => void; onClose: () => void; onConfirm: () => void
+}) {
+  const [typedFamilyName, setTypedFamilyName] = useState('')
+  const familyClear = source === 'clear-family'
+  const destructive = source === 'clear-local' || familyClear
+  const title = source === 'clear-local' ? t(locale, 'clearLocalData')
+    : familyClear ? t(locale, 'clearFamilyData')
+      : source === 'restore' ? t(locale, 'restoreSafetyBackup') : t(locale, scope === 'family' ? 'importFamilyData' : 'importData')
+  const line = (counts: ReplacementSummary['children']) => t(locale, 'replacementCounts', counts)
+  return <div className="development-picker-overlay data-replacement-overlay" role="dialog" aria-modal="true" aria-labelledby="data-replacement-title">
+    <div className="development-picker-sheet data-replacement-sheet">
+      <header><div><small>{t(locale, scope === 'family' ? 'replacementFamilyScope' : 'replacementLocalScope')}</small><h2 id="data-replacement-title">{title}</h2></div><button type="button" aria-label={t(locale, 'cancel')} onClick={onClose} disabled={busy}><Icon name="close" size={18} /></button></header>
+      <p>{t(locale, familyClear ? 'familyClearImpact' : scope === 'family' ? 'replacementFamilyImpact' : source === 'clear-local' ? 'localClearImpact' : 'replacementLocalImpact', { family: familyName || '' })}</p>
+      <div className="replacement-summary"><div><span>{t(locale, 'children')}</span><strong>{line(summary.children)}</strong></div><div><span>{t(locale, 'sleepEntriesLabel')}</span><strong>{line(summary.sessions)}</strong></div></div>
+      <small className="replacement-id-note">{t(locale, 'replacementIdNote')}</small>
+      {diagnostics.length > 0 && <div className="replacement-diagnostics">{diagnostics.map((diagnostic, index) => <small key={`${diagnostic.kind}-${index}`}>• {importDiagnosticText(locale, diagnostic)}</small>)}</div>}
+      {!destructive && <div className="replacement-backup-note"><strong>{t(locale, 'replacementBackupTitle')}</strong><span>{t(locale, 'replacementBackupHint')}</span></div>}
+      {source === 'clear-local' && <button type="button" className="replacement-export" onClick={onExport}>{t(locale, 'exportBeforeLocalClear')}</button>}
+      {familyClear && <><button type="button" className="replacement-export" onClick={onExport}>{t(locale, 'exportBeforeFamilyClear')}</button><label className="family-name-confirm">{t(locale, 'typeFamilyName', { family: familyName || '' })}<input value={typedFamilyName} onChange={(event) => setTypedFamilyName(event.target.value)} autoComplete="off" /></label></>}
+      <div className="development-picker-actions"><button type="button" onClick={onClose} disabled={busy}>{t(locale, 'cancel')}</button><button type="button" className={destructive ? 'danger' : 'primary'} onClick={onConfirm} disabled={busy || (familyClear && typedFamilyName.trim() !== familyName)}>{busy ? t(locale, 'saving') : t(locale, destructive ? 'delete' : 'apply')}</button></div>
+    </div>
+  </div>
 }
 
 function importDiagnosticText(locale: Locale, diagnostic: ImportDiagnostic) {

@@ -1092,6 +1092,66 @@ async function joinAccountFamily(request: Request, env: Env, access: AccountAcce
   }, 201)
 }
 
+async function clearAccountFamilyData(request: Request, env: Env, access: AccountAccess) {
+  const body = await readJson(request)
+  const operationId = requireString(body.operationId, 'operationId', 100)
+  const expectedFamilyName = requireString(body.expectedFamilyName, 'expectedFamilyName', 60)
+  const replacementChildId = requireString(body.replacementChildId, 'replacementChildId', 100)
+  const token = request.headers.get('X-Solemi-Family-Token')
+  if (!token) throw new ApiError(401, 'SESSION_INVALID')
+  const legacy = await legacyFamilyByToken(env, token)
+  if (!legacy || legacy.revoked_at) throw new ApiError(401, 'SESSION_INVALID')
+
+  const membership = await env.DB.prepare(`SELECT role FROM legacy_family_memberships
+    WHERE family_id = ? AND account_id = ? AND status = 'ACTIVE'`)
+    .bind(legacy.family_id, access.account.id).first<{ role: 'ADMIN' | 'MEMBER' }>()
+  if (!membership) throw new ApiError(403, 'FAMILY_MEMBERSHIP_REQUIRED')
+  if (membership.role !== 'ADMIN') throw new ApiError(403, 'FAMILY_ADMIN_REQUIRED')
+  const mapping = await env.DB.prepare(`SELECT 1 AS linked FROM account_family_devices
+    WHERE account_device_id = ? AND account_id = ? AND family_id = ? AND legacy_device_id = ?`)
+    .bind(access.deviceId, access.account.id, legacy.family_id, legacy.device_id)
+    .first<{ linked: number }>()
+  if (!mapping) throw new ApiError(403, 'FAMILY_MEMBERSHIP_REQUIRED')
+  if (legacy.family_name !== expectedFamilyName) throw new ApiError(409, 'FAMILY_NAME_CHANGED')
+
+  const prior = await env.DB.prepare(`SELECT id FROM operations
+    WHERE id = ? AND family_id = ? AND device_id = ? AND operation_type = 'CLEAR_FAMILY_DATA'`)
+    .bind(operationId, legacy.family_id, legacy.device_id).first<{ id: string }>()
+  if (!prior) {
+    const at = nowIso()
+    try {
+      await env.DB.batch([
+        env.DB.prepare(`INSERT INTO operations (id, family_id, device_id, operation_type, created_at)
+          VALUES (?, ?, ?, 'CLEAR_FAMILY_DATA', ?)`)
+          .bind(operationId, legacy.family_id, legacy.device_id, at),
+        env.DB.prepare('UPDATE families SET revision = revision + 1 WHERE id = ?')
+          .bind(legacy.family_id),
+        env.DB.prepare(`UPDATE sleep_sessions
+          SET deleted_at = ?, updated_at = ?, revision = (SELECT revision FROM families WHERE id = ?)
+          WHERE family_id = ? AND deleted_at IS NULL`)
+          .bind(at, at, legacy.family_id, legacy.family_id),
+        env.DB.prepare(`UPDATE children
+          SET deleted_at = ?, updated_at = ?, revision = (SELECT revision FROM families WHERE id = ?)
+          WHERE family_id = ? AND deleted_at IS NULL`)
+          .bind(at, at, legacy.family_id, legacy.family_id),
+        env.DB.prepare(`INSERT INTO children
+          (id, family_id, name, birth_date, created_at, updated_at, deleted_at, revision)
+          VALUES (?, ?, '', NULL, ?, ?, NULL, (SELECT revision FROM families WHERE id = ?))`)
+          .bind(replacementChildId, legacy.family_id, at, at, legacy.family_id)
+      ])
+    } catch (error) {
+      const repeated = await env.DB.prepare(`SELECT id FROM operations
+        WHERE id = ? AND family_id = ? AND device_id = ? AND operation_type = 'CLEAR_FAMILY_DATA'`)
+        .bind(operationId, legacy.family_id, legacy.device_id).first<{ id: string }>()
+      if (!repeated) throw error
+    }
+  }
+
+  const child = await getChild(env, legacy.family_id, replacementChildId)
+  if (!child || child.deleted_at) throw new ApiError(409, 'FAMILY_CLEAR_RETRY_MISMATCH')
+  return ok(request, env, { revision: await currentRevision(env, legacy.family_id), child: childDto(child) })
+}
+
 async function accountAuthRoute(request: Request, env: Env, path: string) {
   const service = accountAuth(env)
   try {
@@ -1155,6 +1215,12 @@ async function accountAuthRoute(request: Request, env: Env, path: string) {
       requireAllowedAuthOrigin(request, env)
       const access = await service.authenticate(accountBearer(request))
       return joinAccountFamily(request, env, access)
+    }
+    if (request.method === 'POST' && path === '/v1/auth/family/data/clear') {
+      requireAccountFamilyBridge(env)
+      requireAllowedAuthOrigin(request, env)
+      const access = await service.authenticate(accountBearer(request))
+      return clearAccountFamilyData(request, env, access)
     }
     if (request.method === 'POST' && path === '/v1/auth/logout') {
       requireAllowedAuthOrigin(request, env)

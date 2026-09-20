@@ -40,8 +40,11 @@ export type DataLoadResult =
 
 const nowIso = () => new Date().toISOString()
 const LOCAL_METADATA_KEY = '__solemiLocal'
+const SAFETY_BACKUP_KEY = 'safetyBackupV1'
 
 type StoredEnvelope = AppData & { [LOCAL_METADATA_KEY]?: Record<string, unknown> }
+export type SafetyBackupReason = 'before-import' | 'before-clear' | 'before-restore' | 'before-family-bootstrap'
+export type SafetyBackup = SleepBackupV4 & { reason: SafetyBackupReason }
 
 function newChildId() {
   return `child_${crypto.randomUUID().replaceAll('-', '')}`
@@ -239,8 +242,45 @@ export function saveDataWithMetadata(data: AppData, key: string, value: unknown)
   }
 }
 
+export function saveDataAfterDeletion(data: AppData, key: string, value: unknown) {
+  loadData()
+  const normalized = normalizeAppData(data)
+  if (!normalized) throw new DataStorageError('corrupt-v4', 'v4')
+  const metadata = { ...currentLocalMetadata(), [key]: value }
+  delete metadata[SAFETY_BACKUP_KEY]
+  const envelope: StoredEnvelope = { ...normalized, [LOCAL_METADATA_KEY]: metadata }
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(envelope))
+  } catch {
+    throw new DataStorageError('storage-write-failed', 'storage')
+  }
+}
+
 export function saveLocalMetadata(key: string, value: unknown) {
   saveDataWithMetadata(loadData(), key, value)
+}
+
+export function saveSafetyBackup(data: AppData, reason: SafetyBackupReason): SafetyBackup {
+  const normalized = normalizeAppData(data)
+  if (!normalized) throw new DataStorageError('corrupt-v4', 'v4')
+  const backup: SafetyBackup = {
+    format: 'solemi-sleep-backup', version: 4, exportedAt: nowIso(), data: normalized, reason
+  }
+  saveLocalMetadata(SAFETY_BACKUP_KEY, backup)
+  return backup
+}
+
+export function loadSafetyBackup(): SafetyBackup | null {
+  const value = getLocalMetadata(SAFETY_BACKUP_KEY)
+  if (!value || typeof value !== 'object') return null
+  const backup = value as Partial<SafetyBackup>
+  const reasons: SafetyBackupReason[] = ['before-import', 'before-clear', 'before-restore', 'before-family-bootstrap']
+  if (backup.format !== 'solemi-sleep-backup' || backup.version !== 4
+    || typeof backup.exportedAt !== 'string' || !Number.isFinite(Date.parse(backup.exportedAt))
+    || !reasons.includes(backup.reason as SafetyBackupReason)) return null
+  const data = normalizeAppData(backup.data)
+  return data ? { format: 'solemi-sleep-backup', version: 4, exportedAt: backup.exportedAt,
+    data, reason: backup.reason as SafetyBackupReason } : null
 }
 
 export function saveRemoteData(data: AppData) {

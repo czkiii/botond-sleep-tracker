@@ -1,5 +1,5 @@
 import type { AppData, ChildProfile, SleepSession } from './types'
-import { getLocalMetadata, loadData, saveDataWithMetadata, saveLocalMetadata, saveRemoteData } from './storage'
+import { getLocalMetadata, loadData, saveDataAfterDeletion, saveDataWithMetadata, saveLocalMetadata, saveRemoteData, saveSafetyBackup } from './storage'
 import { accountDeviceName, accountRequest } from './accountAuth'
 import { fetchJson } from './apiTransport'
 
@@ -256,6 +256,26 @@ export function getSessionSyncRevision(sessionId: string) {
 }
 export function isFamilyConnected() { return Boolean(readStore().connection) }
 
+export type FamilyReplacementReadiness = {
+  scope: 'local' | 'family'
+  ready: boolean
+  reason?: 'offline' | 'pending' | 'attention'
+  familyName?: string
+}
+
+export function getFamilyReplacementReadiness(): FamilyReplacementReadiness {
+  const store = readStore()
+  if (store.corrupt) return { scope: store.connection ? 'family' : 'local', ready: false, reason: 'attention', familyName: store.connection?.familyName }
+  if (!store.connection) return { scope: 'local', ready: true }
+  const familyName = store.connection.familyName
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return { scope: 'family', ready: false, reason: 'offline', familyName }
+  if (store.pending.length) return { scope: 'family', ready: false, reason: 'pending', familyName }
+  if (store.corrupt || store.failure || store.conflicts.length || store.missingSessions.length) {
+    return { scope: 'family', ready: false, reason: 'attention', familyName }
+  }
+  return { scope: 'family', ready: true, familyName }
+}
+
 export async function reconcileAccountFamily() {
   const store = readStore()
   if (store.connection) {
@@ -265,6 +285,7 @@ export async function reconcileAccountFamily() {
     return { claimed: true, connected: true, changed: false }
   }
 
+  saveSafetyBackup(loadData(), 'before-family-bootstrap')
   const result = await accountRequest<{
     membership: null | { familyId: string; familyName: string; role: 'ADMIN' | 'MEMBER' }
     connection?: SyncConnection
@@ -288,6 +309,7 @@ function isEmptyLocalProfile(child: ChildProfile) {
 
 export async function createFamily(familyName: string, deviceName: string) {
   const local = loadData()
+  saveSafetyBackup(local, 'before-family-bootstrap')
   const primaryChild = local.children.find((child) => child.id === local.settings.activeChildId) ?? local.children[0]
   const created = await request<{ familyId: string; familyName: string; device: { id: string; name: string | null }; deviceToken: string; revision: number }>('/v1/families', {
     method: 'POST',
@@ -317,6 +339,7 @@ function applyAuthoritativeChild(child?: RemoteChild | null) {
 
 export async function joinFamily(code: string, deviceName: string) {
   const normalizedCode = code.trim().toUpperCase()
+  saveSafetyBackup(loadData(), 'before-family-bootstrap')
   let connection: SyncConnection
   if (import.meta.env.VITE_ACCOUNT_AUTH === 'true') {
     const joined = await accountRequest<{ connection: SyncConnection }>('/v1/auth/family/join', {
@@ -363,6 +386,58 @@ export async function leaveFamily() {
     try { await request('/v1/device/leave', { method: 'POST', body: '{}' }, store.connection.deviceToken) } catch {}
   }
   writeStore(defaultStore())
+}
+
+function announceDiaryReplacement() {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent('solemi-sync-state'))
+  window.dispatchEvent(new CustomEvent('solemi-remote-data-applied'))
+}
+
+export async function clearLocalDiary(next: AppData) {
+  const store = readStore()
+  if (store.connection) {
+    try { await request('/v1/device/leave', { method: 'POST', body: '{}' }, store.connection.deviceToken) } catch {}
+  }
+  saveDataAfterDeletion(next, SYNC_METADATA_KEY, defaultStore())
+  try { localStorage.removeItem(SYNC_KEY) } catch { /* embedded copy is authoritative */ }
+  announceDiaryReplacement()
+}
+
+export async function clearFamilyDiary(next: AppData, expectedFamilyName: string) {
+  const store = readStore()
+  if (!store.connection) throw new Error('FAMILY_NOT_CONNECTED')
+  const connection = store.connection
+  const replacementChild = next.children[0]
+  const result = await accountRequest<{ revision: number; child: RemoteChild }>('/v1/auth/family/data/clear', {
+    method: 'POST',
+    headers: { 'X-Solemi-Family-Token': connection.deviceToken },
+    body: JSON.stringify({
+      operationId: opId('clear_family'),
+      expectedFamilyName,
+      replacementChildId: replacementChild.id
+    })
+  })
+  const latest = readStore()
+  if (!sameConnection(connection, latest.connection)) throw new Error('FAMILY_CLEAR_LOCAL_REFRESH_REQUIRED')
+  const cleared: AppData = {
+    ...next,
+    settings: { ...next.settings, activeChildId: result.child.id },
+    children: [toLocalChild(result.child)],
+    sessions: []
+  }
+  const nextStore: SyncStore = {
+    connection: { ...connection, revision: result.revision },
+    pending: [], conflicts: [], missingSessions: [], sessionRevisions: {}
+  }
+  try {
+    saveDataAfterDeletion(cleared, SYNC_METADATA_KEY, nextStore)
+  } catch {
+    throw new Error('FAMILY_CLEAR_LOCAL_REFRESH_REQUIRED')
+  }
+  try { localStorage.removeItem(SYNC_KEY) } catch { /* embedded copy is authoritative */ }
+  announceDiaryReplacement()
+  return cleared
 }
 
 export function makeOperations(previous: AppData, next: AppData, baseRevision = 0): PendingOperation[] {

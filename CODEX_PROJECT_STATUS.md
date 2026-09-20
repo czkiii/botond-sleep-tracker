@@ -4,7 +4,20 @@
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
 **Teljes audit alapja:** `e9374f4` (`Add verified store billing foundation`); az akkori helyi origin-refhez képest 0 ahead / 0 behind.
-**A02 javítás alapja:** `5ac2913` (`Protect corrupted sleep data and add recovery flow`). A mostani munkafában elkészült a többlapos írókoordináció és az atomi napló–outbox mentés; commit/push és deploy nem történt.
+**Ellenőrzött HEAD:** `fa67411` (`Make local diary and sync outbox crash-safe`), az A02 commitja. Az A03 implementáció a munkafában elkészült; commit/push és staging elfogadás még nincs.
+
+## Legfrissebb checkpoint — tulajdonosi döntések és A03 staging előtt
+
+**Elsőként olvasandó kiegészítés:** [OWNER_DECISIONS_REVIEW_2026-09-20.md](OWNER_DECISIONS_REVIEW_2026-09-20.md), benne az öt eredeti tulajdonosi TXT linkje, auditkapcsolatok és az A03 folytatási sorrendje. Az új termékdöntések felülírják az eltérő korábbi terveket; a műszaki auditkapuk megmaradnak.
+
+- A03 helyi implementáció elkészült: import/restore előnézet és visszaállítási pont; külön helyi törlés; külön, csak admin által indítható és szerveroldalon is ellenőrzött családi törlés; export és családnév-megerősítés.
+- A helyi törlés egy atomi helyi írással leválasztja az eszközt és törli a naplót, cloud törlést nem képez. A családi törlés D1 batchben tombstone-olja a közös gyermek- és alvásadatokat, majd üres kezdőprofilt hoz létre. Törlés után rejtett safety backup nem marad; import/restore előtt igen.
+- Ellenőrzés: frontend és Worker typecheck; teljes **24 fájl / 205 teszt**; production és auth-enabled internal build; diff whitespace-ellenőrzés sikeres. A bundle méretére Vite figyelmeztet, buildhiba nincs.
+- **A03 még nem lezárt:** commit/push, staging Worker/Pages build és kéttelefonos import/törlés/offline/pending/restore elfogadás hiányzik. Éles környezet nem változott.
+- V1: Google + Apple belépés, Family PDF; nincs push/emlékeztető vagy életkori normaösszehasonlítás. Egyetlen 7 napos trial választható Family/Family+ csomagra; havi és éves ajánlat.
+- Accounttörlés/recovery/retention specifikáció megérkezett, nem elkészült funkció. A privacy dokumentum még kiadás előtti tervezet.
+- `solemi-sleep.app` domain megvásárolva a tulajdonos közlése alapján; bekötés, e-mail, OAuth/origin és adatmigráció még nincs igazolva.
+- Commit/push/deploy/adatbázis-módosítás ebben a lépésben nem történt.
 
 ## Legfrissebb ellenőrzés — teljes kiadás előtti audit
 
@@ -45,9 +58,9 @@ Jelentés: [FAMILY_PLUS_STATISTICS_AUDIT_2026-09-20.md](FAMILY_PLUS_STATISTICS_A
   nem részei a normál tesztcsomagnak. Csak dokumentáció és bizonyíték változott.
 - Javítás, commit/push, deploy és adatbázis-módosítás nem történt.
 
-**A01–A02 elkészült. Következő konkrét fejlesztési szelet: A03 — az import és
-törlés családi hatásának, valamint a visszaállítható mentésnek a rendezése.** Ezután a jelentés
-szerinti tagság/jogosultság és billing. Éles lépések külön engedéllyel.
+**A01–A02 elkészült. A03 helyi implementációja elkészült; következő lépése a
+staging kéttelefonos elfogadás.** Ezután a jelentés szerinti tagság/jogosultság
+és billing következik. Éles lépések külön engedéllyel.
 
 ### A02 lezárás — többlapos és atomi helyi mentés
 
@@ -514,10 +527,10 @@ auditkapu az irányadó, különösen az adatmegőrzési és hozzáférési hib�
 
 ## Következő konkrét feladat
 
-A03: az import és az „összes alvásadat törlése” családi hatásának egyértelművé
-tétele, visszaállítható biztonsági mentéssel és két eszközös regressziós próbával.
-Ezt A13–A14, majd a teljes audit végrehajtási sorrendje követi. A normál kéttelefonos
-staging-elfogadás továbbra is érvényes a korábban kipróbált esetekre.
+A03: commit/push és a külön helyi/családi törlés, import és restore két eszközös
+staging regressziós próbája. Ezt A13–A14, majd a teljes audit végrehajtási sorrendje
+követi. A normál kéttelefonos staging-elfogadás továbbra is érvényes a korábban
+kipróbált esetekre.
 
 A billing HTTP-bekötés az A08–A10 domainhibák javítása után következik.
 A `007` távoli staging migráció előtt export/restore és ellenőrzött munkamenet

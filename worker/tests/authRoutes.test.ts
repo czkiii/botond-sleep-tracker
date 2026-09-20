@@ -312,6 +312,64 @@ describe('account auth routes', () => {
     expect(sqlite.prepare('SELECT COUNT(*) AS count FROM subscriptions').get()).toEqual({ count: 0 })
   })
 
+  it('lets only the active family admin clear the shared diary and keeps retries idempotent', async () => {
+    const adminFamilyToken = 'ss_dv_admin_clear'
+    await seedLegacyFamily(adminFamilyToken)
+    const adminAccess = await accountAccess('acc_admin', 'adev_admin', 'admin_clear')
+    const claim = await fetch('/v1/auth/family/claim', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${adminAccess}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyDeviceToken: adminFamilyToken })
+    })
+    expect(claim.status).toBe(200)
+
+    const memberFamilyToken = 'ss_dv_member_clear'
+    const memberAccess = await accountAccess('acc_member', 'adev_member', 'member_clear')
+    const at = '2026-09-20T10:00:00.000Z'
+    sqlite.prepare(`INSERT INTO devices (id, family_id, token_hash, name, created_at, last_seen_at, revoked_at)
+      VALUES ('dev_member', 'fam_test', ?, 'Chrome', ?, ?, NULL)`)
+      .run(await sha256(`${env.TOKEN_PEPPER}:${memberFamilyToken}`), at, at)
+    sqlite.prepare(`INSERT INTO legacy_family_memberships
+      (id, family_id, account_id, role, status, joined_at, ended_at)
+      VALUES ('mem_member', 'fam_test', 'acc_member', 'MEMBER', 'ACTIVE', ?, NULL)`).run(Date.parse(at))
+    sqlite.prepare(`INSERT INTO account_family_devices
+      (account_device_id, account_id, family_id, legacy_device_id, created_at, updated_at)
+      VALUES ('adev_member', 'acc_member', 'fam_test', 'dev_member', ?, ?)`).run(Date.parse(at), Date.parse(at))
+    sqlite.prepare(`INSERT INTO children
+      (id, family_id, name, birth_date, created_at, updated_at, deleted_at, revision)
+      VALUES ('child_clear', 'fam_test', 'Baba', NULL, ?, ?, NULL, 0)`).run(at, at)
+    sqlite.prepare(`INSERT INTO sleep_sessions
+      (id, family_id, child_id, start_time, end_time, note, day_night_override,
+       created_at, updated_at, deleted_at, revision)
+      VALUES ('sleep_clear', 'fam_test', 'child_clear', ?, ?, '', NULL, ?, ?, NULL, 0)`)
+      .run(at, '2026-09-20T11:00:00.000Z', at, at)
+
+    const clear = (access: string, familyToken: string, operationId: string, replacementChildId: string) =>
+      fetch('/v1/auth/family/data/clear', {
+        method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${access}`,
+          'X-Solemi-Family-Token': familyToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operationId, expectedFamilyName: 'Teszt család', replacementChildId })
+      })
+
+    const denied = await clear(memberAccess, memberFamilyToken, 'clear_member', 'child_member_blank')
+    expect(denied.status).toBe(403)
+    expect(await denied.json()).toMatchObject({ error: { code: 'FAMILY_ADMIN_REQUIRED' } })
+    expect(sqlite.prepare(`SELECT deleted_at FROM sleep_sessions WHERE id = 'sleep_clear'`).get())
+      .toEqual({ deleted_at: null })
+
+    env.ENTITLEMENT_ENFORCEMENT = 'true'
+    const completed = await clear(adminAccess, adminFamilyToken, 'clear_admin', 'child_after_clear')
+    expect(completed.status).toBe(200)
+    expect(await completed.json()).toMatchObject({ data: { revision: 1, child: { id: 'child_after_clear', name: '' } } })
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM sleep_sessions WHERE deleted_at IS NULL`).get())
+      .toEqual({ count: 0 })
+    expect(sqlite.prepare(`SELECT id FROM children WHERE deleted_at IS NULL`).all())
+      .toEqual([{ id: 'child_after_clear' }])
+
+    const retry = await clear(adminAccess, adminFamilyToken, 'clear_admin', 'child_after_clear')
+    expect(retry.status).toBe(200)
+    expect((await retry.json() as { data: { revision: number } }).data.revision).toBe(1)
+  })
+
   it('rejects a stale edit of the same sleep but accepts an unrelated sleep edit', async () => {
     env.RECONCILIATION_CONFLICTS = 'true'
     const firstToken = 'ss_dv_conflict_first'

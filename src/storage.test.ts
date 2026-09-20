@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import demoBackup from '../test-data/solemi-demo-v4-2026-08-26.json'
-import { DataStorageError, ImportValidationError, LEGACY_STORAGE_KEY, STORAGE_KEY, inspectBackup, loadData, loadDataResult, migrateV3, recoverData, saveData, saveRemoteData } from './storage'
+import { DataStorageError, ImportValidationError, LEGACY_STORAGE_KEY, STORAGE_KEY, inspectBackup, loadData, loadDataResult, loadSafetyBackup, migrateV3, recoverData, saveData, saveDataAfterDeletion, saveRemoteData, saveSafetyBackup } from './storage'
 import type { AppData, ChildProfile, SleepSession } from './types'
 
 const child: ChildProfile = { id: 'child-1', name: 'Mira', birthDate: null, photoRef: null, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' }
@@ -218,5 +218,33 @@ describe('protected local storage loading', () => {
     expect(result.status).toBe('empty')
     expect(result.data.sessions).toEqual([])
     expect(values.size).toBe(0)
+  })
+
+  it('keeps a validated safety backup inside the local envelope before destructive work', () => {
+    values.set(STORAGE_KEY, JSON.stringify(backup().data))
+
+    const saved = saveSafetyBackup(backup().data, 'before-import')
+
+    expect(loadSafetyBackup()).toEqual(saved)
+    expect(loadData()).toEqual(backup().data)
+    expect(JSON.parse(values.get(STORAGE_KEY)!).__solemiLocal.safetyBackupV1.reason).toBe('before-import')
+  })
+
+  it('does not report malformed local metadata as a restorable safety backup', () => {
+    values.set(STORAGE_KEY, JSON.stringify({ ...backup().data, __solemiLocal: { safetyBackupV1: { version: 4 } } }))
+
+    expect(loadSafetyBackup()).toBeNull()
+  })
+
+  it('removes an older safety backup atomically when user data is deleted', () => {
+    values.set(STORAGE_KEY, JSON.stringify(backup().data))
+    saveSafetyBackup(backup().data, 'before-import')
+    const empty = { ...backup().data, sessions: [] }
+
+    saveDataAfterDeletion(empty, 'familySyncV1', { connection: null, pending: [], conflicts: [], missingSessions: [] })
+
+    expect(loadData()).toEqual(empty)
+    expect(loadSafetyBackup()).toBeNull()
+    expect(JSON.parse(values.get(STORAGE_KEY)!).__solemiLocal.familySyncV1.connection).toBeNull()
   })
 })

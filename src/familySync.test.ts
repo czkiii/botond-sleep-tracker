@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { flushPending, getSyncStore, isEmptyStarterData, makeOperations, mergeRemote, pullRemote, resolveSyncConflict, saveLocalData } from './familySync'
-import { DataStorageError, STORAGE_KEY } from './storage'
+import { clearLocalDiary, flushPending, getSyncStore, isEmptyStarterData, makeOperations, mergeRemote, pullRemote, resolveSyncConflict, saveLocalData } from './familySync'
+import { DataStorageError, STORAGE_KEY, createDefaultData, loadData, loadSafetyBackup, saveSafetyBackup } from './storage'
 import { API_TIMEOUT_MS } from './apiTransport'
 import type { AppData, ChildProfile, SleepSession } from './types'
 
@@ -58,6 +58,23 @@ describe('Family Sync child deletion', () => {
     expect(merged.children.map((item) => item.id)).toEqual(['a'])
     expect(merged.sessions.map((item) => item.id)).toEqual(['sleep-a'])
     expect(merged.settings.activeChildId).toBe('a')
+  })
+})
+
+describe('local-only diary deletion', () => {
+  it('clears the diary and sync connection without creating family delete operations or retaining the safety backup', async () => {
+    const storage = new MemoryStorage()
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage })
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { onLine: true, language: 'hu-HU' } })
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { dispatchEvent: vi.fn() } })
+    storage.setItem(STORAGE_KEY, JSON.stringify(previous))
+    saveSafetyBackup(previous, 'before-import')
+
+    await clearLocalDiary(createDefaultData('hu'))
+
+    expect(loadData().sessions).toEqual([])
+    expect(loadSafetyBackup()).toBeNull()
+    expect(getSyncStore()).toMatchObject({ connection: null, pending: [], conflicts: [], missingSessions: [] })
   })
 })
 
