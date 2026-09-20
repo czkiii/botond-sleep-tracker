@@ -1,5 +1,5 @@
 import type { AppData, ChildProfile, SleepSession } from './types'
-import { REMOTE_DATA_EVENT, STORAGE_KEY, loadData } from './storage'
+import { loadData, saveRemoteData } from './storage'
 import { accountDeviceName, accountRequest } from './accountAuth'
 import { fetchJson } from './apiTransport'
 
@@ -202,8 +202,7 @@ export function mergeRemote(data: AppData, sessions: RemoteSession[], children: 
 }
 
 function writeRemoteData(data: AppData) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-  window.dispatchEvent(new CustomEvent(REMOTE_DATA_EVENT))
+  saveRemoteData(data)
 }
 
 function applyAuthoritativeSession(session?: RemoteSession | null) {

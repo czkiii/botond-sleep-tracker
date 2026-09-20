@@ -123,6 +123,15 @@ helyreállítási/exportálási lehetőség, hibaállapotban automatikus mentés
 **Lezárás:** hibás JSON, hibás V4, sikertelen migráció és storage-hozzáférési
 hiba után nincs felülírás; a felhasználó érthető helyreállítási utat kap.
 
+**Lezárva a `5bfdcd6` utáni munkafában, 2026-09-20:** a betöltés külön kezeli
+a hiányzó, érvényes, migrált és helyreállítást igénylő naplót. Sérült V4/V3,
+tárhelyhiba vagy sikertelen migráció blokkolja a helyi és távoli mentést,
+valamint a Family Sync indulását. Az eredeti bájtok változatlanok maradnak és
+letölthetők; csak ellenőrzött backup importja vagy külön megerősített üres
+újrakezdés írhatja felül őket. A célzott hibainjektálás, a teljes 195 teszt,
+frontend/Worker typecheck és mindkét frontend build sikeres. A01 kész;
+a következő adatmegőrzési szelet A02.
+
 ### A02 — P1 / R+K — Több böngészőlap és nem atomi napló/outbox mentés
 
 **Forrás:** `src/App.tsx:84`, `src/storage.ts:153`, `src/familySync.ts:90`, `:412`.
@@ -480,13 +489,13 @@ félrevezető eredmény. Hiányos naplóból nem igazolható teljes napi alvásv
 További tételek: időhatár, óraidő-medián, mintavételi ablak, adatminőségi
 politika, időzóna, mintaszám és jelentésfeliratok.
 **Lezárás:** mind a 15 tételhez javítás vagy explicit, ellenőrzött számítási
-szabály és a kívánt viselkedést rögzítő próba. Az A01 elsőbbsége változatlan;
+szabály és a kívánt viselkedést rögzítő próba. Az A01 elkészült;
 a statisztikai problémák sem halasztódnak automatikusan kiadás utánra.
 
 ## Kiadás előtti végrehajtási sorrend
 
-1. **Adatmegőrzés és helyi mentés:** A01, A02, A03, A13, A14. Első konkrét
-   szelet: sérült tároló megőrzése és automatikus felülírás megakadályozása.
+1. **Adatmegőrzés és helyi mentés:** A01 elkészült; következik A02, majd A03,
+   A13 és A14. Következő szelet: többlapos mentés és tartós napló–outbox egység.
 2. **Család és account életciklus:** A04–A06, A15–A16; A17 törlési adatmodell.
    Kilépés, fiókváltás, több lap, offline és pending egyszerre is tesztelt legyen.
 3. **Szerver/környezet:** A07, A18–A19; autentikált API, megfelelő origin és
@@ -521,7 +530,7 @@ minden dokumentációs változásnál. Adat-/auth-/sync-/billing-javítás után
 ## Amit most a tulajdonostól nem kérünk
 
 Nem szükséges most telefont tesztelni, fizetési adatot vagy secretet küldeni,
-productionre tenni az ágat. Előbb az A01 javítási szelet következik külön
-fejlesztési munkában. Később célzott döntés kell a régi funkcióígéretekről,
+productionre tenni az ágat. Az A01 helyi javítása elkészült; következik az A02
+fejlesztési szelet. Később célzott döntés kell a régi funkcióígéretekről,
 offline jogról/megőrzésről, iOS-loginról és a store fiókok konkrét beállításáról.
 A jelentés ezeket nem dönti el a tulajdonos helyett.

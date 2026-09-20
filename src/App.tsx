@@ -4,7 +4,7 @@ import { languageOptions, localeTag, t } from './i18n'
 import type { Locale } from './i18n'
 import type { AppData, ChildProfile, DayNightOverride, Page, SleepSession } from './types'
 import type { DataQualityIssueKind } from './utils'
-import { REMOTE_DATA_EVENT, createChild, createSession, exportData, importData, inspectBackup, loadData, saveData } from './storage'
+import { DataStorageError, REMOTE_DATA_EVENT, createChild, createDefaultData, createSession, exportDamagedData, exportData, importData, inspectBackup, loadData, loadDataResult, recoverData, saveData } from './storage'
 import type { ImportDiagnostic, ImportInspection } from './storage'
 import { deleteChildPhoto, loadChildPhoto, prepareChildPhoto, saveChildPhoto } from './photoStore'
 import type { AvatarCrop } from './photoStore'
@@ -82,7 +82,9 @@ function dateOptions(locale: Locale) {
 }
 
 export default function App() {
-  const [data, setData] = useState<AppData>(() => loadData())
+  const [initialLoad] = useState(() => loadDataResult())
+  const [data, setData] = useState<AppData>(initialLoad.data)
+  const [storageError, setStorageError] = useState<DataStorageError | null>(initialLoad.error)
   const [previewPlan, setPreviewPlan] = useState<ProductPlan>(() => loadInternalPlanPreview())
   const [accountAccess, setAccountAccess] = useState<AccountAccessState | null>(null)
   const [page, setPage] = useState<Page>('today')
@@ -95,22 +97,27 @@ export default function App() {
   const activeSessions = useMemo(() => data.sessions.filter((session) => session.childId === activeChild.id), [data.sessions, activeChild.id])
 
   useEffect(() => {
+    if (storageError) return
     const baseRevision = saveRevision.current
     saveRevision.current = undefined
     saveData(data, baseRevision)
-  }, [data])
+  }, [data, storageError])
   useEffect(() => {
-    const onRemoteData = () => setData(loadData())
+    const onRemoteData = () => {
+      const result = loadDataResult()
+      setData(result.data)
+      setStorageError(result.error)
+    }
     window.addEventListener(REMOTE_DATA_EVENT, onRemoteData)
     return () => window.removeEventListener(REMOTE_DATA_EVENT, onRemoteData)
   }, [])
   useEffect(() => {
-    if (!internalPreview) return
+    if (!internalPreview || storageError) return
     try { window.localStorage.setItem(INTERNAL_PLAN_PREVIEW_KEY, previewPlan) } catch { /* preview preference is non-critical */ }
     window.dispatchEvent(new CustomEvent<ProductPlan>(INTERNAL_PLAN_PREVIEW_EVENT, { detail: previewPlan }))
-  }, [previewPlan])
+  }, [previewPlan, storageError])
   useEffect(() => {
-    if (!accountAuthEnabled) return
+    if (!accountAuthEnabled || storageError) return
     let stopped = false
     const refreshAccess = () => {
       void getAccountAccess()
@@ -132,7 +139,7 @@ export default function App() {
       window.removeEventListener(ACCOUNT_ACCESS_EVENT, onAccess)
       window.removeEventListener(ACCOUNT_STATE_EVENT, onAccount)
     }
-  }, [])
+  }, [storageError])
   useEffect(() => { document.documentElement.lang = locale }, [locale])
   useEffect(() => { const id = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(id) }, [])
 
@@ -168,6 +175,11 @@ export default function App() {
     setEditor(session)
   }
 
+  if (storageError) return <StorageRecoveryScreen error={storageError} locale={locale} onRecovered={(next) => {
+    setData(next)
+    setStorageError(null)
+  }} />
+
   return <div className="app-shell">
     <main className="app-main">
       {page === 'today' && <TodayPage data={data} child={activeChild} sessions={activeSessions} now={now} locale={locale} current={current} onSelectChild={(childId) => setData((previous) => ({ ...previous, settings: { ...previous.settings, activeChildId: childId } }))} onStart={startNow} onEnd={endNow} onAdjustStart={adjustCurrentStart} onOpenEditor={openEditor} onHistory={() => setPage('history')} onSettings={() => setPage('settings')} />}
@@ -178,6 +190,50 @@ export default function App() {
     {page !== 'settings' && <BottomNav page={page} locale={locale} onChange={setPage} />}
     {editor && <SleepEditor childId={activeChild.id} session={editor === 'new' ? null : editor} locale={locale} currentExists={Boolean(current)} onClose={() => setEditor(null)} onSave={saveEditor} onDelete={deleteSession} />}
   </div>
+}
+
+function StorageRecoveryScreen({ error, locale, onRecovered }: { error: DataStorageError; locale: Locale; onRecovered: (data: AppData) => void }) {
+  const [importing, setImporting] = useState(false)
+  const handleImport = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setImporting(true)
+    try {
+      const inspection = await importData(file, locale)
+      if (!window.confirm(t(locale, 'storageRecoveryImportConfirm', { count: inspection.data.sessions.length }))) return
+      recoverData(inspection.data)
+      onRecovered(inspection.data)
+    } catch (importError) {
+      window.alert(importError instanceof DataStorageError && importError.code === 'storage-unavailable' ? t(locale, 'storageRecoveryWriteFailed') : importError instanceof Error ? importError.message : t(locale, 'importError'))
+    } finally {
+      setImporting(false)
+      event.target.value = ''
+    }
+  }
+  const startFresh = () => {
+    if (!window.confirm(t(locale, 'storageRecoveryResetConfirm'))) return
+    const next = createDefaultData(locale)
+    try {
+      recoverData(next)
+      onRecovered(next)
+    } catch {
+      window.alert(t(locale, 'storageRecoveryWriteFailed'))
+    }
+  }
+  return <div className="app-shell"><main className="app-main"><section className="screen storage-recovery-screen">
+    <div className="storage-recovery-card" role="alert">
+      <span className="storage-recovery-mark" aria-hidden="true">!</span>
+      <h1>{t(locale, 'storageRecoveryTitle')}</h1>
+      <p>{t(locale, error.code === 'storage-unavailable' ? 'storageRecoveryUnavailable' : error.code === 'migration-write-failed' ? 'storageRecoveryMigrationFailed' : 'storageRecoveryCorrupt')}</p>
+      <p>{t(locale, 'storageRecoveryProtected')}</p>
+      <div className="storage-recovery-actions">
+        {error.raw !== null && <button type="button" onClick={() => exportDamagedData(error)}>{t(locale, 'storageRecoveryDownload')}</button>}
+        <label className="file-button">{importing ? t(locale, 'storageRecoveryImporting') : t(locale, 'storageRecoveryImport')}<input type="file" accept="application/json" disabled={importing} onChange={handleImport} /></label>
+        <button type="button" className="danger" onClick={startFresh}>{t(locale, 'storageRecoveryReset')}</button>
+      </div>
+      <small>{t(locale, 'storageRecoveryHelp')}</small>
+    </div>
+  </section></main></div>
 }
 
 function TodayPage({ data, child, sessions, now, locale, current, onSelectChild, onStart, onEnd, onAdjustStart, onOpenEditor, onHistory, onSettings }: { data: AppData; child: ChildProfile; sessions: SleepSession[]; now: number; locale: Locale; current: SleepSession | null; onSelectChild: (childId: string) => void; onStart: () => void; onEnd: () => void; onAdjustStart: (minutes: number) => void; onOpenEditor: (value: SleepSession | 'new') => void; onHistory: () => void; onSettings: () => void }) {

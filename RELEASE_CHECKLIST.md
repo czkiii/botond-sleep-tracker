@@ -12,8 +12,8 @@ Az alábbi lista a korábbi szakaszoknál elsőbbséget élvez. Nincs automatiku
 „első frissítésben” halasztás. Minden tételhez javítási commit, sikeres próba
 vagy kifejezett, indokolt termékdöntés kell; a puszta priorizálás nem lezárás.
 
-- [ ] A01 — Sérült helyi napló megőrzése, automatikus felülírás megakadályozása. **Következő munka.**
-- [ ] A02 — Többlapos mentés, quota/crash és tartós napló–outbox egység.
+- [x] A01 — Sérült helyi napló megőrzése, automatikus felülírás megakadályozása. 195/195 teszt, typecheck és két build sikeres.
+- [ ] A02 — Többlapos mentés, quota/crash és tartós napló–outbox egység. **Következő munka.**
 - [ ] A03 — Import/törlés családi hatása és visszaállítható biztonsági mentés.
 - [ ] A04 — Valódi account-szintű családi kilépés, pending adatok védelme.
 - [ ] A05 — Fiókváltás/guest kapcsolat és helyi adatok elkülönítése.
@@ -70,7 +70,7 @@ próba az audit bizonyítéka, nem a hibák lezárása. Minden alábbi tétel ny
 
 Javítás után közös tesztnapló minden kártyán, HU/EN/DE szövegek és célzott
 kéttelefonos elfogadás szükséges. Nincs automatikus kiadás utáni halasztás;
-az első alkalmazásjavítás továbbra is A01.
+az adatmegőrzési sorrend az elkészült A01 után A02-vel folytatódik.
 
 ## Célállapotok
 
@@ -247,7 +247,7 @@ eltéréseit az A23 pontban, tételes döntéssel kell lezárni.
 - [x] Bármely aktív tag Family+ joga az összes aktív családtagnak biztosítja az Insights funkciókat is; saját grant és családi effektív jog külön marad (helyi kód és automatizált tesztek, 2026-09-19).
 - [x] A teljes családi Family+ Insights-jog staging buildjének kéttelefonos elfogadása: Family+ + Free, Free + Free pause, Free + Family és fordított fizetőjű Free + Family+ esetek sikeresek (2026-09-19, `da4fef4`).
 
-**Nyilvános kiadási feltétel:** az elfogadott funkciómátrix és az A01–A26 kapuk
+**Nyilvános kiadási feltétel:** az elfogadott funkciómátrix és az A01–A27 kapuk
 lezárása; mindkét store indulási feltétel. A korábbi minimum-scope javaslat nem
 engedélyez automatikus halasztást. A meglévő Prediction kommunikációját is auditálni kell.
 
@@ -286,8 +286,8 @@ engedélyez automatikus halasztást. A meglévő Prediction kommunikációját i
 
 ## Következő konkrét munkamenet
 
-**Elsőbbség:** A01 — sérült helyi tároló megőrzése, majd A02/A03
-mentési/outbox/import biztonság. Ezután a teljes audit végrehajtási sorrendje.
+**Elsőbbség:** A02 — többlapos mentés és napló–outbox egység, majd A03
+importbiztonság. Ezután a teljes audit végrehajtási sorrendje.
 A billing HTTP/adapterszelet előtt A08–A10 javítás kötelező. Az alábbi korábbi
 tételek történeti és további release-feladatok.
 

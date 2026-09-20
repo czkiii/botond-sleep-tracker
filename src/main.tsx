@@ -1,5 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import { useEffect, useState } from 'react'
 import { registerSW } from 'virtual:pwa-register'
 import App from './App'
 import FamilySyncLayer from './FamilySyncLayer'
@@ -10,6 +11,7 @@ import './today-fit.css'
 import './copy-overrides.css'
 import './background-theme.css'
 import './family-sync.css'
+import { STORAGE_RECOVERED_EVENT, loadDataResult } from './storage'
 
 const internalPreview = import.meta.env.VITE_INTERNAL_PREVIEW === 'true'
 const internalStagingSync = internalPreview && Boolean(import.meta.env.VITE_SYNC_API_BASE)
@@ -20,10 +22,22 @@ installAssetCssVariables()
 
 if (!internalPreview) registerSW({ immediate: true })
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
+function SolemiRoot() {
+  const [storageReady, setStorageReady] = useState(() => loadDataResult().status !== 'recovery-required')
+  useEffect(() => {
+    const onRecovered = () => setStorageReady(loadDataResult().status !== 'recovery-required')
+    window.addEventListener(STORAGE_RECOVERED_EVENT, onRecovered)
+    return () => window.removeEventListener(STORAGE_RECOVERED_EVENT, onRecovered)
+  }, [])
+  return <>
     {internalPreview && <div className="internal-preview-banner">INTERNAL / TEST <span>Family Sync {internalStagingSync ? 'staging' : 'disabled'} · {buildSha}</span></div>}
     <App />
-    {syncEnabled && <FamilySyncLayer />}
+    {syncEnabled && storageReady && <FamilySyncLayer />}
+  </>
+}
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <SolemiRoot />
   </React.StrictMode>
 )

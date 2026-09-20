@@ -23,6 +23,20 @@ export class ImportValidationError extends Error {
 
 export const STORAGE_KEY = 'solemiSleep:v4'
 export const LEGACY_STORAGE_KEY = 'solemiSleep:v3'
+export const STORAGE_RECOVERED_EVENT = 'solemi-storage-recovered'
+
+export type DataStorageErrorCode = 'corrupt-v4' | 'corrupt-v3' | 'storage-unavailable' | 'migration-write-failed'
+
+export class DataStorageError extends Error {
+  constructor(public code: DataStorageErrorCode, public source: 'v4' | 'v3' | 'storage', public raw: string | null = null) {
+    super(code)
+    this.name = 'DataStorageError'
+  }
+}
+
+export type DataLoadResult =
+  | { status: 'ready' | 'empty' | 'migrated'; data: AppData; error: null }
+  | { status: 'recovery-required'; data: AppData; error: DataStorageError }
 
 const nowIso = () => new Date().toISOString()
 
@@ -130,24 +144,85 @@ export function migrateV3(value: unknown): AppData | null {
   }
 }
 
-export function loadData(): AppData {
+export function loadDataResult(): DataLoadResult {
+  let currentRaw: string | null
   try {
-    const currentRaw = localStorage.getItem(STORAGE_KEY)
-    if (currentRaw) {
-      const current = normalizeAppData(JSON.parse(currentRaw))
-      if (current) return current
-    }
+    currentRaw = localStorage.getItem(STORAGE_KEY)
+  } catch {
+    return { status: 'recovery-required', data: createDefaultData(), error: new DataStorageError('storage-unavailable', 'storage') }
+  }
 
-    const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY)
-    if (legacyRaw) {
+  if (currentRaw !== null) {
+    try {
+      const current = normalizeAppData(JSON.parse(currentRaw))
+      if (current) return { status: 'ready', data: current, error: null }
+    } catch { /* reported below without replacing the original bytes */ }
+    return { status: 'recovery-required', data: createDefaultData(), error: new DataStorageError('corrupt-v4', 'v4', currentRaw) }
+  }
+
+  let legacyRaw: string | null
+  try {
+    legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY)
+  } catch {
+    return { status: 'recovery-required', data: createDefaultData(), error: new DataStorageError('storage-unavailable', 'storage') }
+  }
+
+  if (legacyRaw !== null) {
+    try {
       const migrated = migrateV3(JSON.parse(legacyRaw))
       if (migrated) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated))
-        return migrated
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated))
+        } catch {
+          return { status: 'recovery-required', data: createDefaultData(), error: new DataStorageError('migration-write-failed', 'v3', legacyRaw) }
+        }
+        return { status: 'migrated', data: migrated, error: null }
       }
-    }
-  } catch {}
-  return createDefaultData()
+    } catch { /* reported below without replacing the original bytes */ }
+    return { status: 'recovery-required', data: createDefaultData(), error: new DataStorageError('corrupt-v3', 'v3', legacyRaw) }
+  }
+
+  return { status: 'empty', data: createDefaultData(), error: null }
+}
+
+export function loadData(): AppData {
+  const result = loadDataResult()
+  if (result.status === 'recovery-required') throw result.error
+  return result.data
+}
+
+export function recoverData(data: AppData) {
+  const normalized = normalizeAppData(data)
+  if (!normalized) throw new DataStorageError('corrupt-v4', 'v4')
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized))
+  } catch {
+    throw new DataStorageError('storage-unavailable', 'storage')
+  }
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(STORAGE_RECOVERED_EVENT))
+}
+
+export function saveRemoteData(data: AppData) {
+  // A remote merge must not become an implicit recovery action. Reading first
+  // makes a damaged current diary block the write just like a local save.
+  const normalized = normalizeAppData(data)
+  if (!normalized) throw new DataStorageError('corrupt-v4', 'v4')
+  loadData()
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized))
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(REMOTE_DATA_EVENT))
+}
+
+export function exportDamagedData(error: DataStorageError) {
+  if (error.raw === null) return false
+  const date = new Date().toISOString().slice(0, 10)
+  const blob = new Blob([error.raw], { type: 'application/octet-stream' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `solemi-sleep-damaged-${error.source}-${date}.txt`
+  a.click()
+  URL.revokeObjectURL(url)
+  return true
 }
 
 export function saveData(data: AppData, baseRevision?: number) {

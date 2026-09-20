@@ -4,7 +4,7 @@
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
 **Teljes audit alapja:** `e9374f4` (`Add verified store billing foundation`); az akkori helyi origin-refhez képest 0 ahead / 0 behind.
-**Family+ kiegészítéskor ellenőrzött HEAD:** `3a0a687` (`Document full release audit and pre-launch blockers`), változatlan alkalmazáskóddal. A mostani munkafaváltozások kizárólag auditdokumentumok és archivált auditpróbák; alkalmazáskód-javítás, deploy, commit/push nem történt.
+**A01 javítás alapja:** `5bfdcd6` (`Audit Family+ statistics and document calculation edge cases`). A mostani munkafában elkészült a sérült helyi napló védelme; commit/push és deploy nem történt.
 
 ## Legfrissebb ellenőrzés — teljes kiadás előtti audit
 
@@ -12,7 +12,7 @@
 A jelentés A01–A27 pontja és a `RELEASE_CHECKLIST.md` új auditkapuja felülírja
 az alábbi történeti következő-feladat javaslatokat. A termékirány/csomagok változatlanok.
 
-- 185/185 meglévő teszt és frontend/Worker typecheck sikeres; production és
+- A01 után 195/195 teszt és frontend/Worker typecheck sikeres; production és
   auth-enabled internal helyi build sikeres.
 - 14/14 külön auditpróba lefutott: 13 jelenlegi hibás vagy korlátozandó
   viselkedést igazoló próba, 1 teljesítménymérés. Ezek nem kijavított hibák.
@@ -45,11 +45,25 @@ Jelentés: [FAMILY_PLUS_STATISTICS_AUDIT_2026-09-20.md](FAMILY_PLUS_STATISTICS_A
   nem részei a normál tesztcsomagnak. Csak dokumentáció és bizonyíték változott.
 - Javítás, commit/push, deploy és adatbázis-módosítás nem történt.
 
-**Következő konkrét fejlesztési szelet: A01 — sérült helyi napló megőrzése.**
-Különítsük el a hiányzó és a sérült tárolót; ne írjuk vissza automatikusan az
-üres alapállapotot; legyen eredetimentés és érthető helyreállítás. Ezután A02/A03
-mentési/outbox/import biztonság, majd a jelentés szerinti tagság/jogosultság és billing.
-Az auditban még nincs alkalmazáskód-javítás. Éles lépések külön engedéllyel.
+**A01 elkészült. Következő konkrét fejlesztési szelet: A02 — többlapos mentés
+és tartós napló–outbox egység.** Ezután A03 importbiztonság, majd a jelentés
+szerinti tagság/jogosultság és billing. Éles lépések külön engedéllyel.
+
+### A01 lezárás — sérült helyi napló védelme
+
+- A betöltés megkülönbözteti a hiányzó, érvényes, migrált és helyreállítást
+  igénylő tárolót; sérült V4 esetén nem esik vissza régebbi V3 adatra.
+- Hibás JSON, szerkezetileg hibás V4/V3, blokkolt tárhely és sikertelen V3→V4
+  írás esetén az eredeti tartalom változatlan, az automatikus mentés leáll.
+- A szerverről érkező adatírás sem kerülheti meg a védelmet; a Family Sync
+  helyreállításig nem indul el.
+- A helyreállító képernyőn az eredeti sérült adat letölthető, ellenőrzött Solemi
+  backup importálható, vagy külön figyelmeztetés után üres napló indítható.
+- HU/EN/DE szövegek és mobilbarát sötét felület elkészült.
+- Ellenőrzés: frontend és Worker typecheck; teljes **23 fájl / 195 teszt**;
+  production és auth-enabled internal build. Az új tárolási csomag 19 tesztje
+  a sérülési és helyreállítási ágakat is fedi. Diff whitespace-ellenőrzés sikeres.
+- Távoli környezet, adatbázis és production nem változott.
 
 Ez a fájl az új Codex-beszélgetések rövid belépési pontja. A pillanatnyi pontos commit mindig az a commit, amely ezt a fájlt tartalmazza; ellenőrzéshez futtasd a `git log -1 --oneline` parancsot.
 
@@ -481,11 +495,10 @@ auditkapu az irányadó, különösen az adatmegőrzési és hozzáférési hib�
 
 ## Következő konkrét feladat
 
-A01: a sérült helyi napló betöltéskori felülírásának megszüntetése, az eredeti
-adat megőrzésével és célzott hibainjektálásos regressziós tesztekkel.
-Ezt A02/A03 helyi mentés/outbox/import követi, majd a teljes audit végrehajtási
-sorrendje. A normál kéttelefonos staging-elfogadás továbbra is érvényes a
-korábban kipróbált esetekre; az új audit más határeseteket talált.
+A02: a többlapos mentés, quota/crash és a napló–outbox tartósság rendezése
+célzott párhuzamossági és hibainjektálásos tesztekkel. Ezt A03 importbiztonság,
+majd a teljes audit végrehajtási sorrendje követi. A normál kéttelefonos
+staging-elfogadás továbbra is érvényes a korábban kipróbált esetekre.
 
 A billing HTTP-bekötés az A08–A10 domainhibák javítása után következik.
 A `007` távoli staging migráció előtt export/restore és ellenőrzött munkamenet
