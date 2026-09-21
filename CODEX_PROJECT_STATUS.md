@@ -1,23 +1,26 @@
 # Solemi Sleep — Codex projektállapot
 
-**Utolsó frissítés:** 2026-09-20
+**Utolsó frissítés:** 2026-09-21
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
 **Teljes audit alapja:** `e9374f4` (`Add verified store billing foundation`); az akkori helyi origin-refhez képest 0 ahead / 0 behind.
-**Ellenőrzött HEAD:** `fa67411` (`Make local diary and sync outbox crash-safe`), az A02 commitja. Az A03 implementáció a munkafában elkészült; commit/push és staging elfogadás még nincs.
+**Ellenőrzött HEAD:** `c9d5af9` (`Update staging smoke for revision conflicts`). Az A03 commit/push és staging build elkészült; kéttelefonos elfogadása folyamatban. Az A13–A14 javítása a munkafában elkészült, még nincs commitolva vagy stagingre telepítve.
 
-## Legfrissebb checkpoint — tulajdonosi döntések és A03 staging előtt
+## Legfrissebb checkpoint — A03 staging elfogadás, A13–A14 helyi javítás
 
 **Elsőként olvasandó kiegészítés:** [OWNER_DECISIONS_REVIEW_2026-09-20.md](OWNER_DECISIONS_REVIEW_2026-09-20.md), benne az öt eredeti tulajdonosi TXT linkje, auditkapcsolatok és az A03 folytatási sorrendje. Az új termékdöntések felülírják az eltérő korábbi terveket; a műszaki auditkapuk megmaradnak.
 
 - A03 helyi implementáció elkészült: import/restore előnézet és visszaállítási pont; külön helyi törlés; külön, csak admin által indítható és szerveroldalon is ellenőrzött családi törlés; export és családnév-megerősítés.
 - A helyi törlés egy atomi helyi írással leválasztja az eszközt és törli a naplót, cloud törlést nem képez. A családi törlés D1 batchben tombstone-olja a közös gyermek- és alvásadatokat, majd üres kezdőprofilt hoz létre. Törlés után rejtett safety backup nem marad; import/restore előtt igen.
-- Ellenőrzés: frontend és Worker typecheck; teljes **24 fájl / 205 teszt**; production és auth-enabled internal build; diff whitespace-ellenőrzés sikeres. A bundle méretére Vite figyelmeztet, buildhiba nincs.
-- **A03 még nem lezárt:** commit/push, staging Worker/Pages build és kéttelefonos import/törlés/offline/pending/restore elfogadás hiányzik. Éles környezet nem változott.
+- Az A03 commit/push megtörtént. A `6675fe2` Worker- és Pages-buildje sikeres; a régi smoke szkript revízió nélküli módosításai miatt bukott, amit a `c9d5af9` javított. A frissített smoke helyben a staging Worker ellen minden ponton átment.
+- **A03 még nem lezárt:** a kéttelefonos import/törlés/offline/pending/restore elfogadás folyamatban van. Éles környezet nem változott.
+- **A13 helyi javítása kész:** új aktív alvásnál a jegyzet és a kézi nappal/éjszaka felülírás már az atomi start művelettel kerül a Workerhez; külön utólagos patch és adatvesztési ablak nincs.
+- **A14 helyi javítása kész:** a Worker ugyanabban a D1 batchben, feltételes műveletfoglalással védi az utolsó aktív gyermekprofilt. Két egymásba futó törlés közül a vesztes `LAST_CHILD` választ kap; a megmaradó profil alvásai érintetlenek.
+- Ellenőrzés: frontend és Worker typecheck; teljes **25 fájl / 208 teszt**; production és auth-enabled internal build sikeres. Az A13 kliens–Worker–SQLite próbája és az A14 ellenőrzés/batch közé injektált konkurens törlési regressziója is átment. A bundle méretére Vite figyelmeztet, buildhiba nincs.
 - V1: Google + Apple belépés, Family PDF; nincs push/emlékeztető vagy életkori normaösszehasonlítás. Egyetlen 7 napos trial választható Family/Family+ csomagra; havi és éves ajánlat.
 - Accounttörlés/recovery/retention specifikáció megérkezett, nem elkészült funkció. A privacy dokumentum még kiadás előtti tervezet.
 - `solemi-sleep.app` domain megvásárolva a tulajdonos közlése alapján; bekötés, e-mail, OAuth/origin és adatmigráció még nincs igazolva.
-- Commit/push/deploy/adatbázis-módosítás ebben a lépésben nem történt.
+- Az A13–A14 munkafaváltozásához commit/push/deploy még nem történt; production adatbázis-módosítás nem történt.
 
 ### Production V3 adatok mentése és V4 migrációs próba
 
@@ -67,9 +70,10 @@ Jelentés: [FAMILY_PLUS_STATISTICS_AUDIT_2026-09-20.md](FAMILY_PLUS_STATISTICS_A
   nem részei a normál tesztcsomagnak. Csak dokumentáció és bizonyíték változott.
 - Javítás, commit/push, deploy és adatbázis-módosítás nem történt.
 
-**A01–A02 elkészült. A03 helyi implementációja elkészült; következő lépése a
-staging kéttelefonos elfogadás.** Ezután a jelentés szerinti tagság/jogosultság
-és billing következik. Éles lépések külön engedéllyel.
+**A01–A02 elkészült. Az A03 kéttelefonos staging elfogadása folyamatban; az
+A13–A14 helyi javítása és automatizált ellenőrzése elkészült.** Következő kapu:
+A03 eredményének rögzítése, A13–A14 commit/push és staging regresszió, majd A04–A06.
+Éles lépések külön engedéllyel.
 
 ### A02 lezárás — többlapos és atomi helyi mentés
 
@@ -536,10 +540,11 @@ auditkapu az irányadó, különösen az adatmegőrzési és hozzáférési hib�
 
 ## Következő konkrét feladat
 
-A03: commit/push és a külön helyi/családi törlés, import és restore két eszközös
-staging regressziós próbája. Ezt A13–A14, majd a teljes audit végrehajtási sorrendje
-követi. A normál kéttelefonos staging-elfogadás továbbra is érvényes a korábban
-kipróbált esetekre.
+A03: a külön helyi/családi törlés, import és restore folyamatban lévő két eszközös
+staging regressziós próbájának lezárása. Az A13–A14 helyi kódja és automatizált
+tesztje kész; ezután commit/push, staging deploy és a két érintett telefonos próba,
+majd A04–A06 következik. A normál kéttelefonos staging-elfogadás továbbra is
+érvényes a korábban kipróbált esetekre.
 
 A billing HTTP-bekötés az A08–A10 domainhibák javítása után következik.
 A `007` távoli staging migráció előtt export/restore és ellenőrzött munkamenet

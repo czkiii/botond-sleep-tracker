@@ -1,6 +1,6 @@
 # Solemi Sleep — belső verziótól a kiadásig
 
-Utolsó frissítés: 2026-09-20
+Utolsó frissítés: 2026-09-21
 
 Ez az operatív lista a `SOLEMI_EXECUTION_PLAN.md` és a `SOLEMI_MASTER_ROADMAP.md` kiadási pontjait rendezi végrehajtási sorrendbe.
 
@@ -16,7 +16,7 @@ vagy kifejezett, indokolt termékdöntés kell; a puszta priorizálás nem lezá
 
 - [x] A01 — Sérült helyi napló megőrzése, automatikus felülírás megakadályozása. 195/195 teszt, typecheck és két build sikeres.
 - [x] A02 — Többlapos mentés, quota/crash és tartós napló–outbox egység. Egyetlen böngészőlap írhat; az atomi helyi envelope, hibainjektálás és kétlapos átvételi próba sikeres (198/198 teszt).
-- [ ] A03 — Import/törlés családi hatása és visszaállítható biztonsági mentés. Helyi implementáció és 205/205 teszt kész; commit/push, staging kéttelefonos import/törlés/offline/pending/restore elfogadás hiányzik.
+- [ ] A03 — Import/törlés családi hatása és visszaállítható biztonsági mentés. Implementáció, commit/push, staging Worker/Pages build és javított smoke kész; a kéttelefonos import/törlés/offline/pending/restore elfogadás folyamatban.
 - [ ] A04 — Valódi account-szintű családi kilépés, pending adatok védelme.
 - [ ] A05 — Fiókváltás/guest kapcsolat és helyi adatok elkülönítése.
 - [ ] A06 — Legacy API fizetős sync-megkerülés lezárása, kompatibilis átállás.
@@ -26,8 +26,8 @@ vagy kifejezett, indokolt termékdöntés kell; a puszta priorizálás nem lezá
 - [ ] A10 — Store sandbox/production környezeti kerítés.
 - [ ] A11 — Hiteles store verify/restore/webhook/acknowledgement és paywall.
 - [ ] A12 — Valós natív iOS/Android kiadás és megfelelő iOS-login.
-- [ ] A13 — Új aktív alvás jegyzetének és kézi típusának szinkronja.
-- [ ] A14 — Utolsó gyermek párhuzamos törlésének atomi védelme.
+- [ ] A13 — Új aktív alvás jegyzetének és kézi típusának szinkronja. Helyi javítás és kliens–Worker–SQLite regresszió kész; commit/push és staging elfogadás hiányzik.
+- [ ] A14 — Utolsó gyermek párhuzamos törlésének atomi védelme. Feltételes D1 batch és determinisztikus konkurens törlési regresszió helyben kész; commit/push és staging elfogadás hiányzik.
 - [ ] A15 — Nem üres helyi napló csatlakozása, gyermekkonfliktus és pull-határesetek.
 - [ ] A16 — Offline fizetős hozzáférés, refresh race, harmadik eszköz próba.
 - [ ] A17 — Accounttörlés, megőrzés, privacy és store adatkezelési tájékoztatás.

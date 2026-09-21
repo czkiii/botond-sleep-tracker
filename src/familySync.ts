@@ -487,7 +487,7 @@ export function makeOperations(previous: AppData, next: AppData, baseRevision = 
       if (session.endTime) {
         operations.push({ id: opId('op_create'), method: 'POST', path: '/v1/sessions', sessionId: session.id, body: { operationId: opId('mut'), session: { id: session.id, childId: session.childId, startTime: session.startTime, endTime: session.endTime, note: session.note, dayNightOverride: session.dayNightOverride } } })
       } else {
-        operations.push({ id: opId('op_start'), method: 'POST', path: '/v1/sessions/start', sessionId: session.id, body: { operationId: opId('mut'), sessionId: session.id, childId: session.childId, startTime: session.startTime } })
+        operations.push({ id: opId('op_start'), method: 'POST', path: '/v1/sessions/start', sessionId: session.id, body: { operationId: opId('mut'), sessionId: session.id, childId: session.childId, startTime: session.startTime, note: session.note, dayNightOverride: session.dayNightOverride } })
       }
       continue
     }

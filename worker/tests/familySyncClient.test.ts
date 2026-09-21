@@ -88,6 +88,61 @@ async function editOffline(index: number, startTime: string, note: string) {
 }
 
 describe('two device client + Worker reconciliation', () => {
+  it('creates an active sleep with its note and manual type in the first start operation', async () => {
+    useDevice(0, false)
+    const local = loadData()
+    const active = {
+      ...local.sessions[0], id: 'active-with-fields', endTime: null,
+      note: 'Első művelettel megőrzött jegyzet', dayNightOverride: 'night' as const
+    }
+    saveLocalData(local, { ...local, sessions: [...local.sessions, active] })
+    await pullRemote()
+
+    expect(getSyncStore().pending).toHaveLength(1)
+    expect(getSyncStore().pending[0]).toMatchObject({
+      method: 'POST', path: '/v1/sessions/start',
+      body: { note: active.note, dayNightOverride: 'night' }
+    })
+
+    useDevice(0, true)
+    await pullRemote()
+
+    expect(getSyncStore().pending).toEqual([])
+    expect(sqlite.prepare(`SELECT end_time, note, day_night_override
+      FROM sleep_sessions WHERE id = 'active-with-fields'`).get()).toEqual({
+      end_time: null, note: active.note, day_night_override: 'night'
+    })
+  })
+
+  it('keeps one child when another deletion commits after the last-child check', async () => {
+    const token = 'test-device-token-0'
+    const request = (path: string, method: string, body: unknown) => worker.fetch(new Request(`https://sync.example${path}`, {
+      method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }), env)
+    expect((await request('/v1/children', 'POST', {
+      operationId: 'create-child-b', child: { id: 'child-b', name: 'Második baba' }
+    })).status).toBe(201)
+
+    const binding = env.DB as D1Database & { batch: D1Database['batch'] }
+    const originalBatch = binding.batch.bind(binding)
+    let injected = false
+    binding.batch = async (statements) => {
+      if (!injected) {
+        injected = true
+        expect((await request('/v1/children/child-b', 'DELETE', { operationId: 'delete-child-b' })).status).toBe(200)
+      }
+      return originalBatch(statements)
+    }
+
+    const losingDelete = await request('/v1/children/child-a', 'DELETE', { operationId: 'delete-child-a' })
+    expect(losingDelete.status).toBe(409)
+    expect(await losingDelete.json()).toMatchObject({ error: { code: 'LAST_CHILD' } })
+    expect(sqlite.prepare('SELECT id FROM children WHERE deleted_at IS NULL').all()).toEqual([{ id: 'child-a' }])
+    expect(sqlite.prepare("SELECT deleted_at FROM sleep_sessions WHERE id = 'shared-sleep'").get())
+      .toEqual({ deleted_at: null })
+  })
+
   it.each(['local', 'family'] as const)('requires an explicit %s choice if another phone changes an active repair', async (choice) => {
     sqlite.prepare("DELETE FROM sleep_sessions WHERE id = 'shared-sleep'").run()
     useDevice(0, false)
