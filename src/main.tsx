@@ -13,19 +13,46 @@ import './copy-overrides.css'
 import './background-theme.css'
 import './family-sync.css'
 import { STORAGE_RECOVERED_EVENT, loadDataResult } from './storage'
+import { restoreAccount } from './accountAuth'
+import { recoverAccountWorkspaceSwitch } from './accountWorkspace'
+import { t } from './i18n'
 
 const internalPreview = import.meta.env.VITE_INTERNAL_PREVIEW === 'true'
 const internalStagingSync = internalPreview && Boolean(import.meta.env.VITE_SYNC_API_BASE)
 const syncEnabled = !internalPreview || internalStagingSync
+const accountAuthEnabled = import.meta.env.VITE_ACCOUNT_AUTH === 'true'
 const buildSha = import.meta.env.VITE_BUILD_SHA?.slice(0, 7) || 'local'
 
 installAssetCssVariables()
+recoverAccountWorkspaceSwitch()
 
 if (!internalPreview) registerSW({ immediate: true })
 
 function SolemiRoot() {
+  const [accountReady, setAccountReady] = useState(!accountAuthEnabled)
+  const [accountStartupError, setAccountStartupError] = useState(false)
   const [storageReady, setStorageReady] = useState(() => loadDataResult().status !== 'recovery-required')
   const [writeAccess, setWriteAccess] = useState<WriteAccess>(() => 'locks' in navigator ? 'checking' : 'writer')
+  useEffect(() => {
+    if (!accountAuthEnabled) { setAccountReady(true); return }
+    if (writeAccess === 'checking') return
+    if (writeAccess === 'secondary') { setAccountReady(true); return }
+    setAccountReady(false)
+    setAccountStartupError(false)
+    let stopped = false
+    void restoreAccount().then(() => {
+      if (!stopped) {
+        setStorageReady(loadDataResult().status !== 'recovery-required')
+        setAccountReady(true)
+      }
+    }).catch(() => {
+      if (!stopped) {
+        setAccountStartupError(true)
+        setAccountReady(true)
+      }
+    })
+    return () => { stopped = true }
+  }, [writeAccess])
   useEffect(() => {
     const onRecovered = () => setStorageReady(loadDataResult().status !== 'recovery-required')
     window.addEventListener(STORAGE_RECOVERED_EVENT, onRecovered)
@@ -55,6 +82,12 @@ function SolemiRoot() {
       releaseLock?.()
     }
   }, [])
+  if (!accountReady) return <div className="app-startup-loading" aria-label="Loading" />
+  if (accountStartupError) {
+    const locale = loadDataResult().data.settings.locale
+    return <div className="app-startup-error"><strong>{t(locale, 'accountLocalStorageError')}</strong>
+      <button type="button" onClick={() => window.location.reload()}>{t(locale, 'retry')}</button></div>
+  }
   return <>
     {internalPreview && <div className="internal-preview-banner">INTERNAL / TEST <span>Family Sync {internalStagingSync ? 'staging' : 'disabled'} · {buildSha}</span></div>}
     <App key={writeAccess} writeAccess={writeAccess} />

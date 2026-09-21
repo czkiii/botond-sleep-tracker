@@ -4,9 +4,9 @@
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
 **Teljes audit alapja:** `e9374f4` (`Add verified store billing foundation`); az akkori helyi origin-refhez képest 0 ahead / 0 behind.
-**Ellenőrzött HEAD:** `c5ccd23` (`Preserve active sleep details and protect the final child`). Az A03 commit/push és staging build elkészült; kéttelefonos elfogadása folyamatban. Az A13–A14 commit/push megtörtént. Az A04 helyi implementációja elkészült, még nincs commitolva vagy stagingre telepítve.
+**Ellenőrzött HEAD:** `3114711` (`Implement safe family leaving and device disconnect`). Az A03 commit/push és staging build elkészült; kéttelefonos elfogadása folyamatban. Az A13–A14 és A04 commit/push megtörtént. Az A05 helyi implementációja elkészült, még nincs commitolva vagy stagingre telepítve.
 
-## Legfrissebb checkpoint — A03 staging elfogadás, A04 helyi javítás
+## Legfrissebb checkpoint — A03–A04 staging elfogadás, A05 helyi javítás
 
 **Elsőként olvasandó kiegészítés:** [OWNER_DECISIONS_REVIEW_2026-09-20.md](OWNER_DECISIONS_REVIEW_2026-09-20.md), benne az öt eredeti tulajdonosi TXT linkje, auditkapcsolatok és az A03 folytatási sorrendje. Az új termékdöntések felülírják az eltérő korábbi terveket; a műszaki auditkapuk megmaradnak.
 
@@ -15,14 +15,16 @@
 - Az A03 commit/push megtörtént. A `6675fe2` Worker- és Pages-buildje sikeres; a régi smoke szkript revízió nélküli módosításai miatt bukott, amit a `c9d5af9` javított. A frissített smoke helyben a staging Worker ellen minden ponton átment.
 - **A03 még nem lezárt:** a kéttelefonos import/törlés/offline/pending/restore elfogadás folyamatban van. Éles környezet nem változott.
 - **A13–A14 commit/push kész:** a `c5ccd23` tartalmazza az aktív alvás jegyzetének/típusának atomi indítását és az utolsó gyermek párhuzamos törlésének védelmét. Staging telefonos regresszió még nincs rögzítve.
-- **A04 helyi implementáció kész:** az eszközleválasztás és az account-szintű családi kilépés külön művelet. Függő módosítás, konfliktus, sérült sync-állapot vagy offline helyzet nem dobható el csendben; sikertelen szerveres leválasztás megtartja a kapcsolatot. A leválasztott eszköz újratöltéskor nem csatlakozik vissza automatikusan, de külön gombbal újracsatlakoztatható.
+- **A04 commit/push kész (`3114711`):** az eszközleválasztás és az account-szintű családi kilépés külön művelet. Függő módosítás, konfliktus, sérült sync-állapot vagy offline helyzet nem dobható el csendben; sikertelen szerveres leválasztás megtartja a kapcsolatot. A leválasztott eszköz újratöltéskor nem csatlakozik vissza automatikusan, de külön gombbal újracsatlakoztatható.
 - Account-kilépéskor minden account-owned legacy családi eszköz visszavonódik, a membership history `LEFT` állapotban megmarad, és a helyi napló a telefonon marad. Admin előbb választhat utódot; választás nélkül a legrégebbi aktív tag kapja az adminjogot. Az utolsó tag csak a külön családmegszüntetési folyamaton távozhat. Az utolsó fizető kilépése a syncet szünetelteti, az adatot nem törli.
 - A nyers Family Sync hozzáférés már aktív membershipet is követel, ezért a kilépett account régi device-tokenje nem fér hozzá a családi adathoz.
-- Ellenőrzés: frontend és Worker typecheck; teljes **25 fájl / 215 teszt**; production és auth-enabled internal build sikeres. A leválasztás, újratöltési visszakapcsolás tiltása, adminátadás, utolsó tag, összes eszköz visszavonása és utolsó fizető kilépése automatizált regresszióval fedett. A bundle méretére Vite figyelmeztet, buildhiba nincs.
+- **A05 helyi implementáció kész:** a vendégmód és minden Solemi-account külön helyi napló- és Family Sync munkaterületet kap. Kijelentkezéskor a napló megtartható elkülönítve vagy csak az adott telefonról törölhető; másik account nem látja. A vendégnapló első belépéskor csak kifejezett választással kerül az accounthoz. A pending outbox, safety backup, leválasztási marker és utolsó sync időpont ugyanazzal a munkaterülettel mozog.
+- A fiókváltás kis helyreállítási journalt használ; félbeszakadt váltás újraindításkor befejezhető, quota hiba pedig nem írja felül a látható naplót. A workspace-váltás csak a többtabos írózár megszerzése után indul. A függő családi módosítás kijelentkezéskor nem vész el, hanem a saját account munkaterületében marad.
+- Ellenőrzés: frontend és Worker typecheck; teljes **26 fájl / 222 teszt**; production és auth-enabled internal build sikeres. A fiókizoláció, vendégnapló megtartása/áthelyezése, pending megőrzése, helyi accountadat-törlés, quota és megszakított váltás automatizált regresszióval fedett. A bundle méretére Vite figyelmeztet, buildhiba nincs.
 - V1: Google + Apple belépés, Family PDF; nincs push/emlékeztető vagy életkori normaösszehasonlítás. Egyetlen 7 napos trial választható Family/Family+ csomagra; havi és éves ajánlat.
 - Accounttörlés/recovery/retention specifikáció megérkezett, nem elkészült funkció. A privacy dokumentum még kiadás előtti tervezet.
 - `solemi-sleep.app` domain megvásárolva a tulajdonos közlése alapján; bekötés, e-mail, OAuth/origin és adatmigráció még nincs igazolva.
-- Az A04 munkafaváltozásához commit/push/deploy még nem történt; production adatbázis-módosítás nem történt.
+- Az A05 munkafaváltozásához commit/push/deploy még nem történt; production adatbázis-módosítás nem történt.
 
 ### Production V3 adatok mentése és V4 migrációs próba
 
@@ -73,9 +75,11 @@ Jelentés: [FAMILY_PLUS_STATISTICS_AUDIT_2026-09-20.md](FAMILY_PLUS_STATISTICS_A
 - Javítás, commit/push, deploy és adatbázis-módosítás nem történt.
 
 **A01–A02 elkészült. Az A03 kéttelefonos staging elfogadása folyamatban; az
-A13–A14 commit/push kész, az A04 helyi javítása és automatizált ellenőrzése elkészült.**
-Következő kapu: A03 eredményének rögzítése, majd az A04 commit/push, staging build
-és kétaccountos telefonos elfogadása. Ezután A05–A06 következik.
+A13–A14 és az A04 commit/push kész. Az A05 helyi javítása és automatizált
+ellenőrzése elkészült.** Következő kapu: az A03 és A04 kézi staging eredményének
+rögzítése, valamint az A05 tulajdonosi commit/push, staging build és az
+A→kijelentkezés→B, vendégmód és pending adatok kétaccountos telefonos próbája.
+Ezután A06 következik.
 Éles lépések külön engedéllyel.
 
 ### A02 lezárás — többlapos és atomi helyi mentés
@@ -543,12 +547,13 @@ auditkapu az irányadó, különösen az adatmegőrzési és hozzáférési hib�
 
 ## Következő konkrét feladat
 
-A03: a külön helyi/családi törlés, import és restore folyamatban lévő két eszközös
-staging regressziós próbájának lezárása. Az A13–A14 commit/push kész. Az A04
-helyi kódja és automatizált tesztje kész; következik a tulajdonosi commit/push,
-staging build, majd a külön eszközleválasztás, account-kilépés, adminátadás és
-utolsó fizető kétaccountos telefonos próbája. Ezután A05–A06 következik. A normál
-kéttelefonos staging-elfogadás továbbra is érvényes a korábban kipróbált esetekre.
+A03 és A04: a kéttelefonos staging elfogadás lezárása, amikor ismét rendelkezésre
+áll a két készülék. Az A05 accountonként elkülönített helyi munkaterülete és
+automatizált regressziója helyben kész: 26 tesztfájlban 222/222 teszt, valamint a
+production és az auth-enabled internal build sikeres. Következik az A05
+tulajdonosi commit/push, staging build, majd az A→kijelentkezés→B, vendégből
+accountba lépés, helyi megtartás/törlés és pending adatok kézi próbája. Ezután A06
+következik. A korábbi staging-elfogadási esetek továbbra is kötelezőek.
 
 A billing HTTP-bekötés az A08–A10 domainhibák javítása után következik.
 A `007` távoli staging migráció előtt export/restore és ellenőrzött munkamenet

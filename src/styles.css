@@ -643,6 +643,16 @@ svg { display: block; }
 .account-device-list button { display: grid; gap: 4px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 13px; text-align: left; color: #e7f2ff; background: #0b1d30; }
 .account-device-list button strong { font-size: 12px; }
 .account-device-list button span { color: var(--muted); font-size: 10px; line-height: 1.35; }
+.account-signout-choice { display: grid; gap: 9px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: rgba(7, 22, 38, .72); }
+.account-signout-choice strong { color: #e7f2ff; font-size: 13px; }
+.account-signout-choice small { color: var(--muted); font-size: 11px; line-height: 1.45; }
+.account-signout-choice button { min-height: 42px; border: 1px solid var(--line); border-radius: 12px; color: #d9ebff; background: #0b1d30; font: inherit; font-size: 12px; font-weight: 700; }
+.account-signout-choice button.danger { color: #ffb5bd; border-color: rgba(255, 130, 145, .22); }
+.account-signout-choice button.link { min-height: 34px; border: 0; background: transparent; color: #8fb8e8; }
+.app-startup-loading { min-height: 100dvh; background: #020b18; }
+.app-startup-error { min-height: 100dvh; padding: 32px 24px; display: grid; align-content: center; justify-items: center; gap: 18px; color: #e7f2ff; background: #020b18; text-align: center; }
+.app-startup-error strong { max-width: 360px; font-size: 14px; line-height: 1.5; }
+.app-startup-error button { min-width: 180px; min-height: 44px; border: 1px solid var(--line); border-radius: 14px; color: #d9ebff; background: #0b1d30; font: inherit; font-weight: 700; }
 .settings-card input, .note-field textarea {
   width: 100%;
   border: 1px solid var(--line);

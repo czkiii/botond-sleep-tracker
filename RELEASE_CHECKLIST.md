@@ -17,8 +17,8 @@ vagy kifejezett, indokolt termékdöntés kell; a puszta priorizálás nem lezá
 - [x] A01 — Sérült helyi napló megőrzése, automatikus felülírás megakadályozása. 195/195 teszt, typecheck és két build sikeres.
 - [x] A02 — Többlapos mentés, quota/crash és tartós napló–outbox egység. Egyetlen böngészőlap írhat; az atomi helyi envelope, hibainjektálás és kétlapos átvételi próba sikeres (198/198 teszt).
 - [ ] A03 — Import/törlés családi hatása és visszaállítható biztonsági mentés. Implementáció, commit/push, staging Worker/Pages build és javított smoke kész; a kéttelefonos import/törlés/offline/pending/restore elfogadás folyamatban.
-- [ ] A04 — Valódi account-szintű családi kilépés, pending adatok védelme. Helyi implementáció és regresszió kész: külön eszközleválasztás/újracsatlakozás, account-kilépés, választható vagy automatikus adminátadás, utolsó tag blokkolása, régi device-tokenek visszavonása és utolsó fizető utáni pause. Commit/push és staging kétaccountos elfogadás hiányzik.
-- [ ] A05 — Fiókváltás/guest kapcsolat és helyi adatok elkülönítése.
+- [ ] A04 — Valódi account-szintű családi kilépés, pending adatok védelme. Implementáció, regresszió és `3114711` commit/push kész: külön eszközleválasztás/újracsatlakozás, account-kilépés, választható vagy automatikus adminátadás, utolsó tag blokkolása, régi device-tokenek visszavonása és utolsó fizető utáni pause. Staging kétaccountos elfogadás hiányzik.
+- [ ] A05 — Fiókváltás/guest kapcsolat és helyi adatok elkülönítése. Helyi implementáció és regresszió kész: accountonként külön diary+sync workspace, explicit vendégnapló-átvétel, kijelentkezéskori megtartás/törlés, pending megőrzés, többtabos írózár, quota- és crash-helyreállítás. Commit/push és staging A→logout→B/guest elfogadás hiányzik.
 - [ ] A06 — Legacy API fizetős sync-megkerülés lezárása, kompatibilis átállás.
 - [ ] A07 — Production config/auth-proxy/entitlement és tesztkapcsolók elkülönítése.
 - [ ] A08 — Billing eseményverseny és sorrend javítása.
@@ -288,9 +288,12 @@ engedélyez automatikus halasztást. A meglévő Prediction kommunikációját i
 
 ## Következő konkrét munkamenet
 
-**Elsőbbség:** A03 — staging import/törlés/restore elfogadás. Az A13–A14 commit/push kész.
-Az A04 helyi implementációja 215/215 teszttel és két sikeres builddel kész; következik
-az A04 commit/push, staging build és kétaccountos telefonos elfogadás, majd A05–A06.
+**Elsőbbség:** az A03 import/törlés/restore és az A04 kilépési folyamat staging
+elfogadása, amikor rendelkezésre áll két telefon. Az A13–A14 és az A04
+commit/push kész. Az A05 helyi implementációja 222/222 teszttel és két sikeres
+builddel kész; következik az A05 tulajdonosi commit/push, staging build, majd az
+A→kijelentkezés→B, vendégmód, helyi megtartás/törlés és pending adatok kézi
+elfogadása. Ezután A06 következik.
 A billing HTTP/adapterszelet előtt A08–A10 javítás kötelező. Az alábbi korábbi
 tételek történeti és további release-feladatok.
 

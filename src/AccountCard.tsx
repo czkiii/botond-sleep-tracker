@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { AccountAuthError, beginGoogleSignIn, restoreAccount, signOutAccount } from './accountAuth'
 import type { AccountDevice, SignedInAccount } from './accountAuth'
+import { accountWorkspaceNeedsGuestChoice, activateInteractiveAccountWorkspace } from './accountWorkspace'
+import { deleteChildPhoto } from './photoStore'
 import { localeTag, t } from './i18n'
 import type { Locale } from './i18n'
 
 export default function AccountCard({ locale }: { locale: Locale }) {
   const button = useRef<HTMLDivElement>(null)
   const [account, setAccount] = useState<SignedInAccount | null>(null)
-  const [status, setStatus] = useState<'loading' | 'signedOut' | 'ready' | 'deviceLimit' | 'error'>('loading')
+  const [status, setStatus] = useState<'loading' | 'signedOut' | 'ready' | 'signOutChoice' | 'deviceLimit' | 'error'>('loading')
   const [error, setError] = useState('')
   const [devices, setDevices] = useState<AccountDevice[]>([])
   const [replacement, setReplacement] = useState<AccountDevice | null>(null)
@@ -26,7 +28,10 @@ export default function AccountCard({ locale }: { locale: Locale }) {
     if (status !== 'signedOut' || !button.current) return
     let cancelled = false
     const target = button.current
-    void beginGoogleSignIn(target, (current) => {
+    void beginGoogleSignIn(target, async (current) => {
+      const adoptGuest = accountWorkspaceNeedsGuestChoice(current.id)
+        ? window.confirm(t(locale, 'accountGuestAdopt')) : false
+      activateInteractiveAccountWorkspace(current.id, adoptGuest)
       if (!cancelled) { setAccount(current); setReplacement(null); setDevices([]); setStatus('ready'); setError('') }
     }, (failure) => {
       if (cancelled) return
@@ -39,9 +44,14 @@ export default function AccountCard({ locale }: { locale: Locale }) {
     return () => { cancelled = true; target.replaceChildren() }
   }, [locale, replacement, status])
 
-  const logout = async () => {
+  const logout = async (deleteLocalData: boolean) => {
+    if (deleteLocalData && !window.confirm(t(locale, 'signOutDeleteConfirm'))) return
     setStatus('loading'); setError('')
-    try { await signOutAccount(); setAccount(null); setStatus('signedOut') }
+    try {
+      const result = await signOutAccount(deleteLocalData)
+      await Promise.allSettled(result.deletedPhotoRefs.map((ref) => deleteChildPhoto(ref)))
+      setAccount(null); setStatus('signedOut')
+    }
     catch { setStatus('ready'); setError(t(locale, 'accountNetworkError')) }
   }
 
@@ -50,7 +60,14 @@ export default function AccountCard({ locale }: { locale: Locale }) {
     {status === 'loading' && <small className="account-state">{t(locale, 'accountLoading')}</small>}
     {replacement && status === 'signedOut' && <small className="account-replace-confirm">{t(locale, 'accountReplaceConfirm', { device: replacement.name || t(locale, 'unknownDevice') })}</small>}
     {status === 'signedOut' && <div ref={button} className="google-signin-button" />}
-    {status === 'ready' && <button type="button" className="account-signout" onClick={logout}>{t(locale, 'signOut')}</button>}
+    {status === 'ready' && <button type="button" className="account-signout" onClick={() => setStatus('signOutChoice')}>{t(locale, 'signOut')}</button>}
+    {status === 'signOutChoice' && <div className="account-signout-choice">
+      <strong>{t(locale, 'signOutChoiceTitle')}</strong>
+      <small>{t(locale, 'signOutChoiceHint')}</small>
+      <button type="button" onClick={() => logout(false)}>{t(locale, 'signOutKeepLocal')}</button>
+      <button type="button" className="danger" onClick={() => logout(true)}>{t(locale, 'signOutDeleteLocal')}</button>
+      <button type="button" className="link" onClick={() => setStatus('ready')}>{t(locale, 'cancel')}</button>
+    </div>}
     {status === 'deviceLimit' && <div className="account-device-limit">
       <small>{t(locale, 'accountDeviceLimit')}</small>
       <div className="account-device-list">{devices.map((device) => <button type="button" key={device.id} onClick={() => { setReplacement(device); setStatus('signedOut') }}>
@@ -83,5 +100,6 @@ function authError(locale: Locale, error: unknown) {
   if (code === 'AUTH_NOT_CONFIGURED') return t(locale, 'accountNotConfigured')
   if (code === 'DEVICE_LIMIT_REACHED') return t(locale, 'accountDeviceLimit')
   if (code === 'GOOGLE_TOKEN_INVALID' || code === 'LOGIN_CHALLENGE_INVALID') return t(locale, 'googleSignInExpired')
+  if (code === 'LOCAL_WORKSPACE_FAILED') return t(locale, 'accountLocalStorageError')
   return t(locale, 'accountNetworkError')
 }

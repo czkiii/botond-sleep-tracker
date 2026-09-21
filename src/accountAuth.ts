@@ -1,4 +1,5 @@
 import { fetchJson } from './apiTransport'
+import { activateRestoredAccountWorkspace, activateSignedOutWorkspace } from './accountWorkspace'
 
 const internalAccountProxy = import.meta.env.VITE_INTERNAL_PREVIEW === 'true'
   && import.meta.env.VITE_ACCOUNT_AUTH === 'true' ? '/api' : ''
@@ -48,7 +49,6 @@ function announceAccess(access: AccountAccessState | null) {
 
 function saveAccess(data: AccessResponse) {
   sessionStorage.setItem(ACCESS_KEY, JSON.stringify(data))
-  announceAccount(data.account)
   return data.account
 }
 
@@ -69,8 +69,11 @@ function installationSecret() {
 }
 
 let restorePromise: Promise<SignedInAccount | null> | null = null
+let restoreCompleted = false
+let restoredAccount: SignedInAccount | null = null
 
 export function restoreAccount() {
+  if (restoreCompleted) return Promise.resolve(restoredAccount)
   if (!restorePromise) {
     restorePromise = restoreAccountOnce().finally(() => { restorePromise = null })
   }
@@ -80,25 +83,41 @@ export function restoreAccount() {
 async function restoreAccountOnce() {
   const saved = readAccess()
   if (saved && saved.accessExpiresAt > Date.now() + 5_000) {
+    let current: { account: SignedInAccount } | null = null
     try {
-      const current = await request<{ account: SignedInAccount }>('/v1/auth/me', {
+      current = await request<{ account: SignedInAccount }>('/v1/auth/me', {
         headers: { Authorization: `Bearer ${saved.accessToken}` }
       })
+    } catch { sessionStorage.removeItem(ACCESS_KEY) }
+    if (current) {
+      activateRestoredAccountWorkspace(current.account.id)
+      restoredAccount = current.account
+      restoreCompleted = true
       announceAccount(current.account)
       return current.account
-    } catch { sessionStorage.removeItem(ACCESS_KEY) }
+    }
   }
+  let refreshed: AccessResponse
   try {
-    return saveAccess(await request<AccessResponse>('/v1/auth/refresh', { method: 'POST' }))
+    refreshed = await request<AccessResponse>('/v1/auth/refresh', { method: 'POST' })
   } catch {
+    activateSignedOutWorkspace()
+    restoredAccount = null
+    restoreCompleted = true
     announceAccess(null)
     announceAccount(null)
     return null
   }
+  const account = saveAccess(refreshed)
+  activateRestoredAccountWorkspace(account.id)
+  restoredAccount = account
+  restoreCompleted = true
+  announceAccount(account)
+  return account
 }
 
 export async function beginGoogleSignIn(
-  target: HTMLElement, onSuccess: (account: SignedInAccount) => void,
+  target: HTMLElement, onSuccess: (account: SignedInAccount) => void | Promise<void>,
   onError: (error: AccountAuthError) => void, replaceDeviceId?: string
 ) {
   const { nonce, clientId } = await request<{ nonce: string; clientId: string }>('/v1/auth/challenge')
@@ -115,9 +134,13 @@ export async function beginGoogleSignIn(
             deviceName: browserDeviceName(),
             ...(replaceDeviceId ? { replaceDeviceId } : {}) })
         })
-        onSuccess(saveAccess(data))
+        const account = saveAccess(data)
+        await onSuccess(account)
+        restoredAccount = account
+        restoreCompleted = true
+        announceAccount(account)
       } catch (error) {
-        onError(error instanceof AccountAuthError ? error : new AccountAuthError('ACCOUNT_AUTH_FAILED'))
+        onError(error instanceof AccountAuthError ? error : new AccountAuthError('LOCAL_WORKSPACE_FAILED'))
       }
     }
   })
@@ -140,12 +163,24 @@ function browserDeviceName() {
   return `${browser} · ${platform}`
 }
 
-export async function signOutAccount() {
+export async function signOutAccount(deleteLocalData = false) {
   await request('/v1/auth/logout', { method: 'POST' })
   sessionStorage.removeItem(ACCESS_KEY)
+  restoredAccount = null
+  restoreCompleted = true
+  let workspace: ReturnType<typeof activateSignedOutWorkspace>
+  try {
+    workspace = activateSignedOutWorkspace(deleteLocalData)
+  } catch (error) {
+    announceAccess(null)
+    announceAccount(null)
+    window.location.reload()
+    throw error
+  }
   announceAccess(null)
   announceAccount(null)
   window.google?.accounts.id.disableAutoSelect()
+  return workspace
 }
 
 let refreshPromise: Promise<AccessResponse | null> | null = null
@@ -155,7 +190,14 @@ async function usableAccess() {
   if (saved && saved.accessExpiresAt > Date.now() + 5_000) return saved
   if (!refreshPromise) {
     refreshPromise = request<AccessResponse>('/v1/auth/refresh', { method: 'POST' })
-      .then((data) => { saveAccess(data); return data })
+      .then((data) => {
+        saveAccess(data)
+        activateRestoredAccountWorkspace(data.account.id)
+        restoredAccount = data.account
+        restoreCompleted = true
+        announceAccount(data.account)
+        return data
+      })
       .catch(() => { sessionStorage.removeItem(ACCESS_KEY); announceAccount(null); return null })
       .finally(() => { refreshPromise = null })
   }
