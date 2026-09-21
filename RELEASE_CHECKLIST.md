@@ -17,7 +17,7 @@ vagy kifejezett, indokolt termékdöntés kell; a puszta priorizálás nem lezá
 - [x] A01 — Sérült helyi napló megőrzése, automatikus felülírás megakadályozása. 195/195 teszt, typecheck és két build sikeres.
 - [x] A02 — Többlapos mentés, quota/crash és tartós napló–outbox egység. Egyetlen böngészőlap írhat; az atomi helyi envelope, hibainjektálás és kétlapos átvételi próba sikeres (198/198 teszt).
 - [ ] A03 — Import/törlés családi hatása és visszaállítható biztonsági mentés. Implementáció, commit/push, staging Worker/Pages build és javított smoke kész; a kéttelefonos import/törlés/offline/pending/restore elfogadás folyamatban.
-- [ ] A04 — Valódi account-szintű családi kilépés, pending adatok védelme.
+- [ ] A04 — Valódi account-szintű családi kilépés, pending adatok védelme. Helyi implementáció és regresszió kész: külön eszközleválasztás/újracsatlakozás, account-kilépés, választható vagy automatikus adminátadás, utolsó tag blokkolása, régi device-tokenek visszavonása és utolsó fizető utáni pause. Commit/push és staging kétaccountos elfogadás hiányzik.
 - [ ] A05 — Fiókváltás/guest kapcsolat és helyi adatok elkülönítése.
 - [ ] A06 — Legacy API fizetős sync-megkerülés lezárása, kompatibilis átállás.
 - [ ] A07 — Production config/auth-proxy/entitlement és tesztkapcsolók elkülönítése.
@@ -26,8 +26,8 @@ vagy kifejezett, indokolt termékdöntés kell; a puszta priorizálás nem lezá
 - [ ] A10 — Store sandbox/production környezeti kerítés.
 - [ ] A11 — Hiteles store verify/restore/webhook/acknowledgement és paywall.
 - [ ] A12 — Valós natív iOS/Android kiadás és megfelelő iOS-login.
-- [ ] A13 — Új aktív alvás jegyzetének és kézi típusának szinkronja. Helyi javítás és kliens–Worker–SQLite regresszió kész; commit/push és staging elfogadás hiányzik.
-- [ ] A14 — Utolsó gyermek párhuzamos törlésének atomi védelme. Feltételes D1 batch és determinisztikus konkurens törlési regresszió helyben kész; commit/push és staging elfogadás hiányzik.
+- [ ] A13 — Új aktív alvás jegyzetének és kézi típusának szinkronja. Javítás, kliens–Worker–SQLite regresszió és `c5ccd23` commit/push kész; staging elfogadás hiányzik.
+- [ ] A14 — Utolsó gyermek párhuzamos törlésének atomi védelme. Feltételes D1 batch, determinisztikus konkurens törlési regresszió és `c5ccd23` commit/push kész; staging elfogadás hiányzik.
 - [ ] A15 — Nem üres helyi napló csatlakozása, gyermekkonfliktus és pull-határesetek.
 - [ ] A16 — Offline fizetős hozzáférés, refresh race, harmadik eszköz próba.
 - [ ] A17 — Accounttörlés, megőrzés, privacy és store adatkezelési tájékoztatás.
@@ -288,8 +288,9 @@ engedélyez automatikus halasztást. A meglévő Prediction kommunikációját i
 
 ## Következő konkrét munkamenet
 
-**Elsőbbség:** A03 — staging import/törlés/restore elfogadás. Ezután A13–A14 és a teljes audit
-végrehajtási sorrendje.
+**Elsőbbség:** A03 — staging import/törlés/restore elfogadás. Az A13–A14 commit/push kész.
+Az A04 helyi implementációja 215/215 teszttel és két sikeres builddel kész; következik
+az A04 commit/push, staging build és kétaccountos telefonos elfogadás, majd A05–A06.
 A billing HTTP/adapterszelet előtt A08–A10 javítás kötelező. Az alábbi korábbi
 tételek történeti és további release-feladatok.
 

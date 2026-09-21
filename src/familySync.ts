@@ -6,6 +6,7 @@ import { fetchJson } from './apiTransport'
 const API_BASE = (import.meta.env.VITE_SYNC_API_BASE || 'https://solemi-sleep-sync.czki-adam.workers.dev').replace(/\/$/, '')
 const SYNC_KEY = 'solemiSleep:sync:v1'
 const SYNC_METADATA_KEY = 'familySyncV1'
+const DETACHED_FAMILY_KEY = 'solemiSleep:detachedFamily'
 const CORRUPT_SYNC_STORE = 'LOCAL_SYNC_STORE_CORRUPT'
 
 // Local edits can queue immediately, but upload, download and conflict resolution
@@ -285,6 +286,15 @@ export async function reconcileAccountFamily() {
     return { claimed: true, connected: true, changed: false }
   }
 
+  const detachedFamilyId = localStorage.getItem(DETACHED_FAMILY_KEY)
+  if (detachedFamilyId) {
+    const access = await accountRequest<{ membership: null | { familyId: string } }>('/v1/auth/access')
+    if (access.membership?.familyId === detachedFamilyId) {
+      return { claimed: false, connected: false, changed: false, detached: true }
+    }
+    localStorage.removeItem(DETACHED_FAMILY_KEY)
+  }
+
   saveSafetyBackup(loadData(), 'before-family-bootstrap')
   const result = await accountRequest<{
     membership: null | { familyId: string; familyName: string; role: 'ADMIN' | 'MEMBER' }
@@ -296,6 +306,11 @@ export async function reconcileAccountFamily() {
   writeStore({ connection: result.connection, pending: [], conflicts: [], missingSessions: [] })
   const changed = await pullRemote(true)
   return { claimed: false, connected: true, changed }
+}
+
+export async function reconnectAccountFamily() {
+  localStorage.removeItem(DETACHED_FAMILY_KEY)
+  return reconcileAccountFamily()
 }
 
 export function isEmptyStarterData(data: AppData) {
@@ -322,6 +337,7 @@ export async function createFamily(familyName: string, deviceName: string) {
     })
   })
   const connection: SyncConnection = { familyId: created.familyId, familyName: created.familyName, deviceId: created.device.id, deviceToken: created.deviceToken, revision: created.revision }
+  localStorage.removeItem(DETACHED_FAMILY_KEY)
   const baseline = { ...local, children: primaryChild ? [primaryChild] : [], sessions: [] }
   writeStore({ connection, pending: makeOperations(baseline, local, connection.revision), conflicts: [], missingSessions: [] })
   await flushPending()
@@ -353,6 +369,7 @@ export async function joinFamily(code: string, deviceName: string) {
     connection = { familyId: joined.familyId, familyName: joined.familyName,
       deviceId: joined.device.id, deviceToken: joined.deviceToken, revision: 0 }
   }
+  localStorage.removeItem(DETACHED_FAMILY_KEY)
   writeStore({ connection, pending: [], conflicts: [], missingSessions: [] })
 
   // Merge the cloud family into the device without silently discarding an
@@ -382,10 +399,37 @@ export async function createInvite() {
 
 export async function leaveFamily() {
   const store = readStore()
+  const readiness = getFamilyReplacementReadiness()
+  if (!readiness.ready) throw new Error(`FAMILY_DETACH_${readiness.reason?.toUpperCase() || 'BLOCKED'}`)
   if (store.connection) {
-    try { await request('/v1/device/leave', { method: 'POST', body: '{}' }, store.connection.deviceToken) } catch {}
+    await request('/v1/device/leave', { method: 'POST', body: '{}' }, store.connection.deviceToken)
+    localStorage.setItem(DETACHED_FAMILY_KEY, store.connection.familyId)
   }
   writeStore(defaultStore())
+}
+
+export type FamilyMemberChoice = {
+  accountId: string
+  role: 'ADMIN' | 'MEMBER'
+  joinedAt: number
+  name: string | null
+  email: string | null
+}
+
+export async function getAccountFamilyMembers() {
+  const result = await accountRequest<{ members: FamilyMemberChoice[] }>('/v1/auth/family/members')
+  return result.members
+}
+
+export async function leaveAccountFamily(successorAccountId?: string) {
+  const readiness = getFamilyReplacementReadiness()
+  if (!readiness.ready) throw new Error(`FAMILY_LEAVE_${readiness.reason?.toUpperCase() || 'BLOCKED'}`)
+  await accountRequest('/v1/auth/family/leave', {
+    method: 'POST', body: JSON.stringify(successorAccountId ? { successorAccountId } : {})
+  })
+  localStorage.removeItem(DETACHED_FAMILY_KEY)
+  writeStore(defaultStore())
+  announceDiaryReplacement()
 }
 
 function announceDiaryReplacement() {
@@ -398,6 +442,7 @@ export async function clearLocalDiary(next: AppData) {
   const store = readStore()
   if (store.connection) {
     try { await request('/v1/device/leave', { method: 'POST', body: '{}' }, store.connection.deviceToken) } catch {}
+    localStorage.setItem(DETACHED_FAMILY_KEY, store.connection.familyId)
   }
   saveDataAfterDeletion(next, SYNC_METADATA_KEY, defaultStore())
   try { localStorage.removeItem(SYNC_KEY) } catch { /* embedded copy is authoritative */ }

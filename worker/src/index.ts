@@ -898,8 +898,11 @@ async function requireFamilySyncEntitlement(request: Request, env: Env, auth: De
   if (!await service.familyHasAccountMembers(auth.familyId)) return
   if (!request.headers.get('X-Solemi-Family-Token')) throw new ApiError(401, 'SESSION_INVALID')
   const access = await accountAuth(env).authenticate(accountBearer(request))
-  const mapping = await env.DB.prepare(`SELECT 1 AS linked FROM account_family_devices
-    WHERE account_device_id = ? AND account_id = ? AND family_id = ? AND legacy_device_id = ?`)
+  const mapping = await env.DB.prepare(`SELECT 1 AS linked
+    FROM account_family_devices afd
+    JOIN legacy_family_memberships m
+      ON m.account_id = afd.account_id AND m.family_id = afd.family_id AND m.status = 'ACTIVE'
+    WHERE afd.account_device_id = ? AND afd.account_id = ? AND afd.family_id = ? AND afd.legacy_device_id = ?`)
     .bind(access.deviceId, access.account.id, auth.familyId, auth.deviceId)
     .first<{ linked: number }>()
   if (!mapping) throw new ApiError(403, 'FAMILY_MEMBERSHIP_REQUIRED')
@@ -1105,6 +1108,130 @@ async function joinAccountFamily(request: Request, env: Env, access: AccountAcce
   }, 201)
 }
 
+async function listAccountFamilyMembers(request: Request, env: Env, access: AccountAccess) {
+  const membership = await env.DB.prepare(`SELECT family_id
+    FROM legacy_family_memberships
+    WHERE account_id = ? AND status = 'ACTIVE'`)
+    .bind(access.account.id).first<{ family_id: string }>()
+  if (!membership) throw new ApiError(403, 'FAMILY_MEMBERSHIP_REQUIRED')
+  const result = await env.DB.prepare(`SELECT m.account_id, m.role, m.joined_at,
+      a.display_name, a.email
+    FROM legacy_family_memberships m
+    JOIN accounts a ON a.id = m.account_id
+    WHERE m.family_id = ? AND m.status = 'ACTIVE' AND m.account_id <> ?
+    ORDER BY m.joined_at ASC, m.id ASC`)
+    .bind(membership.family_id, access.account.id)
+    .all<{ account_id: string; role: 'ADMIN' | 'MEMBER'; joined_at: number;
+      display_name: string | null; email: string | null }>()
+  return ok(request, env, { members: result.results.map((member) => ({
+    accountId: member.account_id,
+    role: member.role,
+    joinedAt: member.joined_at,
+    name: member.display_name,
+    email: member.email
+  })) })
+}
+
+async function leaveAccountFamily(request: Request, env: Env, access: AccountAccess) {
+  const membership = await env.DB.prepare(`SELECT id, family_id, role
+    FROM legacy_family_memberships
+    WHERE account_id = ? AND status = 'ACTIVE'`)
+    .bind(access.account.id).first<{ id: string; family_id: string; role: 'ADMIN' | 'MEMBER' }>()
+  if (!membership) return ok(request, env, { left: false, membership: null })
+
+  const successor = await env.DB.prepare(`SELECT id FROM legacy_family_memberships
+    WHERE family_id = ? AND account_id <> ? AND status = 'ACTIVE'
+    ORDER BY joined_at ASC, id ASC LIMIT 1`)
+    .bind(membership.family_id, access.account.id).first<{ id: string }>()
+  if (!successor) {
+    throw new ApiError(409, 'FAMILY_DISSOLUTION_REQUIRED',
+      'The final family member must use the family dissolution flow.')
+  }
+
+  const body = request.headers.get('Content-Type')?.includes('application/json')
+    ? await readJson(request) : {}
+  const requestedSuccessor = typeof body.successorAccountId === 'string'
+    ? body.successorAccountId.trim() : ''
+  if (requestedSuccessor) {
+    const selected = await env.DB.prepare(`SELECT id FROM legacy_family_memberships
+      WHERE family_id = ? AND account_id = ? AND account_id <> ? AND status = 'ACTIVE'`)
+      .bind(membership.family_id, requestedSuccessor, access.account.id).first<{ id: string }>()
+    if (!selected) throw new ApiError(409, 'FAMILY_SUCCESSOR_INVALID')
+  }
+
+  const now = Date.now()
+  const endedAt = now
+  const revokedAt = nowIso()
+  const statements: D1PreparedStatement[] = [
+    env.DB.prepare(`UPDATE legacy_family_memberships
+      SET status = 'LEFT', ended_at = ?
+      WHERE id = ? AND account_id = ? AND family_id = ? AND status = 'ACTIVE'
+        AND EXISTS (
+          SELECT 1 FROM legacy_family_memberships other
+          WHERE other.family_id = ? AND other.account_id <> ? AND other.status = 'ACTIVE'
+        )
+        AND (? <> 'ADMIN' OR EXISTS (
+          SELECT 1 FROM legacy_family_memberships successor
+          WHERE successor.family_id = ? AND successor.account_id <> ?
+            AND successor.status = 'ACTIVE'
+            AND (? = '' OR successor.account_id = ?)
+        ))`)
+      .bind(endedAt, membership.id, access.account.id, membership.family_id,
+        membership.family_id, access.account.id, membership.role,
+        membership.family_id, access.account.id, requestedSuccessor, requestedSuccessor)
+  ]
+  if (membership.role === 'ADMIN') {
+    statements.push(env.DB.prepare(`UPDATE legacy_family_memberships
+      SET role = 'ADMIN'
+      WHERE id = (
+        SELECT id FROM legacy_family_memberships
+        WHERE family_id = ? AND account_id <> ? AND status = 'ACTIVE'
+          AND (? = '' OR account_id = ?)
+        ORDER BY joined_at ASC, id ASC LIMIT 1
+      ) AND family_id = ? AND status = 'ACTIVE'
+        AND NOT EXISTS (
+          SELECT 1 FROM legacy_family_memberships admin
+          WHERE admin.family_id = ? AND admin.role = 'ADMIN' AND admin.status = 'ACTIVE'
+        )`)
+      .bind(membership.family_id, access.account.id, requestedSuccessor, requestedSuccessor,
+        membership.family_id, membership.family_id))
+  }
+  statements.push(
+    env.DB.prepare(`UPDATE devices SET revoked_at = ?
+      WHERE revoked_at IS NULL AND id IN (
+        SELECT legacy_device_id FROM account_family_devices
+        WHERE account_id = ? AND family_id = ?
+      ) AND EXISTS (
+        SELECT 1 FROM legacy_family_memberships
+        WHERE id = ? AND status = 'LEFT'
+      )`)
+      .bind(revokedAt, access.account.id, membership.family_id, membership.id),
+    env.DB.prepare(`UPDATE invite_codes SET expires_at = ?
+      WHERE used_at IS NULL AND expires_at > ? AND created_by_device_id IN (
+        SELECT legacy_device_id FROM account_family_devices
+        WHERE account_id = ? AND family_id = ?
+      ) AND EXISTS (
+        SELECT 1 FROM legacy_family_memberships
+        WHERE id = ? AND status = 'LEFT'
+      )`)
+      .bind(revokedAt, revokedAt, access.account.id, membership.family_id, membership.id)
+  )
+
+  const results = await env.DB.batch(statements)
+  if (results[0].meta.changes !== 1) {
+    const latest = await env.DB.prepare(`SELECT status FROM legacy_family_memberships WHERE id = ?`)
+      .bind(membership.id).first<{ status: string }>()
+    if (latest?.status === 'LEFT') return ok(request, env, { left: true, membership: null, idempotent: true })
+    throw new ApiError(409, 'FAMILY_MEMBERSHIP_CHANGED')
+  }
+  if (membership.role === 'ADMIN' && results[1].meta.changes !== 1) {
+    throw new ApiError(409, 'FAMILY_ADMIN_TRANSFER_FAILED')
+  }
+  return ok(request, env, {
+    left: true, membership: null, adminTransferred: membership.role === 'ADMIN'
+  })
+}
+
 async function clearAccountFamilyData(request: Request, env: Env, access: AccountAccess) {
   const body = await readJson(request)
   const operationId = requireString(body.operationId, 'operationId', 100)
@@ -1228,6 +1355,17 @@ async function accountAuthRoute(request: Request, env: Env, path: string) {
       requireAllowedAuthOrigin(request, env)
       const access = await service.authenticate(accountBearer(request))
       return joinAccountFamily(request, env, access)
+    }
+    if (request.method === 'GET' && path === '/v1/auth/family/members') {
+      requireAccountFamilyBridge(env)
+      const access = await service.authenticate(accountBearer(request))
+      return listAccountFamilyMembers(request, env, access)
+    }
+    if (request.method === 'POST' && path === '/v1/auth/family/leave') {
+      requireAccountFamilyBridge(env)
+      requireAllowedAuthOrigin(request, env)
+      const access = await service.authenticate(accountBearer(request))
+      return leaveAccountFamily(request, env, access)
     }
     if (request.method === 'POST' && path === '/v1/auth/family/data/clear') {
       requireAccountFamilyBridge(env)

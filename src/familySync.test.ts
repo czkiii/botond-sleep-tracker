@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { clearLocalDiary, flushPending, getSyncStore, isEmptyStarterData, makeOperations, mergeRemote, pullRemote, resolveSyncConflict, saveLocalData } from './familySync'
+import { clearLocalDiary, flushPending, getSyncStore, isEmptyStarterData, leaveFamily, makeOperations, mergeRemote, pullRemote, reconcileAccountFamily, resolveSyncConflict, saveLocalData } from './familySync'
 import { DataStorageError, STORAGE_KEY, createDefaultData, loadData, loadSafetyBackup, saveSafetyBackup } from './storage'
 import { API_TIMEOUT_MS } from './apiTransport'
 import type { AppData, ChildProfile, SleepSession } from './types'
@@ -28,7 +28,8 @@ const originalDescriptors = {
   localStorage: Object.getOwnPropertyDescriptor(globalThis, 'localStorage'),
   navigator: Object.getOwnPropertyDescriptor(globalThis, 'navigator'),
   window: Object.getOwnPropertyDescriptor(globalThis, 'window'),
-  fetch: Object.getOwnPropertyDescriptor(globalThis, 'fetch')
+  fetch: Object.getOwnPropertyDescriptor(globalThis, 'fetch'),
+  sessionStorage: Object.getOwnPropertyDescriptor(globalThis, 'sessionStorage')
 }
 
 function restoreGlobal(name: keyof typeof originalDescriptors) {
@@ -42,6 +43,7 @@ afterEach(() => {
   restoreGlobal('navigator')
   restoreGlobal('window')
   restoreGlobal('fetch')
+  restoreGlobal('sessionStorage')
   vi.restoreAllMocks()
   vi.useRealTimers()
 })
@@ -68,6 +70,13 @@ describe('local-only diary deletion', () => {
     Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { onLine: true, language: 'hu-HU' } })
     Object.defineProperty(globalThis, 'window', { configurable: true, value: { dispatchEvent: vi.fn() } })
     storage.setItem(STORAGE_KEY, JSON.stringify(previous))
+    storage.setItem('solemiSleep:sync:v1', JSON.stringify({
+      connection: { familyId: 'family-1', familyName: 'Teszt', deviceId: 'device-1', deviceToken: 'token-1', revision: 4 },
+      pending: [], conflicts: [], missingSessions: []
+    }))
+    Object.defineProperty(globalThis, 'fetch', { configurable: true, value: vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ ok: true, data: { left: true } }), { status: 200, headers: { 'Content-Type': 'application/json' } }
+    )) })
     saveSafetyBackup(previous, 'before-import')
 
     await clearLocalDiary(createDefaultData('hu'))
@@ -75,6 +84,71 @@ describe('local-only diary deletion', () => {
     expect(loadData().sessions).toEqual([])
     expect(loadSafetyBackup()).toBeNull()
     expect(getSyncStore()).toMatchObject({ connection: null, pending: [], conflicts: [], missingSessions: [] })
+    expect(storage.getItem('solemiSleep:detachedFamily')).toBe('family-1')
+  })
+
+  it('does not discard pending changes when disconnecting one device', async () => {
+    const storage = new MemoryStorage()
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage })
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { onLine: true, language: 'hu-HU' } })
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { dispatchEvent: vi.fn() } })
+    storage.setItem('solemiSleep:sync:v1', JSON.stringify({
+      connection: { familyId: 'family-1', familyName: 'Teszt', deviceId: 'device-1', deviceToken: 'token-1', revision: 4 },
+      pending: [{ id: 'pending-1', method: 'PATCH', path: '/v1/sessions/sleep-a',
+        body: { operationId: 'mutation-1', baseRevision: 4, patch: { note: 'Megőrzendő' } } }],
+      conflicts: [], missingSessions: []
+    }))
+    const fetchMock = vi.fn()
+    Object.defineProperty(globalThis, 'fetch', { configurable: true, value: fetchMock })
+
+    await expect(leaveFamily()).rejects.toThrow('FAMILY_DETACH_PENDING')
+
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(getSyncStore().connection?.familyId).toBe('family-1')
+    expect(getSyncStore().pending).toHaveLength(1)
+    expect(storage.getItem('solemiSleep:detachedFamily')).toBeNull()
+  })
+
+  it('keeps the connection when the server cannot revoke the device', async () => {
+    const storage = new MemoryStorage()
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage })
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { onLine: true, language: 'hu-HU' } })
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { dispatchEvent: vi.fn() } })
+    storage.setItem('solemiSleep:sync:v1', JSON.stringify({
+      connection: { familyId: 'family-1', familyName: 'Teszt', deviceId: 'device-1', deviceToken: 'token-1', revision: 4 },
+      pending: [], conflicts: [], missingSessions: []
+    }))
+    Object.defineProperty(globalThis, 'fetch', { configurable: true, value: vi.fn().mockRejectedValue(new TypeError('offline')) })
+
+    await expect(leaveFamily()).rejects.toThrow()
+
+    expect(getSyncStore().connection?.deviceId).toBe('device-1')
+    expect(storage.getItem('solemiSleep:detachedFamily')).toBeNull()
+  })
+
+  it('does not reconnect a deliberately detached device after reload', async () => {
+    const storage = new MemoryStorage()
+    const session = new MemoryStorage()
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage })
+    Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, value: session })
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { onLine: true, language: 'hu-HU' } })
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { dispatchEvent: vi.fn() } })
+    storage.setItem('solemiSleep:detachedFamily', 'family-1')
+    session.setItem('solemiSleep:accountAccess', JSON.stringify({
+      account: { id: 'account-1', email: null, name: null }, deviceId: 'account-device-1',
+      accessToken: 'account-token', accessExpiresAt: Date.now() + 60_000, expiresAt: Date.now() + 120_000
+    }))
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true, data: {
+      membership: { familyId: 'family-1', role: 'MEMBER' }
+    } }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    Object.defineProperty(globalThis, 'fetch', { configurable: true, value: fetchMock })
+
+    await expect(reconcileAccountFamily()).resolves.toMatchObject({ connected: false, detached: true })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(String(fetchMock.mock.calls[0][0])).toContain('/v1/auth/access')
+    expect(getSyncStore().connection).toBeNull()
+    expect(storage.getItem('solemiSleep:detachedFamily')).toBe('family-1')
   })
 })
 

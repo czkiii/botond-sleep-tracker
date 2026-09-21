@@ -211,6 +211,167 @@ describe('account auth routes', () => {
     expect(sqlite.prepare('SELECT used_at FROM invite_codes').get()).toEqual({ used_at: null })
   })
 
+  it('moves admin to the oldest remaining member and revokes every device when an account leaves', async () => {
+    const legacyToken = 'ss_dv_leave_owner'
+    const inviteCode = 'LEAVE01'
+    await seedLegacyFamily(legacyToken)
+    const owner = await accountAccess('acc_owner', 'adev_owner_first', 'leave_owner_first')
+    expect((await fetch('/v1/auth/family/claim', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${owner}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyDeviceToken: legacyToken })
+    })).status).toBe(200)
+
+    const ownerSecond = await accountAccess('acc_owner', 'adev_owner_second', 'leave_owner_second')
+    const restored = await fetch('/v1/auth/family/bootstrap', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${ownerSecond}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deviceName: 'Owner second phone' })
+    })
+    const restoredBody = await restored.json() as { data: { connection: { deviceToken: string } } }
+    await seedInvite(inviteCode)
+    const member = await accountAccess('acc_member', 'adev_member', 'leave_member')
+    expect((await fetch('/v1/auth/family/join', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${member}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: inviteCode, deviceName: 'Member phone' })
+    })).status).toBe(201)
+
+    const left = await fetch('/v1/auth/family/leave', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${owner}` }
+    })
+    expect(left.status).toBe(200)
+    expect(await left.json()).toMatchObject({ data: { left: true, membership: null, adminTransferred: true } })
+    expect(sqlite.prepare(`SELECT account_id, role, status FROM legacy_family_memberships ORDER BY account_id`).all())
+      .toEqual([
+        { account_id: 'acc_member', role: 'ADMIN', status: 'ACTIVE' },
+        { account_id: 'acc_owner', role: 'ADMIN', status: 'LEFT' }
+      ])
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM devices d
+      JOIN account_family_devices afd ON afd.legacy_device_id = d.id
+      WHERE afd.account_id = 'acc_owner' AND d.revoked_at IS NOT NULL`).get()).toEqual({ count: 2 })
+
+    const noReconnect = await fetch('/v1/auth/family/bootstrap', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${ownerSecond}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deviceName: 'Owner second phone' })
+    })
+    expect(await noReconnect.json()).toMatchObject({ data: { membership: null } })
+    const revokedSync = await fetch('/v1/sync?after=0', {
+      headers: { Authorization: `Bearer ${restoredBody.data.connection.deviceToken}` }
+    })
+    expect(revokedSync.status).toBe(403)
+    expect(await revokedSync.json()).toMatchObject({ error: { code: 'DEVICE_REVOKED' } })
+  })
+
+  it('lists possible successors and honors the admin selected for transfer', async () => {
+    const legacyToken = 'ss_dv_selected_successor'
+    await seedLegacyFamily(legacyToken)
+    const owner = await accountAccess('acc_owner', 'adev_owner', 'selected_owner')
+    expect((await fetch('/v1/auth/family/claim', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${owner}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyDeviceToken: legacyToken })
+    })).status).toBe(200)
+    await accountAccess('acc_oldest', 'adev_oldest', 'selected_oldest')
+    await accountAccess('acc_chosen', 'adev_chosen', 'selected_chosen')
+    sqlite.prepare(`UPDATE accounts SET display_name = 'Older member' WHERE id = 'acc_oldest'`).run()
+    sqlite.prepare(`UPDATE accounts SET display_name = 'Chosen member' WHERE id = 'acc_chosen'`).run()
+    sqlite.prepare(`INSERT INTO legacy_family_memberships
+      (id, family_id, account_id, role, status, joined_at, ended_at)
+      VALUES ('mem_oldest', 'fam_test', 'acc_oldest', 'MEMBER', 'ACTIVE', 10, NULL),
+             ('mem_chosen', 'fam_test', 'acc_chosen', 'MEMBER', 'ACTIVE', 20, NULL)`).run()
+
+    const members = await fetch('/v1/auth/family/members', {
+      headers: { Authorization: `Bearer ${owner}` }
+    })
+    expect(members.status).toBe(200)
+    expect(await members.json()).toMatchObject({ data: { members: [
+      { accountId: 'acc_oldest', name: 'Older member' },
+      { accountId: 'acc_chosen', name: 'Chosen member' }
+    ] } })
+
+    const invalid = await fetch('/v1/auth/family/leave', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${owner}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ successorAccountId: 'acc_not_a_member' })
+    })
+    expect(invalid.status).toBe(409)
+    expect(await invalid.json()).toMatchObject({ error: { code: 'FAMILY_SUCCESSOR_INVALID' } })
+    expect(sqlite.prepare(`SELECT status FROM legacy_family_memberships WHERE account_id = 'acc_owner'`).get())
+      .toEqual({ status: 'ACTIVE' })
+
+    const left = await fetch('/v1/auth/family/leave', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${owner}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ successorAccountId: 'acc_chosen' })
+    })
+    expect(left.status).toBe(200)
+    expect(sqlite.prepare(`SELECT account_id FROM legacy_family_memberships
+      WHERE family_id = 'fam_test' AND status = 'ACTIVE' AND role = 'ADMIN'`).get())
+      .toEqual({ account_id: 'acc_chosen' })
+  })
+
+  it('requires the separate dissolution flow when the final member tries to leave', async () => {
+    const legacyToken = 'ss_dv_last_member'
+    await seedLegacyFamily(legacyToken)
+    const owner = await accountAccess('acc_owner', 'adev_owner', 'last_member')
+    expect((await fetch('/v1/auth/family/claim', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${owner}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyDeviceToken: legacyToken })
+    })).status).toBe(200)
+
+    const rejected = await fetch('/v1/auth/family/leave', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${owner}` }
+    })
+    expect(rejected.status).toBe(409)
+    expect(await rejected.json()).toMatchObject({ error: { code: 'FAMILY_DISSOLUTION_REQUIRED' } })
+    expect(sqlite.prepare(`SELECT role, status, ended_at FROM legacy_family_memberships`).get())
+      .toEqual({ role: 'ADMIN', status: 'ACTIVE', ended_at: null })
+    expect(sqlite.prepare(`SELECT revoked_at FROM devices`).get()).toEqual({ revoked_at: null })
+  })
+
+  it('pauses family sync when the leaving member was the final payer', async () => {
+    env.ENTITLEMENT_ENFORCEMENT = 'true'
+    env.ENTITLEMENT_TEST_MODE = 'true'
+    const legacyToken = 'ss_dv_payer_leave_owner'
+    const inviteCode = 'PAYLEFT'
+    await seedLegacyFamily(legacyToken)
+    const owner = await accountAccess('acc_owner', 'adev_owner', 'payer_leave_owner')
+    expect((await fetch('/v1/auth/family/claim', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${owner}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyDeviceToken: legacyToken })
+    })).status).toBe(200)
+    await seedInvite(inviteCode)
+
+    const payer = await accountAccess('acc_payer', 'adev_payer', 'payer_leave_member')
+    const joined = await fetch('/v1/auth/family/join', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${payer}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: inviteCode, deviceName: 'Payer phone' })
+    })
+    expect(joined.status).toBe(201)
+    expect((await fetch('/v1/auth/test/plan', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${payer}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan: 'family' })
+    })).status).toBe(200)
+
+    const before = await fetch('/v1/auth/access', { headers: { Authorization: `Bearer ${owner}` } })
+    expect(await before.json()).toMatchObject({ data: {
+      familySync: { status: 'ACTIVE', canSync: true, familyId: 'fam_test' }
+    } })
+
+    const left = await fetch('/v1/auth/family/leave', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${payer}` }
+    })
+    expect(left.status).toBe(200)
+    const ownerAfter = await fetch('/v1/auth/access', { headers: { Authorization: `Bearer ${owner}` } })
+    expect(await ownerAfter.json()).toMatchObject({ data: {
+      membership: { familyId: 'fam_test', role: 'ADMIN' },
+      familyFeatures: [],
+      familySync: { status: 'PAUSED', canSync: false, familyId: 'fam_test' }
+    } })
+    const payerAfter = await fetch('/v1/auth/access', { headers: { Authorization: `Bearer ${payer}` } })
+    expect(await payerAfter.json()).toMatchObject({ data: {
+      membership: null,
+      accountFeatures: ['FAMILY_SYNC', 'PDF_EXPORT'],
+      familyFeatures: [],
+      familySync: { status: 'NO_ACTIVE_MEMBERSHIP', canSync: false }
+    } })
+  })
+
   it('shares the highest active family plan and pauses after the last grant ends', async () => {
     env.ENTITLEMENT_ENFORCEMENT = 'true'
     env.ENTITLEMENT_TEST_MODE = 'true'

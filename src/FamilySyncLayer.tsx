@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Locale } from './i18n'
 import { loadData } from './storage'
-import { createFamily, createInvite, getSyncStore, joinFamily, leaveFamily, pullRemote, reconcileAccountFamily, refreshFamilyInfo, resolveSyncConflict, restoreMissingSession } from './familySync'
-import { ACCOUNT_STATE_EVENT, getAccountAccess, setInternalTestPlan } from './accountAuth'
+import { createFamily, createInvite, getAccountFamilyMembers, getSyncStore, joinFamily, leaveAccountFamily, leaveFamily, pullRemote, reconcileAccountFamily, reconnectAccountFamily, refreshFamilyInfo, resolveSyncConflict, restoreMissingSession } from './familySync'
+import type { FamilyMemberChoice } from './familySync'
+import { ACCOUNT_ACCESS_EVENT, ACCOUNT_STATE_EVENT, getAccountAccess, setInternalTestPlan } from './accountAuth'
 import { INTERNAL_PLAN_PREVIEW_EVENT, INTERNAL_PLAN_PREVIEW_KEY, canUseFamilySync, parseProductPlan } from './entitlements'
 import type { ProductPlan } from './entitlements'
 
@@ -27,8 +28,8 @@ const copy = {
     familyName: 'Család neve', familyNamePlaceholder: 'Pl. Kovács család', createButton: 'Család létrehozása',
     codePlaceholder: 'Meghívókód', joinButton: 'Csatlakozás', cancel: 'Mégse', close: 'Bezárás',
     inviteTitle: 'Meghívókód', inviteHelp: 'A másik családtag lépjen be a saját Google-fiókjával, majd írja be ezt a kódot. 30 percig érvényes.',
-    newInvite: 'Új meghívókód', copyCode: 'Kód másolása', copied: 'Másolva ✓', leave: 'Eszköz leválasztása',
-    leaveConfirm: 'Leválasztod ezt a telefont a közös családi adatokról?', syncing: 'Adatok frissítése…', offline: 'Offline', error: 'Nem sikerült frissíteni a családi adatokat.',
+    newInvite: 'Új meghívókód', copyCode: 'Kód másolása', copied: 'Másolva ✓', leave: 'Eszköz leválasztása', reconnect: 'Eszköz újracsatlakoztatása', leaveAccount: 'Kilépés a családból',
+    leaveConfirm: 'Csak ezt a telefont választod le. A családi tagságod és a helyi napló megmarad. Később újracsatlakoztathatod az eszközt.', leaveAccountConfirm: 'Kilépsz a családból? Minden eszközöd elveszíti a családi hozzáférést, a telefon helyi naplója megmarad.', leaveAdminTitle: 'Ki legyen az új admin?', leaveAdminHelp: 'Válassz családtagot, vagy bízd a rendszerre. Automatikus választásnál a legrégebbi aktív tag lesz az admin.', leaveAdminAuto: 'Automatikus választás', leaveAdminFinalConfirm: 'Kilépsz a családból? Minden eszközöd elveszíti a családi hozzáférést, a telefon helyi naplója megmarad.', syncing: 'Adatok frissítése…', offline: 'Offline', error: 'Nem sikerült frissíteni a családi adatokat.',
     settingsHintConnected: 'A család eszközei ugyanazokat az alvásadatokat látják.', settingsHintDisconnected: 'Párosíts egy másik telefont meghívókóddal.', familyConnected: 'Család összekapcsolva',
     pendingOne: '1 módosítás várakozik', pendingMany: (count: number) => `${count} módosítás várakozik`,
     conflictOne: '1 módosítás ütközik egy másik telefon változatával', conflictMany: (count: number) => `${count} módosítás ütközik egy másik telefon változatával`,
@@ -37,7 +38,7 @@ const copy = {
     offlineHint: 'A módosításokat elmentjük, és internetkapcsolatnál elküldjük.', syncIssue: 'Szinkron ellenőrzése szükséges',
     lastSyncNow: 'Utolsó szinkron: most', lastSyncMinutes: (minutes: number) => `Utolsó szinkron: ${minutes} perce`, lastSyncLongAgo: 'Utolsó szinkron: régebben',
     inviteNotFound: 'A meghívókód nem található. Ellenőrizd a kódot, vagy kérj újat.', inviteUsed: 'Ezt a meghívókódot már felhasználták. Kérj egy új kódot.', inviteExpired: 'A meghívókód lejárt. Kérj egy új kódot.',
-    deviceRevoked: 'Ez a telefon már le lett választva a családról.', invalidToken: 'A készülék kapcsolata már nem érvényes. Párosítsd újra a telefont.', accountRequired: 'A meghívókód használatához előbb lépj be a saját Google-fiókoddal.', ownerAccountRequired: 'A család létrehozójának előbb össze kell kapcsolnia a családot a Solemi-fiókjával.', alreadyInFamily: 'Ez a Google-fiók már egy családhoz tartozik.', networkError: 'Nincs kapcsolat a Solemi Sleep szerverével. Próbáld újra később.',
+    deviceRevoked: 'Ez a telefon már le lett választva a családról.', invalidToken: 'A készülék kapcsolata már nem érvényes. Párosítsd újra a telefont.', accountRequired: 'A meghívókód használatához előbb lépj be a saját Google-fiókoddal.', ownerAccountRequired: 'A család létrehozójának előbb össze kell kapcsolnia a családot a Solemi-fiókjával.', alreadyInFamily: 'Ez a Google-fiók már egy családhoz tartozik.', familyDissolutionRequired: 'Egyetlen megmaradt tagként külön a Család megszüntetése folyamatot kell használnod.', leaveOffline: 'Kilépés vagy leválasztás előtt csatlakozz az internethez.', leavePending: 'Kilépés vagy leválasztás előtt várd meg a függő módosítások szinkronizálását.', leaveAttention: 'Kilépés vagy leválasztás előtt rendezd a jelzett szinkronhibát vagy ütközést.', networkError: 'Nincs kapcsolat a Solemi Sleep szerverével. Próbáld újra később.',
     locked: 'Zárolva', lockedHint: 'Ehhez a funkcióhoz Family előfizetés szükséges.', lockedDescription: 'A Family csomaggal összekapcsolhatod a család telefonjait, hogy ugyanazokat az alvásadatokat lássátok.',
     paused: 'A családi szinkron szünetel', pausedHint: 'A családban jelenleg nincs aktív Family vagy Family+ előfizetés. A helyi módosításaid megmaradnak.'
   },
@@ -47,8 +48,8 @@ const copy = {
     familyName: 'Family name', familyNamePlaceholder: 'e.g. Smith family', createButton: 'Create family',
     codePlaceholder: 'Invite code', joinButton: 'Join', cancel: 'Cancel', close: 'Close',
     inviteTitle: 'Invite code', inviteHelp: 'The other family member should sign in with their own Google account, then enter this code. It is valid for 30 minutes.',
-    newInvite: 'New invite code', copyCode: 'Copy code', copied: 'Copied ✓', leave: 'Disconnect this device',
-    leaveConfirm: 'Disconnect this phone from the shared family data?', syncing: 'Updating family data…', offline: 'Offline', error: 'Could not update family data.',
+    newInvite: 'New invite code', copyCode: 'Copy code', copied: 'Copied ✓', leave: 'Disconnect this device', reconnect: 'Reconnect this device', leaveAccount: 'Leave family',
+    leaveConfirm: 'Disconnect only this phone? Your family membership and local diary remain, and you can reconnect this device later.', leaveAccountConfirm: 'Leave the family? All your devices lose family access while this phone keeps its local diary.', leaveAdminTitle: 'Who should become admin?', leaveAdminHelp: 'Choose a family member or let Solemi decide. Automatic selection makes the oldest active member admin.', leaveAdminAuto: 'Choose automatically', leaveAdminFinalConfirm: 'Leave the family? All your devices lose family access while this phone keeps its local diary.', syncing: 'Updating family data…', offline: 'Offline', error: 'Could not update family data.',
     settingsHintConnected: 'Family devices see the same sleep data.', settingsHintDisconnected: 'Pair another phone with an invite code.', familyConnected: 'Family connected',
     pendingOne: '1 change waiting', pendingMany: (count: number) => `${count} changes waiting`,
     conflictOne: '1 change conflicts with another phone’s version', conflictMany: (count: number) => `${count} changes conflict with another phone’s version`,
@@ -57,7 +58,7 @@ const copy = {
     offlineHint: 'Changes are saved and will be sent when the internet connection returns.', syncIssue: 'Sync needs attention',
     lastSyncNow: 'Last sync: now', lastSyncMinutes: (minutes: number) => `Last sync: ${minutes} min ago`, lastSyncLongAgo: 'Last sync: earlier',
     inviteNotFound: 'Invite code not found. Check the code or request a new one.', inviteUsed: 'This invite code has already been used. Request a new code.', inviteExpired: 'This invite code has expired. Request a new code.',
-    deviceRevoked: 'This phone has already been disconnected from the family.', invalidToken: 'This device connection is no longer valid. Pair the phone again.', accountRequired: 'Sign in with your own Google account before using an invite code.', ownerAccountRequired: 'The family creator must connect the family to their Solemi account first.', alreadyInFamily: 'This Google account already belongs to a family.', networkError: 'Cannot reach the Solemi Sleep server. Try again later.',
+    deviceRevoked: 'This phone has already been disconnected from the family.', invalidToken: 'This device connection is no longer valid. Pair the phone again.', accountRequired: 'Sign in with your own Google account before using an invite code.', ownerAccountRequired: 'The family creator must connect the family to their Solemi account first.', alreadyInFamily: 'This Google account already belongs to a family.', familyDissolutionRequired: 'As the final member, use the separate Dissolve family flow.', leaveOffline: 'Connect to the internet before leaving or disconnecting.', leavePending: 'Wait for pending changes to sync before leaving or disconnecting.', leaveAttention: 'Resolve the sync error or conflict before leaving or disconnecting.', networkError: 'Cannot reach the Solemi Sleep server. Try again later.',
     locked: 'Locked', lockedHint: 'A Family subscription is required for this feature.', lockedDescription: 'With the Family plan, you can connect the family’s phones so everyone sees the same sleep data.',
     paused: 'Family sync is paused', pausedHint: 'No family member currently has an active Family or Family+ subscription. Your local changes are kept.'
   },
@@ -67,8 +68,8 @@ const copy = {
     familyName: 'Familienname', familyNamePlaceholder: 'z. B. Familie Müller', createButton: 'Familie erstellen',
     codePlaceholder: 'Einladungscode', joinButton: 'Beitreten', cancel: 'Abbrechen', close: 'Schließen',
     inviteTitle: 'Einladungscode', inviteHelp: 'Das andere Familienmitglied meldet sich mit dem eigenen Google-Konto an und gibt dann diesen Code ein. Er ist 30 Minuten gültig.',
-    newInvite: 'Neuer Einladungscode', copyCode: 'Code kopieren', copied: 'Kopiert ✓', leave: 'Dieses Gerät trennen',
-    leaveConfirm: 'Dieses Telefon von den gemeinsamen Familiendaten trennen?', syncing: 'Familiendaten werden aktualisiert…', offline: 'Offline', error: 'Familiendaten konnten nicht aktualisiert werden.',
+    newInvite: 'Neuer Einladungscode', copyCode: 'Code kopieren', copied: 'Kopiert ✓', leave: 'Dieses Gerät trennen', reconnect: 'Dieses Gerät wieder verbinden', leaveAccount: 'Familie verlassen',
+    leaveConfirm: 'Nur dieses Telefon trennen? Deine Familienmitgliedschaft und das lokale Tagebuch bleiben erhalten. Du kannst das Gerät später wieder verbinden.', leaveAccountConfirm: 'Familie verlassen? Alle deine Geräte verlieren den Familienzugriff, das lokale Tagebuch auf diesem Telefon bleibt erhalten.', leaveAdminTitle: 'Wer soll Admin werden?', leaveAdminHelp: 'Wähle ein Familienmitglied oder überlasse Solemi die Auswahl. Automatisch wird das älteste aktive Mitglied Admin.', leaveAdminAuto: 'Automatisch auswählen', leaveAdminFinalConfirm: 'Familie verlassen? Alle deine Geräte verlieren den Familienzugriff, das lokale Tagebuch bleibt erhalten.', syncing: 'Familiendaten werden aktualisiert…', offline: 'Offline', error: 'Familiendaten konnten nicht aktualisiert werden.',
     settingsHintConnected: 'Familiengeräte sehen dieselben Schlafdaten.', settingsHintDisconnected: 'Verbinde ein weiteres Telefon per Einladungscode.', familyConnected: 'Familie verbunden',
     pendingOne: '1 Änderung wartet', pendingMany: (count: number) => `${count} Änderungen warten`,
     conflictOne: '1 Änderung steht im Konflikt mit der Version eines anderen Telefons', conflictMany: (count: number) => `${count} Änderungen stehen im Konflikt mit der Version eines anderen Telefons`,
@@ -77,7 +78,7 @@ const copy = {
     offlineHint: 'Änderungen werden gespeichert und bei Internetverbindung übertragen.', syncIssue: 'Sync muss geprüft werden',
     lastSyncNow: 'Letzter Sync: gerade eben', lastSyncMinutes: (minutes: number) => `Letzter Sync: vor ${minutes} Min.`, lastSyncLongAgo: 'Letzter Sync: vor längerer Zeit',
     inviteNotFound: 'Einladungscode nicht gefunden. Prüfe den Code oder fordere einen neuen an.', inviteUsed: 'Dieser Einladungscode wurde bereits verwendet. Fordere einen neuen an.', inviteExpired: 'Dieser Einladungscode ist abgelaufen. Fordere einen neuen an.',
-    deviceRevoked: 'Dieses Telefon wurde bereits von der Familie getrennt.', invalidToken: 'Diese Geräteverbindung ist nicht mehr gültig. Kopple das Telefon erneut.', accountRequired: 'Melde dich mit deinem eigenen Google-Konto an, bevor du einen Einladungscode verwendest.', ownerAccountRequired: 'Der Ersteller der Familie muss die Familie zuerst mit dem Solemi-Konto verbinden.', alreadyInFamily: 'Dieses Google-Konto gehört bereits zu einer Familie.', networkError: 'Der Solemi-Sleep-Server ist nicht erreichbar. Versuche es später erneut.',
+    deviceRevoked: 'Dieses Telefon wurde bereits von der Familie getrennt.', invalidToken: 'Diese Geräteverbindung ist nicht mehr gültig. Kopple das Telefon erneut.', accountRequired: 'Melde dich mit deinem eigenen Google-Konto an, bevor du einen Einladungscode verwendest.', ownerAccountRequired: 'Der Ersteller der Familie muss die Familie zuerst mit dem Solemi-Konto verbinden.', alreadyInFamily: 'Dieses Google-Konto gehört bereits zu einer Familie.', familyDissolutionRequired: 'Als letztes Mitglied musst du den separaten Ablauf Familie auflösen verwenden.', leaveOffline: 'Stelle vor dem Verlassen oder Trennen eine Internetverbindung her.', leavePending: 'Warte vor dem Verlassen oder Trennen, bis ausstehende Änderungen synchronisiert sind.', leaveAttention: 'Behebe vor dem Verlassen oder Trennen den Sync-Fehler oder Konflikt.', networkError: 'Der Solemi-Sleep-Server ist nicht erreichbar. Versuche es später erneut.',
     locked: 'Gesperrt', lockedHint: 'Für diese Funktion ist ein Family-Abo erforderlich.', lockedDescription: 'Mit dem Family-Abo kannst du die Telefone der Familie verbinden, damit alle dieselben Schlafdaten sehen.',
     paused: 'Familiensynchronisierung pausiert', pausedHint: 'Derzeit hat kein Familienmitglied ein aktives Family- oder Family+-Abo. Lokale Änderungen bleiben erhalten.'
   }
@@ -94,7 +95,7 @@ function deviceName() {
 
 export default function FamilySyncLayer() {
   const [open, setOpen] = useState(false)
-  const [mode, setMode] = useState<'home' | 'create' | 'join' | 'invite'>('home')
+  const [mode, setMode] = useState<'home' | 'create' | 'join' | 'invite' | 'leave-admin'>('home')
   const [code, setCode] = useState('')
   const [familyName, setFamilyName] = useState('')
   const [inviteCode, setInviteCode] = useState(() => sessionStorage.getItem(LAST_INVITE_KEY) || '')
@@ -115,20 +116,27 @@ export default function FamilySyncLayer() {
   const [previewPlan, setPreviewPlan] = useState<ProductPlan>(() => loadInternalPlanPreview())
   const [serverFamilySync, setServerFamilySync] = useState<boolean | null>(null)
   const [serverPaused, setServerPaused] = useState(false)
+  const [accountMembership, setAccountMembership] = useState<null | { familyId: string; role: 'ADMIN' | 'MEMBER' }>(null)
+  const [leaveCandidates, setLeaveCandidates] = useState<FamilyMemberChoice[]>([])
   const locale = loadData().settings.locale as Locale
   const text = copy[locale]
   const familySyncAvailable = serverFamilySync ?? (!internalPreview || canUseFamilySync(previewPlan))
 
   const friendlyError = (err: unknown) => {
     const apiError = err as SyncError
-    if (apiError?.code === 'INVITE_NOT_FOUND') return text.inviteNotFound
-    if (apiError?.code === 'INVITE_ALREADY_USED') return text.inviteUsed
-    if (apiError?.code === 'INVITE_EXPIRED') return text.inviteExpired
-    if (apiError?.code === 'DEVICE_REVOKED') return text.deviceRevoked
-    if (apiError?.code === 'INVALID_DEVICE_TOKEN') return text.invalidToken
-    if (apiError?.code === 'SESSION_INVALID') return text.accountRequired
-    if (apiError?.code === 'FAMILY_OWNER_ACCOUNT_REQUIRED') return text.ownerAccountRequired
-    if (apiError?.code === 'ACCOUNT_ALREADY_IN_FAMILY' || apiError?.code === 'ACCOUNT_ALREADY_IN_OTHER_FAMILY') return text.alreadyInFamily
+    const code = apiError?.code || (err instanceof Error ? err.message : '')
+    if (code === 'INVITE_NOT_FOUND') return text.inviteNotFound
+    if (code === 'INVITE_ALREADY_USED') return text.inviteUsed
+    if (code === 'INVITE_EXPIRED') return text.inviteExpired
+    if (code === 'DEVICE_REVOKED') return text.deviceRevoked
+    if (code === 'INVALID_DEVICE_TOKEN') return text.invalidToken
+    if (code === 'SESSION_INVALID') return text.accountRequired
+    if (code === 'FAMILY_OWNER_ACCOUNT_REQUIRED') return text.ownerAccountRequired
+    if (code === 'ACCOUNT_ALREADY_IN_FAMILY' || code === 'ACCOUNT_ALREADY_IN_OTHER_FAMILY') return text.alreadyInFamily
+    if (code === 'FAMILY_DISSOLUTION_REQUIRED') return text.familyDissolutionRequired
+    if (code.endsWith('_OFFLINE')) return text.leaveOffline
+    if (code.endsWith('_PENDING')) return text.leavePending
+    if (code.endsWith('_ATTENTION') || code.endsWith('_BLOCKED')) return text.leaveAttention
     if (!navigator.onLine || err instanceof TypeError || apiError?.code === 'API_TIMEOUT' || apiError?.code === 'NETWORK_ERROR') return text.networkError
     return text.error
   }
@@ -175,6 +183,7 @@ export default function FamilySyncLayer() {
         const access = await getAccountAccess()
         setServerFamilySync(access.familySync.canSync)
         setServerPaused(access.familySync.status === 'PAUSED')
+        setAccountMembership(access.membership)
         if (result.connected) {
           const next = getSyncStore().connection
           setConnected(Boolean(next))
@@ -188,6 +197,15 @@ export default function FamilySyncLayer() {
     window.addEventListener(ACCOUNT_STATE_EVENT, reconcile)
     return () => window.removeEventListener(ACCOUNT_STATE_EVENT, reconcile)
   }, [previewPlan])
+
+  useEffect(() => {
+    const onAccess = (event: Event) => {
+      const access = (event as CustomEvent<{ access?: { membership?: null | { familyId: string; role: 'ADMIN' | 'MEMBER' } } }>).detail?.access
+      setAccountMembership(access?.membership ?? null)
+    }
+    window.addEventListener(ACCOUNT_ACCESS_EVENT, onAccess)
+    return () => window.removeEventListener(ACCOUNT_ACCESS_EVENT, onAccess)
+  }, [])
 
   useEffect(() => {
     const refreshTarget = () => setSettingsTarget(document.querySelector('.settings-screen'))
@@ -249,6 +267,7 @@ export default function FamilySyncLayer() {
         if (stopped) return
         setServerFamilySync(access.familySync.canSync)
         setServerPaused(access.familySync.status === 'PAUSED')
+        setAccountMembership(access.membership)
       } catch { /* account restoration and the sync loop surface connection errors */ }
     }
     void refreshAccess()
@@ -386,10 +405,60 @@ export default function FamilySyncLayer() {
 
   const handleLeave = async () => {
     if (!window.confirm(text.leaveConfirm)) return
-    setBusy(true)
-    await leaveFamily()
-    localStorage.removeItem(LAST_SYNC_KEY)
-    window.location.reload()
+    setBusy(true); setError('')
+    try {
+      await leaveFamily()
+      localStorage.removeItem(LAST_SYNC_KEY)
+      window.location.reload()
+    } catch (err) {
+      setError(friendlyError(err))
+      setBusy(false)
+    }
+  }
+
+  const handleReconnect = async () => {
+    setBusy(true); setError('')
+    try {
+      const result = await reconnectAccountFamily()
+      if (!result.connected) throw new Error('FAMILY_MEMBERSHIP_CHANGED')
+      window.location.reload()
+    } catch (err) {
+      setError(friendlyError(err))
+      setBusy(false)
+    }
+  }
+
+  const performAccountLeave = async (successorAccountId?: string) => {
+    if (!window.confirm(accountMembership?.role === 'ADMIN' ? text.leaveAdminFinalConfirm : text.leaveAccountConfirm)) return
+    setBusy(true); setError('')
+    try {
+      await leaveAccountFamily(successorAccountId)
+      await getAccountAccess()
+      localStorage.removeItem(LAST_SYNC_KEY)
+      window.location.reload()
+    } catch (err) {
+      setError(friendlyError(err))
+      setBusy(false)
+    }
+  }
+
+  const handleAccountLeave = async () => {
+    if (accountMembership?.role !== 'ADMIN') {
+      await performAccountLeave()
+      return
+    }
+    setBusy(true); setError('')
+    try {
+      const members = await getAccountFamilyMembers()
+      if (!members.length) {
+        await performAccountLeave()
+        return
+      }
+      setLeaveCandidates(members)
+      setMode('leave-admin')
+    } catch (err) {
+      setError(friendlyError(err))
+    } finally { setBusy(false) }
   }
 
   const handleConflict = async (resolution: 'local' | 'family') => {
@@ -435,12 +504,23 @@ export default function FamilySyncLayer() {
       <section className="family-sync-sheet" onClick={(event) => event.stopPropagation()}>
         <div className="family-sync-handle" />
         <header><div><small>{status}</small><h2>{text.title}</h2></div><button onClick={() => setOpen(false)} disabled={busy}>×</button></header>
-        {!familySyncAvailable && <div className="family-sync-content family-sync-locked">
+        {!familySyncAvailable && mode !== 'leave-admin' && <div className="family-sync-content family-sync-locked">
           <div className="family-sync-lock-icon">🔒</div>
           <strong>{serverPaused ? text.paused : text.lockedHint}</strong>
           <p>{serverPaused ? text.pausedHint : text.lockedDescription}</p>
+          {accountMembership && <>
+            {connected
+              ? <button className="family-sync-secondary" onClick={handleLeave} disabled={busy}>{text.leave}</button>
+              : <button className="family-sync-secondary" onClick={handleReconnect} disabled={busy || !online}>{text.reconnect}</button>}
+            <button className="family-sync-link danger" onClick={handleAccountLeave} disabled={busy || !online}>{text.leaveAccount}</button>
+          </>}
         </div>}
-        {familySyncAvailable && mode === 'home' && !connected && <div className="family-sync-content">
+        {familySyncAvailable && mode === 'home' && !connected && accountMembership && <div className="family-sync-content">
+          <p>{text.settingsHintDisconnected}</p>
+          <button className="family-sync-primary" onClick={handleReconnect} disabled={busy || !online}>{busy ? text.syncing : text.reconnect}</button>
+          <button className="family-sync-link danger" onClick={handleAccountLeave} disabled={busy || !online}>{text.leaveAccount}</button>
+        </div>}
+        {familySyncAvailable && mode === 'home' && !connected && !accountMembership && <div className="family-sync-content">
           <p>{text.intro}</p>
           <button className="family-sync-primary" onClick={() => setMode('create')} disabled={busy}>{text.create}</button>
           <button className="family-sync-secondary" onClick={() => setMode('join')} disabled={busy}>{text.join}</button>
@@ -457,6 +537,16 @@ export default function FamilySyncLayer() {
           <button className="family-sync-primary" onClick={handleJoin} disabled={busy || !code.trim()}>{busy ? text.syncing : text.joinButton}</button>
           <button className="family-sync-link" onClick={() => setMode('home')} disabled={busy}>{text.cancel}</button>
         </div>}
+        {mode === 'leave-admin' && <div className="family-sync-content">
+          <strong>{text.leaveAdminTitle}</strong>
+          <p>{text.leaveAdminHelp}</p>
+          {leaveCandidates.map((member) => <button className="family-sync-secondary" key={member.accountId}
+            onClick={() => performAccountLeave(member.accountId)} disabled={busy}>
+            {member.name || member.email || member.accountId}
+          </button>)}
+          <button className="family-sync-secondary" onClick={() => performAccountLeave()} disabled={busy}>{text.leaveAdminAuto}</button>
+          <button className="family-sync-link" onClick={() => setMode('home')} disabled={busy}>{text.cancel}</button>
+        </div>}
         {familySyncAvailable && mode === 'home' && connected && conflictCount > 0 && <div className="family-sync-content">
           <div className="family-sync-status-card"><span>!</span><div><strong>{text.conflictTitle}</strong><small>{text.conflictHelp}</small></div></div>
           <button className="family-sync-primary" onClick={() => handleConflict('local')} disabled={busy}>{text.keepLocal}</button>
@@ -467,6 +557,7 @@ export default function FamilySyncLayer() {
           {!missingSessions.length && <>
             <button className="family-sync-primary" onClick={handleInvite} disabled={busy || !online}>{busy ? text.syncing : text.newInvite}</button>
             <button className="family-sync-link danger" onClick={handleLeave} disabled={busy}>{text.leave}</button>
+            {accountMembership && <button className="family-sync-link danger" onClick={handleAccountLeave} disabled={busy || !online}>{text.leaveAccount}</button>}
           </>}
         </div>}
         {familySyncAvailable && mode === 'invite' && <div className="family-sync-content invite-view">
