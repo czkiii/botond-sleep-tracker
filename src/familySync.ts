@@ -326,17 +326,26 @@ export async function createFamily(familyName: string, deviceName: string) {
   const local = loadData()
   saveSafetyBackup(local, 'before-family-bootstrap')
   const primaryChild = local.children.find((child) => child.id === local.settings.activeChildId) ?? local.children[0]
-  const created = await request<{ familyId: string; familyName: string; device: { id: string; name: string | null }; deviceToken: string; revision: number }>('/v1/families', {
-    method: 'POST',
-    body: JSON.stringify({
-      familyName: familyName.trim(),
-      deviceName,
-      childId: primaryChild?.id,
-      childName: primaryChild?.name ?? '',
-      birthDate: primaryChild?.birthDate ?? null
-    })
+  const body = JSON.stringify({
+    familyName: familyName.trim(),
+    deviceName,
+    childId: primaryChild?.id,
+    childName: primaryChild?.name ?? '',
+    birthDate: primaryChild?.birthDate ?? null
   })
-  const connection: SyncConnection = { familyId: created.familyId, familyName: created.familyName, deviceId: created.device.id, deviceToken: created.deviceToken, revision: created.revision }
+  let connection: SyncConnection
+  if (import.meta.env.VITE_ACCOUNT_AUTH === 'true') {
+    const created = await accountRequest<{ connection: SyncConnection }>('/v1/auth/family/create', {
+      method: 'POST', body
+    })
+    connection = created.connection
+  } else {
+    const created = await request<{ familyId: string; familyName: string; device: { id: string; name: string | null }; deviceToken: string; revision: number }>('/v1/families', {
+      method: 'POST', body
+    })
+    connection = { familyId: created.familyId, familyName: created.familyName,
+      deviceId: created.device.id, deviceToken: created.deviceToken, revision: created.revision }
+  }
   localStorage.removeItem(DETACHED_FAMILY_KEY)
   const baseline = { ...local, children: primaryChild ? [primaryChild] : [], sessions: [] }
   writeStore({ connection, pending: makeOperations(baseline, local, connection.revision), conflicts: [], missingSessions: [] })

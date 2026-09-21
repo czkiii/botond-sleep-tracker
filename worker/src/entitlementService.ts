@@ -38,14 +38,6 @@ export class EntitlementService {
     return (await this.familyFeatures(familyId, now)).includes('FAMILY_SYNC')
   }
 
-  async familyHasAccountMembers(familyId: string) {
-    const row = await this.db.prepare(`SELECT EXISTS (
-      SELECT 1 FROM legacy_family_memberships
-      WHERE family_id = ? AND status = 'ACTIVE'
-    ) AS found`).bind(familyId).first<{ found: number }>()
-    return row?.found === 1
-  }
-
   async accessState(accountId: string, now = Date.now()) {
     const [accountFeatures, membership] = await Promise.all([
       this.accountFeatures(accountId, now),

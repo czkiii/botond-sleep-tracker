@@ -74,6 +74,13 @@ async function seedInvite(code: string) {
       new Date(now.getTime() + 30 * 60 * 1000).toISOString())
 }
 
+function setTestPlan(access: string, plan: 'free' | 'family' | 'familyPlus') {
+  return fetch('/v1/auth/test/plan', {
+    method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${access}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ plan })
+  })
+}
+
 describe('account auth routes', () => {
   it('returns a stored one-use challenge and public client ID with credentialed CORS', async () => {
     const response = await fetch('/v1/auth/challenge', { headers: { Origin: origin } })
@@ -141,6 +148,96 @@ describe('account auth routes', () => {
     expect(sync.status).toBe(200)
     expect(await sync.json()).toMatchObject({ data: { familyName: 'Teszt család', revision: 0 } })
     expect(sqlite.prepare('SELECT COUNT(*) AS count FROM account_family_devices').get()).toEqual({ count: 2 })
+  })
+
+  it('creates a paid family atomically through the account route and closes legacy writes', async () => {
+    env.ENTITLEMENT_ENFORCEMENT = 'true'
+    env.ENTITLEMENT_TEST_MODE = 'true'
+    const access = await accountAccess('acc_owner', 'adev_owner', 'account_create')
+    expect((await setTestPlan(access, 'family')).status).toBe(200)
+
+    const legacyCreate = await fetch('/v1/families', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyName: 'Megkerülés', deviceName: 'Régi kliens' })
+    })
+    expect(legacyCreate.status).toBe(401)
+    expect(await legacyCreate.json()).toMatchObject({ error: { code: 'ACCOUNT_REQUIRED' } })
+
+    const created = await fetch('/v1/auth/family/create', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${access}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyName: 'Új család', deviceName: 'Safari', childId: 'child_owned',
+        childName: 'Baba', birthDate: '2026-01-02' })
+    })
+    expect(created.status).toBe(201)
+    const body = await created.json() as { data: { membership: { role: string }; connection: {
+      familyId: string; deviceId: string; deviceToken: string } } }
+    expect(body.data.membership.role).toBe('ADMIN')
+    expect(sqlite.prepare(`SELECT family_id, account_id, role, status FROM legacy_family_memberships`).get())
+      .toEqual({ family_id: body.data.connection.familyId, account_id: 'acc_owner', role: 'ADMIN', status: 'ACTIVE' })
+    expect(sqlite.prepare(`SELECT account_device_id, legacy_device_id FROM account_family_devices`).get())
+      .toEqual({ account_device_id: 'adev_owner', legacy_device_id: body.data.connection.deviceId })
+    expect(sqlite.prepare(`SELECT name, birth_date FROM children WHERE id = 'child_owned'`).get())
+      .toEqual({ name: 'Baba', birth_date: '2026-01-02' })
+
+    const rawSync = await fetch('/v1/sync?after=0', {
+      headers: { Authorization: `Bearer ${body.data.connection.deviceToken}` }
+    })
+    expect(rawSync.status).toBe(401)
+    expect(await rawSync.json()).toMatchObject({ error: { code: 'SESSION_INVALID' } })
+
+    const authorizedSync = await fetch('/v1/sync?after=0', { headers: {
+      Authorization: `Bearer ${access}`, 'X-Solemi-Family-Token': body.data.connection.deviceToken
+    } })
+    expect(authorizedSync.status).toBe(200)
+
+    const rawInvite = await fetch('/v1/invites', {
+      method: 'POST', headers: { Authorization: `Bearer ${body.data.connection.deviceToken}` }
+    })
+    expect(rawInvite.status).toBe(401)
+    const authorizedInvite = await fetch('/v1/invites', { method: 'POST', headers: {
+      Authorization: `Bearer ${access}`, 'X-Solemi-Family-Token': body.data.connection.deviceToken
+    } })
+    expect(authorizedInvite.status).toBe(201)
+  })
+
+  it('keeps an unclaimed legacy family claimable but blocks raw diary access during enforcement', async () => {
+    env.ENTITLEMENT_ENFORCEMENT = 'true'
+    env.ENTITLEMENT_TEST_MODE = 'true'
+    const legacyToken = 'ss_dv_compatible-claim'
+    await seedLegacyFamily(legacyToken)
+
+    const blocked = await fetch('/v1/sync?after=0', {
+      headers: { Authorization: `Bearer ${legacyToken}` }
+    })
+    expect(blocked.status).toBe(401)
+    expect(await blocked.json()).toMatchObject({ error: { code: 'SESSION_INVALID' } })
+
+    const access = await accountAccess('acc_owner', 'adev_owner', 'compatible_claim')
+    const claim = await fetch('/v1/auth/family/claim', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${access}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyDeviceToken: legacyToken })
+    })
+    expect(claim.status).toBe(200)
+    expect((await setTestPlan(access, 'family')).status).toBe(200)
+    const migrated = await fetch('/v1/sync?after=0', { headers: {
+      Authorization: `Bearer ${access}`, 'X-Solemi-Family-Token': legacyToken
+    } })
+    expect(migrated.status).toBe(200)
+    expect(await migrated.json()).toMatchObject({ data: { familyName: 'Teszt család' } })
+  })
+
+  it('does not create server rows when a free account calls the authenticated family route', async () => {
+    env.ENTITLEMENT_ENFORCEMENT = 'true'
+    const access = await accountAccess('acc_free', 'adev_free', 'free_create')
+    const response = await fetch('/v1/auth/family/create', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${access}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyName: 'Nem jöhet létre', deviceName: 'Chrome' })
+    })
+    expect(response.status).toBe(403)
+    expect(await response.json()).toMatchObject({ error: { code: 'FAMILY_SYNC_SUBSCRIPTION_REQUIRED' } })
+    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM families').get()).toEqual({ count: 0 })
+    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM devices').get()).toEqual({ count: 0 })
+    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM legacy_family_memberships').get()).toEqual({ count: 0 })
   })
 
   it('does not let a different account claim an already owned legacy family', async () => {

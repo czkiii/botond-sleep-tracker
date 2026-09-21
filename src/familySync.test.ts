@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { clearLocalDiary, flushPending, getSyncStore, isEmptyStarterData, leaveFamily, makeOperations, mergeRemote, pullRemote, reconcileAccountFamily, resolveSyncConflict, saveLocalData } from './familySync'
+import { clearLocalDiary, createFamily, flushPending, getSyncStore, isEmptyStarterData, leaveFamily, makeOperations, mergeRemote, pullRemote, reconcileAccountFamily, resolveSyncConflict, saveLocalData } from './familySync'
 import { DataStorageError, STORAGE_KEY, createDefaultData, loadData, loadSafetyBackup, saveSafetyBackup } from './storage'
 import { API_TIMEOUT_MS } from './apiTransport'
 import type { AppData, ChildProfile, SleepSession } from './types'
@@ -45,7 +45,53 @@ afterEach(() => {
   restoreGlobal('fetch')
   restoreGlobal('sessionStorage')
   vi.restoreAllMocks()
+  vi.unstubAllEnvs()
   vi.useRealTimers()
+})
+
+describe('account-owned family creation', () => {
+  it('uses the authenticated atomic route and sends the account session for the first invite', async () => {
+    vi.stubEnv('VITE_ACCOUNT_AUTH', 'true')
+    const storage = new MemoryStorage()
+    const session = new MemoryStorage()
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage })
+    Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, value: session })
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { onLine: true, language: 'hu-HU' } })
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { dispatchEvent: vi.fn() } })
+    const local = { ...previous, children: [previous.children[1]], sessions: [] }
+    storage.setItem(STORAGE_KEY, JSON.stringify(local))
+    session.setItem('solemiSleep:accountAccess', JSON.stringify({
+      account: { id: 'account-1', email: null, name: null }, deviceId: 'account-device-1',
+      accessToken: 'account-token', accessExpiresAt: Date.now() + 60_000, expiresAt: Date.now() + 120_000
+    }))
+    const fetchMock = vi.fn().mockImplementation((url: string, options: RequestInit) => {
+      if (String(url).includes('/v1/auth/family/create')) {
+        return Promise.resolve(new Response(JSON.stringify({ ok: true, data: { connection: {
+          familyId: 'family-1', familyName: 'Teszt', deviceId: 'family-device-1',
+          deviceToken: 'family-token', revision: 0
+        } } }), { status: 201, headers: { 'Content-Type': 'application/json' } }))
+      }
+      if (String(url).includes('/v1/invites')) {
+        return Promise.resolve(new Response(JSON.stringify({ ok: true, data: {
+          code: 'SOLEMI7', expiresAt: '2026-09-21T22:00:00.000Z'
+        } }), { status: 201, headers: { 'Content-Type': 'application/json' } }))
+      }
+      throw new Error(`Unexpected request: ${url} ${options.method}`)
+    })
+    Object.defineProperty(globalThis, 'fetch', { configurable: true, value: fetchMock })
+
+    await expect(createFamily('Teszt', 'Safari')).resolves.toMatchObject({ code: 'SOLEMI7' })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(String(fetchMock.mock.calls[0][0])).toContain('/v1/auth/family/create')
+    expect(String(fetchMock.mock.calls[0][0])).not.toContain('/v1/families')
+    const createHeaders = new Headers(fetchMock.mock.calls[0][1]?.headers)
+    expect(createHeaders.get('Authorization')).toBe('Bearer account-token')
+    const inviteHeaders = new Headers(fetchMock.mock.calls[1][1]?.headers)
+    expect(inviteHeaders.get('Authorization')).toBe('Bearer account-token')
+    expect(inviteHeaders.get('X-Solemi-Family-Token')).toBe('family-token')
+    expect(getSyncStore().connection).toMatchObject({ familyId: 'family-1', deviceId: 'family-device-1' })
+  })
 })
 
 describe('Family Sync child deletion', () => {

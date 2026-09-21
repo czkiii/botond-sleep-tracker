@@ -162,7 +162,7 @@ export default function FamilySyncLayer() {
       if (plan) {
         setPreviewPlan(plan)
         void setInternalTestPlan(plan).then((access) => {
-          setServerFamilySync(access.familySync.canSync)
+          setServerFamilySync(access.features.includes('FAMILY_SYNC'))
           setServerPaused(access.familySync.status === 'PAUSED')
         }).catch(() => {})
       }
@@ -181,7 +181,7 @@ export default function FamilySyncLayer() {
         if (internalPreview) await setInternalTestPlan(previewPlan)
         const result = await reconcileAccountFamily()
         const access = await getAccountAccess()
-        setServerFamilySync(access.familySync.canSync)
+        setServerFamilySync(access.features.includes('FAMILY_SYNC'))
         setServerPaused(access.familySync.status === 'PAUSED')
         setAccountMembership(access.membership)
         if (result.connected) {

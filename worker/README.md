@@ -204,11 +204,19 @@ Sync access is derived at request time: one active member with a current
 `FAMILY_SYNC` grant enables raw sync for every active member of that family.
 `FAMILY_PLUS_INSIGHTS` remains personal to the entitled account.
 
-Claimed families require both a current Solemi account session and the family
-device token mapped to that account device. The internal client sends the
-family token in `X-Solemi-Family-Token`; the account access token remains the
-Authorization bearer. Families not yet claimed retain the legacy bearer flow
-only during the transition.
+When `ENTITLEMENT_ENFORCEMENT=true`, every family diary read and write requires
+both a current Solemi account session and the family device token mapped to
+that account device. The client sends the family token in
+`X-Solemi-Family-Token`; the account access token remains the Authorization
+bearer. A paid account creates a family atomically through
+`POST /v1/auth/family/create`. The unauthenticated `/v1/families` and `/v1/join`
+routes remain available only while enforcement is disabled.
+
+Existing legacy families are not rewritten or deleted. Their current device
+token can still be claimed once through `POST /v1/auth/family/claim`; after the
+claim, normal membership, device mapping and family entitlement checks apply.
+This allows a compatible account migration without retaining raw-token access
+to paid diary data.
 
 Staging enables `/v1/auth/test/plan` with a `MANUAL` provider so Free, Family,
 Family+, expiry and reactivation can be tested before Apple and Google Play

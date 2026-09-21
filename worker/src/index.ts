@@ -844,6 +844,62 @@ async function deleteSleep(request: Request, env: Env, auth: DeviceAuth, session
   return ok(request, env, { revision: await currentRevision(env, auth.familyId), session: sessionDto(deleted) })
 }
 
+async function createAccountFamily(request: Request, env: Env, access: AccountAccess) {
+  const service = entitlementService(env)
+  if (env.ENTITLEMENT_ENFORCEMENT === 'true'
+    && !(await service.accountFeatures(access.account.id)).includes('FAMILY_SYNC')) {
+    throw new ApiError(403, 'FAMILY_SYNC_SUBSCRIPTION_REQUIRED')
+  }
+  const existingMembership = await service.activeMembership(access.account.id)
+  if (existingMembership) throw new ApiError(409, 'ACCOUNT_ALREADY_IN_FAMILY')
+  const existingMapping = await env.DB.prepare(`SELECT family_id FROM account_family_devices
+    WHERE account_device_id = ?`).bind(access.deviceId).first<{ family_id: string }>()
+  if (existingMapping) throw new ApiError(409, 'ACCOUNT_DEVICE_ALREADY_LINKED')
+
+  const body = await readJson(request)
+  const familyName = requireString(body.familyName, 'familyName', 60)
+  const deviceName = typeof body.deviceName === 'string' ? body.deviceName.trim().slice(0, 80) : null
+  const familyId = newId('fam')
+  const childId = typeof body.childId === 'string' && body.childId.trim()
+    ? body.childId.trim().slice(0, 100) : legacyChildId(familyId)
+  const childName = typeof body.childName === 'string' ? body.childName.trim().slice(0, 60) : ''
+  const birthDate = body.birthDate === undefined ? null : body.birthDate
+  if (!isBirthDate(birthDate)) throw new ApiError(400, 'INVALID_REQUEST', 'Invalid birthDate.')
+  const deviceId = newId('dev')
+  const membershipId = newId('mem')
+  const token = randomToken()
+  const tokenHash = await hashSecret(token, env.TOKEN_PEPPER)
+  const now = Date.now()
+  const createdAt = nowIso()
+
+  await env.DB.batch([
+    env.DB.prepare('INSERT INTO families (id, name, revision, created_at) VALUES (?, ?, 0, ?)')
+      .bind(familyId, familyName, createdAt),
+    env.DB.prepare(`INSERT INTO children
+      (id, family_id, name, birth_date, created_at, updated_at, deleted_at, revision)
+      VALUES (?, ?, ?, ?, ?, ?, NULL, 0)`)
+      .bind(childId, familyId, childName, birthDate, createdAt, createdAt),
+    env.DB.prepare(`INSERT INTO devices
+      (id, family_id, token_hash, name, created_at, last_seen_at, revoked_at)
+      VALUES (?, ?, ?, ?, ?, ?, NULL)`)
+      .bind(deviceId, familyId, tokenHash, deviceName, createdAt, createdAt),
+    env.DB.prepare(`INSERT INTO legacy_family_memberships
+      (id, family_id, account_id, role, status, joined_at, ended_at)
+      VALUES (?, ?, ?, 'ADMIN', 'ACTIVE', ?, NULL)`)
+      .bind(membershipId, familyId, access.account.id, now),
+    env.DB.prepare(`INSERT INTO account_family_devices
+      (account_device_id, account_id, family_id, legacy_device_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)`)
+      .bind(access.deviceId, access.account.id, familyId, deviceId, now, now)
+  ])
+
+  return ok(request, env, {
+    membership: { familyId, familyName, role: 'ADMIN' as const },
+    connection: { familyId, familyName, deviceId, deviceToken: token, revision: 0 },
+    child: { id: childId, name: childName, birthDate }
+  }, 201)
+}
+
 const REFRESH_COOKIE = 'solemi_refresh'
 
 function accountAuth(env: Env) {
@@ -893,9 +949,6 @@ function entitlementService(env: Env) {
 async function requireFamilySyncEntitlement(request: Request, env: Env, auth: DeviceAuth) {
   if (env.ENTITLEMENT_ENFORCEMENT !== 'true') return
   const service = entitlementService(env)
-  // Families without an account membership remain accessible during the
-  // legacy transition. Once claimed, the server becomes the authority.
-  if (!await service.familyHasAccountMembers(auth.familyId)) return
   if (!request.headers.get('X-Solemi-Family-Token')) throw new ApiError(401, 'SESSION_INVALID')
   const access = await accountAuth(env).authenticate(accountBearer(request))
   const mapping = await env.DB.prepare(`SELECT 1 AS linked
@@ -1344,6 +1397,12 @@ async function accountAuthRoute(request: Request, env: Env, path: string) {
       const access = await service.authenticate(accountBearer(request))
       return claimAccountFamily(request, env, access)
     }
+    if (request.method === 'POST' && path === '/v1/auth/family/create') {
+      requireAccountFamilyBridge(env)
+      requireAllowedAuthOrigin(request, env)
+      const access = await service.authenticate(accountBearer(request))
+      return createAccountFamily(request, env, access)
+    }
     if (request.method === 'POST' && path === '/v1/auth/family/bootstrap') {
       requireAccountFamilyBridge(env)
       requireAllowedAuthOrigin(request, env)
@@ -1401,18 +1460,27 @@ async function route(request: Request, env: Env) {
 
   if (path.startsWith('/v1/auth/')) return accountAuthRoute(request, env, path)
 
-  if (request.method === 'POST' && path === '/v1/families') return createFamily(request, env)
-  if (request.method === 'POST' && path === '/v1/join') return joinFamily(request, env)
+  if (request.method === 'POST' && path === '/v1/families') {
+    if (env.ENTITLEMENT_ENFORCEMENT === 'true') throw new ApiError(401, 'ACCOUNT_REQUIRED')
+    return createFamily(request, env)
+  }
+  if (request.method === 'POST' && path === '/v1/join') {
+    if (env.ENTITLEMENT_ENFORCEMENT === 'true') throw new ApiError(401, 'ACCOUNT_REQUIRED')
+    return joinFamily(request, env)
+  }
 
   const auth = await authenticate(request, env)
 
-  if (request.method === 'POST' && path === '/v1/invites') return createInvite(request, env, auth)
   const isRawFamilyData = (request.method === 'GET' && path === '/v1/sync')
     || (request.method === 'POST' && (path === '/v1/children' || path === '/v1/sessions' || path === '/v1/sessions/start'))
     || (request.method === 'POST' && /^\/v1\/sessions\/[^/]+\/end$/.test(path))
     || ((request.method === 'PATCH' || request.method === 'DELETE')
       && (/^\/v1\/children\/[^/]+$/.test(path) || /^\/v1\/sessions\/[^/]+$/.test(path)))
   if (isRawFamilyData) await requireFamilySyncEntitlement(request, env, auth)
+  if (request.method === 'POST' && path === '/v1/invites') {
+    await requireFamilySyncEntitlement(request, env, auth)
+    return createInvite(request, env, auth)
+  }
 
   if (request.method === 'GET' && path === '/v1/sync') return sync(request, env, auth)
   if (request.method === 'GET' && path === '/v1/device') return getDevice(request, env, auth)

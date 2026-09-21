@@ -18,8 +18,8 @@ vagy kifejezett, indokolt termékdöntés kell; a puszta priorizálás nem lezá
 - [x] A02 — Többlapos mentés, quota/crash és tartós napló–outbox egység. Egyetlen böngészőlap írhat; az atomi helyi envelope, hibainjektálás és kétlapos átvételi próba sikeres (198/198 teszt).
 - [ ] A03 — Import/törlés családi hatása és visszaállítható biztonsági mentés. Implementáció, commit/push, staging Worker/Pages build és javított smoke kész; a kéttelefonos import/törlés/offline/pending/restore elfogadás folyamatban.
 - [ ] A04 — Valódi account-szintű családi kilépés, pending adatok védelme. Implementáció, regresszió és `3114711` commit/push kész: külön eszközleválasztás/újracsatlakozás, account-kilépés, választható vagy automatikus adminátadás, utolsó tag blokkolása, régi device-tokenek visszavonása és utolsó fizető utáni pause. Staging kétaccountos elfogadás hiányzik.
-- [ ] A05 — Fiókváltás/guest kapcsolat és helyi adatok elkülönítése. Helyi implementáció és regresszió kész: accountonként külön diary+sync workspace, explicit vendégnapló-átvétel, kijelentkezéskori megtartás/törlés, pending megőrzés, többtabos írózár, quota- és crash-helyreállítás. Commit/push és staging A→logout→B/guest elfogadás hiányzik.
-- [ ] A06 — Legacy API fizetős sync-megkerülés lezárása, kompatibilis átállás.
+- [ ] A05 — Fiókváltás/guest kapcsolat és helyi adatok elkülönítése. Implementáció, regresszió és `3665d25` commit/push kész: accountonként külön diary+sync workspace, explicit vendégnapló-átvétel, kijelentkezéskori megtartás/törlés, pending megőrzés, többtabos írózár, quota- és crash-helyreállítás. Staging A→logout→B/guest elfogadás hiányzik.
+- [ ] A06 — Legacy API fizetős sync-megkerülés lezárása, kompatibilis átállás. Helyi implementáció és regresszió kész: enforcement mellett kötelező account+device+membership+családi entitlement; atomi, fizetős accountos családlétrehozás; raw legacy create/join/sync és invite tiltás; meglévő család adatvesztés nélküli claimje. 226/226 teszt és két build sikeres; commit/push, staging build és kézi elfogadás hiányzik.
 - [ ] A07 — Production config/auth-proxy/entitlement és tesztkapcsolók elkülönítése.
 - [ ] A08 — Billing eseményverseny és sorrend javítása.
 - [ ] A09 — Google linked-token csere és régi grantok visszavonása.
@@ -288,12 +288,12 @@ engedélyez automatikus halasztást. A meglévő Prediction kommunikációját i
 
 ## Következő konkrét munkamenet
 
-**Elsőbbség:** az A03 import/törlés/restore és az A04 kilépési folyamat staging
-elfogadása, amikor rendelkezésre áll két telefon. Az A13–A14 és az A04
-commit/push kész. Az A05 helyi implementációja 222/222 teszttel és két sikeres
-builddel kész; következik az A05 tulajdonosi commit/push, staging build, majd az
-A→kijelentkezés→B, vendégmód, helyi megtartás/törlés és pending adatok kézi
-elfogadása. Ezután A06 következik.
+**Elsőbbség:** az A03–A05 staging elfogadása, amikor rendelkezésre áll két
+telefon. Az A13–A14, A04 és A05 commit/push kész. Az A06 helyi implementációja
+226/226 teszttel és két sikeres builddel kész; következik az A06 tulajdonosi
+commit/push, staging Worker és Pages build, majd a legacy claim, fizetős
+családlétrehozás, Free tiltás és kétaccountos sync kézi elfogadása. Ezután A07
+következik.
 A billing HTTP/adapterszelet előtt A08–A10 javítás kötelező. Az alábbi korábbi
 tételek történeti és további release-feladatok.
 
