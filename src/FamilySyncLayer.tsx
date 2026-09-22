@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { t } from './i18n'
 import type { Locale } from './i18n'
 import { loadData } from './storage'
 import { createFamily, createInvite, getAccountFamilyMembers, getSyncStore, joinFamily, leaveAccountFamily, leaveFamily, pullRemote, reconcileAccountFamily, reconnectAccountFamily, refreshFamilyInfo, resolveSyncConflict, restoreMissingSession } from './familySync'
 import type { FamilyMemberChoice } from './familySync'
-import { ACCOUNT_ACCESS_EVENT, ACCOUNT_STATE_EVENT, getAccountAccess, setInternalTestPlan } from './accountAuth'
+import { ACCOUNT_ACCESS_EVENT, ACCOUNT_STATE_EVENT, getAccountAccess, restoreAccount, setInternalTestPlan } from './accountAuth'
 import type { AccountAccessState } from './accountAuth'
 import { INTERNAL_PLAN_PREVIEW_EVENT, INTERNAL_PLAN_PREVIEW_KEY, canUseFamilySync, parseProductPlan } from './entitlements'
 import type { ProductPlan } from './entitlements'
@@ -40,7 +41,7 @@ const copy = {
     lastSyncNow: 'Utolsó szinkron: most', lastSyncMinutes: (minutes: number) => `Utolsó szinkron: ${minutes} perce`, lastSyncLongAgo: 'Utolsó szinkron: régebben',
     inviteNotFound: 'A meghívókód nem található. Ellenőrizd a kódot, vagy kérj újat.', inviteUsed: 'Ezt a meghívókódot már felhasználták. Kérj egy új kódot.', inviteExpired: 'A meghívókód lejárt. Kérj egy új kódot.',
     deviceRevoked: 'Ez a telefon már le lett választva a családról.', invalidToken: 'A készülék kapcsolata már nem érvényes. Párosítsd újra a telefont.', accountRequired: 'A meghívókód használatához előbb lépj be a saját Google-fiókoddal.', ownerAccountRequired: 'A család létrehozójának előbb össze kell kapcsolnia a családot a Solemi-fiókjával.', alreadyInFamily: 'Ez a Google-fiók már egy családhoz tartozik.', familyDissolutionRequired: 'Egyetlen megmaradt tagként külön a Család megszüntetése folyamatot kell használnod.', leaveOffline: 'Kilépés vagy leválasztás előtt csatlakozz az internethez.', leavePending: 'Kilépés vagy leválasztás előtt várd meg a függő módosítások szinkronizálását.', leaveAttention: 'Kilépés vagy leválasztás előtt rendezd a jelzett szinkronhibát vagy ütközést.', networkError: 'Nincs kapcsolat a Solemi Sleep szerverével. Próbáld újra később.',
-    locked: 'Zárolva', lockedHint: 'Ehhez a funkcióhoz Family előfizetés szükséges.', lockedDescription: 'A Family csomaggal összekapcsolhatod a család telefonjait, hogy ugyanazokat az alvásadatokat lássátok.',
+    locked: 'Zárolva', lockedHint: 'Ehhez a funkcióhoz Family vagy Family+ jogosultság szükséges.', lockedDescription: 'Family vagy Family+ csomaggal összekapcsolhatod a család telefonjait, hogy ugyanazokat az alvásadatokat lássátok.',
     paused: 'A családi szinkron szünetel', pausedHint: 'A családban jelenleg nincs aktív Family vagy Family+ előfizetés. A helyi módosításaid megmaradnak.'
   },
   en: {
@@ -60,7 +61,7 @@ const copy = {
     lastSyncNow: 'Last sync: now', lastSyncMinutes: (minutes: number) => `Last sync: ${minutes} min ago`, lastSyncLongAgo: 'Last sync: earlier',
     inviteNotFound: 'Invite code not found. Check the code or request a new one.', inviteUsed: 'This invite code has already been used. Request a new code.', inviteExpired: 'This invite code has expired. Request a new code.',
     deviceRevoked: 'This phone has already been disconnected from the family.', invalidToken: 'This device connection is no longer valid. Pair the phone again.', accountRequired: 'Sign in with your own Google account before using an invite code.', ownerAccountRequired: 'The family creator must connect the family to their Solemi account first.', alreadyInFamily: 'This Google account already belongs to a family.', familyDissolutionRequired: 'As the final member, use the separate Dissolve family flow.', leaveOffline: 'Connect to the internet before leaving or disconnecting.', leavePending: 'Wait for pending changes to sync before leaving or disconnecting.', leaveAttention: 'Resolve the sync error or conflict before leaving or disconnecting.', networkError: 'Cannot reach the Solemi Sleep server. Try again later.',
-    locked: 'Locked', lockedHint: 'A Family subscription is required for this feature.', lockedDescription: 'With the Family plan, you can connect the family’s phones so everyone sees the same sleep data.',
+    locked: 'Locked', lockedHint: 'A Family or Family+ subscription is required for this feature.', lockedDescription: 'With Family or Family+, you can connect the family’s phones so everyone sees the same sleep data.',
     paused: 'Family sync is paused', pausedHint: 'No family member currently has an active Family or Family+ subscription. Your local changes are kept.'
   },
   de: {
@@ -80,7 +81,7 @@ const copy = {
     lastSyncNow: 'Letzter Sync: gerade eben', lastSyncMinutes: (minutes: number) => `Letzter Sync: vor ${minutes} Min.`, lastSyncLongAgo: 'Letzter Sync: vor längerer Zeit',
     inviteNotFound: 'Einladungscode nicht gefunden. Prüfe den Code oder fordere einen neuen an.', inviteUsed: 'Dieser Einladungscode wurde bereits verwendet. Fordere einen neuen an.', inviteExpired: 'Dieser Einladungscode ist abgelaufen. Fordere einen neuen an.',
     deviceRevoked: 'Dieses Telefon wurde bereits von der Familie getrennt.', invalidToken: 'Diese Geräteverbindung ist nicht mehr gültig. Kopple das Telefon erneut.', accountRequired: 'Melde dich mit deinem eigenen Google-Konto an, bevor du einen Einladungscode verwendest.', ownerAccountRequired: 'Der Ersteller der Familie muss die Familie zuerst mit dem Solemi-Konto verbinden.', alreadyInFamily: 'Dieses Google-Konto gehört bereits zu einer Familie.', familyDissolutionRequired: 'Als letztes Mitglied musst du den separaten Ablauf Familie auflösen verwenden.', leaveOffline: 'Stelle vor dem Verlassen oder Trennen eine Internetverbindung her.', leavePending: 'Warte vor dem Verlassen oder Trennen, bis ausstehende Änderungen synchronisiert sind.', leaveAttention: 'Behebe vor dem Verlassen oder Trennen den Sync-Fehler oder Konflikt.', networkError: 'Der Solemi-Sleep-Server ist nicht erreichbar. Versuche es später erneut.',
-    locked: 'Gesperrt', lockedHint: 'Für diese Funktion ist ein Family-Abo erforderlich.', lockedDescription: 'Mit dem Family-Abo kannst du die Telefone der Familie verbinden, damit alle dieselben Schlafdaten sehen.',
+    locked: 'Gesperrt', lockedHint: 'Für diese Funktion ist ein Family- oder Family+-Abo erforderlich.', lockedDescription: 'Mit Family oder Family+ kannst du die Telefone der Familie verbinden, damit alle dieselben Schlafdaten sehen.',
     paused: 'Familiensynchronisierung pausiert', pausedHint: 'Derzeit hat kein Familienmitglied ein aktives Family- oder Family+-Abo. Lokale Änderungen bleiben erhalten.'
   }
 } as const
@@ -116,13 +117,16 @@ export default function FamilySyncLayer() {
   const [connectionName, setConnectionName] = useState(() => getSyncStore().connection?.familyName || '')
   const [previewPlan, setPreviewPlan] = useState<ProductPlan>(() => loadInternalPlanPreview())
   const [serverFamilySync, setServerFamilySync] = useState<boolean | null>(null)
+  const [accessChecking, setAccessChecking] = useState(import.meta.env.VITE_ACCOUNT_AUTH === 'true')
+  const [accessCheckFailed, setAccessCheckFailed] = useState(false)
   const [serverPaused, setServerPaused] = useState(false)
   const [accountMembership, setAccountMembership] = useState<null | { familyId: string; role: 'ADMIN' | 'MEMBER' }>(null)
   const [leaveCandidates, setLeaveCandidates] = useState<FamilyMemberChoice[]>([])
   const locale = loadData().settings.locale as Locale
   const text = copy[locale]
   const familySyncAvailable = import.meta.env.VITE_ACCOUNT_AUTH === 'true'
-    ? serverFamilySync === true : internalPreview && canUseFamilySync(previewPlan)
+    ? !accessChecking && !accessCheckFailed && serverFamilySync === true
+    : internalPreview && canUseFamilySync(previewPlan)
 
   const friendlyError = (err: unknown) => {
     const apiError = err as SyncError
@@ -163,10 +167,6 @@ export default function FamilySyncLayer() {
       const plan = parseProductPlan((event as CustomEvent<unknown>).detail)
       if (plan) {
         setPreviewPlan(plan)
-        void setInternalTestPlan(plan).then((access) => {
-          setServerFamilySync(access.features.includes('FAMILY_SYNC'))
-          setServerPaused(access.familySync.status === 'PAUSED')
-        }).catch(() => {})
       }
     }
     window.addEventListener(INTERNAL_PLAN_PREVIEW_EVENT, onPlanChange)
@@ -176,12 +176,16 @@ export default function FamilySyncLayer() {
   useEffect(() => {
     if (import.meta.env.VITE_ACCOUNT_AUTH !== 'true') return
     let running = false
-    const reconcile = async (event: Event) => {
-      if (!(event as CustomEvent<{ account?: unknown }>).detail?.account || running) return
+    let stopped = false
+    const reconcile = async (account: unknown) => {
+      if (!account || running || stopped) return
       running = true
+      setAccessChecking(true)
+      setAccessCheckFailed(false)
       try {
         if (internalPreview) await setInternalTestPlan(previewPlan)
         const access = await getAccountAccess()
+        if (stopped) return
         setServerFamilySync(access.features.includes('FAMILY_SYNC'))
         setServerPaused(access.familySync.status === 'PAUSED')
         setAccountMembership(access.membership)
@@ -194,11 +198,28 @@ export default function FamilySyncLayer() {
           markSynced()
         }
       } catch {
-        setSyncIssue(true)
-      } finally { running = false }
+        if (!stopped) { setSyncIssue(true); setAccessCheckFailed(true) }
+      } finally {
+        running = false
+        if (!stopped) setAccessChecking(false)
+      }
     }
-    window.addEventListener(ACCOUNT_STATE_EVENT, reconcile)
-    return () => window.removeEventListener(ACCOUNT_STATE_EVENT, reconcile)
+    const onAccount = (event: Event) => {
+      const account = (event as CustomEvent<{ account?: unknown }>).detail?.account
+      if (account) void reconcile(account)
+      else {
+        setServerFamilySync(false)
+        setAccountMembership(null)
+        setAccessChecking(false)
+      }
+    }
+    window.addEventListener(ACCOUNT_STATE_EVENT, onAccount)
+    void restoreAccount().then((account) => {
+      if (stopped) return
+      if (account) void reconcile(account)
+      else { setServerFamilySync(false); setAccessChecking(false) }
+    }).catch(() => { if (!stopped) { setAccessCheckFailed(true); setAccessChecking(false) } })
+    return () => { stopped = true; window.removeEventListener(ACCOUNT_STATE_EVENT, onAccount) }
   }, [previewPlan])
 
   useEffect(() => {
@@ -339,6 +360,8 @@ export default function FamilySyncLayer() {
   }, [lastSyncAt, text])
 
   const status = useMemo(() => {
+    if (accessChecking) return text.syncing
+    if (accessCheckFailed) return text.syncIssue
     if (serverPaused) return text.paused
     if (!familySyncAvailable) return text.locked
     if (!connected) return text.disconnected
@@ -348,9 +371,11 @@ export default function FamilySyncLayer() {
     if (syncIssue) return text.syncIssue
     if (pendingCount) return text.syncing
     return text.connected
-  }, [serverPaused, familySyncAvailable, connected, online, conflictCount, missingSessions, pendingCount, syncIssue, text])
+  }, [accessChecking, accessCheckFailed, serverPaused, familySyncAvailable, connected, online, conflictCount, missingSessions, pendingCount, syncIssue, text])
 
   const detailHint = useMemo(() => {
+    if (accessChecking) return text.syncing
+    if (accessCheckFailed) return text.error
     if (serverPaused) return text.pausedHint
     if (!familySyncAvailable) return text.lockedHint
     if (!connected) return text.settingsHintDisconnected
@@ -362,7 +387,7 @@ export default function FamilySyncLayer() {
     if (pendingCount > 1) return text.pendingMany(pendingCount)
     if (syncIssue) return text.syncIssue
     return lastSyncLabel || text.settingsHintConnected
-  }, [serverPaused, familySyncAvailable, connected, online, conflictCount, missingSessions, pendingCount, syncIssue, lastSyncLabel, text])
+  }, [accessChecking, accessCheckFailed, serverPaused, familySyncAvailable, connected, online, conflictCount, missingSessions, pendingCount, syncIssue, lastSyncLabel, text])
 
   const handleCreate = async () => {
     if (!familyName.trim()) return
@@ -491,7 +516,7 @@ export default function FamilySyncLayer() {
   const settingsEntry = settingsTarget ? createPortal(
     <div className="settings-card family-sync-settings-card">
       <button className="family-sync-settings-button" onClick={openPanel} aria-label={text.title}>
-        <span className={`family-sync-settings-icon ${familySyncAvailable && connected ? 'connected' : ''} ${!familySyncAvailable ? 'locked' : ''}`}>{familySyncAvailable ? '☁' : '🔒'}</span>
+        <span className={`family-sync-settings-icon ${familySyncAvailable && connected ? 'connected' : ''} ${!familySyncAvailable && !accessChecking && !accessCheckFailed ? 'locked' : ''}`}>{familySyncAvailable || accessChecking || accessCheckFailed ? '☁' : '🔒'}</span>
         <span className="family-sync-settings-copy">
           <strong>{connected && connectionName ? connectionName : text.title}</strong>
           <small>{detailHint}</small>
@@ -509,7 +534,11 @@ export default function FamilySyncLayer() {
       <section className="family-sync-sheet" onClick={(event) => event.stopPropagation()}>
         <div className="family-sync-handle" />
         <header><div><small>{status}</small><h2>{text.title}</h2></div><button onClick={() => setOpen(false)} disabled={busy}>×</button></header>
-        {!familySyncAvailable && mode !== 'leave-admin' && <div className="family-sync-content family-sync-locked">
+        {(accessChecking || accessCheckFailed) && <div className="family-sync-content family-sync-locked">
+          <strong>{accessChecking ? text.syncing : text.error}</strong>
+          {accessCheckFailed && <button className="family-sync-secondary" onClick={() => window.location.reload()}>{t(locale, 'retry')}</button>}
+        </div>}
+        {!accessChecking && !accessCheckFailed && !familySyncAvailable && mode !== 'leave-admin' && <div className="family-sync-content family-sync-locked">
           <div className="family-sync-lock-icon">🔒</div>
           <strong>{serverPaused ? text.paused : text.lockedHint}</strong>
           <p>{serverPaused ? text.pausedHint : text.lockedDescription}</p>

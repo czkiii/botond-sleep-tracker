@@ -4,7 +4,7 @@
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
 **Teljes audit alapja:** `e9374f4` (`Add verified store billing foundation`); az akkori helyi origin-refhez képest 0 ahead / 0 behind.
-**Ellenőrzött HEAD:** `d81a942` (`Secure account proxy and limit JSON request size`). A munkafa a következő javítás előtt tiszta volt. A tulajdonos internal mobilpróbája során az A18 proxy-szűkítés családi sync és meghívó útvonalakat is 404-re zárt; ennek helyi javítása és regressziói munkafában vannak, commit/push/deploy nélkül. Az A03–A06 kéttelefonos elfogadása továbbra is nyitott.
+**Ellenőrzött HEAD:** `1b59031` (`Restore family sync routes through secure proxy`). A munkafa a következő javítás előtt tiszta volt. A tulajdonos további mobilpróbájában Family+ előnézet mellett a Családi megosztás tévesen Family-jogosultságot kért; az induláskori account/entitlement ellenőrzés helyi javítása munkafában van, commit/push/deploy nélkül. Az A03–A06 kéttelefonos elfogadása továbbra is nyitott.
 
 ## Legfrissebb checkpoint — A03–A06 staging elfogadás, A07 helyi előkészítés
 
@@ -39,6 +39,7 @@
 - **A19 helyi részeredmény:** a Worker és a Pages account-proxy JSON-kérését egyaránt 64 KiB-re korlátoztuk; a Worker streamet olvas, így a hiányzó vagy hamis `Content-Length` sem kerüli meg a korlátot. Túlméretes kérés 413-at ad a feldolgozás/továbbítás előtt. Célzott Worker- és proxyregresszió készült. Rate limit, nagy bootstrap, headerek, CSP, függőség- és üzemeltetési ellenőrzés továbbra is nyitott.
 - **A18–A19 helyi ellenőrzés:** frontend és Worker typecheck, 27 fájl / 254 teszt, frontend build és Pages Functions build sikeres. Az A18 staging böngészős próba továbbra is szükséges.
 - **A18 staging regresszió és helyi korrekció:** a `d81a942` internal mobilpróbában a Google-belépés működött, de a `/api/v1/auth/`-ra szűkített proxy 404-gyel blokkolta a hitelesített családi `/v1/sync`, `/v1/invites` és naplómutációs kéréseket. A felhasználó telefonján a böngészési adatok törlése után üres helyi napló jelent meg; a felesége telefonján az adatok megmaradtak. A proxy engedélyezett családi útvonalai helyben helyreállítva, az Origin/Fetch Metadata és body-határ megtartásával; minden használt családi útvonalra proxyteszt készült. A teljes 27 fájl / 267 teszt, frontend typecheck és Pages Functions build sikeres. A staging visszaállítás és kéttelefonos újrapróba még szükséges. Nem történt szerveroldali családi törlés vagy production művelet.
+- **Induláskori Family+ jogosultság helyi javítása (`1b59031` után):** a `FamilySyncLayer` az oldal újranyitásakor korábban csak az `ACCOUNT_STATE_EVENT`-re várta a szerveres hozzáférést. A fiók-visszaállítás eseménye a réteg mountja előtt is megtörténhetett, ekkor a jogosultság `null` maradt, és a felület tévesen előfizetési paywallt mutatott. Most mountkor is lekéri a már visszaállított fiókot, majd a staging tesztcsomagot, a szerveres jogosultságot és a meglévő családot egyezteti. Ellenőrzés közben frissítési, hiba esetén újrapróbálási állapot látszik; a fizetős szöveg Family és Family+ csomagot is megnevez. Frontend typecheck, 27 fájl / 267 teszt és build sikeres; staging mobilpróba szükséges.
 
 ### Production V3 adatok mentése és V4 migrációs próba
 
@@ -560,9 +561,9 @@ auditkapu az irányadó, különösen az adatmegőrzési és hozzáférési hib�
 
 ## Következő konkrét feladat
 
-A `d81a942` proxyregresszió korrekciójának helyi ellenőrzése, majd
-tulajdonosi commit/push és staging Pages build szükséges. Ezután a meglévő
-családi napló visszatöltését és a kéttelefonos szinkront kell ellenőrizni. Az A03–A06
+A `1b59031` utáni induláskori jogosultság-javítás tulajdonosi commit/pushja és
+staging Pages buildje szükséges. Ezután a meglévő családi napló visszatöltését
+és a kéttelefonos szinkront kell ellenőrizni. Az A03–A06
 kéttelefonos, bejelentkezett staging elfogadása továbbra is nyitott.
 A valódi éles host, Worker, OAuth és cookie-környezet kialakításához külön
 kiadási döntés és kézi iOS-próba kell.

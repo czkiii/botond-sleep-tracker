@@ -29,7 +29,7 @@ vagy kifejezett, indokolt termékdöntés kell; a puszta priorizálás nem lezá
 - [ ] A13 — Új aktív alvás jegyzetének és kézi típusának szinkronja. Javítás, kliens–Worker–SQLite regresszió és `c5ccd23` commit/push kész; staging elfogadás hiányzik.
 - [ ] A14 — Utolsó gyermek párhuzamos törlésének atomi védelme. Feltételes D1 batch, determinisztikus konkurens törlési regresszió és `c5ccd23` commit/push kész; staging elfogadás hiányzik.
 - [ ] A15 — Nem üres helyi napló csatlakozása, gyermekkonfliktus és pull-határesetek.
-- [ ] A16 — Offline fizetős hozzáférés, refresh race, harmadik eszköz próba.
+- [ ] A16 — Offline fizetős hozzáférés, refresh race, harmadik eszköz próba. Részleges helyi javítás: az újranyitott oldalon a Családi megosztás mountkor is ellenőrzi a már visszaállított fiókot/jogosultságot; ellenőrzés vagy hálózati hiba nem jelenik meg hamis előfizetési paywallként. A tényleges staging és offline/third-device elfogadás nyitott.
 - [ ] A17 — Accounttörlés, megőrzés, privacy és store adatkezelési tájékoztatás.
 - [ ] A18 — Proxy eredeti Origin ellenőrzése és auth CSRF-határ. A `d81a942` túl szűk auth-only útvonalengedélye stagingen blokkolta a családi szinkront/meghívót. Helyi korrekció: a szükséges családi API-útvonalak ismét átmennek, miközben az idegen vagy hiányzó módosító Origin és nem `same-origin` Fetch Metadata továbbra is tiltott; célzott 25/25 proxyteszt sikeres. Új staging build és belépés/szinkron regresszió nyitott.
 - [ ] A19 — Rate/body/resource limitek, security headerek és függőségvizsgálat. Helyi részeredmény: a Worker és a Pages account-proxy JSON-body limitje 64 KiB, a túllépés 413; hiányzó `Content-Length` mellett is tesztelt. Rate/resource limit, CSP/header és dependency review még nyitott.
