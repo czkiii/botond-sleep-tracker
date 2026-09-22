@@ -26,6 +26,15 @@ type ExistingSubscriptionRow = {
   last_verified_at: number | null
   provider_transaction_id: string | null
   last_applied_event_id: string | null
+  environment: string | null
+  external_account_token: string | null
+}
+
+type GoogleReplacementRow = {
+  replacement_subscription_id: string
+  account_id: string
+  environment: string
+  external_account_token: string
 }
 
 export type StoreBillingApplyResult = {
@@ -40,6 +49,8 @@ export type StoreBillingServiceErrorCode =
   | 'PROVIDER_MISMATCH'
   | 'SUBSCRIPTION_OWNERSHIP_MISMATCH'
   | 'SUBSCRIPTION_NOT_FOUND'
+  | 'LINKED_SUBSCRIPTION_OWNERSHIP_MISMATCH'
+  | 'LINKED_SUBSCRIPTION_CONFLICT'
 
 export class StoreBillingServiceError extends Error {
   constructor(readonly code: StoreBillingServiceErrorCode, message: string) {
@@ -137,6 +148,33 @@ export class StoreBillingService {
       }
     }
 
+    if (subscription.provider === 'GOOGLE_PLAY') {
+      const replaced = await this.findGoogleReplacement(subscription.providerSubscriptionId)
+      if (replaced) {
+        const old = await this.findSubscription('GOOGLE_PLAY', subscription.providerSubscriptionId)
+        return { outcome: 'STALE', subscriptionId: old?.id ?? null }
+      }
+    }
+
+    const oldToken = subscription.replacementProviderSubscriptionId
+    let linkedBefore: GoogleReplacementRow | null = null
+    if (oldToken) {
+      linkedBefore = await this.findGoogleReplacement(oldToken)
+      const old = await this.findSubscription('GOOGLE_PLAY', oldToken)
+      if (old && (old.account_id !== input.accountId ||
+        old.environment !== subscription.environment ||
+        old.external_account_token !== subscription.externalAccountToken)) {
+        throw new StoreBillingServiceError('LINKED_SUBSCRIPTION_OWNERSHIP_MISMATCH',
+          'Linked Google token belongs to another account or environment')
+      }
+      if (linkedBefore && (linkedBefore.account_id !== input.accountId ||
+        linkedBefore.environment !== subscription.environment ||
+        linkedBefore.external_account_token !== subscription.externalAccountToken)) {
+        throw new StoreBillingServiceError('LINKED_SUBSCRIPTION_OWNERSHIP_MISMATCH',
+          'Linked Google token belongs to another account or environment')
+      }
+    }
+
     const existing = await this.findSubscription(
       subscription.provider,
       subscription.providerSubscriptionId
@@ -149,6 +187,10 @@ export class StoreBillingService {
     }
 
     const subscriptionId = existing?.id ?? this.tokens.id('sub')
+    if (linkedBefore && linkedBefore.replacement_subscription_id !== subscriptionId) {
+      throw new StoreBillingServiceError('LINKED_SUBSCRIPTION_CONFLICT',
+        'Linked Google token was already replaced by another subscription')
+    }
     const canceledAt = subscription.status === 'CANCELED' ? event.occurredAt : null
     const acknowledgement = subscription.provider === 'APPLE' ? 'NOT_REQUIRED' : 'PENDING'
     const statements: D1PreparedStatement[] = [
@@ -250,10 +292,75 @@ export class StoreBillingService {
       }
     }
 
+    if (oldToken && !linkedBefore) {
+      statements.push(this.db.prepare(`UPDATE subscriptions
+        SET status = 'REVOKED', auto_renews = 0, updated_at = ?, canceled_at = ?
+        WHERE provider = 'GOOGLE_PLAY' AND provider_subscription_id = ?
+          AND account_id = ?
+          AND EXISTS (SELECT 1 FROM store_subscription_state old_state
+            WHERE old_state.subscription_id = subscriptions.id
+              AND old_state.environment = ?
+              AND old_state.external_account_token = ?)
+          AND EXISTS (SELECT 1 FROM store_subscription_state new_state
+            WHERE new_state.subscription_id = ?
+              AND new_state.last_applied_event_id = ?)`)
+        .bind(event.receivedAt, event.receivedAt, oldToken, input.accountId,
+          subscription.environment, subscription.externalAccountToken,
+          subscriptionId, event.providerEventId))
+      statements.push(this.db.prepare(`UPDATE account_entitlements
+        SET revoked_at = ?, updated_at = ?
+        WHERE account_id = ? AND source_type = 'SUBSCRIPTION' AND revoked_at IS NULL
+          AND source_id IN (SELECT id FROM subscriptions
+            WHERE provider = 'GOOGLE_PLAY' AND provider_subscription_id = ?
+              AND account_id = ?)
+          AND EXISTS (SELECT 1 FROM store_subscription_state new_state
+            WHERE new_state.subscription_id = ?
+              AND new_state.last_applied_event_id = ?)`)
+        .bind(event.receivedAt, event.receivedAt, input.accountId, oldToken,
+          input.accountId, subscriptionId, event.providerEventId))
+      statements.push(this.db.prepare(`INSERT INTO google_token_replacements
+        (old_purchase_token, replacement_subscription_id, account_id,
+         environment, external_account_token, created_at)
+        SELECT ?, ?, ?, ?, ?, ?
+        WHERE EXISTS (SELECT 1 FROM store_subscription_state new_state
+          WHERE new_state.subscription_id = ?
+            AND new_state.last_applied_event_id = ?)
+        ON CONFLICT(old_purchase_token) DO NOTHING`)
+        .bind(oldToken, subscriptionId, input.accountId, subscription.environment,
+          subscription.externalAccountToken, event.receivedAt,
+          subscriptionId, event.providerEventId))
+    }
+
     statements.push(this.insertProcessedEvent(event, subscriptionId))
     try {
       await this.db.batch(statements)
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      if (message.includes('LINKED_TOKEN_OWNER_MISMATCH')) {
+        throw new StoreBillingServiceError('LINKED_SUBSCRIPTION_OWNERSHIP_MISMATCH',
+          'Linked Google token belongs to another account or environment')
+      }
+      if (message.includes('LINKED_TOKEN_ALREADY_REPLACED')) {
+        throw new StoreBillingServiceError('LINKED_SUBSCRIPTION_CONFLICT',
+          'Linked Google token was already replaced by another subscription')
+      }
+      if (message.includes('REPLACED_GOOGLE_TOKEN')) {
+        if (oldToken) {
+          const winningLink = await this.findGoogleReplacement(oldToken)
+          if (winningLink) {
+            const winningSubscription = await this.findSubscription(
+              subscription.provider, subscription.providerSubscriptionId
+            )
+            if (winningLink.replacement_subscription_id !== winningSubscription?.id) {
+              throw new StoreBillingServiceError('LINKED_SUBSCRIPTION_CONFLICT',
+                'Linked Google token was already replaced by another subscription')
+            }
+            if (firstPurchaseRetry) return this.applyVerifiedSubscription(input, false)
+          }
+        }
+        const replaced = await this.findSubscription('GOOGLE_PLAY', subscription.providerSubscriptionId)
+        return { outcome: 'STALE', subscriptionId: replaced?.id ?? null }
+      }
       const racedEvent = await this.db.prepare(`SELECT payload_hash, processed_at
         FROM subscription_events WHERE provider = ? AND provider_event_id = ?`)
         .bind(event.provider, event.providerEventId).first<ExistingEventRow>()
@@ -310,11 +417,19 @@ export class StoreBillingService {
 
   private findSubscription(provider: StoreProvider, providerSubscriptionId: string) {
     return this.db.prepare(`SELECT s.id, s.account_id, st.last_verified_at,
-        st.provider_transaction_id, st.last_applied_event_id
+        st.provider_transaction_id, st.last_applied_event_id,
+        st.environment, st.external_account_token
       FROM subscriptions s
       LEFT JOIN store_subscription_state st ON st.subscription_id = s.id
       WHERE s.provider = ? AND s.provider_subscription_id = ?`)
       .bind(provider, providerSubscriptionId).first<ExistingSubscriptionRow>()
+  }
+
+  private findGoogleReplacement(oldToken: string) {
+    return this.db.prepare(`SELECT replacement_subscription_id, account_id,
+        environment, external_account_token
+      FROM google_token_replacements WHERE old_purchase_token = ?`)
+      .bind(oldToken).first<GoogleReplacementRow>()
   }
 
   private insertProcessedEvent(event: VerifiedStoreEvent, subscriptionId: string) {

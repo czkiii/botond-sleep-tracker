@@ -22,7 +22,7 @@ vagy kifejezett, indokolt termékdöntés kell; a puszta priorizálás nem lezá
 - [ ] A06 — Legacy API fizetős sync-megkerülés lezárása, kompatibilis átállás. Implementáció, regresszió és `eac16ef` commit/push kész: enforcement mellett kötelező account+device+membership+családi entitlement; atomi, fizetős accountos családlétrehozás; raw legacy create/join/sync és invite tiltás; meglévő család adatvesztés nélküli claimje. Staging build és kézi elfogadás nincs rögzítve.
 - [ ] A07 — Production config/auth-proxy/entitlement és tesztkapcsolók elkülönítése. Helyi kiadási kapu és Free alapállapot elkészült: GitHub Pages production build blokkolva; a proxy éles hoston nem hív staginget; production Worker hiányos vagy tesztmódú konfigurációval 503-at ad. Frontend és Worker typecheck, 27 fájl / 232 teszt sikeres. Éles Cloudflare Pages host, OAuth origin/cookie, Worker secrets, D1 migráció és mobilos elfogadás még nyitott.
 - [ ] A08 — Billing eseményverseny és sorrend javítása. Helyi atomi event-ütközésvédelem, visszavonás elsőbbsége és párhuzamos első vásárlás regressziói kész; a `008_billing_event_order.sql` csak helyben tesztelt, távoli D1-en nincs alkalmazva. Provider-szintű állapotverzió és éles adapteres verify/webhook/restore elfogadás hiányzik.
-- [ ] A09 — Google linked-token csere és régi grantok visszavonása.
+- [ ] A09 — Google linked-token csere és régi grantok visszavonása. Helyi atomi grant-visszavonás és a még nem ismert régi token tombstone-ja kész (`009_google_token_replacements.sql`); távoli D1-migráció, valódi Play API/RTDN és store elfogadás hiányzik.
 - [ ] A10 — Store sandbox/production környezeti kerítés.
 - [ ] A11 — Hiteles store verify/restore/webhook/acknowledgement és paywall.
 - [ ] A12 — Valós natív iOS/Android kiadás és megfelelő iOS-login.
@@ -242,6 +242,7 @@ eltéréseit az A23 pontban, tételes döntéssel kell lezárni.
   - [x] Apple/Google/Capacitor integrációs sorrend és kötelező tesztmátrix dokumentálása (`STORE_BILLING_INTEGRATION_PLAN.md`).
   - [x] Additív billing account-link és store-state D1 persistence helyben (`007_store_billing_state.sql`; távoli D1-en még nincs alkalmazva).
   - [x] Additív eseménysorrend-követés helyben (`008_billing_event_order.sql`; távoli D1-en még nincs alkalmazva).
+  - [x] Google linked-token tombstone és régi grantok atomi lezárása helyben (`009_google_token_replacements.sql`; távoli D1-en még nincs alkalmazva).
   - [ ] Teljesen idempotens, időrendvédett snapshot-alkalmazás: a soros tesztek sikeresek, de A08–A10 auditjavítás szükséges a párhuzamosság, linked token és környezeti kerítés miatt.
   - [ ] StoreKit 2 adapter és App Store Server Notifications V2.
   - [ ] Play Billing 9.x adapter, acknowledgement és RTDN.

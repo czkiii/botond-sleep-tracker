@@ -106,4 +106,16 @@ describe('store billing contract', () => {
       externalAccountToken: 'M7F8abCDefghijklmnop_QrsTuvwxyZ01234'
     })).provider).toBe('GOOGLE_PLAY')
   })
+
+  it('accepts linked tokens only for a different Google purchase', () => {
+    expect(() => validateVerifiedStoreSubscription(verifiedSubscription({
+      replacementProviderSubscriptionId: 'old-apple-transaction'
+    }))).toThrowError(expect.objectContaining({ code: 'INVALID_VERIFIED_SUBSCRIPTION' }))
+    expect(() => validateVerifiedStoreSubscription(verifiedSubscription({
+      provider: 'GOOGLE_PLAY',
+      providerSubscriptionId: 'google-purchase-1',
+      externalAccountToken: 'M7F8abCDefghijklmnop_QrsTuvwxyZ01234',
+      replacementProviderSubscriptionId: 'google-purchase-1'
+    }))).toThrowError(expect.objectContaining({ code: 'INVALID_VERIFIED_SUBSCRIPTION' }))
+  })
 })

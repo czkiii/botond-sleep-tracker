@@ -29,6 +29,10 @@ const orderingMigration = readFileSync(
   new URL('../migrations/008_billing_event_order.sql', import.meta.url),
   'utf8'
 )
+const replacementMigration = readFileSync(
+  new URL('../migrations/009_google_token_replacements.sql', import.meta.url),
+  'utf8'
+)
 
 const now = 1_800_000_000_000
 const appleToken = '01990d45-a1b2-47e8-91f3-123456789abc'
@@ -96,6 +100,7 @@ beforeEach(() => {
   sqlite.exec(entitlementMigration)
   sqlite.exec(billingMigration)
   sqlite.exec(orderingMigration)
+  sqlite.exec(replacementMigration)
   insertAccount()
   sequence = 1
   service = new StoreBillingService(sqliteBinding(sqlite), {
@@ -128,6 +133,7 @@ describe('store billing migration', () => {
 
     legacy.exec(billingMigration)
     legacy.exec(orderingMigration)
+    legacy.exec(replacementMigration)
 
     expect(legacy.prepare('SELECT * FROM subscriptions').all()).toEqual(beforeSubscriptions)
     expect(legacy.prepare('SELECT * FROM account_entitlements').all()).toEqual(beforeEntitlements)
@@ -390,6 +396,174 @@ describe('store billing persistence', () => {
     expect(sqlite.prepare(`SELECT acknowledgement_state, acknowledged_at
       FROM store_subscription_state`).get())
       .toEqual({ acknowledgement_state: 'ACKNOWLEDGED', acknowledged_at: now + 1 })
+  })
+
+  it('replaces a Google Family+ token with Family and blocks late old-token restore', async () => {
+    await service.getOrCreateAccountLink('acc_a', 'GOOGLE_PLAY', now)
+    const old = snapshot({ provider: 'GOOGLE_PLAY' })
+    await service.applyVerifiedSubscription({ accountId: 'acc_a', subscription: old,
+      event: event(old) })
+    const next = snapshot({ provider: 'GOOGLE_PLAY', providerSubscriptionId: 'google-purchase-2',
+      providerTransactionId: 'google-order-2', replacementProviderSubscriptionId: old.providerSubscriptionId,
+      product: 'FAMILY', verifiedAt: now + 1 })
+    expect(await service.applyVerifiedSubscription({ accountId: 'acc_a', subscription: next,
+      event: event(next) })).toMatchObject({ outcome: 'APPLIED' })
+    expect(activeFeatures()).toEqual(['FAMILY_SYNC', 'PDF_EXPORT'])
+    expect(sqlite.prepare(`SELECT provider_subscription_id, status FROM subscriptions
+      ORDER BY provider_subscription_id`).all()).toEqual([
+      { provider_subscription_id: 'google-purchase-1', status: 'REVOKED' },
+      { provider_subscription_id: 'google-purchase-2', status: 'ACTIVE' }
+    ])
+    expect(sqlite.prepare('SELECT old_purchase_token FROM google_token_replacements').get())
+      .toEqual({ old_purchase_token: old.providerSubscriptionId })
+
+    const oldRestore = snapshot({ provider: 'GOOGLE_PLAY', verifiedAt: now + 10 })
+    expect(await service.applyVerifiedSubscription({ accountId: 'acc_a',
+      subscription: oldRestore, event: event(oldRestore, { source: 'RESTORE' }) }))
+      .toMatchObject({ outcome: 'STALE' })
+    expect(activeFeatures()).toEqual(['FAMILY_SYNC', 'PDF_EXPORT'])
+
+    const renewed = { ...next, verifiedAt: now + 2, providerTransactionId: 'google-order-3' }
+    expect(await service.applyVerifiedSubscription({ accountId: 'acc_a',
+      subscription: renewed, event: event(renewed, { source: 'SERVER_NOTIFICATION' }) }))
+      .toMatchObject({ outcome: 'APPLIED' })
+    expect(activeFeatures()).toEqual(['FAMILY_SYNC', 'PDF_EXPORT'])
+  })
+
+  it('tombstones an unseen linked Google token before any late purchase arrives', async () => {
+    await service.getOrCreateAccountLink('acc_a', 'GOOGLE_PLAY', now)
+    const next = snapshot({ provider: 'GOOGLE_PLAY', providerSubscriptionId: 'google-purchase-2',
+      replacementProviderSubscriptionId: 'google-purchase-unseen' })
+    await service.applyVerifiedSubscription({ accountId: 'acc_a', subscription: next,
+      event: event(next) })
+    const lateOld = snapshot({ provider: 'GOOGLE_PLAY',
+      providerSubscriptionId: 'google-purchase-unseen', verifiedAt: now + 10 })
+    expect(await service.applyVerifiedSubscription({ accountId: 'acc_a',
+      subscription: lateOld, event: event(lateOld, { source: 'RESTORE' }) }))
+      .toMatchObject({ outcome: 'STALE', subscriptionId: null })
+    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM subscriptions').get())
+      .toEqual({ count: 1 })
+  })
+
+  it('keeps only the newest grants through a Google upgrade and downgrade chain', async () => {
+    await service.getOrCreateAccountLink('acc_a', 'GOOGLE_PLAY', now)
+    const family = snapshot({ provider: 'GOOGLE_PLAY', product: 'FAMILY' })
+    const plus = snapshot({ provider: 'GOOGLE_PLAY', providerSubscriptionId: 'google-purchase-2',
+      replacementProviderSubscriptionId: family.providerSubscriptionId,
+      providerTransactionId: 'google-order-2', verifiedAt: now + 1 })
+    const familyAgain = snapshot({ provider: 'GOOGLE_PLAY', product: 'FAMILY',
+      providerSubscriptionId: 'google-purchase-3',
+      replacementProviderSubscriptionId: plus.providerSubscriptionId,
+      providerTransactionId: 'google-order-3', verifiedAt: now + 2 })
+    for (const purchase of [family, plus, familyAgain]) {
+      await service.applyVerifiedSubscription({ accountId: 'acc_a',
+        subscription: purchase, event: event(purchase) })
+    }
+    expect(activeFeatures()).toEqual(['FAMILY_SYNC', 'PDF_EXPORT'])
+    expect(sqlite.prepare(`SELECT provider_subscription_id, status FROM subscriptions
+      ORDER BY provider_subscription_id`).all()).toEqual([
+      { provider_subscription_id: 'google-purchase-1', status: 'REVOKED' },
+      { provider_subscription_id: 'google-purchase-2', status: 'REVOKED' },
+      { provider_subscription_id: 'google-purchase-3', status: 'ACTIVE' }
+    ])
+    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM google_token_replacements').get())
+      .toEqual({ count: 2 })
+  })
+
+  it('rejects linking a Google token owned by another account', async () => {
+    await service.getOrCreateAccountLink('acc_a', 'GOOGLE_PLAY', now)
+    const old = snapshot({ provider: 'GOOGLE_PLAY' })
+    await service.applyVerifiedSubscription({ accountId: 'acc_a', subscription: old,
+      event: event(old) })
+    insertAccount('acc_b')
+    const other = new StoreBillingService(sqliteBinding(sqlite), {
+      appleAccountToken: () => appleToken,
+      googleAccountToken: () => 'N8G9bcDEfghijklmnop_QrsTuvwxyZ012345',
+      id: (prefix) => `${prefix}_other_${sequence++}`
+    })
+    const otherAlias = await other.getOrCreateAccountLink('acc_b', 'GOOGLE_PLAY', now)
+    const stolen = snapshot({ provider: 'GOOGLE_PLAY', externalAccountToken: otherAlias,
+      providerSubscriptionId: 'google-purchase-2',
+      replacementProviderSubscriptionId: old.providerSubscriptionId })
+    await expect(other.applyVerifiedSubscription({ accountId: 'acc_b',
+      subscription: stolen, event: event(stolen) }))
+      .rejects.toMatchObject({ code: 'LINKED_SUBSCRIPTION_OWNERSHIP_MISMATCH' })
+    expect(activeFeatures('acc_b')).toEqual([])
+    expect(activeFeatures('acc_a')).toEqual(['FAMILY_PLUS_INSIGHTS', 'FAMILY_SYNC', 'PDF_EXPORT'])
+  })
+
+  it('rejects a second replacement for the same Google token', async () => {
+    await service.getOrCreateAccountLink('acc_a', 'GOOGLE_PLAY', now)
+    const old = snapshot({ provider: 'GOOGLE_PLAY' })
+    await service.applyVerifiedSubscription({ accountId: 'acc_a', subscription: old,
+      event: event(old) })
+    const first = snapshot({ provider: 'GOOGLE_PLAY', providerSubscriptionId: 'google-purchase-2',
+      replacementProviderSubscriptionId: old.providerSubscriptionId, product: 'FAMILY' })
+    await service.applyVerifiedSubscription({ accountId: 'acc_a', subscription: first,
+      event: event(first) })
+    const second = snapshot({ provider: 'GOOGLE_PLAY', providerSubscriptionId: 'google-purchase-3',
+      replacementProviderSubscriptionId: old.providerSubscriptionId, verifiedAt: now + 1 })
+    await expect(service.applyVerifiedSubscription({ accountId: 'acc_a',
+      subscription: second, event: event(second) }))
+      .rejects.toMatchObject({ code: 'LINKED_SUBSCRIPTION_CONFLICT' })
+    expect(activeFeatures()).toEqual(['FAMILY_SYNC', 'PDF_EXPORT'])
+  })
+
+  it('rolls back both subscriptions and grants if the Google link cannot be saved', async () => {
+    await service.getOrCreateAccountLink('acc_a', 'GOOGLE_PLAY', now)
+    const old = snapshot({ provider: 'GOOGLE_PLAY' })
+    await service.applyVerifiedSubscription({ accountId: 'acc_a', subscription: old,
+      event: event(old) })
+    sqlite.exec(`CREATE TRIGGER fail_google_link BEFORE INSERT ON google_token_replacements
+      BEGIN SELECT RAISE(ABORT, 'SIMULATED_LINK_FAILURE'); END`)
+    const next = snapshot({ provider: 'GOOGLE_PLAY', providerSubscriptionId: 'google-purchase-2',
+      replacementProviderSubscriptionId: old.providerSubscriptionId, product: 'FAMILY',
+      verifiedAt: now + 1 })
+    await expect(service.applyVerifiedSubscription({ accountId: 'acc_a',
+      subscription: next, event: event(next) })).rejects.toThrow(/SIMULATED_LINK_FAILURE/)
+    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM subscriptions').get())
+      .toEqual({ count: 1 })
+    expect(sqlite.prepare('SELECT status FROM subscriptions').get()).toEqual({ status: 'ACTIVE' })
+    expect(activeFeatures()).toEqual(['FAMILY_PLUS_INSIGHTS', 'FAMILY_SYNC', 'PDF_EXPORT'])
+  })
+
+  it('blocks an old-token restore that started before the replacement committed', async () => {
+    await service.getOrCreateAccountLink('acc_a', 'GOOGLE_PLAY', now)
+    const old = snapshot({ provider: 'GOOGLE_PLAY' })
+    await service.applyVerifiedSubscription({ accountId: 'acc_a', subscription: old,
+      event: event(old) })
+
+    const base = sqliteBinding(sqlite)
+    let resumeRestore!: () => void
+    let signalPaused!: () => void
+    const paused = new Promise<void>((resolve) => { signalPaused = resolve })
+    const gate = new Promise<void>((resolve) => { resumeRestore = resolve })
+    const delayedDb = {
+      prepare: (sql: string) => base.prepare(sql),
+      batch: async (statements: D1PreparedStatement[]) => {
+        signalPaused()
+        await gate
+        return base.batch(statements)
+      }
+    } as D1Database
+    const delayed = new StoreBillingService(delayedDb, {
+      appleAccountToken: () => appleToken,
+      googleAccountToken: () => googleToken,
+      id: (prefix) => `${prefix}_delayed_${sequence++}`
+    })
+    const restoring = snapshot({ provider: 'GOOGLE_PLAY', verifiedAt: now + 2 })
+    const restore = delayed.applyVerifiedSubscription({ accountId: 'acc_a',
+      subscription: restoring, event: event(restoring, { source: 'RESTORE' }) })
+    await paused
+
+    const next = snapshot({ provider: 'GOOGLE_PLAY', providerSubscriptionId: 'google-purchase-2',
+      replacementProviderSubscriptionId: old.providerSubscriptionId,
+      product: 'FAMILY', verifiedAt: now + 1 })
+    await service.applyVerifiedSubscription({ accountId: 'acc_a', subscription: next,
+      event: event(next) })
+    resumeRestore()
+    await expect(restore).resolves.toMatchObject({ outcome: 'STALE' })
+    expect(activeFeatures()).toEqual(['FAMILY_SYNC', 'PDF_EXPORT'])
   })
 
   it('rolls back subscription, state and event together when a grant write fails', async () => {

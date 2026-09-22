@@ -116,6 +116,14 @@ egy batchben maradnak; azonos ellenőrzési időnél a visszavonás elsőbbsége
 Ezt a migrációt sem alkalmaztuk távoli D1-en. A provider-állapotverzió és a
 valódi Apple/Google adapteres párhuzamos próba nélkül A08 továbbra is nyitott.
 
+Az A09 helyi `009_google_token_replacements.sql` migráció a Play által igazolt
+`linkedPurchaseToken` régi tokenjét tartósan lezárja. Az új grant, a régi grant
+visszavonása és a tokenkapcsolat egyetlen batchben történik; tulajdonos,
+környezet és account-alias ütközéskor a művelet nem ad jogot. A még nem látott
+régi token később sem aktiválható. Az új sémát csak helyben próbáltuk; távoli
+D1-re a `007`, `008`, `009` migrációk sorrendben, külön mentési és visszaállítási
+próba után kerülhetnek.
+
 ## Apple folyamat
 
 1. Az app a Servertől lekéri a bejelentkezett account stabil

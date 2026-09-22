@@ -4,7 +4,7 @@
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
 **Teljes audit alapja:** `e9374f4` (`Add verified store billing foundation`); az akkori helyi origin-refhez képest 0 ahead / 0 behind.
-**Ellenőrzött HEAD:** `eac16ef` (`Close legacy Family Sync entitlement bypass`). Az A03–A05 kéttelefonos elfogadása nyitott. Az A06 commit/push megtörtént; staging elfogadása nincs rögzítve. Az A07 kiadási konfigurációja és az A08 billing-sorrend helyi javítása munkafában van, commit/push/deploy nélkül.
+**Ellenőrzött HEAD:** `e725278` (`Guard production release and harden billing event ordering`). Az A03–A05 kéttelefonos elfogadása nyitott. Az A07–A08 commit/push megtörtént a tulajdonos közlése szerint; staging elfogadása nincs rögzítve. Az A09 Google Play linked-token javítása munkafában van, commit/push/deploy nélkül.
 
 ## Legfrissebb checkpoint — A03–A06 staging elfogadás, A07 helyi előkészítés
 
@@ -29,7 +29,9 @@
 - **A07 helyi előkészítés:** a publikus, belépés nélküli frontend Free nézetből indul és nem indít fizetős szinkront. A release build kifejezett account-auth, éles HTTPS Worker és first-party Cloudflare Pages proxy beállítást követel; a jelenlegi GitHub Pages workflow e kapun megáll. Az internal proxy staginget csak az internal hoston használhatja, más host éles upstream nélkül 503-at kap. A production Worker konfiguráció hiányos vagy tesztmódú beállítás esetén `RELEASE_NOT_CONFIGURED` hibával áll meg. Az éles domain/proxy, OAuth origin, titkok, D1 migráció és kézi iOS-próba még hiányzik, így A07 nincs lezárva.
 - **A07 helyi ellenőrzés:** frontend és Worker typecheck, 27 fájl / 232 teszt sikeres; a tényleges kiadási és kéttelefonos próbák még nyitottak.
 - **A08 helyi javítás:** az eseményazonosító ütközése atomi batch-rollbacket okoz, azonos ellenőrzési időnél a REVOKED állapot elsőbbséget kap, és ugyanaz a token késői ACTIVE eseménnyel nem aktiválható újra. Az új `008_billing_event_order.sql` csak additív, helyben tesztelt séma; távoli D1-en nem futott. A párhuzamos első vásárlás, eltérő payload-hash, régi replay és jogosultság-visszavonás regressziói átmentek. A tényleges Apple/Google provider-állapotverzió és párhuzamos hálózati verify/webhook/restore elfogadása még hiányzik, ezért A08 nyitott.
-- **Friss helyi ellenőrzés:** frontend és Worker typecheck, 27 fájl / 236 teszt sikeres. Az A07–A08 munkafaváltozásokhoz commit/push/deploy még nem történt; production adatbázis-módosítás nem történt.
+- **A07–A08 commit/push:** `e725278` commit a feature ágon; a távoli staging eredményt és az éles konfigurációt nem igazoltuk, production művelet nem történt.
+- **A09 helyi javítás:** a Google Play új tokenje által hivatkozott régi token grantjait ugyanabban a D1 batchben visszavonja. A `009_google_token_replacements.sql` additív tombstone táblája a még nem ismert régi token késői restore-ját is kizárja. A régi token tulajdonosa, környezete és account-aliasza ellenőrzött; eltérő account vagy másik új token ütközése nem kaphat jogot. Plus→Family, Family→Plus→Family, késői restore, ismeretlen régi token és rollback célzott próbája sikeres. A 009 migráció távoli D1-en nem futott, a valódi Google API adapter/RTDN és két store elfogadás továbbra is nyitott.
+- **Friss helyi ellenőrzés:** frontend és Worker typecheck; az A09 utáni teljes futás 27 fájl / 244 tesztet teljesített, benne a régi restore és új token párhuzamosságával. A09-hez commit/push/deploy vagy production adatbázis-módosítás nem történt.
 
 ### Production V3 adatok mentése és V4 migrációs próba
 

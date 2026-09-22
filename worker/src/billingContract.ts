@@ -178,6 +178,10 @@ export function validateVerifiedStoreSubscription(
   requireSubscriptionString(value.providerTransactionId, 'providerTransactionId')
   requireSubscriptionString(value.externalAccountToken, 'externalAccountToken')
   if (value.replacementProviderSubscriptionId !== null) {
+    if (value.provider !== 'GOOGLE_PLAY' ||
+      value.replacementProviderSubscriptionId === value.providerSubscriptionId) {
+      throw invalidSubscription('Invalid linked Google purchase token')
+    }
     requireSubscriptionString(
       value.replacementProviderSubscriptionId,
       'replacementProviderSubscriptionId'
