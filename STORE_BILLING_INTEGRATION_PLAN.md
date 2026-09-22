@@ -124,6 +124,13 @@ régi token később sem aktiválható. Az új sémát csak helyben próbáltuk;
 D1-re a `007`, `008`, `009` migrációk sorrendben, külön mentési és visszaállítási
 próba után kerülhetnek.
 
+Az A10 helyi szeletében a `StoreBillingService` létrehozásakor a szervernek
+kötelezően meg kell adnia a várt store-környezetet. Ettől eltérő provider
+snapshot elutasított, és a már mentett provider-azonosító környezete nem
+változtatható. A valódi adapterben a store-válaszból származó bundle/package,
+product és környezet ellenőrzése, valamint a külön staging/production D1
+elfogadása későbbi kiadási kapu; klienskérés nem választhat környezetet.
+
 ## Apple folyamat
 
 1. Az app a Servertől lekéri a bejelentkezett account stabil

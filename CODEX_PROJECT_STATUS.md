@@ -4,7 +4,7 @@
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
 **Teljes audit alapja:** `e9374f4` (`Add verified store billing foundation`); az akkori helyi origin-refhez képest 0 ahead / 0 behind.
-**Ellenőrzött HEAD:** `e725278` (`Guard production release and harden billing event ordering`). Az A03–A05 kéttelefonos elfogadása nyitott. Az A07–A08 commit/push megtörtént a tulajdonos közlése szerint; staging elfogadása nincs rögzítve. Az A09 Google Play linked-token javítása munkafában van, commit/push/deploy nélkül.
+**Ellenőrzött HEAD:** `8cbebb4` (`Prevent old Google Play token grants after subscription replacement`). Az A03–A05 kéttelefonos elfogadása nyitott. Az A07–A09 commit/push megtörtént a tulajdonos közlése szerint; staging elfogadása nincs rögzítve. A smoke- és A10-javítás munkafában van, commit/push/deploy nélkül.
 
 ## Legfrissebb checkpoint — A03–A06 staging elfogadás, A07 helyi előkészítés
 
@@ -31,7 +31,10 @@
 - **A08 helyi javítás:** az eseményazonosító ütközése atomi batch-rollbacket okoz, azonos ellenőrzési időnél a REVOKED állapot elsőbbséget kap, és ugyanaz a token késői ACTIVE eseménnyel nem aktiválható újra. Az új `008_billing_event_order.sql` csak additív, helyben tesztelt séma; távoli D1-en nem futott. A párhuzamos első vásárlás, eltérő payload-hash, régi replay és jogosultság-visszavonás regressziói átmentek. A tényleges Apple/Google provider-állapotverzió és párhuzamos hálózati verify/webhook/restore elfogadása még hiányzik, ezért A08 nyitott.
 - **A07–A08 commit/push:** `e725278` commit a feature ágon; a távoli staging eredményt és az éles konfigurációt nem igazoltuk, production művelet nem történt.
 - **A09 helyi javítás:** a Google Play új tokenje által hivatkozott régi token grantjait ugyanabban a D1 batchben visszavonja. A `009_google_token_replacements.sql` additív tombstone táblája a még nem ismert régi token késői restore-ját is kizárja. A régi token tulajdonosa, környezete és account-aliasza ellenőrzött; eltérő account vagy másik új token ütközése nem kaphat jogot. Plus→Family, Family→Plus→Family, késői restore, ismeretlen régi token és rollback célzott próbája sikeres. A 009 migráció távoli D1-en nem futott, a valódi Google API adapter/RTDN és két store elfogadás továbbra is nyitott.
-- **Friss helyi ellenőrzés:** frontend és Worker typecheck; az A09 utáni teljes futás 27 fájl / 244 tesztet teljesített, benne a régi restore és új token párhuzamosságával. A09-hez commit/push/deploy vagy production adatbázis-módosítás nem történt.
+- **A09 ellenőrzés és commit:** frontend és Worker typecheck; 27 fájl / 244 teszt sikeres, benne a régi restore és új token párhuzamosságával. A tulajdonos `8cbebb4` commitja és pushja megtörtént; production adatbázis-módosítás nem történt.
+- **Smoke-felülvizsgálat (2026-09-22):** az `8cbebb4` commitnál a staging Worker/Pages és CI ellenőrzések sikeresek, de a régi smoke ellenőrzés bukott. Oka: a szkript továbbra is névtelen `POST /v1/families` hívással kezdett, amelyet az A06 szerveroldali jogosultsági védelem helyesen `ACCOUNT_REQUIRED` hibával tilt. Az új smoke csak a staging health/CORS és a névtelen útvonalak tiltását ellenőrzi; helyben élő staging ellen átment. Nem teszteli a két hitelesített account közti tényleges szinkront: az külön staging elfogadási kapu marad. A smoke-javítás még nincs commitolva/pusholva.
+- **A10 helyi szelet:** a store persistence szolgáltatás kötelező, szerver által kiválasztott `SANDBOX` vagy `PRODUCTION` környezetet kap; eltérő verified snapshotot elutasít, és meglévő provider-azonosító környezete nem írható át. A tényleges Apple/Google adapter-, csomagazonosító-, külön D1- és store sandbox/production elfogadás nyitott, tehát A10 nem lezárt.
+- **Friss ellenőrzés:** frontend és Worker typecheck; teljes 27 fájl / 246 teszt sikeres; a módosított smoke élő staging Worker ellen átment. Éles deploy, main merge és production D1-módosítás nem történt.
 
 ### Production V3 adatok mentése és V4 migrációs próba
 
@@ -553,17 +556,16 @@ auditkapu az irányadó, különösen az adatmegőrzési és hozzáférési hib�
 
 ## Következő konkrét feladat
 
-A03–A06: a kéttelefonos staging elfogadás lezárása, amikor ismét rendelkezésre
-áll a két készülék. Az A06 commit/push kész (`eac16ef`). Az A07 jelenlegi helyi
-szelete a publikus Free alapállapotot és az éles build/Worker/proxy hiányos
-konfigurációjának tiltását készíti elő. Következik az A07 tulajdonosi commit/push,
-majd a tényleges éles host, Worker, OAuth és cookie-környezet kialakítása; ez
-utóbbihoz külön kiadási döntés és kézi iOS-próba kell. A korábbi staging
-elfogadási esetek továbbra is kötelezőek.
+A jelenlegi helyi smoke/A10 változások tulajdonosi commit/pushja után a GitHub
+`smoke` ellenőrzés eredményét kell visszaigazolni. Ez csak auth-határ próba;
+az A03–A06 kéttelefonos, bejelentkezett staging elfogadása továbbra is nyitott.
+A valódi éles host, Worker, OAuth és cookie-környezet kialakításához külön
+kiadási döntés és kézi iOS-próba kell.
 
-A billing HTTP-bekötés az A08–A10 domainhibák javítása után következik.
-A `007` távoli staging migráció előtt export/restore és ellenőrzött munkamenet
-kell. Éles művelet külön jóváhagyással; commit/push a tulajdonos feladata.
+A billing HTTP-bekötés előtt az A08–A10 még nyitott adapteres és környezeti
+feltételeit teljesíteni kell. A `007`–`009` távoli staging migrációk előtt
+export/restore és ellenőrzött munkamenet szükséges. Éles művelet külön
+jóváhagyással; commit/push a tulajdonos feladata.
 
 ## Munkamegosztás
 

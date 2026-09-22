@@ -5,6 +5,7 @@ import {
   validateVerifiedStoreEvent,
   validateVerifiedStoreSubscription,
   type StoreProvider,
+  type StoreEnvironment,
   type VerifiedStoreEvent,
   type VerifiedStoreSubscription
 } from './billingContract'
@@ -51,6 +52,7 @@ export type StoreBillingServiceErrorCode =
   | 'SUBSCRIPTION_NOT_FOUND'
   | 'LINKED_SUBSCRIPTION_OWNERSHIP_MISMATCH'
   | 'LINKED_SUBSCRIPTION_CONFLICT'
+  | 'STORE_ENVIRONMENT_MISMATCH'
 
 export class StoreBillingServiceError extends Error {
   constructor(readonly code: StoreBillingServiceErrorCode, message: string) {
@@ -74,6 +76,7 @@ const defaultTokenFactory: TokenFactory = {
 export class StoreBillingService {
   constructor(
     private readonly db: D1Database,
+    private readonly expectedEnvironment: StoreEnvironment,
     private readonly tokens: TokenFactory = defaultTokenFactory
   ) {}
 
@@ -113,6 +116,10 @@ export class StoreBillingService {
   }, firstPurchaseRetry = true): Promise<StoreBillingApplyResult> {
     const event = validateVerifiedStoreEvent(input.event)
     const subscription = validateVerifiedStoreSubscription(input.subscription)
+    if (subscription.environment !== this.expectedEnvironment) {
+      throw new StoreBillingServiceError('STORE_ENVIRONMENT_MISMATCH',
+        'Verified store environment differs from the server environment')
+    }
     if (event.provider !== subscription.provider ||
       event.providerSubscriptionId !== subscription.providerSubscriptionId) {
       throw new StoreBillingServiceError(
@@ -179,6 +186,10 @@ export class StoreBillingService {
       subscription.provider,
       subscription.providerSubscriptionId
     )
+    if (existing && existing.environment !== this.expectedEnvironment) {
+      throw new StoreBillingServiceError('STORE_ENVIRONMENT_MISMATCH',
+        'Stored subscription belongs to another store environment')
+    }
     if (existing && existing.account_id !== input.accountId) {
       throw new StoreBillingServiceError(
         'SUBSCRIPTION_OWNERSHIP_MISMATCH',
@@ -214,6 +225,7 @@ export class StoreBillingService {
               WHERE current_state.subscription_id = subscriptions.id)
             OR EXISTS (SELECT 1 FROM store_subscription_state current_state
               WHERE current_state.subscription_id = subscriptions.id
+                AND current_state.environment = ?
                 AND (current_state.last_verified_at < ?
                   OR (current_state.last_verified_at = ?
                     AND excluded.status = 'REVOKED'
@@ -223,7 +235,8 @@ export class StoreBillingService {
           subscription.providerSubscriptionId, subscription.product, subscription.status,
           subscription.autoRenews ? 1 : 0, subscription.trialEndsAt,
           subscription.currentPeriodEndsAt, subscription.accessUntil, subscription.startedAt,
-          event.receivedAt, canceledAt, subscription.verifiedAt, subscription.verifiedAt),
+          event.receivedAt, canceledAt, this.expectedEnvironment,
+          subscription.verifiedAt, subscription.verifiedAt),
       this.db.prepare(`INSERT INTO store_subscription_state
         (subscription_id, account_id, provider, environment, provider_transaction_id,
          external_account_token, last_verified_at, acknowledgement_state, acknowledged_at,
@@ -250,6 +263,7 @@ export class StoreBillingService {
             AND excluded.last_applied_status = 'REVOKED'
             AND store_subscription_state.last_applied_status IS NOT 'REVOKED'))
           AND store_subscription_state.account_id = excluded.account_id
+          AND store_subscription_state.environment = excluded.environment
           AND EXISTS (SELECT 1 FROM subscriptions applied
             WHERE applied.id = excluded.subscription_id
               AND applied.status = ?)`)

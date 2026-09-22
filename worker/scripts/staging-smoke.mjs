@@ -1,211 +1,61 @@
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
 
-const base = (process.env.SOLEMI_STAGING_API_BASE || '').replace(/\/$/, '')
-if (!base) throw new Error('Set SOLEMI_STAGING_API_BASE to the staging Worker URL.')
-if (!/staging/i.test(base)) throw new Error('Refusing to run: the URL must contain "staging".')
+const configuredBase = process.env.SOLEMI_STAGING_API_BASE
+if (!configuredBase) throw new Error('Set SOLEMI_STAGING_API_BASE to the staging Worker URL.')
+const base = new URL(configuredBase)
+if (base.protocol !== 'https:' || !/staging/i.test(base.hostname) ||
+  base.pathname !== '/' || base.search || base.hash || base.username || base.password) {
+  throw new Error('Refusing to run against a non-staging HTTPS Worker origin.')
+}
 
 const origin = 'https://solemi-sleep-internal.pages.dev'
-const run = randomUUID().replaceAll('-', '').slice(0, 12)
-const childA = `child_smoke_a_${run}`
-const childB = `child_smoke_b_${run}`
-const sessionA = `sleep_smoke_a_${run}`
-const sessionB = `sleep_smoke_b_${run}`
-const sessionC = `sleep_smoke_child_delete_${run}`
-const conflictingSession = `sleep_smoke_conflict_${run}`
 
-function operationId(label) {
-  return `op_${label}_${randomUUID().replaceAll('-', '')}`
-}
-
-async function api(path, { method = 'GET', token, body } = {}) {
-  const headers = { Origin: origin }
-  if (token) headers.Authorization = `Bearer ${token}`
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
-  const response = await fetch(`${base}${path}`, {
+async function request(path, { method = 'GET', body } = {}) {
+  const response = await fetch(new URL(path, base), {
     method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body)
-  })
-  const payload = await response.json().catch(() => null)
-  if (!response.ok || !payload?.ok) {
-    const detail = payload?.error ? `${payload.error.code}: ${payload.error.message}` : `HTTP ${response.status}`
-    throw new Error(`${method} ${path} failed: ${detail}`)
-  }
-  return { response, data: payload.data }
-}
-
-async function expectedApiError(path, expectedStatus, expectedCode, { method = 'GET', token, body } = {}) {
-  const headers = { Origin: origin }
-  if (token) headers.Authorization = `Bearer ${token}`
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
-  const response = await fetch(`${base}${path}`, {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body)
+    headers: {
+      Origin: origin,
+      ...(body === undefined ? {} : { 'Content-Type': 'application/json' })
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal: AbortSignal.timeout(15_000)
   })
   const payload = await response.json()
-  assert.equal(response.status, expectedStatus)
-  assert.equal(payload?.ok, false)
-  assert.equal(payload?.error?.code, expectedCode)
-  return payload
+  assert.equal(response.headers.get('access-control-allow-origin'), origin,
+    `${method} ${path} must allow the internal Pages origin`)
+  return { response, payload }
 }
 
-console.log(`Staging smoke test: ${base}`)
+async function expectRejected(path, status, code, options) {
+  const { response, payload } = await request(path, options)
+  assert.equal(response.status, status, `${options?.method || 'GET'} ${path}: ${JSON.stringify(payload)}`)
+  assert.equal(payload?.ok, false)
+  assert.equal(payload?.error?.code, code)
+}
 
-const health = await api('/health')
-assert.equal(health.data.status, 'ok')
-assert.equal(health.response.headers.get('access-control-allow-origin'), origin)
+console.log(`Staging auth boundary smoke: ${base.origin}`)
 
-const created = await api('/v1/families', {
-  method: 'POST',
-  body: {
-    familyName: `Solemi staging smoke ${run}`,
-    deviceName: 'smoke-primary',
-    childId: childA,
-    childName: 'Boti smoke',
-    birthDate: '2025-08-23'
-  }
-})
-const primaryToken = created.data.deviceToken
-assert.ok(primaryToken)
+const health = await request('/health')
+assert.equal(health.response.status, 200)
+assert.equal(health.payload?.ok, true)
+assert.equal(health.payload?.data?.status, 'ok')
 
-await api('/v1/children', {
-  method: 'POST',
-  token: primaryToken,
-  body: {
-    operationId: operationId('create_child'),
-    child: { id: childB, name: 'Frici smoke', birthDate: '2026-08-18' }
-  }
-})
+// Empty bodies cannot create data even if a deployment accidentally disables
+// enforcement. The expected ACCOUNT_REQUIRED response also detects that drift.
+await expectRejected('/v1/families', 401, 'ACCOUNT_REQUIRED',
+  { method: 'POST', body: {} })
+await expectRejected('/v1/join', 401, 'ACCOUNT_REQUIRED',
+  { method: 'POST', body: {} })
 
-const now = Date.now()
-await api('/v1/sessions/start', {
-  method: 'POST', token: primaryToken,
-  body: { operationId: operationId('start_a'), sessionId: sessionA, childId: childA, startTime: new Date(now - 10 * 60_000).toISOString() }
-})
-const duplicateStart = await expectedApiError('/v1/sessions/start', 409, 'ACTIVE_SLEEP_EXISTS', {
-  method: 'POST', token: primaryToken,
-  body: { operationId: operationId('duplicate_start_a'), sessionId: conflictingSession, childId: childA, startTime: new Date(now - 9 * 60_000).toISOString() }
-})
-assert.equal(duplicateStart.data?.activeSession?.id, sessionA)
+await expectRejected('/v1/auth/access', 401, 'SESSION_INVALID')
+await expectRejected('/v1/auth/family/create', 401, 'SESSION_INVALID',
+  { method: 'POST', body: {} })
+await expectRejected('/v1/auth/family/join', 401, 'SESSION_INVALID',
+  { method: 'POST', body: {} })
+await expectRejected('/v1/auth/test/plan', 401, 'SESSION_INVALID',
+  { method: 'POST', body: { plan: 'familyPlus' } })
 
-await api('/v1/sessions/start', {
-  method: 'POST', token: primaryToken,
-  body: { operationId: operationId('start_b'), sessionId: sessionB, childId: childB, startTime: new Date(now - 8 * 60_000).toISOString() }
-})
-
-let synced = (await api('/v1/sync?after=0', { token: primaryToken })).data
-assert.equal(synced.children.filter((child) => !child.deletedAt).length, 2)
-assert.equal(synced.sessions.filter((session) => !session.endTime && !session.deletedAt).length, 2)
-let sessionARevision = synced.sessions.find((session) => session.id === sessionA)?.revision
-let sessionBRevision = synced.sessions.find((session) => session.id === sessionB)?.revision
-assert.ok(Number.isInteger(sessionARevision))
-assert.ok(Number.isInteger(sessionBRevision))
-
-await api(`/v1/children/${childB}`, {
-  method: 'PATCH', token: primaryToken,
-  body: { operationId: operationId('patch_child'), patch: { name: 'Frici staging' } }
-})
-
-const endTime = new Date().toISOString()
-const endedA = await api(`/v1/sessions/${sessionA}/end`, {
-  method: 'POST', token: primaryToken,
-  body: { operationId: operationId('end_a'), endTime, baseRevision: sessionARevision }
-})
-sessionARevision = endedA.data.session.revision
-const endedB = await api(`/v1/sessions/${sessionB}/end`, {
-  method: 'POST', token: primaryToken,
-  body: { operationId: operationId('end_b'), endTime, baseRevision: sessionBRevision }
-})
-sessionBRevision = endedB.data.session.revision
-
-const doubleStop = await api(`/v1/sessions/${sessionA}/end`, {
-  method: 'POST', token: primaryToken,
-  body: { operationId: operationId('double_stop_a'), endTime, baseRevision: sessionARevision }
-})
-assert.equal(doubleStop.data.alreadyEnded, true)
-
-const patchedA = await api(`/v1/sessions/${sessionA}`, {
-  method: 'PATCH', token: primaryToken,
-  body: { operationId: operationId('patch_sleep'), baseRevision: sessionARevision,
-    patch: { note: 'staging smoke verified', dayNightOverride: 'day' } }
-})
-sessionARevision = patchedA.data.session.revision
-await api(`/v1/sessions/${sessionB}`, {
-  method: 'DELETE', token: primaryToken,
-  body: { operationId: operationId('delete_sleep'), baseRevision: sessionBRevision }
-})
-
-const invite = await api('/v1/invites', { method: 'POST', token: primaryToken, body: {} })
-const joined = await api('/v1/join', {
-  method: 'POST',
-  body: { code: invite.data.code, deviceName: 'smoke-secondary' }
-})
-assert.ok(joined.data.deviceToken)
-
-const competingBaseRevision = sessionARevision
-const primaryEdit = await api(`/v1/sessions/${sessionA}`, {
-  method: 'PATCH', token: primaryToken,
-  body: { operationId: operationId('conflict_primary'), baseRevision: competingBaseRevision,
-    patch: { note: 'primary edit' } }
-})
-sessionARevision = primaryEdit.data.session.revision
-const conflict = await expectedApiError(`/v1/sessions/${sessionA}`, 409, 'SYNC_CONFLICT', {
-  method: 'PATCH', token: joined.data.deviceToken,
-  body: { operationId: operationId('conflict_secondary'), baseRevision: competingBaseRevision,
-    patch: { note: 'secondary edit wins' } }
-})
-assert.equal(conflict.data?.conflict?.serverRevision, sessionARevision)
-const secondaryEdit = await api(`/v1/sessions/${sessionA}`, {
-  method: 'PATCH', token: joined.data.deviceToken,
-  body: { operationId: operationId('conflict_secondary_retry'), baseRevision: sessionARevision,
-    patch: { note: 'secondary edit wins' } }
-})
-sessionARevision = secondaryEdit.data.session.revision
-
-synced = (await api('/v1/sync?after=0', { token: joined.data.deviceToken })).data
-const syncedA = synced.sessions.find((session) => session.id === sessionA)
-const syncedB = synced.sessions.find((session) => session.id === sessionB)
-assert.equal(synced.children.find((child) => child.id === childB)?.name, 'Frici staging')
-assert.equal(syncedA?.note, 'secondary edit wins')
-assert.equal(syncedA?.dayNightOverride, 'day')
-assert.ok(syncedB?.deletedAt)
-
-await api('/v1/sessions', {
-  method: 'POST', token: primaryToken,
-  body: {
-    operationId: operationId('create_before_child_delete'),
-    session: {
-      id: sessionC,
-      childId: childB,
-      startTime: new Date(now - 90 * 60_000).toISOString(),
-      endTime: new Date(now - 60 * 60_000).toISOString(),
-      note: 'removed with child',
-      dayNightOverride: 'day'
-    }
-  }
-})
-await api(`/v1/children/${childB}`, {
-  method: 'DELETE', token: primaryToken,
-  body: { operationId: operationId('delete_child') }
-})
-
-// Pull the complete authoritative state so isolation is checked as well as
-// the incremental tombstones produced by the child deletion.
-const afterChildDelete = (await api('/v1/sync?after=0', { token: joined.data.deviceToken })).data
-assert.ok(afterChildDelete.children.find((child) => child.id === childB)?.deletedAt)
-assert.ok(afterChildDelete.sessions.find((session) => session.id === sessionC)?.deletedAt)
-assert.equal(afterChildDelete.children.find((child) => child.id === childA)?.deletedAt, null)
-assert.equal(afterChildDelete.sessions.find((session) => session.id === sessionA)?.deletedAt, null)
-assert.equal(afterChildDelete.sessions.find((session) => session.id === sessionA)?.note, 'secondary edit wins')
-
-console.log('PASS: health + CORS')
-console.log('PASS: two child profiles + parallel active sleeps')
-console.log('PASS: edit + delete tombstone')
-console.log('PASS: duplicate start rejected + duplicate stop idempotent')
-console.log('PASS: competing edit is rejected, then explicit retry wins')
-console.log('PASS: child delete cascades to its sleep data')
-console.log('PASS: one child mutation leaves the other child untouched')
-console.log('PASS: invite + second-device sync')
-console.log(`PASS: family ${created.data.familyId}, revision ${synced.revision}`)
+console.log('PASS: health and internal-origin CORS')
+console.log('PASS: legacy anonymous family creation and join are blocked')
+console.log('PASS: account access, family mutation and test plan require a session')
+console.log('Authenticated two-account Family Sync remains a separate staging acceptance test.')

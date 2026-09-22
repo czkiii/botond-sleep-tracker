@@ -1,4 +1,4 @@
-name: Family Sync staging smoke
+name: Staging auth boundary smoke
 
 on:
   workflow_dispatch:

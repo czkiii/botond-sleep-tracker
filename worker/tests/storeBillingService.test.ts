@@ -103,7 +103,7 @@ beforeEach(() => {
   sqlite.exec(replacementMigration)
   insertAccount()
   sequence = 1
-  service = new StoreBillingService(sqliteBinding(sqlite), {
+  service = new StoreBillingService(sqliteBinding(sqlite), 'SANDBOX', {
     appleAccountToken: () => appleToken,
     googleAccountToken: () => googleToken,
     id: (prefix) => `${prefix}_${sequence++}`
@@ -144,6 +144,33 @@ describe('store billing migration', () => {
 })
 
 describe('store billing persistence', () => {
+  it('rejects sandbox proofs on a production-configured billing service', async () => {
+    const production = new StoreBillingService(sqliteBinding(sqlite), 'PRODUCTION')
+    await production.getOrCreateAccountLink('acc_a', 'APPLE', now)
+    const sandbox = snapshot()
+    await expect(production.applyVerifiedSubscription({ accountId: 'acc_a',
+      subscription: sandbox, event: event(sandbox) }))
+      .rejects.toMatchObject({ code: 'STORE_ENVIRONMENT_MISMATCH' })
+    expect(activeFeatures()).toEqual([])
+    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM subscriptions').get())
+      .toEqual({ count: 0 })
+  })
+
+  it('keeps a provider ID bound to its original store environment', async () => {
+    await service.getOrCreateAccountLink('acc_a', 'APPLE', now)
+    const sandbox = snapshot()
+    await service.applyVerifiedSubscription({ accountId: 'acc_a',
+      subscription: sandbox, event: event(sandbox) })
+    const production = new StoreBillingService(sqliteBinding(sqlite), 'PRODUCTION')
+    const productionProof = snapshot({ environment: 'PRODUCTION', verifiedAt: now + 1 })
+    await expect(production.applyVerifiedSubscription({ accountId: 'acc_a',
+      subscription: productionProof, event: event(productionProof) }))
+      .rejects.toMatchObject({ code: 'STORE_ENVIRONMENT_MISMATCH' })
+    expect(sqlite.prepare('SELECT environment FROM store_subscription_state').get())
+      .toEqual({ environment: 'SANDBOX' })
+    expect(activeFeatures()).toEqual(['FAMILY_PLUS_INSIGHTS', 'FAMILY_SYNC', 'PDF_EXPORT'])
+  })
+
   it('creates stable provider-specific account aliases for active accounts', async () => {
     expect(await service.getOrCreateAccountLink('acc_a', 'APPLE', now)).toBe(appleToken)
     expect(await service.getOrCreateAccountLink('acc_a', 'APPLE', now + 1)).toBe(appleToken)
@@ -298,7 +325,7 @@ describe('store billing persistence', () => {
         return run
       }
     } as D1Database
-    const makeService = () => new StoreBillingService(serialized, {
+    const makeService = () => new StoreBillingService(serialized, 'SANDBOX', {
       appleAccountToken: () => appleToken,
       googleAccountToken: () => googleToken,
       id: (prefix) => `${prefix}_${sequence++}`
@@ -334,7 +361,7 @@ describe('store billing persistence', () => {
         return run
       }
     } as D1Database
-    const makeService = () => new StoreBillingService(serialized, {
+    const makeService = () => new StoreBillingService(serialized, 'SANDBOX', {
       appleAccountToken: () => appleToken,
       googleAccountToken: () => googleToken,
       id: (prefix) => `${prefix}_${sequence++}`
@@ -365,7 +392,7 @@ describe('store billing persistence', () => {
       event: event(purchase) })
 
     insertAccount('acc_b')
-    const secondService = new StoreBillingService(sqliteBinding(sqlite), {
+    const secondService = new StoreBillingService(sqliteBinding(sqlite), 'SANDBOX', {
       appleAccountToken: () => '01990d45-a1b2-47e8-91f3-123456789abd',
       googleAccountToken: () => 'N8G9bcDEfghijklmnop_QrsTuvwxyZ012345',
       id: (prefix) => `${prefix}_other_${sequence++}`
@@ -476,7 +503,7 @@ describe('store billing persistence', () => {
     await service.applyVerifiedSubscription({ accountId: 'acc_a', subscription: old,
       event: event(old) })
     insertAccount('acc_b')
-    const other = new StoreBillingService(sqliteBinding(sqlite), {
+    const other = new StoreBillingService(sqliteBinding(sqlite), 'SANDBOX', {
       appleAccountToken: () => appleToken,
       googleAccountToken: () => 'N8G9bcDEfghijklmnop_QrsTuvwxyZ012345',
       id: (prefix) => `${prefix}_other_${sequence++}`
@@ -546,7 +573,7 @@ describe('store billing persistence', () => {
         return base.batch(statements)
       }
     } as D1Database
-    const delayed = new StoreBillingService(delayedDb, {
+    const delayed = new StoreBillingService(delayedDb, 'SANDBOX', {
       appleAccountToken: () => appleToken,
       googleAccountToken: () => googleToken,
       id: (prefix) => `${prefix}_delayed_${sequence++}`

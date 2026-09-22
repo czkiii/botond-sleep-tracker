@@ -23,7 +23,7 @@ vagy kifejezett, indokolt termékdöntés kell; a puszta priorizálás nem lezá
 - [ ] A07 — Production config/auth-proxy/entitlement és tesztkapcsolók elkülönítése. Helyi kiadási kapu és Free alapállapot elkészült: GitHub Pages production build blokkolva; a proxy éles hoston nem hív staginget; production Worker hiányos vagy tesztmódú konfigurációval 503-at ad. Frontend és Worker typecheck, 27 fájl / 232 teszt sikeres. Éles Cloudflare Pages host, OAuth origin/cookie, Worker secrets, D1 migráció és mobilos elfogadás még nyitott.
 - [ ] A08 — Billing eseményverseny és sorrend javítása. Helyi atomi event-ütközésvédelem, visszavonás elsőbbsége és párhuzamos első vásárlás regressziói kész; a `008_billing_event_order.sql` csak helyben tesztelt, távoli D1-en nincs alkalmazva. Provider-szintű állapotverzió és éles adapteres verify/webhook/restore elfogadás hiányzik.
 - [ ] A09 — Google linked-token csere és régi grantok visszavonása. Helyi atomi grant-visszavonás és a még nem ismert régi token tombstone-ja kész (`009_google_token_replacements.sql`); távoli D1-migráció, valódi Play API/RTDN és store elfogadás hiányzik.
-- [ ] A10 — Store sandbox/production környezeti kerítés.
+- [ ] A10 — Store sandbox/production környezeti kerítés. A helyi billing service kötelező szerveroldali környezetet vár, más környezet snapshotját elutasítja és a meglévő provider-azonosító környezetét nem engedi átírni. Az Apple/Google adapteres bundle/package/product ellenőrzés, a külön D1 és a store sandbox/production elfogadás továbbra is nyitott.
 - [ ] A11 — Hiteles store verify/restore/webhook/acknowledgement és paywall.
 - [ ] A12 — Valós natív iOS/Android kiadás és megfelelő iOS-login.
 - [ ] A13 — Új aktív alvás jegyzetének és kézi típusának szinkronja. Javítás, kliens–Worker–SQLite regresszió és `c5ccd23` commit/push kész; staging elfogadás hiányzik.
@@ -162,7 +162,7 @@ A fejlesztés ugyanabban a repóban és ugyanazon a fő alkalmazáson folytatód
 
 - [x] Külön staging Worker-konfiguráció elkészült, production erőforrás-hivatkozás nélkül.
 - [x] Internal frontend csak explicit staging API URL esetén tölti be a Family Sync réteget.
-- [x] Automatizált staging smoke teszt két gyerekkel és két készülékkel sikeresen lefutott.
+- [x] A korábbi, enforcement előtti automatizált staging smoke teszt két gyerekkel és két készülékkel sikeresen lefutott. Az A06 utáni staging Worker ezt a névtelen útvonalat már helyesen tiltja; a jelenlegi CI-smoke csak health/CORS és auth-kapu ellenőrzés. A két bejelentkezett fiókos teljes szinkronpróba külön nyitott elfogadási feltétel.
 - [x] Külön EU-jurisdictionös `solemi-sleep-db-staging` D1 létrehozása és a teljes `schema.sql` alkalmazása.
 - [x] `solemi-sleep-sync-staging` Worker deploy és külön `TOKEN_PEPPER` secret beállítása.
 - [x] Internal Pages `VITE_SYNC_API_BASE` beállítása a staging Worker URL-jére.
