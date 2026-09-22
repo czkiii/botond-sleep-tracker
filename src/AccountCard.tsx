@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AccountAuthError, beginGoogleSignIn, restoreAccount, signOutAccount } from './accountAuth'
 import type { AccountDevice, SignedInAccount } from './accountAuth'
 import { accountWorkspaceNeedsGuestChoice, activateInteractiveAccountWorkspace } from './accountWorkspace'
+import { deviceToReplaceWhenKeeping } from './accountDeviceSelection'
 import { deleteChildPhoto } from './photoStore'
 import { localeTag, t } from './i18n'
 import type { Locale } from './i18n'
@@ -37,7 +38,7 @@ export default function AccountCard({ locale }: { locale: Locale }) {
       if (cancelled) return
       const choices = deviceChoices(failure)
       if (choices.length) { setDevices(choices); setReplacement(null); setStatus('deviceLimit'); setError('') }
-      else { setStatus('error'); setError(authError(locale, failure)) }
+      else { setStatus('error'); setError(failure.code === 'DEVICE_LIMIT_REACHED' ? t(locale, 'accountNetworkError') : authError(locale, failure)) }
     }, replacement?.id).catch((failure) => {
       if (!cancelled) { setStatus('error'); setError(authError(locale, failure)) }
     })
@@ -70,7 +71,12 @@ export default function AccountCard({ locale }: { locale: Locale }) {
     </div>}
     {status === 'deviceLimit' && <div className="account-device-limit">
       <small>{t(locale, 'accountDeviceLimit')}</small>
-      <div className="account-device-list">{devices.map((device) => <button type="button" key={device.id} onClick={() => { setReplacement(device); setStatus('signedOut') }}>
+      <div className="account-device-list">{devices.map((device) => <button type="button" key={device.id} onClick={() => {
+        const replaced = deviceToReplaceWhenKeeping(devices, device.id)
+        if (!replaced) { setStatus('error'); setError(t(locale, 'accountNetworkError')); return }
+        setReplacement(replaced)
+        setStatus('signedOut')
+      }}>
         <strong>{device.name || t(locale, 'unknownDevice')}</strong>
         <span>{t(locale, 'accountReplaceDevice')} · {formatLastSeen(locale, device.last_seen_at)}</span>
       </button>)}</div>
@@ -85,9 +91,10 @@ function deviceChoices(error: AccountAuthError) {
   if (error.code !== 'DEVICE_LIMIT_REACHED' || !error.data || typeof error.data !== 'object') return []
   const raw = (error.data as { devices?: unknown }).devices
   if (!Array.isArray(raw)) return []
-  return raw.filter((device): device is AccountDevice => Boolean(device && typeof device === 'object'
+  const devices = raw.filter((device): device is AccountDevice => Boolean(device && typeof device === 'object'
     && typeof (device as AccountDevice).id === 'string'
     && typeof (device as AccountDevice).last_seen_at === 'number'))
+  return devices.length === 2 && devices[0].id !== devices[1].id ? devices : []
 }
 
 function formatLastSeen(locale: Locale, value: number) {
