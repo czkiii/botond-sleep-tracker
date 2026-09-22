@@ -36,7 +36,7 @@ const accountAuthEnabled = import.meta.env.VITE_ACCOUNT_AUTH === 'true'
 type SaveFailure = 'write' | 'sync-store-corrupt'
 
 function loadInternalPlanPreview(): ProductPlan {
-  if (!internalPreview) return 'familyPlus'
+  if (!internalPreview) return 'free'
   try {
     return parseProductPlan(window.localStorage.getItem(INTERNAL_PLAN_PREVIEW_KEY)) ?? 'familyPlus'
   } catch {
@@ -205,9 +205,9 @@ export default function App({ writeAccess = 'writer' }: { writeAccess?: WriteAcc
     <main className="app-main">
       {page === 'today' && <TodayPage data={data} child={activeChild} sessions={activeSessions} now={now} locale={locale} current={current} onSelectChild={(childId) => setData((previous) => ({ ...previous, settings: { ...previous.settings, activeChildId: childId } }))} onStart={startNow} onEnd={endNow} onAdjustStart={adjustCurrentStart} onOpenEditor={openEditor} onHistory={() => setPage('history')} onSettings={() => setPage('settings')} />}
       {page === 'history' && <HistoryPage sessions={activeSessions} locale={locale} onEdit={openEditor} onDelete={deleteSession} onNew={() => openEditor('new')} />}
-      {page === 'stats' && <StatsPage sessions={activeSessions} now={now} locale={locale} childName={activeChild.name} productPlan={previewPlan} premiumInsightsAvailable={accountAuthEnabled ? Boolean(accountAccess?.features.includes('FAMILY_PLUS_INSIGHTS')) : canUsePremiumInsights(previewPlan)} onPreviewPlanChange={internalPreview ? setPreviewPlan : undefined} />}
+      {page === 'stats' && <StatsPage sessions={activeSessions} now={now} locale={locale} childName={activeChild.name} productPlan={previewPlan} premiumInsightsAvailable={accountAuthEnabled ? Boolean(accountAccess?.features.includes('FAMILY_PLUS_INSIGHTS')) : internalPreview && canUsePremiumInsights(previewPlan)} onPreviewPlanChange={internalPreview ? setPreviewPlan : undefined} />}
       {page === 'settings' && <SettingsPage data={data} setData={setData} onBack={() => setPage('today')}
-        familySyncAvailable={accountAuthEnabled ? Boolean(accountAccess?.features.includes('FAMILY_SYNC')) : canUseFamilySync(previewPlan)}
+        familySyncAvailable={accountAuthEnabled ? Boolean(accountAccess?.features.includes('FAMILY_SYNC')) : internalPreview && canUseFamilySync(previewPlan)}
         familyRole={accountAccess?.membership?.role ?? null} />}
     </main>
     {page !== 'settings' && <BottomNav page={page} locale={locale} onChange={setPage} />}

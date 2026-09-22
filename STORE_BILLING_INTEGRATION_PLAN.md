@@ -109,6 +109,13 @@ A helyi additív `007_store_billing_state.sql` migráció létrehozza:
 Kiegészítő táblákkal a meglévő `006` adatok átírás nélkül megmaradnak. A
 migráció csak külön staging backup/restore próbával kerülhet távoli D1-re.
 
+Az A08 helyi javításához a `008_billing_event_order.sql` két mezőt ad a
+`store_subscription_state` táblához: az utoljára ténylegesen alkalmazott
+eseményazonosítót és státuszt. Az eseményfoglalás, állapotváltás és grantok
+egy batchben maradnak; azonos ellenőrzési időnél a visszavonás elsőbbséget kap.
+Ezt a migrációt sem alkalmaztuk távoli D1-en. A provider-állapotverzió és a
+valódi Apple/Google adapteres párhuzamos próba nélkül A08 továbbra is nyitott.
+
 ## Apple folyamat
 
 1. Az app a Servertől lekéri a bejelentkezett account stabil

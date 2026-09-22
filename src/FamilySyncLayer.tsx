@@ -5,6 +5,7 @@ import { loadData } from './storage'
 import { createFamily, createInvite, getAccountFamilyMembers, getSyncStore, joinFamily, leaveAccountFamily, leaveFamily, pullRemote, reconcileAccountFamily, reconnectAccountFamily, refreshFamilyInfo, resolveSyncConflict, restoreMissingSession } from './familySync'
 import type { FamilyMemberChoice } from './familySync'
 import { ACCOUNT_ACCESS_EVENT, ACCOUNT_STATE_EVENT, getAccountAccess, setInternalTestPlan } from './accountAuth'
+import type { AccountAccessState } from './accountAuth'
 import { INTERNAL_PLAN_PREVIEW_EVENT, INTERNAL_PLAN_PREVIEW_KEY, canUseFamilySync, parseProductPlan } from './entitlements'
 import type { ProductPlan } from './entitlements'
 
@@ -13,7 +14,7 @@ const LAST_SYNC_KEY = 'solemiSleep:lastSyncAt'
 const internalPreview = import.meta.env.VITE_INTERNAL_PREVIEW === 'true'
 
 function loadInternalPlanPreview(): ProductPlan {
-  if (!internalPreview) return 'familyPlus'
+  if (!internalPreview) return 'free'
   try {
     return parseProductPlan(window.localStorage.getItem(INTERNAL_PLAN_PREVIEW_KEY)) ?? 'familyPlus'
   } catch {
@@ -120,7 +121,8 @@ export default function FamilySyncLayer() {
   const [leaveCandidates, setLeaveCandidates] = useState<FamilyMemberChoice[]>([])
   const locale = loadData().settings.locale as Locale
   const text = copy[locale]
-  const familySyncAvailable = serverFamilySync ?? (!internalPreview || canUseFamilySync(previewPlan))
+  const familySyncAvailable = import.meta.env.VITE_ACCOUNT_AUTH === 'true'
+    ? serverFamilySync === true : internalPreview && canUseFamilySync(previewPlan)
 
   const friendlyError = (err: unknown) => {
     const apiError = err as SyncError
@@ -172,18 +174,19 @@ export default function FamilySyncLayer() {
   }, [])
 
   useEffect(() => {
-    if (!familySyncAvailable || import.meta.env.VITE_ACCOUNT_AUTH !== 'true') return
+    if (import.meta.env.VITE_ACCOUNT_AUTH !== 'true') return
     let running = false
     const reconcile = async (event: Event) => {
       if (!(event as CustomEvent<{ account?: unknown }>).detail?.account || running) return
       running = true
       try {
         if (internalPreview) await setInternalTestPlan(previewPlan)
-        const result = await reconcileAccountFamily()
         const access = await getAccountAccess()
         setServerFamilySync(access.features.includes('FAMILY_SYNC'))
         setServerPaused(access.familySync.status === 'PAUSED')
         setAccountMembership(access.membership)
+        if (!access.features.includes('FAMILY_SYNC')) return
+        const result = await reconcileAccountFamily()
         if (result.connected) {
           const next = getSyncStore().connection
           setConnected(Boolean(next))
@@ -200,7 +203,9 @@ export default function FamilySyncLayer() {
 
   useEffect(() => {
     const onAccess = (event: Event) => {
-      const access = (event as CustomEvent<{ access?: { membership?: null | { familyId: string; role: 'ADMIN' | 'MEMBER' } } }>).detail?.access
+      const access = (event as CustomEvent<{ access?: AccountAccessState | null }>).detail?.access
+      setServerFamilySync(Boolean(access?.features.includes('FAMILY_SYNC')))
+      setServerPaused(access?.familySync.status === 'PAUSED')
       setAccountMembership(access?.membership ?? null)
     }
     window.addEventListener(ACCOUNT_ACCESS_EVENT, onAccess)
@@ -265,7 +270,7 @@ export default function FamilySyncLayer() {
       try {
         const access = await getAccountAccess()
         if (stopped) return
-        setServerFamilySync(access.familySync.canSync)
+        setServerFamilySync(access.features.includes('FAMILY_SYNC'))
         setServerPaused(access.familySync.status === 'PAUSED')
         setAccountMembership(access.membership)
       } catch { /* account restoration and the sync loop surface connection errors */ }

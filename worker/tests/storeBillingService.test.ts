@@ -25,6 +25,10 @@ const billingMigration = readFileSync(
   new URL('../migrations/007_store_billing_state.sql', import.meta.url),
   'utf8'
 )
+const orderingMigration = readFileSync(
+  new URL('../migrations/008_billing_event_order.sql', import.meta.url),
+  'utf8'
+)
 
 const now = 1_800_000_000_000
 const appleToken = '01990d45-a1b2-47e8-91f3-123456789abc'
@@ -91,6 +95,7 @@ beforeEach(() => {
   sqlite.exec(accountMigration)
   sqlite.exec(entitlementMigration)
   sqlite.exec(billingMigration)
+  sqlite.exec(orderingMigration)
   insertAccount()
   sequence = 1
   service = new StoreBillingService(sqliteBinding(sqlite), {
@@ -122,6 +127,7 @@ describe('store billing migration', () => {
     const beforeEntitlements = legacy.prepare('SELECT * FROM account_entitlements').all()
 
     legacy.exec(billingMigration)
+    legacy.exec(orderingMigration)
 
     expect(legacy.prepare('SELECT * FROM subscriptions').all()).toEqual(beforeSubscriptions)
     expect(legacy.prepare('SELECT * FROM account_entitlements').all()).toEqual(beforeEntitlements)
@@ -239,6 +245,111 @@ describe('store billing persistence', () => {
     expect(activeFeatures()).toEqual([])
     expect(sqlite.prepare('SELECT status FROM subscriptions').get())
       .toEqual({ status: 'REVOKED' })
+  })
+
+  it('lets revocation win an equal-time conflict and never restores the refunded token', async () => {
+    await service.getOrCreateAccountLink('acc_a', 'APPLE', now)
+    const active = snapshot()
+    await service.applyVerifiedSubscription({ accountId: 'acc_a', subscription: active,
+      event: event(active) })
+    const revoked = snapshot({ status: 'REVOKED', autoRenews: false })
+    expect(await service.applyVerifiedSubscription({ accountId: 'acc_a', subscription: revoked,
+      event: event(revoked, { eventType: 'REFUNDED' }) }))
+      .toMatchObject({ outcome: 'APPLIED' })
+    expect(activeFeatures()).toEqual([])
+
+    const replayedActive = snapshot({ verifiedAt: now + 10,
+      providerTransactionId: 'apple-transaction-late' })
+    expect(await service.applyVerifiedSubscription({ accountId: 'acc_a',
+      subscription: replayedActive, event: event(replayedActive) }))
+      .toMatchObject({ outcome: 'STALE' })
+    expect(activeFeatures()).toEqual([])
+    expect(sqlite.prepare('SELECT status FROM subscriptions').get()).toEqual({ status: 'REVOKED' })
+  })
+
+  it('does not regrant on a second event with the same verification time and transaction', async () => {
+    await service.getOrCreateAccountLink('acc_a', 'APPLE', now)
+    const active = snapshot()
+    await service.applyVerifiedSubscription({ accountId: 'acc_a', subscription: active,
+      event: event(active) })
+    const tied = snapshot({ product: 'FAMILY', autoRenews: false })
+    expect(await service.applyVerifiedSubscription({ accountId: 'acc_a', subscription: tied,
+      event: event(tied, { eventType: 'CORRECTION' }) }))
+      .toMatchObject({ outcome: 'STALE' })
+    expect(activeFeatures()).toEqual(['FAMILY_PLUS_INSIGHTS', 'FAMILY_SYNC', 'PDF_EXPORT'])
+    expect(sqlite.prepare('SELECT product FROM subscriptions').get())
+      .toEqual({ product: 'FAMILY_PLUS' })
+  })
+
+  it('serializes competing first purchases and rejects conflicting event ID reuse', async () => {
+    const base = sqliteBinding(sqlite)
+    let previous = Promise.resolve()
+    const serialized = {
+      prepare: (sql: string) => base.prepare(sql),
+      batch: (statements: D1PreparedStatement[]) => {
+        const run = previous.then(() => base.batch(statements))
+        previous = run.then(() => {}, () => {})
+        return run
+      }
+    } as D1Database
+    const makeService = () => new StoreBillingService(serialized, {
+      appleAccountToken: () => appleToken,
+      googleAccountToken: () => googleToken,
+      id: (prefix) => `${prefix}_${sequence++}`
+    })
+    const left = makeService()
+    const right = makeService()
+    await left.getOrCreateAccountLink('acc_a', 'APPLE', now)
+    const purchase = snapshot()
+    const first = event(purchase, { providerEventId: 'competing-event' })
+    const conflicting = { ...first, payloadHash: 'different-payload' }
+    const results = await Promise.allSettled([
+      left.applyVerifiedSubscription({ accountId: 'acc_a', subscription: purchase, event: first }),
+      right.applyVerifiedSubscription({ accountId: 'acc_a', subscription: purchase,
+        event: conflicting })
+    ])
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1)
+    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1)
+    expect(results.find((result) => result.status === 'rejected'))
+      .toMatchObject({ reason: { code: 'EVENT_ID_REUSED' } })
+    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM subscription_events').get())
+      .toEqual({ count: 1 })
+    expect(activeFeatures()).toEqual(['FAMILY_PLUS_INSIGHTS', 'FAMILY_SYNC', 'PDF_EXPORT'])
+  })
+
+  it('retries a different first-purchase event against the winning subscription row', async () => {
+    const base = sqliteBinding(sqlite)
+    let previous = Promise.resolve()
+    const serialized = {
+      prepare: (sql: string) => base.prepare(sql),
+      batch: (statements: D1PreparedStatement[]) => {
+        const run = previous.then(() => base.batch(statements))
+        previous = run.then(() => {}, () => {})
+        return run
+      }
+    } as D1Database
+    const makeService = () => new StoreBillingService(serialized, {
+      appleAccountToken: () => appleToken,
+      googleAccountToken: () => googleToken,
+      id: (prefix) => `${prefix}_${sequence++}`
+    })
+    const left = makeService()
+    const right = makeService()
+    await left.getOrCreateAccountLink('acc_a', 'APPLE', now)
+    const purchase = snapshot()
+    const results = await Promise.all([
+      left.applyVerifiedSubscription({ accountId: 'acc_a', subscription: purchase,
+        event: event(purchase) }),
+      right.applyVerifiedSubscription({ accountId: 'acc_a', subscription: purchase,
+        event: event(purchase) })
+    ])
+    expect(results.map((result) => result.outcome).sort()).toEqual(['APPLIED', 'STALE'])
+    expect(results[0].subscriptionId).toBe(results[1].subscriptionId)
+    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM subscriptions').get())
+      .toEqual({ count: 1 })
+    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM subscription_events').get())
+      .toEqual({ count: 2 })
+    expect(activeFeatures()).toEqual(['FAMILY_PLUS_INSIGHTS', 'FAMILY_SYNC', 'PDF_EXPORT'])
   })
 
   it('does not let another account claim an existing store subscription', async () => {

@@ -25,6 +25,7 @@ type ExistingSubscriptionRow = {
   account_id: string
   last_verified_at: number | null
   provider_transaction_id: string | null
+  last_applied_event_id: string | null
 }
 
 export type StoreBillingApplyResult = {
@@ -98,7 +99,7 @@ export class StoreBillingService {
     accountId: string
     event: VerifiedStoreEvent
     subscription: VerifiedStoreSubscription
-  }): Promise<StoreBillingApplyResult> {
+  }, firstPurchaseRetry = true): Promise<StoreBillingApplyResult> {
     const event = validateVerifiedStoreEvent(input.event)
     const subscription = validateVerifiedStoreSubscription(input.subscription)
     if (event.provider !== subscription.provider ||
@@ -147,12 +148,6 @@ export class StoreBillingService {
       )
     }
 
-    if (existing?.last_verified_at !== null && existing?.last_verified_at !== undefined &&
-      existing.last_verified_at > subscription.verifiedAt) {
-      await this.recordProcessedEvent(event, existing.id)
-      return { outcome: 'STALE', subscriptionId: existing.id }
-    }
-
     const subscriptionId = existing?.id ?? this.tokens.id('sub')
     const canceledAt = subscription.status === 'CANCELED' ? event.occurredAt : null
     const acknowledgement = subscription.provider === 'APPLE' ? 'NOT_REQUIRED' : 'PENDING'
@@ -171,6 +166,7 @@ export class StoreBillingService {
           updated_at = excluded.updated_at,
           canceled_at = excluded.canceled_at
         WHERE subscriptions.account_id = excluded.account_id
+          AND (subscriptions.status <> 'REVOKED' OR excluded.status = 'REVOKED')
           AND (
             NOT EXISTS (SELECT 1 FROM store_subscription_state current_state
               WHERE current_state.subscription_id = subscriptions.id)
@@ -178,19 +174,20 @@ export class StoreBillingService {
               WHERE current_state.subscription_id = subscriptions.id
                 AND (current_state.last_verified_at < ?
                   OR (current_state.last_verified_at = ?
-                    AND current_state.provider_transaction_id = ?)))
+                    AND excluded.status = 'REVOKED'
+                    AND subscriptions.status <> 'REVOKED')))
           )`)
         .bind(subscriptionId, input.accountId, subscription.provider,
           subscription.providerSubscriptionId, subscription.product, subscription.status,
           subscription.autoRenews ? 1 : 0, subscription.trialEndsAt,
           subscription.currentPeriodEndsAt, subscription.accessUntil, subscription.startedAt,
-          event.receivedAt, canceledAt, subscription.verifiedAt,
-          subscription.verifiedAt, subscription.providerTransactionId),
+          event.receivedAt, canceledAt, subscription.verifiedAt, subscription.verifiedAt),
       this.db.prepare(`INSERT INTO store_subscription_state
         (subscription_id, account_id, provider, environment, provider_transaction_id,
          external_account_token, last_verified_at, acknowledgement_state, acknowledged_at,
-         replacement_provider_subscription_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
+         replacement_provider_subscription_id, created_at, updated_at,
+         last_applied_event_id, last_applied_status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)
         ON CONFLICT(subscription_id) DO UPDATE SET
           environment = excluded.environment,
           provider_transaction_id = excluded.provider_transaction_id,
@@ -203,14 +200,22 @@ export class StoreBillingService {
           END,
           acknowledged_at = store_subscription_state.acknowledged_at,
           replacement_provider_subscription_id = excluded.replacement_provider_subscription_id,
-          updated_at = excluded.updated_at
-        WHERE excluded.last_verified_at > store_subscription_state.last_verified_at
+          updated_at = excluded.updated_at,
+          last_applied_event_id = excluded.last_applied_event_id,
+          last_applied_status = excluded.last_applied_status
+        WHERE (excluded.last_verified_at > store_subscription_state.last_verified_at
           OR (excluded.last_verified_at = store_subscription_state.last_verified_at
-            AND excluded.provider_transaction_id = store_subscription_state.provider_transaction_id)`)
+            AND excluded.last_applied_status = 'REVOKED'
+            AND store_subscription_state.last_applied_status IS NOT 'REVOKED'))
+          AND store_subscription_state.account_id = excluded.account_id
+          AND EXISTS (SELECT 1 FROM subscriptions applied
+            WHERE applied.id = excluded.subscription_id
+              AND applied.status = ?)`)
         .bind(subscriptionId, input.accountId, subscription.provider, subscription.environment,
           subscription.providerTransactionId, subscription.externalAccountToken,
           subscription.verifiedAt, acknowledgement,
-          subscription.replacementProviderSubscriptionId, event.receivedAt, event.receivedAt),
+          subscription.replacementProviderSubscriptionId, event.receivedAt, event.receivedAt,
+          event.providerEventId, subscription.status, subscription.status),
       this.db.prepare(`UPDATE account_entitlements
         SET revoked_at = ?, updated_at = ?
         WHERE account_id = ? AND source_type = 'SUBSCRIPTION' AND source_id = ?
@@ -218,9 +223,9 @@ export class StoreBillingService {
           AND EXISTS (SELECT 1 FROM store_subscription_state current_state
             WHERE current_state.subscription_id = ?
               AND current_state.last_verified_at = ?
-              AND current_state.provider_transaction_id = ?)`)
+              AND current_state.last_applied_event_id = ?)`)
         .bind(event.receivedAt, event.receivedAt, input.accountId, subscriptionId,
-          subscriptionId, subscription.verifiedAt, subscription.providerTransactionId)
+          subscriptionId, subscription.verifiedAt, event.providerEventId)
     ]
 
     if (subscriptionGrantsAccess(subscription, event.receivedAt)) {
@@ -232,7 +237,7 @@ export class StoreBillingService {
           WHERE EXISTS (SELECT 1 FROM store_subscription_state current_state
             WHERE current_state.subscription_id = ?
               AND current_state.last_verified_at = ?
-              AND current_state.provider_transaction_id = ?)
+              AND current_state.last_applied_event_id = ?)
           ON CONFLICT(account_id, feature_key, source_type, source_id) DO UPDATE SET
             valid_from = CASE WHEN account_entitlements.revoked_at IS NULL
               THEN account_entitlements.valid_from ELSE excluded.valid_from END,
@@ -241,19 +246,34 @@ export class StoreBillingService {
             updated_at = excluded.updated_at`)
           .bind(this.tokens.id('ent'), input.accountId, feature, subscriptionId,
             event.receivedAt, subscription.accessUntil, event.receivedAt, event.receivedAt,
-            subscriptionId, subscription.verifiedAt, subscription.providerTransactionId))
+            subscriptionId, subscription.verifiedAt, event.providerEventId))
       }
     }
 
-    statements.push(this.eventUpsert(event, subscriptionId))
+    statements.push(this.insertProcessedEvent(event, subscriptionId))
     try {
       await this.db.batch(statements)
     } catch (error) {
       const racedEvent = await this.db.prepare(`SELECT payload_hash, processed_at
         FROM subscription_events WHERE provider = ? AND provider_event_id = ?`)
         .bind(event.provider, event.providerEventId).first<ExistingEventRow>()
-      if (racedEvent?.payload_hash === event.payloadHash && racedEvent.processed_at !== null) {
-        return { outcome: 'DUPLICATE', subscriptionId }
+      if (racedEvent && racedEvent.payload_hash !== event.payloadHash) {
+        throw new StoreBillingServiceError('EVENT_ID_REUSED',
+          'Provider event ID was reused with a different payload')
+      }
+      if (racedEvent?.processed_at !== null && racedEvent?.processed_at !== undefined) {
+        const committed = await this.findSubscription(
+          subscription.provider, subscription.providerSubscriptionId
+        )
+        return { outcome: 'DUPLICATE', subscriptionId: committed?.id ?? null }
+      }
+      if (!existing && firstPurchaseRetry) {
+        const racedSubscription = await this.findSubscription(
+          subscription.provider, subscription.providerSubscriptionId
+        )
+        if (racedSubscription && racedSubscription.id !== subscriptionId) {
+          return this.applyVerifiedSubscription(input, false)
+        }
       }
       throw error
     }
@@ -261,8 +281,7 @@ export class StoreBillingService {
       subscription.provider,
       subscription.providerSubscriptionId
     )
-    const outcome = appliedState?.last_verified_at === subscription.verifiedAt &&
-      appliedState.provider_transaction_id === subscription.providerTransactionId
+    const outcome = appliedState?.last_applied_event_id === event.providerEventId
       ? 'APPLIED'
       : 'STALE'
     return { outcome, subscriptionId }
@@ -291,35 +310,23 @@ export class StoreBillingService {
 
   private findSubscription(provider: StoreProvider, providerSubscriptionId: string) {
     return this.db.prepare(`SELECT s.id, s.account_id, st.last_verified_at,
-        st.provider_transaction_id
+        st.provider_transaction_id, st.last_applied_event_id
       FROM subscriptions s
       LEFT JOIN store_subscription_state st ON st.subscription_id = s.id
       WHERE s.provider = ? AND s.provider_subscription_id = ?`)
       .bind(provider, providerSubscriptionId).first<ExistingSubscriptionRow>()
   }
 
-  private eventUpsert(event: VerifiedStoreEvent, subscriptionId: string) {
+  private insertProcessedEvent(event: VerifiedStoreEvent, subscriptionId: string) {
     return this.db.prepare(`INSERT INTO subscription_events
       (id, provider, provider_event_id, subscription_id, event_type, occurred_at,
        received_at, payload_hash, processed_at, processing_error)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
-      ON CONFLICT(provider, provider_event_id) DO UPDATE SET
-        subscription_id = excluded.subscription_id,
-        event_type = excluded.event_type,
-        occurred_at = excluded.occurred_at,
-        received_at = excluded.received_at,
-        processed_at = excluded.processed_at,
-        processing_error = NULL
-      WHERE subscription_events.payload_hash = excluded.payload_hash
-        AND subscription_events.processed_at IS NULL`)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`)
       .bind(this.tokens.id('evt'), event.provider, event.providerEventId, subscriptionId,
         event.eventType, event.occurredAt, event.receivedAt, event.payloadHash,
         event.receivedAt)
   }
 
-  private async recordProcessedEvent(event: VerifiedStoreEvent, subscriptionId: string) {
-    await this.eventUpsert(event, subscriptionId).run()
-  }
 }
 
 function randomBase64Url(byteLength: number) {

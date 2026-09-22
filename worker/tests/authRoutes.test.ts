@@ -12,6 +12,7 @@ const migrations = ['003_accounts_and_sessions.sql', '004_auth_challenges_and_re
 const origin = 'https://solemi-sleep-internal.pages.dev'
 let sqlite: DatabaseSync
 let env: { DB: D1Database; TOKEN_PEPPER: string; ALLOWED_ORIGINS: string;
+  SOLEMI_ENVIRONMENT?: string;
   GOOGLE_CLIENT_ID?: string; AUTH_SECRET?: string; ACCOUNT_FAMILY_BRIDGE?: string;
   ENTITLEMENT_ENFORCEMENT?: string; ENTITLEMENT_TEST_MODE?: string;
   RECONCILIATION_CONFLICTS?: string }
@@ -82,6 +83,23 @@ function setTestPlan(access: string, plan: 'free' | 'family' | 'familyPlus') {
 }
 
 describe('account auth routes', () => {
+  it('refuses an incomplete or test-enabled production Worker configuration', async () => {
+    env.SOLEMI_ENVIRONMENT = 'production'
+    const incomplete = await fetch('/health')
+    expect(incomplete.status).toBe(503)
+    expect(await incomplete.json()).toMatchObject({ error: { code: 'RELEASE_NOT_CONFIGURED' } })
+
+    env.ALLOWED_ORIGINS = 'https://solemi-sleep.app'
+    env.ACCOUNT_FAMILY_BRIDGE = 'true'
+    env.ENTITLEMENT_ENFORCEMENT = 'true'
+    env.RECONCILIATION_CONFLICTS = 'true'
+    env.ENTITLEMENT_TEST_MODE = 'true'
+    const testEnabled = await fetch('/health')
+    expect(testEnabled.status).toBe(503)
+
+    delete env.ENTITLEMENT_TEST_MODE
+    expect((await fetch('/health')).status).toBe(200)
+  })
   it('returns a stored one-use challenge and public client ID with credentialed CORS', async () => {
     const response = await fetch('/v1/auth/challenge', { headers: { Origin: origin } })
     const body = await response.json() as { data: { nonce: string; clientId: string } }

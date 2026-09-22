@@ -1,6 +1,6 @@
 # Solemi Sleep — belső verziótól a kiadásig
 
-Utolsó frissítés: 2026-09-21
+Utolsó frissítés: 2026-09-22
 
 Ez az operatív lista a `SOLEMI_EXECUTION_PLAN.md` és a `SOLEMI_MASTER_ROADMAP.md` kiadási pontjait rendezi végrehajtási sorrendbe.
 
@@ -19,9 +19,9 @@ vagy kifejezett, indokolt termékdöntés kell; a puszta priorizálás nem lezá
 - [ ] A03 — Import/törlés családi hatása és visszaállítható biztonsági mentés. Implementáció, commit/push, staging Worker/Pages build és javított smoke kész; a kéttelefonos import/törlés/offline/pending/restore elfogadás folyamatban.
 - [ ] A04 — Valódi account-szintű családi kilépés, pending adatok védelme. Implementáció, regresszió és `3114711` commit/push kész: külön eszközleválasztás/újracsatlakozás, account-kilépés, választható vagy automatikus adminátadás, utolsó tag blokkolása, régi device-tokenek visszavonása és utolsó fizető utáni pause. Staging kétaccountos elfogadás hiányzik.
 - [ ] A05 — Fiókváltás/guest kapcsolat és helyi adatok elkülönítése. Implementáció, regresszió és `3665d25` commit/push kész: accountonként külön diary+sync workspace, explicit vendégnapló-átvétel, kijelentkezéskori megtartás/törlés, pending megőrzés, többtabos írózár, quota- és crash-helyreállítás. Staging A→logout→B/guest elfogadás hiányzik.
-- [ ] A06 — Legacy API fizetős sync-megkerülés lezárása, kompatibilis átállás. Helyi implementáció és regresszió kész: enforcement mellett kötelező account+device+membership+családi entitlement; atomi, fizetős accountos családlétrehozás; raw legacy create/join/sync és invite tiltás; meglévő család adatvesztés nélküli claimje. 226/226 teszt és két build sikeres; commit/push, staging build és kézi elfogadás hiányzik.
-- [ ] A07 — Production config/auth-proxy/entitlement és tesztkapcsolók elkülönítése.
-- [ ] A08 — Billing eseményverseny és sorrend javítása.
+- [ ] A06 — Legacy API fizetős sync-megkerülés lezárása, kompatibilis átállás. Implementáció, regresszió és `eac16ef` commit/push kész: enforcement mellett kötelező account+device+membership+családi entitlement; atomi, fizetős accountos családlétrehozás; raw legacy create/join/sync és invite tiltás; meglévő család adatvesztés nélküli claimje. Staging build és kézi elfogadás nincs rögzítve.
+- [ ] A07 — Production config/auth-proxy/entitlement és tesztkapcsolók elkülönítése. Helyi kiadási kapu és Free alapállapot elkészült: GitHub Pages production build blokkolva; a proxy éles hoston nem hív staginget; production Worker hiányos vagy tesztmódú konfigurációval 503-at ad. Frontend és Worker typecheck, 27 fájl / 232 teszt sikeres. Éles Cloudflare Pages host, OAuth origin/cookie, Worker secrets, D1 migráció és mobilos elfogadás még nyitott.
+- [ ] A08 — Billing eseményverseny és sorrend javítása. Helyi atomi event-ütközésvédelem, visszavonás elsőbbsége és párhuzamos első vásárlás regressziói kész; a `008_billing_event_order.sql` csak helyben tesztelt, távoli D1-en nincs alkalmazva. Provider-szintű állapotverzió és éles adapteres verify/webhook/restore elfogadás hiányzik.
 - [ ] A09 — Google linked-token csere és régi grantok visszavonása.
 - [ ] A10 — Store sandbox/production környezeti kerítés.
 - [ ] A11 — Hiteles store verify/restore/webhook/acknowledgement és paywall.
@@ -241,6 +241,7 @@ eltéréseit az A23 pontban, tételes döntéssel kell lezárni.
   - [x] Közös proof-only provider contract, állapotmátrix és célzott helyi tesztek.
   - [x] Apple/Google/Capacitor integrációs sorrend és kötelező tesztmátrix dokumentálása (`STORE_BILLING_INTEGRATION_PLAN.md`).
   - [x] Additív billing account-link és store-state D1 persistence helyben (`007_store_billing_state.sql`; távoli D1-en még nincs alkalmazva).
+  - [x] Additív eseménysorrend-követés helyben (`008_billing_event_order.sql`; távoli D1-en még nincs alkalmazva).
   - [ ] Teljesen idempotens, időrendvédett snapshot-alkalmazás: a soros tesztek sikeresek, de A08–A10 auditjavítás szükséges a párhuzamosság, linked token és környezeti kerítés miatt.
   - [ ] StoreKit 2 adapter és App Store Server Notifications V2.
   - [ ] Play Billing 9.x adapter, acknowledgement és RTDN.
@@ -288,12 +289,11 @@ engedélyez automatikus halasztást. A meglévő Prediction kommunikációját i
 
 ## Következő konkrét munkamenet
 
-**Elsőbbség:** az A03–A05 staging elfogadása, amikor rendelkezésre áll két
-telefon. Az A13–A14, A04 és A05 commit/push kész. Az A06 helyi implementációja
-226/226 teszttel és két sikeres builddel kész; következik az A06 tulajdonosi
-commit/push, staging Worker és Pages build, majd a legacy claim, fizetős
-családlétrehozás, Free tiltás és kétaccountos sync kézi elfogadása. Ezután A07
-következik.
+**Elsőbbség:** az A03–A06 staging elfogadása, amikor rendelkezésre áll két
+telefon. Az A13–A14 és A04–A06 commit/push kész. Az A07 helyi kiadási kapu
+elő van készítve; következik a tulajdonosi commit/push, majd a tényleges éles
+host/proxy/OAuth/Worker konfiguráció külön kiadási munkamenetben. A staging
+kézi próbák továbbra is szükségesek.
 A billing HTTP/adapterszelet előtt A08–A10 javítás kötelező. Az alábbi korábbi
 tételek történeti és további release-feladatok.
 

@@ -36,4 +36,43 @@ describe('internal account proxy', () => {
     expect(response.status).toBe(404)
     expect(fetchMock).not.toHaveBeenCalled()
   })
+
+  it('refuses to send production-host traffic to the internal staging backend', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const response = await onRequest({ request: new Request('https://solemi-sleep.app/api/v1/auth/refresh', {
+      method: 'POST', body: '{}'
+    }) })
+    expect(response.status).toBe(503)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('uses an explicitly configured production backend for the production host', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const forwarded = new Request(input, init)
+      expect(forwarded.url).toBe('https://solemi-sleep-sync.czki-adam.workers.dev/v1/auth/refresh')
+      expect(forwarded.headers.get('Origin')).toBe('https://solemi-sleep.app')
+      return new Response('{"ok":true}', { status: 200 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const response = await onRequest({
+      request: new Request('https://solemi-sleep.app/api/v1/auth/refresh', { method: 'POST', body: '{}' }),
+      env: { SOLEMI_PROXY_ENV: 'production',
+        SOLEMI_API_ORIGIN: 'https://solemi-sleep-sync.czki-adam.workers.dev' }
+    })
+    expect(response.status).toBe(200)
+    expect(fetchMock).toHaveBeenCalledOnce()
+  })
+
+  it('rejects a staging upstream in production configuration', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const response = await onRequest({
+      request: new Request('https://solemi-sleep.app/api/v1/auth/refresh'),
+      env: { SOLEMI_PROXY_ENV: 'production',
+        SOLEMI_API_ORIGIN: 'https://solemi-sleep-sync-staging.czki-adam.workers.dev' }
+    })
+    expect(response.status).toBe(503)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
 })

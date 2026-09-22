@@ -6,6 +6,7 @@ interface Env {
   DB: D1Database
   TOKEN_PEPPER: string
   ALLOWED_ORIGINS: string
+  SOLEMI_ENVIRONMENT?: string
   GOOGLE_CLIENT_ID?: string
   AUTH_SECRET?: string
   ACCOUNT_FAMILY_BRIDGE?: string
@@ -68,6 +69,19 @@ class ApiError extends Error {
 const encoder = new TextEncoder()
 const INVITE_CHARSET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'
 const INVITE_TTL_MS = 30 * 60 * 1000
+
+function assertWorkerEnvironment(env: Env) {
+  if (env.SOLEMI_ENVIRONMENT !== 'production') return
+  const validOrigins = env.ALLOWED_ORIGINS?.split(',').map((value) => value.trim()).filter(Boolean)
+  if (env.ACCOUNT_FAMILY_BRIDGE !== 'true' || env.ENTITLEMENT_ENFORCEMENT !== 'true'
+    || env.RECONCILIATION_CONFLICTS !== 'true' || env.ENTITLEMENT_TEST_MODE === 'true'
+    || !env.GOOGLE_CLIENT_ID || !env.AUTH_SECRET || env.AUTH_SECRET.length < 32
+    || !env.TOKEN_PEPPER || !validOrigins?.length
+    || validOrigins.some((origin) => !origin.startsWith('https://')
+      || /staging|internal|localhost|127\.0\.0\.1/i.test(origin))) {
+    throw new ApiError(503, 'RELEASE_NOT_CONFIGURED', 'Production Worker configuration is incomplete.')
+  }
+}
 
 function corsHeaders(request: Request, env: Env) {
   const origin = request.headers.get('Origin')
@@ -1447,6 +1461,7 @@ async function accountAuthRoute(request: Request, env: Env, path: string) {
 }
 
 async function route(request: Request, env: Env) {
+  assertWorkerEnvironment(env)
   const url = new URL(request.url)
   const path = url.pathname.replace(/\/+$/, '') || '/'
 

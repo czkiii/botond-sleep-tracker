@@ -1,12 +1,12 @@
 # Solemi Sleep — Codex projektállapot
 
-**Utolsó frissítés:** 2026-09-21
+**Utolsó frissítés:** 2026-09-22
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
 **Teljes audit alapja:** `e9374f4` (`Add verified store billing foundation`); az akkori helyi origin-refhez képest 0 ahead / 0 behind.
-**Ellenőrzött HEAD:** `3665d25` (`Isolate local diaries between Solemi accounts`). Az A03 commit/push és staging build elkészült; kéttelefonos elfogadása folyamatban. Az A13–A14, A04 és A05 commit/push megtörtént. Az A06 helyi implementációja elkészült, még nincs commitolva vagy stagingre telepítve.
+**Ellenőrzött HEAD:** `eac16ef` (`Close legacy Family Sync entitlement bypass`). Az A03–A05 kéttelefonos elfogadása nyitott. Az A06 commit/push megtörtént; staging elfogadása nincs rögzítve. Az A07 kiadási konfigurációja és az A08 billing-sorrend helyi javítása munkafában van, commit/push/deploy nélkül.
 
-## Legfrissebb checkpoint — A03–A05 staging elfogadás, A06 helyi javítás
+## Legfrissebb checkpoint — A03–A06 staging elfogadás, A07 helyi előkészítés
 
 **Elsőként olvasandó kiegészítés:** [OWNER_DECISIONS_REVIEW_2026-09-20.md](OWNER_DECISIONS_REVIEW_2026-09-20.md), benne az öt eredeti tulajdonosi TXT linkje, auditkapcsolatok és az A03 folytatási sorrendje. Az új termékdöntések felülírják az eltérő korábbi terveket; a műszaki auditkapuk megmaradnak.
 
@@ -20,13 +20,16 @@
 - A nyers Family Sync hozzáférés már aktív membershipet is követel, ezért a kilépett account régi device-tokenje nem fér hozzá a családi adathoz.
 - **A05 commit/push kész (`3665d25`):** a vendégmód és minden Solemi-account külön helyi napló- és Family Sync munkaterületet kap. Kijelentkezéskor a napló megtartható elkülönítve vagy csak az adott telefonról törölhető; másik account nem látja. A vendégnapló első belépéskor csak kifejezett választással kerül az accounthoz. A pending outbox, safety backup, leválasztási marker és utolsó sync időpont ugyanazzal a munkaterülettel mozog.
 - A fiókváltás kis helyreállítási journalt használ; félbeszakadt váltás újraindításkor befejezhető, quota hiba pedig nem írja felül a látható naplót. A workspace-váltás csak a többtabos írózár megszerzése után indul. A függő családi módosítás kijelentkezéskor nem vész el, hanem a saját account munkaterületében marad.
-- **A06 helyi implementáció kész:** aktív entitlement enforcement mellett minden családi naplóolvasás és -írás egyidejűleg követel account sessiont, az accounthoz és családhoz rendelt device-tokent, aktív membershipet és családi `FAMILY_SYNC` jogosultságot. A régi `/v1/families` és `/v1/join` útvonal enforcement mellett nem használható; az új család fizető accountból, atomi `/v1/auth/family/create` művelettel jön létre. A meghívók létrehozása is ugyanazon jogosultsági kapun halad át.
+- **A06 commit/push kész (`eac16ef`):** aktív entitlement enforcement mellett minden családi naplóolvasás és -írás egyidejűleg követel account sessiont, az accounthoz és családhoz rendelt device-tokent, aktív membershipet és családi `FAMILY_SYNC` jogosultságot. A régi `/v1/families` és `/v1/join` útvonal enforcement mellett nem használható; az új család fizető accountból, atomi `/v1/auth/family/create` művelettel jön létre. A meghívók létrehozása is ugyanazon jogosultsági kapun halad át.
 - A meglévő legacy családok adatai változatlanok és egyszer továbbra is account alá igényelhetők. Az igényléshez nem kell előre adatot migrálni vagy törölni, de a régi token önmagában már nem ad naplóhozzáférést. Enforcement nélkül a régi kliensútvonalak a fokozatos production átállás idejére változatlanok maradnak.
 - Ellenőrzés: frontend és Worker typecheck; teljes **26 fájl / 226 teszt**; production és auth-enabled internal build sikeres. Az atomi fizetős családlétrehozás, a kliens hitelesített útvonalválasztása, Free elutasítás mellékhatás nélkül, raw-token tiltás, jogosult account-hozzáférés és legacy claim regresszióval fedett. A bundle méretére Vite figyelmeztet, buildhiba nincs.
 - V1: Google + Apple belépés, Family PDF; nincs push/emlékeztető vagy életkori normaösszehasonlítás. Egyetlen 7 napos trial választható Family/Family+ csomagra; havi és éves ajánlat.
 - Accounttörlés/recovery/retention specifikáció megérkezett, nem elkészült funkció. A privacy dokumentum még kiadás előtti tervezet.
 - `solemi-sleep.app` domain megvásárolva a tulajdonos közlése alapján; bekötés, e-mail, OAuth/origin és adatmigráció még nincs igazolva.
-- Az A06 munkafaváltozásához commit/push/deploy még nem történt; production adatbázis-módosítás nem történt.
+- **A07 helyi előkészítés:** a publikus, belépés nélküli frontend Free nézetből indul és nem indít fizetős szinkront. A release build kifejezett account-auth, éles HTTPS Worker és first-party Cloudflare Pages proxy beállítást követel; a jelenlegi GitHub Pages workflow e kapun megáll. Az internal proxy staginget csak az internal hoston használhatja, más host éles upstream nélkül 503-at kap. A production Worker konfiguráció hiányos vagy tesztmódú beállítás esetén `RELEASE_NOT_CONFIGURED` hibával áll meg. Az éles domain/proxy, OAuth origin, titkok, D1 migráció és kézi iOS-próba még hiányzik, így A07 nincs lezárva.
+- **A07 helyi ellenőrzés:** frontend és Worker typecheck, 27 fájl / 232 teszt sikeres; a tényleges kiadási és kéttelefonos próbák még nyitottak.
+- **A08 helyi javítás:** az eseményazonosító ütközése atomi batch-rollbacket okoz, azonos ellenőrzési időnél a REVOKED állapot elsőbbséget kap, és ugyanaz a token késői ACTIVE eseménnyel nem aktiválható újra. Az új `008_billing_event_order.sql` csak additív, helyben tesztelt séma; távoli D1-en nem futott. A párhuzamos első vásárlás, eltérő payload-hash, régi replay és jogosultság-visszavonás regressziói átmentek. A tényleges Apple/Google provider-állapotverzió és párhuzamos hálózati verify/webhook/restore elfogadása még hiányzik, ezért A08 nyitott.
+- **Friss helyi ellenőrzés:** frontend és Worker typecheck, 27 fájl / 236 teszt sikeres. Az A07–A08 munkafaváltozásokhoz commit/push/deploy még nem történt; production adatbázis-módosítás nem történt.
 
 ### Production V3 adatok mentése és V4 migrációs próba
 
@@ -76,12 +79,11 @@ Jelentés: [FAMILY_PLUS_STATISTICS_AUDIT_2026-09-20.md](FAMILY_PLUS_STATISTICS_A
   nem részei a normál tesztcsomagnak. Csak dokumentáció és bizonyíték változott.
 - Javítás, commit/push, deploy és adatbázis-módosítás nem történt.
 
-**A01–A02 elkészült. Az A03–A05 kéttelefonos staging elfogadása folyamatban; az
-A13–A14, A04 és A05 commit/push kész. Az A06 helyi javítása és automatizált
-ellenőrzése elkészült.** Következő kapu: az A03–A05 kézi staging eredményének
-rögzítése, valamint az A06 tulajdonosi commit/push, staging Worker és Pages
-build, majd a kompatibilis legacy claim, fizetős családlétrehozás, Free tiltás
-és kétaccountos szinkron telefonos próbája. Ezután A07 következik.
+**A01–A02 elkészült. Az A03–A06 staging elfogadása folyamatban; az A13–A14 és
+A04–A06 commit/push kész. Az A07 kiadási konfiguráció helyi védelme elkészült,
+de a production infrastruktúra nincs beállítva.** Következő kapu: az A07 helyi
+commit/push és a staging ellenőrzés, majd a kéttelefonos elfogadás, amikor
+rendelkezésre állnak a készülékek. Éles lépések külön engedéllyel.
 Éles lépések külön engedéllyel.
 
 ### A02 lezárás — többlapos és atomi helyi mentés
@@ -549,13 +551,13 @@ auditkapu az irányadó, különösen az adatmegőrzési és hozzáférési hib�
 
 ## Következő konkrét feladat
 
-A03–A05: a kéttelefonos staging elfogadás lezárása, amikor ismét rendelkezésre
-áll a két készülék. Az A05 commit/push kész (`3665d25`). Az A06 legacy API
-megkerülésének kompatibilis lezárása helyben kész: 26 tesztfájlban 226/226 teszt,
-valamint a production és az auth-enabled internal build sikeres. Következik az
-A06 tulajdonosi commit/push, staging Worker és Pages build, majd a meglévő család
-claimje, fizetős családlétrehozás, Free tiltás és kétaccountos sync kézi próbája.
-Ezután A07 következik. A korábbi staging-elfogadási esetek továbbra is kötelezőek.
+A03–A06: a kéttelefonos staging elfogadás lezárása, amikor ismét rendelkezésre
+áll a két készülék. Az A06 commit/push kész (`eac16ef`). Az A07 jelenlegi helyi
+szelete a publikus Free alapállapotot és az éles build/Worker/proxy hiányos
+konfigurációjának tiltását készíti elő. Következik az A07 tulajdonosi commit/push,
+majd a tényleges éles host, Worker, OAuth és cookie-környezet kialakítása; ez
+utóbbihoz külön kiadási döntés és kézi iOS-próba kell. A korábbi staging
+elfogadási esetek továbbra is kötelezőek.
 
 A billing HTTP-bekötés az A08–A10 domainhibák javítása után következik.
 A `007` távoli staging migráció előtt export/restore és ellenőrzött munkamenet
