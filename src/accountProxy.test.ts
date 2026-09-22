@@ -97,7 +97,7 @@ describe('internal account proxy', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('rejects cross-site reads and requests outside the account API', async () => {
+  it('rejects cross-site reads and requests outside the allowed API', async () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
     const crossSite = await onRequest({ request: new Request(
@@ -110,6 +110,52 @@ describe('internal account proxy', () => {
     ) })
     expect(crossSite.status).toBe(403)
     expect(syncPath.status).toBe(404)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    { method: 'GET', path: '/v1/sync?after=0' },
+    { method: 'GET', path: '/v1/device' },
+    { method: 'POST', path: '/v1/device/leave' },
+    { method: 'POST', path: '/v1/invites' },
+    { method: 'POST', path: '/v1/children' },
+    { method: 'PATCH', path: '/v1/children/child_1' },
+    { method: 'POST', path: '/v1/sessions/start' },
+    { method: 'POST', path: '/v1/sessions' },
+    { method: 'POST', path: '/v1/sessions/sleep_1/end' },
+    { method: 'PATCH', path: '/v1/sessions/sleep_1' },
+    { method: 'DELETE', path: '/v1/sessions/sleep_1' },
+    { method: 'DELETE', path: '/v1/children/child_1' }
+  ])('forwards authenticated family $method $path through the protected proxy', async ({ method, path }) => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const forwarded = new Request(input, init)
+      expect(forwarded.url).toBe(`https://solemi-sleep-sync-staging.czki-adam.workers.dev${path}`)
+      expect(forwarded.headers.get('Authorization')).toBe('Bearer account-token')
+      expect(forwarded.headers.get('X-Solemi-Family-Token')).toBe('family-token')
+      expect(forwarded.headers.get('Origin')).toBe('https://solemi-sleep-internal.pages.dev')
+      return new Response('{"ok":true}', { headers: { 'Content-Type': 'application/json' } })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const response = await onRequest({ request: new Request(
+      `https://solemi-sleep-internal.pages.dev/api${path}`,
+      { method, headers: { Origin: 'https://solemi-sleep-internal.pages.dev',
+        Authorization: 'Bearer account-token', 'X-Solemi-Family-Token': 'family-token',
+        ...(method === 'GET' ? {} : { 'Content-Type': 'application/json' }) },
+      ...(method === 'GET' ? {} : { body: '{}' }) }
+    ) })
+    expect(response.status).toBe(200)
+    expect(fetchMock).toHaveBeenCalledOnce()
+  })
+
+  it('rejects a foreign-origin family mutation before forwarding its credentials', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const response = await onRequest({ request: new Request(
+      'https://solemi-sleep-internal.pages.dev/api/v1/invites',
+      { method: 'POST', headers: { Origin: 'https://foreign.example',
+        Authorization: 'Bearer account-token', 'X-Solemi-Family-Token': 'family-token' }, body: '{}' }
+    ) })
+    expect(response.status).toBe(403)
     expect(fetchMock).not.toHaveBeenCalled()
   })
 

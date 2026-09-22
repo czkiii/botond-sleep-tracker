@@ -1,6 +1,7 @@
 const STAGING_API_ORIGIN = 'https://solemi-sleep-sync-staging.czki-adam.workers.dev'
 const INTERNAL_APP_ORIGIN = 'https://solemi-sleep-internal.pages.dev'
-const MAX_ACCOUNT_BODY_BYTES = 64 * 1024
+const MAX_JSON_BODY_BYTES = 64 * 1024
+const FAMILY_API_PATH = /^\/api\/v1\/(?:sync|invites|device(?:\/leave)?|children(?:\/[^/]+)?|sessions(?:\/start|\/[^/]+(?:\/end)?)?)$/
 
 type PagesContext = { request: Request; env?: {
   SOLEMI_PROXY_ENV?: string
@@ -23,7 +24,7 @@ function proxyTarget(appOrigin: string, env: PagesContext['env']) {
 
 export async function onRequest({ request, env }: PagesContext) {
   const incomingUrl = new URL(request.url)
-  if (!incomingUrl.pathname.startsWith('/api/v1/auth/')) {
+  if (!incomingUrl.pathname.startsWith('/api/v1/auth/') && !FAMILY_API_PATH.test(incomingUrl.pathname)) {
     return new Response('Not found', { status: 404 })
   }
   const appOrigin = incomingUrl.origin
@@ -55,17 +56,17 @@ export async function onRequest({ request, env }: PagesContext) {
   let body: ArrayBuffer | undefined
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     const declaredLength = Number(request.headers.get('Content-Length'))
-    if (Number.isFinite(declaredLength) && declaredLength > MAX_ACCOUNT_BODY_BYTES) {
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_JSON_BODY_BYTES) {
       return new Response('Request too large', { status: 413 })
     }
     if (request.body) {
       const reader = request.body.getReader()
-      const buffer = new Uint8Array(MAX_ACCOUNT_BODY_BYTES)
+      const buffer = new Uint8Array(MAX_JSON_BODY_BYTES)
       let length = 0
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-        if (length + value.byteLength > MAX_ACCOUNT_BODY_BYTES) {
+        if (length + value.byteLength > MAX_JSON_BODY_BYTES) {
           await reader.cancel().catch(() => {})
           return new Response('Request too large', { status: 413 })
         }
