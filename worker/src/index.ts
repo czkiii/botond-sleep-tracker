@@ -67,6 +67,7 @@ class ApiError extends Error {
 }
 
 const encoder = new TextEncoder()
+const MAX_JSON_BODY_BYTES = 64 * 1024
 const INVITE_CHARSET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'
 const INVITE_TTL_MS = 30 * 60 * 1000
 
@@ -173,11 +174,30 @@ function requireString(value: unknown, field: string, maxLength = 200) {
 async function readJson(request: Request): Promise<Record<string, unknown>> {
   const contentType = request.headers.get('Content-Type') ?? ''
   if (!contentType.includes('application/json')) throw new ApiError(400, 'INVALID_REQUEST', 'JSON body required.')
+  const declaredLength = Number(request.headers.get('Content-Length'))
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_JSON_BODY_BYTES) {
+    throw new ApiError(413, 'REQUEST_TOO_LARGE', 'JSON body is too large.')
+  }
+  const reader = request.body?.getReader()
+  if (!reader) throw new ApiError(400, 'INVALID_REQUEST', 'JSON body required.')
+  const bytes = new Uint8Array(MAX_JSON_BODY_BYTES)
+  let length = 0
   try {
-    const value = await request.json()
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      if (length + value.byteLength > MAX_JSON_BODY_BYTES) {
+        await reader.cancel().catch(() => {})
+        throw new ApiError(413, 'REQUEST_TOO_LARGE', 'JSON body is too large.')
+      }
+      bytes.set(value, length)
+      length += value.byteLength
+    }
+    const value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes.subarray(0, length)))
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('invalid')
     return value as Record<string, unknown>
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiError) throw error
     throw new ApiError(400, 'INVALID_REQUEST', 'Invalid JSON body.')
   }
 }

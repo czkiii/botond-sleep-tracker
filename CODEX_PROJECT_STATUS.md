@@ -4,7 +4,7 @@
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
 **Teljes audit alapja:** `e9374f4` (`Add verified store billing foundation`); az akkori helyi origin-refhez képest 0 ahead / 0 behind.
-**Ellenőrzött HEAD:** `8cbebb4` (`Prevent old Google Play token grants after subscription replacement`). Az A03–A05 kéttelefonos elfogadása nyitott. Az A07–A09 commit/push megtörtént a tulajdonos közlése szerint; staging elfogadása nincs rögzítve. A smoke- és A10-javítás munkafában van, commit/push/deploy nélkül.
+**Ellenőrzött HEAD:** `6fa5aca` (`Update staging smoke for account auth and separate billing environments`). A tulajdonos szerint a CI ellenőrzések zöldek. Az A03–A06 kéttelefonos elfogadása továbbra is nyitott. Az A18 proxyvédelmi és A19 kérésméret-javítás helyi munkafában van, commit/push/deploy nélkül.
 
 ## Legfrissebb checkpoint — A03–A06 staging elfogadás, A07 helyi előkészítés
 
@@ -35,6 +35,9 @@
 - **Smoke-felülvizsgálat (2026-09-22):** az `8cbebb4` commitnál a staging Worker/Pages és CI ellenőrzések sikeresek, de a régi smoke ellenőrzés bukott. Oka: a szkript továbbra is névtelen `POST /v1/families` hívással kezdett, amelyet az A06 szerveroldali jogosultsági védelem helyesen `ACCOUNT_REQUIRED` hibával tilt. Az új smoke csak a staging health/CORS és a névtelen útvonalak tiltását ellenőrzi; helyben élő staging ellen átment. Nem teszteli a két hitelesített account közti tényleges szinkront: az külön staging elfogadási kapu marad. A smoke-javítás még nincs commitolva/pusholva.
 - **A10 helyi szelet:** a store persistence szolgáltatás kötelező, szerver által kiválasztott `SANDBOX` vagy `PRODUCTION` környezetet kap; eltérő verified snapshotot elutasít, és meglévő provider-azonosító környezete nem írható át. A tényleges Apple/Google adapter-, csomagazonosító-, külön D1- és store sandbox/production elfogadás nyitott, tehát A10 nem lezárt.
 - **Friss ellenőrzés:** frontend és Worker typecheck; teljes 27 fájl / 246 teszt sikeres; a módosított smoke élő staging Worker ellen átment. Éles deploy, main merge és production D1-módosítás nem történt.
+- **A18 helyi javítás (2026-09-22):** a Pages account-proxy csak `/api/v1/auth/` útvonalat és öt szükséges HTTP metódust enged. Idegen `Origin`, `cross-site`/`same-site` Fetch Metadata és Origin nélküli módosító kérés még a továbbítás előtt 403-at kap; csak az authhoz szükséges fejlécek jutnak a Workerhez. Célzott 12/12 proxyteszt sikeres. A staging Pages build és böngészős regresszió a tulajdonosi commit/push után még szükséges; A18 kiadási kapu nem lezárt.
+- **A19 helyi részeredmény:** a Worker és a Pages account-proxy JSON-kérését egyaránt 64 KiB-re korlátoztuk; a Worker streamet olvas, így a hiányzó vagy hamis `Content-Length` sem kerüli meg a korlátot. Túlméretes kérés 413-at ad a feldolgozás/továbbítás előtt. Célzott Worker- és proxyregresszió készült. Rate limit, nagy bootstrap, headerek, CSP, függőség- és üzemeltetési ellenőrzés továbbra is nyitott.
+- **A18–A19 helyi ellenőrzés:** frontend és Worker typecheck, 27 fájl / 254 teszt, frontend build és Pages Functions build sikeres. Az A18 staging böngészős próba továbbra is szükséges.
 
 ### Production V3 adatok mentése és V4 migrációs próba
 
@@ -556,9 +559,9 @@ auditkapu az irányadó, különösen az adatmegőrzési és hozzáférési hib�
 
 ## Következő konkrét feladat
 
-A jelenlegi helyi smoke/A10 változások tulajdonosi commit/pushja után a GitHub
-`smoke` ellenőrzés eredményét kell visszaigazolni. Ez csak auth-határ próba;
-az A03–A06 kéttelefonos, bejelentkezett staging elfogadása továbbra is nyitott.
+A `6fa5aca` utáni A18 proxyvédelmi és A19 kérésméret-módosítások helyi ellenőrzése, majd
+tulajdonosi commit/push és staging Pages build szükséges. Az A03–A06
+kéttelefonos, bejelentkezett staging elfogadása továbbra is nyitott.
 A valódi éles host, Worker, OAuth és cookie-környezet kialakításához külön
 kiadási döntés és kézi iOS-próba kell.
 

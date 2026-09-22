@@ -31,8 +31,8 @@ vagy kifejezett, indokolt termékdöntés kell; a puszta priorizálás nem lezá
 - [ ] A15 — Nem üres helyi napló csatlakozása, gyermekkonfliktus és pull-határesetek.
 - [ ] A16 — Offline fizetős hozzáférés, refresh race, harmadik eszköz próba.
 - [ ] A17 — Accounttörlés, megőrzés, privacy és store adatkezelési tájékoztatás.
-- [ ] A18 — Proxy eredeti Origin ellenőrzése és auth CSRF-határ.
-- [ ] A19 — Rate/body/resource limitek, security headerek és függőségvizsgálat.
+- [ ] A18 — Proxy eredeti Origin ellenőrzése és auth CSRF-határ. Helyi javítás: idegen vagy hiányzó módosító Origin és nem `same-origin` Fetch Metadata tiltva; csak account API és szükséges fejlécek továbbíthatók. Célzott 12/12 proxyteszt sikeres; staging Pages build és belépés/szinkron regresszió még nyitott.
+- [ ] A19 — Rate/body/resource limitek, security headerek és függőségvizsgálat. Helyi részeredmény: a Worker és a Pages account-proxy JSON-body limitje 64 KiB, a túllépés 413; hiányzó `Content-Length` mellett is tesztelt. Rate/resource limit, CSP/header és dependency review még nyitott.
 - [ ] A20 — Összehasonlítható konfliktusválasztás, akadálymentes és mobilos UX.
 - [ ] A21 — Statisztikai összegek/szűrés és időpontjelzések egyeztetése.
 - [ ] A22 — Telefonos teljesítményprofil, másodpercenkénti elemzés újraszámolás rendezése.

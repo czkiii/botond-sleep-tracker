@@ -120,6 +120,22 @@ describe('account auth routes', () => {
     expect(await response.json()).toMatchObject({ error: { code: 'AUTH_NOT_CONFIGURED' } })
   })
 
+  it('rejects oversized JSON before parsing, even without a trustworthy Content-Length', async () => {
+    const body = JSON.stringify({ credential: 'x'.repeat(64 * 1024) })
+    const oversized = await fetch('/v1/auth/google', {
+      method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body
+    })
+    expect(oversized.status).toBe(413)
+    expect(await oversized.json()).toMatchObject({ error: { code: 'REQUEST_TOO_LARGE' } })
+    expect(sqlite.prepare('SELECT count(*) AS count FROM account_sessions').get()).toMatchObject({ count: 0 })
+
+    const declared = await fetch('/v1/auth/google', {
+      method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', 'Content-Length': '65537' },
+      body: '{}'
+    })
+    expect(declared.status).toBe(413)
+  })
+
   it('rejects cross-origin cookie mutations and missing refresh cookies', async () => {
     const foreign = await fetch('/v1/auth/refresh', { method: 'POST', headers: { Origin: 'https://attacker.example' } })
     expect(foreign.status).toBe(403)
