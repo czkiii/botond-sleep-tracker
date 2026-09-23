@@ -43,6 +43,8 @@ V1-ben PDF export szükséges Family/Family+ jogosultsággal. Push, fix és adap
 
 Cél: rendszeresen használó családok és kis, fenntartható mellékbevétel; heti 5–8 órás fejlesztési/tesztelői kapacitással. Nyilvános induláskor App Store és Google Play jelenlét is szükséges. Az egyszerűséget és a csomagok értékét további családokkal ellenőrizzük, új funkciók automatikus hozzáadása nélkül.
 
+**Marketingötlet, még nem elfogadott fejlesztési scope:** a Copilottal készülő weboldal telefonkeretében egy külön, regisztráció nélküli, mintaadatokkal működő interaktív Solemi-demó jelenhetne meg. A részletes javaslatot és nyitott döntéseit a [MARKETING_INTERACTIVE_DEMO_IDEA.md](MARKETING_INTERACTIVE_DEMO_IDEA.md) rögzíti. Ez nem része a valódi családi naplónak, és nem változtatja meg a V1 kiadási kapuit.
+
 A01–A02 elkészült; a következő feladat a félkész A03 befejezése az új tulajdonosi törlési/import/mentési szabályokkal, majd a jelentés családi és billing sorrendje. Lásd `FULL_RELEASE_AUDIT_2026-09-20.md` és `CODEX_PROJECT_STATUS.md`. Nincs automatikusan első frissítésre halasztott tétel. Későbbi kutatási feladat: szülői Reddit-beszélgetések és más közösségi visszajelzések áttekintése arról, miért kezdenek naplózni, mikor válik teherré, és miért hagyják abba. Kutatás ebben a munkamenetben nem indul.
 
 Commit/push a tulajdonos feladata. Éles deploy, main merge és production adatbázis-módosítás külön engedélyhez kötött.
