@@ -18,6 +18,8 @@ A jelenlegi család 1799 alvásos exportjának UI-s visszaimportja külön szink
 
 ## Tesztfiókok és a visszaút korlátja
 
+**Későbbi, helyi fejlesztési kiegészítés:** a lent leírt hiányzó megszüntetési út helyben elkészült, automatizált ellenőrzése sikeres. Commit/push és a staging build elfogadása még szükséges; az új, kis tesztcsaládos próba menetét a [FAMILY_DISSOLUTION_CHECKPOINT_2026-09-23.md](FAMILY_DISSOLUTION_CHECKPOINT_2026-09-23.md) rögzíti. Az alábbi bekezdés a mentés készítésekor fennálló korlátot dokumentálja.
+
 A két jelenlegi tesztfiók egyikének átvitele egy új családba csak akkor jó próba, ha a visszaút is kész: az utolsó aktív családtag jelenleg `FAMILY_DISSOLUTION_REQUIRED` hibával nem tud kilépni, és a külön családmegszüntetési felület még nincs kész. Egy egyfiókos tesztcsalád létrehozása ezért átmenetileg ott ragaszthatja a fiókot. Az Opo családban maradó Free-tag szinkronja ráadásul szünetelhet, ha az utolsó fizető kilép. A két meglévő fiókot ne mozgassuk át erre a próbára addig, amíg a tesztcsalád megszüntetésének és az Opo családba visszacsatlakozásnak a teljes útja nincs rendezve, vagy nincs külön, erre fenntartott tesztfiók.
 
 Az offline fájlimport nem szerveroldali visszagörgetés. A meglévő Opo-exportot nem szabad az elkülönített tesztcsaládba importálni, mert az 1799 meglévő bejegyzést oda is feltöltheti.

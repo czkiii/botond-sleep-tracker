@@ -2,7 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { t } from './i18n'
 import type { Locale } from './i18n'
-import { loadData } from './storage'
+import { exportData, loadData } from './storage'
+import { familyDissolutionCopy } from './familyDissolutionCopy'
+import { dissolveFamily, prepareFamilyDissolution } from './familySync'
+import type { FamilyDissolutionPreview } from './familySync'
 import { createFamily, createInvite, getAccountFamilyMembers, getSyncStore, joinFamily, leaveAccountFamily, leaveFamily, pullRemote, reconcileAccountFamily, reconnectAccountFamily, refreshFamilyInfo, resolveSyncConflict, restoreMissingSession } from './familySync'
 import type { FamilyMemberChoice } from './familySync'
 import { ACCOUNT_ACCESS_EVENT, ACCOUNT_STATE_EVENT, getAccountAccess, restoreAccount, setInternalTestPlan } from './accountAuth'
@@ -97,10 +100,13 @@ function deviceName() {
 
 export default function FamilySyncLayer() {
   const [open, setOpen] = useState(false)
-  const [mode, setMode] = useState<'home' | 'create' | 'join' | 'invite' | 'leave-admin'>('home')
+  const [mode, setMode] = useState<'home' | 'create' | 'join' | 'invite' | 'leave-admin' | 'dissolve'>('home')
+  const [dissolution, setDissolution] = useState<FamilyDissolutionPreview | null>(null)
+  const [typedFamilyName, setTypedFamilyName] = useState('')
+  const [connectionEnded, setConnectionEnded] = useState(() => Boolean(getSyncStore().connectionEnded))
   const [code, setCode] = useState('')
   const [familyName, setFamilyName] = useState('')
-  const [inviteCode, setInviteCode] = useState(() => sessionStorage.getItem(LAST_INVITE_KEY) || '')
+  const [inviteCode, setInviteCode] = useState(() => getSyncStore().connectionEnded ? '' : sessionStorage.getItem(LAST_INVITE_KEY) || '')
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState('')
@@ -124,6 +130,7 @@ export default function FamilySyncLayer() {
   const [leaveCandidates, setLeaveCandidates] = useState<FamilyMemberChoice[]>([])
   const locale = loadData().settings.locale as Locale
   const text = copy[locale]
+  const dissolutionText = familyDissolutionCopy[locale]
   const familySyncAvailable = import.meta.env.VITE_ACCOUNT_AUTH === 'true'
     ? !accessChecking && !accessCheckFailed && serverFamilySync === true
     : internalPreview && canUseFamilySync(previewPlan)
@@ -140,6 +147,9 @@ export default function FamilySyncLayer() {
     if (code === 'FAMILY_OWNER_ACCOUNT_REQUIRED') return text.ownerAccountRequired
     if (code === 'ACCOUNT_ALREADY_IN_FAMILY' || code === 'ACCOUNT_ALREADY_IN_OTHER_FAMILY') return text.alreadyInFamily
     if (code === 'FAMILY_DISSOLUTION_REQUIRED') return text.familyDissolutionRequired
+    if (code === 'FAMILY_DISSOLUTION_CHANGED') return dissolutionText.changed
+    if (code === 'FAMILY_HAS_OTHER_MEMBERS') return dissolutionText.otherMembers
+    if (code === 'FAMILY_ADMIN_REQUIRED') return dissolutionText.adminRequired
     if (code.endsWith('_OFFLINE')) return text.leaveOffline
     if (code.endsWith('_PENDING')) return text.leavePending
     if (code.endsWith('_ATTENTION') || code.endsWith('_BLOCKED')) return text.leaveAttention
@@ -189,8 +199,9 @@ export default function FamilySyncLayer() {
         setServerFamilySync(access.features.includes('FAMILY_SYNC'))
         setServerPaused(access.familySync.status === 'PAUSED')
         setAccountMembership(access.membership)
-        if (!access.features.includes('FAMILY_SYNC')) return
+        if (!access.features.includes('FAMILY_SYNC') && !getSyncStore().connection) return
         const result = await reconcileAccountFamily()
+        setConnected(Boolean(getSyncStore().connection))
         if (result.connected) {
           const next = getSyncStore().connection
           setConnected(Boolean(next))
@@ -252,6 +263,12 @@ export default function FamilySyncLayer() {
   useEffect(() => {
     const onState = () => {
       const store = getSyncStore()
+      setConnectionEnded(Boolean(store.connectionEnded))
+      if (store.connectionEnded) {
+        setInviteCode('')
+        sessionStorage.removeItem(LAST_INVITE_KEY)
+        setMode('home')
+      }
       const next = store.connection
       setConnected(Boolean(next))
       setConnectionName(next?.familyName || '')
@@ -294,6 +311,7 @@ export default function FamilySyncLayer() {
         setServerFamilySync(access.features.includes('FAMILY_SYNC'))
         setServerPaused(access.familySync.status === 'PAUSED')
         setAccountMembership(access.membership)
+        if (!access.membership && getSyncStore().connection) await reconcileAccountFamily()
       } catch { /* account restoration and the sync loop surface connection errors */ }
     }
     void refreshAccess()
@@ -377,6 +395,7 @@ export default function FamilySyncLayer() {
     if (accessChecking) return text.syncing
     if (accessCheckFailed) return text.error
     if (serverPaused) return text.pausedHint
+    if (connectionEnded && !connected) return dissolutionText.ended
     if (!familySyncAvailable) return text.lockedHint
     if (!connected) return text.settingsHintDisconnected
     if (!online) return text.offlineHint
@@ -387,7 +406,7 @@ export default function FamilySyncLayer() {
     if (pendingCount > 1) return text.pendingMany(pendingCount)
     if (syncIssue) return text.syncIssue
     return lastSyncLabel || text.settingsHintConnected
-  }, [accessChecking, accessCheckFailed, serverPaused, familySyncAvailable, connected, online, conflictCount, missingSessions, pendingCount, syncIssue, lastSyncLabel, text])
+  }, [accessChecking, accessCheckFailed, serverPaused, familySyncAvailable, connected, online, conflictCount, missingSessions, pendingCount, syncIssue, lastSyncLabel, text, connectionEnded, dissolutionText])
 
   const handleCreate = async () => {
     if (!familyName.trim()) return
@@ -473,15 +492,13 @@ export default function FamilySyncLayer() {
   }
 
   const handleAccountLeave = async () => {
-    if (accountMembership?.role !== 'ADMIN') {
-      await performAccountLeave()
-      return
-    }
     setBusy(true); setError('')
     try {
       const members = await getAccountFamilyMembers()
       if (!members.length) {
-        await performAccountLeave()
+        setDissolution(await prepareFamilyDissolution())
+        setTypedFamilyName('')
+        setMode('dissolve')
         return
       }
       setLeaveCandidates(members)
@@ -489,6 +506,20 @@ export default function FamilySyncLayer() {
     } catch (err) {
       setError(friendlyError(err))
     } finally { setBusy(false) }
+  }
+
+  const handleDissolve = async () => {
+    if (!dissolution || typedFamilyName !== dissolution.familyName) return
+    setBusy(true); setError('')
+    try {
+      await dissolveFamily(dissolution)
+      sessionStorage.removeItem(LAST_INVITE_KEY)
+      localStorage.removeItem(LAST_SYNC_KEY)
+      window.location.reload()
+    } catch (err) {
+      setError(friendlyError(err))
+      setBusy(false)
+    }
   }
 
   const handleConflict = async (resolution: 'local' | 'family') => {
@@ -538,7 +569,7 @@ export default function FamilySyncLayer() {
           <strong>{accessChecking ? text.syncing : text.error}</strong>
           {accessCheckFailed && <button className="family-sync-secondary" onClick={() => window.location.reload()}>{t(locale, 'retry')}</button>}
         </div>}
-        {!accessChecking && !accessCheckFailed && !familySyncAvailable && mode !== 'leave-admin' && <div className="family-sync-content family-sync-locked">
+        {!accessChecking && !accessCheckFailed && !familySyncAvailable && mode !== 'leave-admin' && mode !== 'dissolve' && <div className="family-sync-content family-sync-locked">
           <div className="family-sync-lock-icon">🔒</div>
           <strong>{serverPaused ? text.paused : text.lockedHint}</strong>
           <p>{serverPaused ? text.pausedHint : text.lockedDescription}</p>
@@ -572,15 +603,30 @@ export default function FamilySyncLayer() {
           <button className="family-sync-link" onClick={() => setMode('home')} disabled={busy}>{text.cancel}</button>
         </div>}
         {mode === 'leave-admin' && <div className="family-sync-content">
-          <strong>{text.leaveAdminTitle}</strong>
-          <p>{text.leaveAdminHelp}</p>
-          {leaveCandidates.map((member) => <button className="family-sync-secondary" key={member.accountId}
+          <strong>{accountMembership?.role === 'ADMIN' ? text.leaveAdminTitle : text.leaveAccount}</strong>
+          <p>{accountMembership?.role === 'ADMIN' ? text.leaveAdminHelp : text.leaveAccountConfirm}</p>
+          <button className="family-sync-secondary" onClick={() => exportData(loadData())} disabled={busy}>{dissolutionText.localExport}</button>
+          {accountMembership?.role === 'ADMIN' && leaveCandidates.map((member) => <button className="family-sync-secondary" key={member.accountId}
             onClick={() => performAccountLeave(member.accountId)} disabled={busy}>
             {member.name || member.email || member.accountId}
           </button>)}
-          <button className="family-sync-secondary" onClick={() => performAccountLeave()} disabled={busy}>{text.leaveAdminAuto}</button>
+          <button className="family-sync-secondary" onClick={() => performAccountLeave()} disabled={busy}>{accountMembership?.role === 'ADMIN' ? text.leaveAdminAuto : text.leaveAccount}</button>
           <button className="family-sync-link" onClick={() => setMode('home')} disabled={busy}>{text.cancel}</button>
         </div>}
+        {mode === 'dissolve' && dissolution && <div className="family-sync-content">
+          <strong>{dissolutionText.title}: {dissolution.familyName}</strong>
+          <p>{dissolutionText.explanation}</p>
+          <p>{dissolutionText.kept}</p>
+          <p>{dissolutionText.children}: {dissolution.childCount} · {dissolutionText.sleeps}: {dissolution.data.sessions.length}</p>
+          <button className="family-sync-secondary" onClick={() => exportData(dissolution.data)} disabled={busy}>{dissolutionText.export}</button>
+          <label className="family-name-confirm">{dissolutionText.confirmName} <strong>{dissolution.familyName}</strong>
+            <input className="family-sync-name-input" value={typedFamilyName} onChange={(event) => setTypedFamilyName(event.target.value)} autoComplete="off" disabled={busy} />
+          </label>
+          <button className="family-sync-secondary danger" onClick={handleDissolve}
+            disabled={busy || !online || pendingCount > 0 || conflictCount > 0 || typedFamilyName !== dissolution.familyName}>{busy ? text.syncing : dissolutionText.confirm}</button>
+          <button className="family-sync-link" onClick={() => { setMode('home'); setDissolution(null) }} disabled={busy}>{text.cancel}</button>
+        </div>}
+        {mode === 'home' && connectionEnded && <div className="family-sync-content"><p role="status">{dissolutionText.ended}</p></div>}
         {familySyncAvailable && mode === 'home' && connected && conflictCount > 0 && <div className="family-sync-content">
           <div className="family-sync-status-card"><span>!</span><div><strong>{text.conflictTitle}</strong><small>{text.conflictHelp}</small></div></div>
           <button className="family-sync-primary" onClick={() => handleConflict('local')} disabled={busy}>{text.keepLocal}</button>

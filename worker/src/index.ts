@@ -1319,6 +1319,70 @@ async function leaveAccountFamily(request: Request, env: Env, access: AccountAcc
   })
 }
 
+async function soleFamilyAdmin(env: Env, accountId: string) {
+  const family = await env.DB.prepare(`SELECT f.id, f.name, f.revision, m.role
+    FROM families f JOIN legacy_family_memberships m ON m.family_id = f.id
+    WHERE m.account_id = ? AND m.status = 'ACTIVE'`)
+    .bind(accountId).first<{ id: string; name: string; revision: number; role: string }>()
+  if (!family) throw new ApiError(403, 'FAMILY_MEMBERSHIP_REQUIRED')
+  if (family.role !== 'ADMIN') throw new ApiError(403, 'FAMILY_ADMIN_REQUIRED')
+  const other = await env.DB.prepare(`SELECT id FROM legacy_family_memberships
+    WHERE family_id = ? AND status = 'ACTIVE' AND account_id <> ? LIMIT 1`)
+    .bind(family.id, accountId).first()
+  if (other) throw new ApiError(409, 'FAMILY_HAS_OTHER_MEMBERS')
+  return family
+}
+
+async function previewFamilyDissolution(request: Request, env: Env, access: AccountAccess) {
+  const family = await soleFamilyAdmin(env, access.account.id)
+  const children = await env.DB.prepare(`SELECT * FROM children WHERE family_id = ? AND deleted_at IS NULL`)
+    .bind(family.id).all<ChildRow>()
+  const sessions = await env.DB.prepare(`SELECT * FROM sleep_sessions WHERE family_id = ? AND deleted_at IS NULL`)
+    .bind(family.id).all<SessionRow>()
+  // All diary mutations advance the revision. Reject a snapshot read across a write.
+  const fresh = await soleFamilyAdmin(env, access.account.id)
+  if (fresh.id !== family.id || fresh.revision !== family.revision || fresh.name !== family.name) {
+    throw new ApiError(409, 'FAMILY_DISSOLUTION_CHANGED')
+  }
+  return ok(request, env, {
+    familyId: family.id, familyName: family.name, revision: family.revision,
+    children: children.results.map(childDto), sessions: sessions.results.map(sessionDto)
+  })
+}
+
+async function dissolveAccountFamily(request: Request, env: Env, access: AccountAccess) {
+  const body = await readJson(request)
+  const familyId = requireString(body.familyId, 'familyId', 100)
+  const name = requireString(body.expectedFamilyName, 'expectedFamilyName', 60)
+  const revision = body.expectedRevision
+  if (typeof revision !== 'number' || !Number.isSafeInteger(revision) || revision < 0) {
+    throw new ApiError(400, 'INVALID_REQUEST')
+  }
+  const exists = await env.DB.prepare('SELECT id FROM families WHERE id = ?').bind(familyId).first()
+  // An acknowledged deletion can be retried after a lost response, without touching a new family.
+  if (!exists) return ok(request, env, { dissolved: true, familyId })
+  const family = await soleFamilyAdmin(env, access.account.id)
+  if (family.id !== familyId) throw new ApiError(403, 'FAMILY_MEMBERSHIP_REQUIRED')
+  if (family.name !== name || family.revision !== revision) throw new ApiError(409, 'FAMILY_DISSOLUTION_CHANGED')
+
+  // Each statement uses the same guard inside one transaction. Memberships stay intact
+  // until the final family delete, so a concurrent join or edit makes the entire batch a no-op.
+  const guard = `EXISTS (SELECT 1 FROM families f
+    JOIN legacy_family_memberships m ON m.family_id = f.id
+    WHERE f.id = ? AND f.name = ? AND f.revision = ?
+      AND m.account_id = ? AND m.role = 'ADMIN' AND m.status = 'ACTIVE'
+      AND NOT EXISTS (SELECT 1 FROM legacy_family_memberships other
+        WHERE other.family_id = f.id AND other.status = 'ACTIVE' AND other.account_id <> m.account_id))`
+  const tables = ['operations', 'invite_codes', 'sleep_sessions', 'children', 'devices']
+  const statements = tables.map((table) => env.DB.prepare(`DELETE FROM ${table} WHERE family_id = ? AND ${guard}`)
+    .bind(familyId, familyId, name, revision, access.account.id))
+  statements.push(env.DB.prepare(`DELETE FROM families WHERE id = ? AND ${guard}`)
+    .bind(familyId, familyId, name, revision, access.account.id))
+  const results = await env.DB.batch(statements)
+  if (results[results.length - 1].meta.changes !== 1) throw new ApiError(409, 'FAMILY_DISSOLUTION_CHANGED')
+  return ok(request, env, { dissolved: true, familyId })
+}
+
 async function clearAccountFamilyData(request: Request, env: Env, access: AccountAccess) {
   const body = await readJson(request)
   const operationId = requireString(body.operationId, 'operationId', 100)
@@ -1459,6 +1523,17 @@ async function accountAuthRoute(request: Request, env: Env, path: string) {
       requireAllowedAuthOrigin(request, env)
       const access = await service.authenticate(accountBearer(request))
       return leaveAccountFamily(request, env, access)
+    }
+    if (request.method === 'GET' && path === '/v1/auth/family/dissolution-preview') {
+      requireAccountFamilyBridge(env)
+      const access = await service.authenticate(accountBearer(request))
+      return previewFamilyDissolution(request, env, access)
+    }
+    if (request.method === 'POST' && path === '/v1/auth/family/dissolve') {
+      requireAccountFamilyBridge(env)
+      requireAllowedAuthOrigin(request, env)
+      const access = await service.authenticate(accountBearer(request))
+      return dissolveAccountFamily(request, env, access)
     }
     if (request.method === 'POST' && path === '/v1/auth/family/data/clear') {
       requireAccountFamilyBridge(env)

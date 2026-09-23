@@ -1,5 +1,5 @@
 import type { AppData, ChildProfile, SleepSession } from './types'
-import { getLocalMetadata, loadData, saveDataAfterDeletion, saveDataWithMetadata, saveLocalMetadata, saveRemoteData, saveSafetyBackup } from './storage'
+import { createDefaultData, getLocalMetadata, loadData, saveDataAfterDeletion, saveDataWithMetadata, saveLocalMetadata, saveRemoteData, saveSafetyBackup } from './storage'
 import { accountDeviceName, accountRequest } from './accountAuth'
 import { fetchJson } from './apiTransport'
 
@@ -67,6 +67,7 @@ type SyncStore = {
   failure?: { code: string; status?: number }
   missingSessions: MissingSession[]
   corrupt?: boolean
+  connectionEnded?: boolean
 }
 
 type RemoteSession = Omit<SleepSession, 'childId' | 'dayNightOverride'> & {
@@ -130,7 +131,8 @@ function parseStore(value: unknown): SyncStore {
   const failure = parsed.failure && /^[A-Z_0-9]{1,64}$/.test(parsed.failure.code)
     ? { code: parsed.failure.code, status: parsed.failure.status } : undefined
   const missingSessions = (parsed.missingSessions ?? []).filter((item) => item && typeof item.sessionId === 'string')
-  return { connection, pending, conflicts: parsed.conflicts ?? [], sessionRevisions, failure, missingSessions }
+  return { connection, pending, conflicts: parsed.conflicts ?? [], sessionRevisions, failure, missingSessions,
+    connectionEnded: parsed.connectionEnded === true }
 }
 
 function readStore(): SyncStore {
@@ -158,7 +160,8 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
   if (options.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
   if (token && import.meta.env.VITE_ACCOUNT_AUTH === 'true') {
     headers.set('X-Solemi-Family-Token', token)
-    return accountRequest<T>(path, { ...options, headers })
+    try { return await accountRequest<T>(path, { ...options, headers }) }
+    catch (error) { releaseRevokedConnection(token, error); throw error }
   }
   if (token) headers.set('Authorization', `Bearer ${token}`)
   const { response, body: payload } = await fetchJson<ApiEnvelope<T>>(`${API_BASE}${path}`, {
@@ -240,6 +243,19 @@ function writeRemoteData(data: AppData) {
   saveRemoteData(data)
 }
 
+function releaseRevokedConnection(token: string, error: unknown) {
+  const code = (error as { code?: string })?.code
+  if (code !== 'INVALID_DEVICE_TOKEN' && code !== 'DEVICE_REVOKED') return false
+  const store = readStore()
+  if (store.corrupt || store.connection?.deviceToken !== token) return false
+  localStorage.setItem(DETACHED_FAMILY_KEY, store.connection.familyId)
+  // The diary already contains every local edit. Old-family operations cannot be replayed
+  // elsewhere; keep the diary as local data and surface that transition explicitly.
+  writeStore({ ...defaultStore(), connectionEnded: true })
+  announceDiaryReplacement()
+  return true
+}
+
 function applyAuthoritativeSession(session?: RemoteSession | null) {
   if (!session) return false
   const current = loadData()
@@ -280,9 +296,14 @@ export function getFamilyReplacementReadiness(): FamilyReplacementReadiness {
 export async function reconcileAccountFamily() {
   const store = readStore()
   if (store.connection) {
-    await accountRequest('/v1/auth/family/claim', {
-      method: 'POST', body: JSON.stringify({ familyDeviceToken: store.connection.deviceToken })
-    })
+    try {
+      await accountRequest('/v1/auth/family/claim', {
+        method: 'POST', body: JSON.stringify({ familyDeviceToken: store.connection.deviceToken })
+      })
+    } catch (error) {
+      if (releaseRevokedConnection(store.connection.deviceToken, error)) return { claimed: false, connected: false, changed: false }
+      throw error
+    }
     return { claimed: true, connected: true, changed: false }
   }
 
@@ -439,6 +460,56 @@ export async function leaveAccountFamily(successorAccountId?: string) {
   localStorage.removeItem(DETACHED_FAMILY_KEY)
   writeStore(defaultStore())
   announceDiaryReplacement()
+}
+
+export type FamilyDissolutionPreview = {
+  familyId: string
+  familyName: string
+  revision: number
+  childCount: number
+  data: AppData
+}
+
+function requireDissolutionReady() {
+  if (!navigator.onLine) throw new Error('FAMILY_DISSOLUTION_OFFLINE')
+  const readiness = getFamilyReplacementReadiness()
+  if (!readiness.ready) throw new Error(`FAMILY_DISSOLUTION_${readiness.reason?.toUpperCase() || 'BLOCKED'}`)
+}
+
+export function prepareFamilyDissolution() {
+  return serializeSync(async (): Promise<FamilyDissolutionPreview> => {
+    requireDissolutionReady()
+    const snapshot = await accountRequest<{
+      familyId: string; familyName: string; revision: number; children: RemoteChild[]; sessions: RemoteSession[]
+    }>('/v1/auth/family/dissolution-preview')
+    requireDissolutionReady()
+    // Export the server snapshot, even when this device is detached or the plan is Free.
+    const data = createDefaultData(loadData().settings.locale)
+    const children = snapshot.children.map((child) => toLocalChild(child))
+    if (children.length) data.children = children
+    data.settings.activeChildId = data.children[0].id
+    data.sessions = snapshot.sessions.map(toRemoteLocal)
+    return { familyId: snapshot.familyId, familyName: snapshot.familyName, revision: snapshot.revision,
+      childCount: snapshot.children.length, data }
+  })
+}
+
+export function dissolveFamily(preview: FamilyDissolutionPreview) {
+  return serializeSync(async () => {
+    requireDissolutionReady()
+    const connection = readStore().connection
+    if (connection && connection.familyId !== preview.familyId) throw new Error('FAMILY_DISSOLUTION_CHANGED')
+    await accountRequest('/v1/auth/family/dissolve', {
+      method: 'POST', body: JSON.stringify({ familyId: preview.familyId,
+        expectedFamilyName: preview.familyName, expectedRevision: preview.revision })
+    })
+    const latest = readStore().connection
+    if ((!latest && !connection) || sameConnection(connection, latest)) {
+      writeStore({ ...defaultStore(), connectionEnded: true })
+      localStorage.removeItem(DETACHED_FAMILY_KEY)
+      announceDiaryReplacement()
+    }
+  })
 }
 
 function announceDiaryReplacement() {

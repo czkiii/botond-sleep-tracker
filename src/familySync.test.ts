@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { clearLocalDiary, createFamily, flushPending, getFamilyReplacementReadiness, getSyncStore, isEmptyStarterData, leaveFamily, makeOperations, mergeRemote, pullRemote, reconcileAccountFamily, resolveSyncConflict, saveLocalData } from './familySync'
-import { DataStorageError, STORAGE_KEY, createDefaultData, loadData, loadSafetyBackup, saveSafetyBackup } from './storage'
+import { clearLocalDiary, createFamily, dissolveFamily, prepareFamilyDissolution, flushPending, getFamilyReplacementReadiness, getSyncStore, isEmptyStarterData, leaveFamily, makeOperations, mergeRemote, pullRemote, reconcileAccountFamily, resolveSyncConflict, saveLocalData } from './familySync'
+import { DataStorageError, STORAGE_KEY, createDefaultData, inspectBackup, loadData, loadSafetyBackup, saveSafetyBackup } from './storage'
 import { API_TIMEOUT_MS } from './apiTransport'
 import type { AppData, ChildProfile, SleepSession } from './types'
 
@@ -47,6 +47,117 @@ afterEach(() => {
   vi.restoreAllMocks()
   vi.unstubAllEnvs()
   vi.useRealTimers()
+})
+
+describe('family dissolution on the client', () => {
+  function setup() {
+    vi.stubEnv('VITE_ACCOUNT_AUTH', 'true')
+    const storage = new MemoryStorage()
+    const session = new MemoryStorage()
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage })
+    Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, value: session })
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { onLine: true, language: 'hu-HU' } })
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { dispatchEvent: vi.fn() } })
+    storage.setItem(STORAGE_KEY, JSON.stringify(previous))
+    const store = { connection: { familyId: 'family-1', familyName: 'Teszt', deviceId: 'device-1', deviceToken: 'token-1', revision: 4 },
+      pending: [] as Array<{ id: string; method: string; path: string; body: Record<string, unknown> }>, conflicts: [], missingSessions: [] }
+    storage.setItem('solemiSleep:sync:v1', JSON.stringify(store))
+    session.setItem('solemiSleep:accountAccess', JSON.stringify({
+      account: { id: 'account-1', email: null, name: null }, deviceId: 'account-device-1',
+      accessToken: 'account-token', accessExpiresAt: Date.now() + 60_000, expiresAt: Date.now() + 120_000
+    }))
+    const remote = { familyId: 'family-1', familyName: 'Teszt', revision: 9,
+      children: [{ ...child('remote'), deletedAt: null, revision: 8 }],
+      sessions: [{ ...sleep('remote-sleep', 'remote'), deletedAt: null, revision: 9 }] }
+    const fetchMock = vi.fn().mockImplementation((url: string) => Promise.resolve(new Response(JSON.stringify({ ok: true,
+      data: String(url).endsWith('/dissolution-preview') ? remote : { dissolved: true, familyId: 'family-1' }
+    }), { status: 200 })))
+    Object.defineProperty(globalThis, 'fetch', { configurable: true, value: fetchMock })
+    return { storage, store, fetchMock }
+  }
+
+  it('exports the authoritative family snapshot without replacing the local diary, then detaches after success', async () => {
+    const { fetchMock } = setup()
+    const preview = await prepareFamilyDissolution()
+    expect(preview.data.sessions.map(s => s.id)).toEqual(['remote-sleep'])
+    expect(inspectBackup({ format: 'solemi-sleep-backup', version: 4, exportedAt: at, data: preview.data }).data).toEqual(preview.data)
+    expect(loadData()).toEqual(previous)
+    await dissolveFamily(preview)
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ familyId: 'family-1', expectedFamilyName: 'Teszt', expectedRevision: 9 })
+    expect(loadData()).toEqual(previous)
+    expect(getSyncStore()).toMatchObject({ connection: null, connectionEnded: true, pending: [] })
+  })
+
+  it('does not send a destructive request when a local edit appears after the preview', async () => {
+    const { fetchMock } = setup()
+    const preview = await prepareFamilyDissolution()
+    const edited = { ...previous, sessions: previous.sessions.map(s => ({ ...s, note: 'Keep this local edit' })) }
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { onLine: false } })
+    saveLocalData(previous, edited)
+    await flushPending()
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { onLine: true } })
+    await expect(dissolveFamily(preview)).rejects.toThrow('FAMILY_DISSOLUTION_PENDING')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(loadData()).toEqual(edited)
+  })
+
+  it('blocks an offline preview even when the device is detached', async () => {
+    const { storage, fetchMock } = setup()
+    storage.removeItem('solemiSleep:sync:v1')
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { onLine: false } })
+    await expect(prepareFamilyDissolution()).rejects.toThrow('FAMILY_DISSOLUTION_OFFLINE')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('can export and dissolve a family from a detached device without importing its server data locally', async () => {
+    const { storage } = setup()
+    storage.removeItem('solemiSleep:sync:v1')
+    const preview = await prepareFamilyDissolution()
+    expect(preview.childCount).toBe(1)
+    expect(preview.data.sessions[0].id).toBe('remote-sleep')
+    await dissolveFamily(preview)
+    expect(loadData()).toEqual(previous)
+    expect(getSyncStore().connectionEnded).toBe(true)
+  })
+
+  it('keeps the connection and all local data on a lost response, and allows retry', async () => {
+    const { fetchMock } = setup()
+    const preview = await prepareFamilyDissolution()
+    fetchMock.mockRejectedValueOnce(new TypeError('network interrupted'))
+    await expect(dissolveFamily(preview)).rejects.toThrow()
+    expect(getSyncStore().connection?.familyId).toBe('family-1')
+    expect(loadData()).toEqual(previous)
+    await dissolveFamily(preview)
+    expect(getSyncStore().connection).toBeNull()
+    expect(loadData()).toEqual(previous)
+  })
+
+  it.each(['INVALID_DEVICE_TOKEN', 'DEVICE_REVOKED'])('retains another device’s local edits after confirmed %s', async (code) => {
+    const { store, storage, fetchMock } = setup()
+    store.pending = [{ id: 'op', method: 'PATCH', path: '/v1/sessions/sleep-a', body: { patch: { note: 'local' } } }]
+    storage.setItem('solemiSleep:sync:v1', JSON.stringify(store))
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ ok: false, error: { code } }), { status: 401 }))
+    await flushPending()
+    expect(getSyncStore()).toMatchObject({ connection: null, connectionEnded: true, pending: [] })
+    expect(loadData()).toEqual(previous)
+    expect(fetchMock).toHaveBeenCalledOnce()
+  })
+
+  it('recovers on reload when the family was dissolved on another device', async () => {
+    const { fetchMock } = setup()
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ ok: false, error: { code: 'INVALID_DEVICE_TOKEN' } }), { status: 401 }))
+    await expect(reconcileAccountFamily()).resolves.toMatchObject({ connected: false })
+    expect(getSyncStore()).toMatchObject({ connection: null, connectionEnded: true })
+    expect(loadData()).toEqual(previous)
+  })
+
+  it('never detaches on an ordinary server failure', async () => {
+    const { fetchMock } = setup()
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ ok: false, error: { code: 'INTERNAL_ERROR' } }), { status: 500 }))
+    await expect(reconcileAccountFamily()).rejects.toThrow()
+    expect(getSyncStore().connection?.familyId).toBe('family-1')
+    expect(getSyncStore().connectionEnded).not.toBe(true)
+  })
 })
 
 describe('account-owned family creation', () => {

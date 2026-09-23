@@ -114,6 +114,8 @@ describe('internal account proxy', () => {
   })
 
   it.each([
+    { method: 'GET', path: '/v1/auth/family/dissolution-preview' },
+    { method: 'POST', path: '/v1/auth/family/dissolve' },
     { method: 'GET', path: '/v1/sync?after=0' },
     { method: 'GET', path: '/v1/device' },
     { method: 'POST', path: '/v1/device/leave' },

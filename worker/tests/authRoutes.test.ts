@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
 import { readFileSync } from 'node:fs'
 import worker from '../src/index'
@@ -81,6 +81,155 @@ function setTestPlan(access: string, plan: 'free' | 'family' | 'familyPlus') {
     body: JSON.stringify({ plan })
   })
 }
+
+describe('last-member family dissolution', () => {
+  async function setup() {
+    await seedLegacyFamily('dissolve-token')
+    const access = await accountAccess('acc_owner', 'adev_owner', 'dissolve')
+    const headers = { Origin: origin, Authorization: `Bearer ${access}`, 'Content-Type': 'application/json' }
+    expect((await fetch('/v1/auth/family/claim', { method: 'POST', headers,
+      body: JSON.stringify({ familyDeviceToken: 'dissolve-token' }) })).status).toBe(200)
+    await seedInvite('DISSOLVE')
+    const at = '2026-09-23T10:00:00.000Z'
+    sqlite.prepare(`INSERT INTO children (id, family_id, name, birth_date, created_at, updated_at, revision)
+      VALUES ('child_dissolve', 'fam_test', 'Demo', NULL, ?, ?, 1)`).run(at, at)
+    sqlite.prepare(`INSERT INTO sleep_sessions (id, family_id, child_id, start_time, end_time, note, created_at, updated_at, revision)
+      VALUES ('sleep_dissolve', 'fam_test', 'child_dissolve', ?, ?, 'Export me', ?, ?, 2)`).run(at, at, at, at)
+    sqlite.prepare(`INSERT INTO operations VALUES ('op_dissolve', 'fam_test', 'dev_legacy', 'CREATE_SESSION', ?)`).run(at)
+    sqlite.prepare(`UPDATE families SET revision = 2 WHERE id = 'fam_test'`).run()
+    return { access, headers }
+  }
+  const body = () => JSON.stringify({ familyId: 'fam_test', expectedFamilyName: 'Teszt család', expectedRevision: 2 })
+  const tableNames = ['families', 'children', 'sleep_sessions', 'operations', 'invite_codes', 'devices', 'legacy_family_memberships', 'account_family_devices']
+  const snapshot = () => tableNames.map(table => sqlite.prepare(`SELECT * FROM ${table} ORDER BY 1`).all())
+
+  it('exports a Free last admin snapshot and permanently removes only that family, allowing a new family', async () => {
+    const { access, headers } = await setup()
+    env.ENTITLEMENT_ENFORCEMENT = 'true'
+    env.ENTITLEMENT_TEST_MODE = 'true'
+    const secondAccess = await accountAccess('acc_owner', 'adev_second', 'dissolve_second')
+    const secondHeaders = { ...headers, Authorization: `Bearer ${secondAccess}` }
+    const secondBootstrap = await fetch('/v1/auth/family/bootstrap', { method: 'POST', headers: secondHeaders, body: '{}' })
+    const second = await secondBootstrap.json() as { data: { connection: { deviceToken: string } } }
+    const preview = await fetch('/v1/auth/family/dissolution-preview', { headers })
+    expect(preview.status).toBe(200)
+    expect(await preview.json()).toMatchObject({ data: { familyId: 'fam_test', revision: 2,
+      children: [{ id: 'child_dissolve' }], sessions: [{ id: 'sleep_dissolve', note: 'Export me' }] } })
+    sqlite.prepare(`INSERT INTO families VALUES ('untouched', 'Other', 0, '2026-09-23')`).run()
+    const response = await fetch('/v1/auth/family/dissolve', { method: 'POST', headers, body: body() })
+    expect(response.status).toBe(200)
+    for (const table of tableNames.filter(t => t !== 'families')) {
+      expect(sqlite.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get()).toEqual({ n: 0 })
+    }
+    expect(sqlite.prepare('SELECT id FROM families').all()).toEqual([{ id: 'untouched' }])
+    expect(sqlite.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+    expect((await fetch('/v1/auth/me', { headers })).status).toBe(200)
+    expect((await fetch('/v1/auth/me', { headers: secondHeaders })).status).toBe(200)
+    expect((await fetch('/v1/sync?after=0', { headers: { ...secondHeaders, 'X-Solemi-Family-Token': second.data.connection.deviceToken } })).status).toBe(401)
+    expect((await fetch('/v1/auth/family/join', { method: 'POST', headers, body: JSON.stringify({ code: 'DISSOLVE' }) })).status).toBe(404)
+    expect(await (await fetch('/v1/auth/access', { headers })).json()).toMatchObject({ data: { membership: null } })
+    expect((await fetch('/v1/auth/family/claim', { method: 'POST', headers,
+      body: JSON.stringify({ familyDeviceToken: 'dissolve-token' }) })).status).toBe(401)
+    await setTestPlan(access, 'family')
+    expect((await fetch('/v1/auth/family/create', { method: 'POST', headers,
+      body: JSON.stringify({ familyName: 'New family', childId: 'child_dissolve' }) })).status).toBe(201)
+    const afterNewFamily = snapshot()
+    expect((await fetch('/v1/auth/family/dissolve', { method: 'POST', headers, body: body() })).status).toBe(200)
+    expect(snapshot()).toEqual(afterNewFamily)
+  })
+
+  it('preserves the personal paid entitlement when the family is dissolved', async () => {
+    const { access, headers } = await setup()
+    env.ENTITLEMENT_TEST_MODE = 'true'
+    await setTestPlan(access, 'familyPlus')
+    const before = sqlite.prepare('SELECT * FROM account_entitlements ORDER BY id').all()
+    expect((await fetch('/v1/auth/family/dissolve', { method: 'POST', headers, body: body() })).status).toBe(200)
+    expect(sqlite.prepare('SELECT * FROM account_entitlements ORDER BY id').all()).toEqual(before)
+  })
+
+  it.each([
+    ['wrong name', { expectedFamilyName: 'Wrong' }],
+    ['stale revision', { expectedRevision: 1 }],
+    ['missing revision', { expectedRevision: null }]
+  ])('rejects %s without changing the family', async (_label, patch) => {
+    const { headers } = await setup()
+    const before = snapshot()
+    const response = await fetch('/v1/auth/family/dissolve', { method: 'POST', headers,
+      body: JSON.stringify({ ...JSON.parse(body()), ...patch }) })
+    expect([400, 409]).toContain(response.status)
+    expect(snapshot()).toEqual(before)
+  })
+
+  it('denies members and nonmembers, and blocks the admin while another active member remains', async () => {
+    const { headers } = await setup()
+    const member = await accountAccess('acc_member', 'adev_member', 'dissolve_member')
+    const outsider = await accountAccess('acc_outsider', 'adev_outsider', 'dissolve_outsider')
+    sqlite.prepare(`INSERT INTO legacy_family_memberships VALUES ('member', 'fam_test', 'acc_member', 'MEMBER', 'ACTIVE', 1, NULL)`).run()
+    const before = snapshot()
+    for (const [token, status] of [[member, 403], [outsider, 403]] as const) {
+      const requestHeaders = { ...headers, Authorization: `Bearer ${token}` }
+      expect((await fetch('/v1/auth/family/dissolution-preview', { headers: requestHeaders })).status).toBe(status)
+      expect((await fetch('/v1/auth/family/dissolve', { method: 'POST', headers: requestHeaders, body: body() })).status).toBe(status)
+    }
+    expect((await fetch('/v1/auth/family/dissolve', { method: 'POST', headers, body: body() })).status).toBe(409)
+    expect(snapshot()).toEqual(before)
+  })
+
+  it.each(['join', 'edit'])('protects against a concurrent %s after the preliminary authorization', async (race) => {
+    const { headers } = await setup()
+    await accountAccess('acc_race', 'adev_race', 'race')
+    const originalBatch = env.DB.batch.bind(env.DB)
+    let afterConcurrentChange: unknown
+    env.DB.batch = (async (statements: D1PreparedStatement[]) => {
+      if (race === 'join') sqlite.prepare(`INSERT INTO legacy_family_memberships VALUES ('racer', 'fam_test', 'acc_race', 'MEMBER', 'ACTIVE', 1, NULL)`).run()
+      else sqlite.prepare(`UPDATE families SET revision = revision + 1 WHERE id = 'fam_test'`).run()
+      afterConcurrentChange = snapshot()
+      return originalBatch(statements)
+    }) as D1Database['batch']
+    expect((await fetch('/v1/auth/family/dissolve', { method: 'POST', headers, body: body() })).status).toBe(409)
+    expect(snapshot()).toEqual(afterConcurrentChange)
+  })
+
+  it('rolls back every deletion if a later statement fails', async () => {
+    const { headers } = await setup()
+    sqlite.exec(`CREATE TRIGGER fail_dissolution BEFORE DELETE ON children BEGIN SELECT RAISE(ABORT, 'simulated failure'); END;`)
+    const before = snapshot()
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      expect((await fetch('/v1/auth/family/dissolve', { method: 'POST', headers, body: body() })).status).toBe(500)
+    } finally { errorLog.mockRestore() }
+    expect(snapshot()).toEqual(before)
+  })
+
+  it('rejects an export snapshot when the diary changes during the read', async () => {
+    const { headers } = await setup()
+    const prepare = env.DB.prepare.bind(env.DB)
+    env.DB.prepare = ((sql: string) => {
+      const statement = prepare(sql)
+      if (sql.startsWith('SELECT * FROM sleep_sessions')) {
+        const all = statement.all.bind(statement)
+        statement.all = (async () => {
+          const rows = await all()
+          sqlite.prepare(`UPDATE families SET revision = revision + 1 WHERE id = 'fam_test'`).run()
+          return rows
+        }) as D1PreparedStatement['all']
+      }
+      return statement
+    }) as D1Database['prepare']
+    const preview = await fetch('/v1/auth/family/dissolution-preview', { headers })
+    expect(preview.status).toBe(409)
+    expect(await preview.json()).toMatchObject({ error: { code: 'FAMILY_DISSOLUTION_CHANGED' } })
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM sleep_sessions').get()).toEqual({ n: 1 })
+  })
+
+  it('requires a valid account and same allowed Origin for dissolution', async () => {
+    const { headers } = await setup()
+    const before = snapshot()
+    expect((await fetch('/v1/auth/family/dissolve', { method: 'POST', headers: { ...headers, Origin: 'https://evil.example' }, body: body() })).status).toBe(403)
+    expect((await fetch('/v1/auth/family/dissolve', { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: body() })).status).toBe(401)
+    expect(snapshot()).toEqual(before)
+  })
+})
 
 describe('account auth routes', () => {
   it('refuses an incomplete or test-enabled production Worker configuration', async () => {
