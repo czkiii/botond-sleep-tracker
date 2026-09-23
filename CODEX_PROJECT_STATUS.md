@@ -4,7 +4,7 @@
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
 **Teljes audit alapja:** `e9374f4` (`Add verified store billing foundation`); az akkori helyi origin-refhez képest 0 ahead / 0 behind.
-**Ellenőrzött HEAD:** `03190aa` a `feat/child-profile-v4` ágon; a 2026-09-23-i teszt előtt a munkafa tiszta volt. A két Google-fiókos Chrome+Edge staging próba igazolta a családi alvás indításának, leállításának és törlésének szinkronját, továbbá a helyi törlés elkülönített hatását és az eszköz újracsatlakozását. Az A03 teljes elfogadása továbbra is nyitott.
+**Ellenőrzött HEAD:** `d090ad8` (`Record A03 staging results and verify pending sync guard`) a `feat/child-profile-v4` ágon. A két Google-fiókos Chrome+Edge staging próba igazolta a családi alvás indításának, leállításának és törlésének szinkronját, a helyi törlés/újracsatlakozás hatását, valamint az import/restore és offline queue működését. Az A03 teljes elfogadása továbbra is nyitott.
 
 ## Legfrissebb checkpoint — A03–A06 staging elfogadás, A07 helyi előkészítés
 
@@ -568,13 +568,12 @@ Az A03 tényleges családi törlését kis, elkülönített staging családon va
 szerveres restore mellett kell kipróbálni. A jelenlegi 1799 alvásos család exportjának
 visszatöltése nem egy atomi szerveres rollback: a kliens külön sync műveleteket képez
 a bejegyzésekhez, ezért az export önmagában nem elég garancia egy teljes törléses
-próbához. A Cloudflare D1 Time Travel elvileg szerveres visszaállítási út, de a
-2026-09-23-i olvasási staging D1-info próba lejárt/érvénytelen Wrangler OAuth-token
-miatt `Authentication error [code: 10000]` hibát kapott; a konkrét staging DB
-visszaállítási képessége nincs igazolva. Következő kapu: az A03 tényleges családi
-törlés elkülönített staging próbája, ehhez a staging D1 hitelesítés és igazolt
-rollback szükséges. A külön online-pending kézi gát és az A04–A06 kétfiókos
-staging elfogadása szintén nyitott.
+próbához. A 2026-09-23-i lejárt Wrangler OAuth-belépést a tulajdonos megújította;
+utána a `solemi-sleep-db-staging` D1-info és az aktuális Time Travel könyvjelző
+csak olvasási lekérdezése sikeres volt. A konkrét staging DB **visszaállítása
+nem volt kipróbálva**. Következő kapu: az A03 tényleges családi törlés
+elkülönített staging próbája, előtte export és igazolt rollback. A külön
+online-pending kézi gát és az A04–A06 kétfiókos staging elfogadása is nyitott.
 A valódi éles host, Worker, OAuth és cookie-környezet kialakításához külön
 kiadási döntés és kézi iOS-próba kell.
 
