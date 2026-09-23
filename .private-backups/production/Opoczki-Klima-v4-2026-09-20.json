@@ -1,0 +1,1045 @@
+{
+  "format": "solemi-sleep-backup",
+  "version": 4,
+  "exportedAt": "2026-09-20T19:10:02.272Z",
+  "data": {
+    "version": 4,
+    "settings": {
+      "locale": "hu",
+      "activeChildId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+      "longSleepReminderEnabled": false
+    },
+    "children": [
+      {
+        "id": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "name": "",
+        "birthDate": null,
+        "photoRef": null,
+        "createdAt": "2026-08-22T23:48:32.171Z",
+        "updatedAt": "2026-08-22T23:48:32.171Z"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "0d8ba0fe-8326-49c6-abe4-022d1350f7a3",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-20T18:43:02.013Z",
+        "endTime": null,
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-20T18:43:02.372Z",
+        "updatedAt": "2026-09-20T18:43:02.372Z"
+      },
+      {
+        "id": "22f5fbf9-9991-4fcd-93ee-eab704525ce4",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-20T12:22:54.769Z",
+        "endTime": "2026-09-20T13:27:51.652Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-20T12:22:55.032Z",
+        "updatedAt": "2026-09-20T13:27:51.988Z"
+      },
+      {
+        "id": "8a1cf8b3-5c5d-48e8-9367-bff27c51018a",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-20T07:43:17.390Z",
+        "endTime": "2026-09-20T08:52:56.097Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-20T07:43:17.604Z",
+        "updatedAt": "2026-09-20T08:52:56.421Z"
+      },
+      {
+        "id": "cd90a133-02ca-46c3-9752-a94c744ab9b5",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-20T03:21:35.961Z",
+        "endTime": "2026-09-20T05:03:55.796Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-20T03:21:36.098Z",
+        "updatedAt": "2026-09-20T05:03:55.880Z"
+      },
+      {
+        "id": "929a77ea-0f56-4bc0-b51c-8610bd6aeb33",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-20T03:03:14.138Z",
+        "endTime": "2026-09-20T03:14:34.294Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-20T03:03:14.313Z",
+        "updatedAt": "2026-09-20T03:14:34.426Z"
+      },
+      {
+        "id": "5c538c5b-3b53-457a-8512-040e13051710",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-19T18:44:59.018Z",
+        "endTime": "2026-09-20T02:51:24.219Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-19T18:44:59.231Z",
+        "updatedAt": "2026-09-20T02:51:24.449Z"
+      },
+      {
+        "id": "97650406-80bc-4f65-88c0-8fc6c9d06955",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-19T12:28:46.711Z",
+        "endTime": "2026-09-19T15:25:47.909Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-19T12:28:46.946Z",
+        "updatedAt": "2026-09-19T15:25:48.163Z"
+      },
+      {
+        "id": "e476cba1-f765-40c0-b393-9759501a15e7",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-19T07:10:14.873Z",
+        "endTime": "2026-09-19T08:54:53.895Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-19T07:10:15.172Z",
+        "updatedAt": "2026-09-19T08:54:54.213Z"
+      },
+      {
+        "id": "fbced82b-5ed4-4fa1-adc4-c79c1f04669a",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-19T02:43:37.627Z",
+        "endTime": "2026-09-19T04:30:00.000Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-19T02:43:37.912Z",
+        "updatedAt": "2026-09-19T06:15:34.342Z"
+      },
+      {
+        "id": "2f7ab82d-ce8b-43a3-a43e-ee438458a003",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-18T18:42:37.025Z",
+        "endTime": "2026-09-18T23:33:00.000Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-18T18:42:37.395Z",
+        "updatedAt": "2026-09-19T02:43:47.379Z"
+      },
+      {
+        "id": "6ef6394a-561f-440d-9eb5-8246f446b79e",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-18T11:53:09.502Z",
+        "endTime": "2026-09-18T13:22:01.229Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-18T11:53:09.734Z",
+        "updatedAt": "2026-09-18T13:22:01.525Z"
+      },
+      {
+        "id": "3eb44135-1bcf-4c0a-bad8-d181d2d744e3",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-18T06:54:00.000Z",
+        "endTime": "2026-09-18T07:50:45.338Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-18T07:50:43.391Z",
+        "updatedAt": "2026-09-18T07:51:03.641Z"
+      },
+      {
+        "id": "b8574f88-8c93-4d7f-96cb-ba874ffb7862",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-17T18:41:46.609Z",
+        "endTime": "2026-09-18T06:54:37.620Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-17T18:41:47.474Z",
+        "updatedAt": "2026-09-18T07:50:43.721Z"
+      },
+      {
+        "id": "26beaa7b-542d-405c-8093-1608e2a3d137",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-17T12:32:37.175Z",
+        "endTime": "2026-09-17T14:34:57.427Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-17T12:32:37.376Z",
+        "updatedAt": "2026-09-17T14:34:57.857Z"
+      },
+      {
+        "id": "227d7723-768d-456f-80ef-8d4286fc5d0b",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-17T07:27:22.805Z",
+        "endTime": "2026-09-17T08:52:39.140Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-17T07:27:23.033Z",
+        "updatedAt": "2026-09-17T08:52:39.474Z"
+      },
+      {
+        "id": "3dc2468d-7417-408e-8ee1-2be9e14c9204",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-16T22:35:10.089Z",
+        "endTime": "2026-09-17T04:27:15.198Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-16T22:35:10.324Z",
+        "updatedAt": "2026-09-17T04:27:15.356Z"
+      },
+      {
+        "id": "27fdd11c-89df-4315-bc05-88cf16ce626b",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-16T18:43:06.988Z",
+        "endTime": "2026-09-16T22:20:00.000Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-16T18:43:07.184Z",
+        "updatedAt": "2026-09-16T22:33:51.528Z"
+      },
+      {
+        "id": "9d6d339e-78da-4faa-bd3c-c56266ab6cb6",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-16T12:52:49.093Z",
+        "endTime": "2026-09-16T14:19:12.000Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-16T12:52:49.332Z",
+        "updatedAt": "2026-09-16T14:19:12.394Z"
+      },
+      {
+        "id": "53d8062e-3719-4c9c-8dc5-c2a012f65326",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-16T07:30:10.607Z",
+        "endTime": "2026-09-16T09:04:28.614Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-16T07:30:10.882Z",
+        "updatedAt": "2026-09-16T09:04:28.939Z"
+      },
+      {
+        "id": "cae1bcb1-060d-4132-b57f-67329dff2bd5",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-16T01:06:09.070Z",
+        "endTime": "2026-09-16T04:59:10.759Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-16T01:06:09.318Z",
+        "updatedAt": "2026-09-16T04:59:10.960Z"
+      },
+      {
+        "id": "ea03675c-bf23-4076-b03b-58ea31004afd",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-15T18:27:32.277Z",
+        "endTime": "2026-09-16T00:30:00.000Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-15T18:27:32.523Z",
+        "updatedAt": "2026-09-16T01:06:35.109Z"
+      },
+      {
+        "id": "45985957-487f-4902-8ddc-bd07f0183a52",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-15T12:48:49.995Z",
+        "endTime": "2026-09-15T14:33:24.371Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-15T12:48:50.229Z",
+        "updatedAt": "2026-09-15T14:33:24.642Z"
+      },
+      {
+        "id": "e4accfc8-06db-4762-8bf9-b6a32a1d3de8",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-15T07:32:13.195Z",
+        "endTime": "2026-09-15T08:44:38.235Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-15T07:32:13.507Z",
+        "updatedAt": "2026-09-15T08:44:38.652Z"
+      },
+      {
+        "id": "20fcf59d-83f4-4183-8d8c-fa2c00668626",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-14T18:22:00.000Z",
+        "endTime": "2026-09-15T04:53:42.985Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-14T18:27:12.091Z",
+        "updatedAt": "2026-09-15T04:53:43.158Z"
+      },
+      {
+        "id": "fab30f43-a27e-4350-bd8f-ae4e11b2df7e",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-14T12:30:17.825Z",
+        "endTime": "2026-09-14T14:21:33.291Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-14T12:30:18.247Z",
+        "updatedAt": "2026-09-14T14:21:33.612Z"
+      },
+      {
+        "id": "16d7bcf9-1e9e-4463-91f1-fe18656ea3b9",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-14T07:33:01.961Z",
+        "endTime": "2026-09-14T09:01:39.377Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-14T07:33:02.236Z",
+        "updatedAt": "2026-09-14T09:01:39.659Z"
+      },
+      {
+        "id": "485374f1-14c5-4bba-beed-4cbf825ac344",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-13T18:45:11.150Z",
+        "endTime": "2026-09-14T05:14:01.567Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-13T18:45:11.444Z",
+        "updatedAt": "2026-09-14T05:14:01.721Z"
+      },
+      {
+        "id": "74ff2bee-7e5e-4199-91b2-d8bd99f892eb",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-13T13:23:42.810Z",
+        "endTime": "2026-09-13T14:32:07.588Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-13T13:23:43.117Z",
+        "updatedAt": "2026-09-13T14:32:07.863Z"
+      },
+      {
+        "id": "3430267e-0ba6-4a77-acc6-84a85f46ca64",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-13T07:11:31.728Z",
+        "endTime": "2026-09-13T08:41:27.966Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-13T07:11:31.979Z",
+        "updatedAt": "2026-09-13T08:41:28.270Z"
+      },
+      {
+        "id": "381007b9-66c1-48cb-bbd8-1cea4071ece5",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-12T22:42:22.021Z",
+        "endTime": "2026-09-13T04:18:01.544Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-12T22:42:22.284Z",
+        "updatedAt": "2026-09-13T04:18:01.633Z"
+      },
+      {
+        "id": "1a57c383-e0e2-4182-81c3-e1f3003e0f62",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-12T18:04:27.356Z",
+        "endTime": "2026-09-12T22:17:00.000Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-12T18:04:27.664Z",
+        "updatedAt": "2026-09-12T22:23:15.797Z"
+      },
+      {
+        "id": "d3f7ddda-042b-4fff-b14b-6e97a7b4e862",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-12T13:09:34.552Z",
+        "endTime": "2026-09-12T14:16:00.000Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-12T13:09:34.809Z",
+        "updatedAt": "2026-09-12T14:23:32.651Z"
+      },
+      {
+        "id": "c5fb83e0-48b8-41e2-bffd-afe1af2710bb",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-12T07:34:41.339Z",
+        "endTime": "2026-09-12T08:46:59.692Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-12T07:34:41.531Z",
+        "updatedAt": "2026-09-12T08:46:59.912Z"
+      },
+      {
+        "id": "1e106841-52c7-46fa-8ee6-915cbd7b81d4",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-11T18:18:55.578Z",
+        "endTime": "2026-09-12T04:52:27.028Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-11T18:18:55.842Z",
+        "updatedAt": "2026-09-12T04:52:27.218Z"
+      },
+      {
+        "id": "91df3da0-4553-4ed9-a3cc-d680031a624e",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-11T12:21:41.090Z",
+        "endTime": "2026-09-11T13:29:24.123Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-11T12:21:41.363Z",
+        "updatedAt": "2026-09-11T13:29:24.312Z"
+      },
+      {
+        "id": "ee3a2673-a9a6-4a42-89a3-df56f3609f55",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-11T07:23:46.054Z",
+        "endTime": "2026-09-11T08:48:28.308Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-11T07:23:46.341Z",
+        "updatedAt": "2026-09-11T08:48:28.673Z"
+      },
+      {
+        "id": "9c168bde-ad1c-40ef-a116-b6c7fff798ee",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-11T00:11:39.047Z",
+        "endTime": "2026-09-11T05:14:07.466Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-11T00:11:39.358Z",
+        "updatedAt": "2026-09-11T05:14:07.664Z"
+      },
+      {
+        "id": "0b2dac20-9682-47cf-b26c-58f9d733a084",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-10T18:31:38.476Z",
+        "endTime": "2026-09-10T22:21:39.232Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-10T18:31:38.813Z",
+        "updatedAt": "2026-09-10T22:21:39.442Z"
+      },
+      {
+        "id": "550356a9-491c-4645-8ea1-f604c5f7aace",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-10T13:41:00.000Z",
+        "endTime": "2026-09-10T14:53:08.794Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-10T13:47:25.850Z",
+        "updatedAt": "2026-09-10T14:53:09.029Z"
+      },
+      {
+        "id": "7206417d-946a-48fc-a498-654b81bae47e",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-10T11:59:48.656Z",
+        "endTime": "2026-09-10T13:34:23.743Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-10T11:59:49.020Z",
+        "updatedAt": "2026-09-10T13:34:24.047Z"
+      },
+      {
+        "id": "a31415d3-6d59-42ff-a6e9-6903c10cc21a",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-10T06:46:25.771Z",
+        "endTime": "2026-09-10T08:22:30.029Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-10T06:47:35.468Z",
+        "updatedAt": "2026-09-10T08:22:30.289Z"
+      },
+      {
+        "id": "3edd9907-dc99-402c-b669-977f39430395",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-09T18:10:54.596Z",
+        "endTime": "2026-09-10T04:10:00.000Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-09T18:10:54.964Z",
+        "updatedAt": "2026-09-10T06:47:35.795Z"
+      },
+      {
+        "id": "4c15f704-76b5-4837-9fc2-56442ef0bdd5",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-09T11:51:56.541Z",
+        "endTime": "2026-09-09T13:49:12.238Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-09T11:51:56.832Z",
+        "updatedAt": "2026-09-09T13:49:12.570Z"
+      },
+      {
+        "id": "f928d1bc-e2d2-4016-87d3-3f155ab76891",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-09T07:07:14.725Z",
+        "endTime": "2026-09-09T08:12:48.590Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-09T07:07:15.021Z",
+        "updatedAt": "2026-09-09T08:12:48.887Z"
+      },
+      {
+        "id": "eb7136d0-4be9-4c3e-9f92-3d91740f5848",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-08T23:42:40.580Z",
+        "endTime": "2026-09-09T04:39:11.872Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-08T23:42:40.913Z",
+        "updatedAt": "2026-09-09T04:39:12.016Z"
+      },
+      {
+        "id": "17ad7248-961d-464e-85db-e6c657654977",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-08T18:16:15.280Z",
+        "endTime": "2026-09-08T22:30:00.000Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-08T18:16:15.592Z",
+        "updatedAt": "2026-09-08T22:34:42.701Z"
+      },
+      {
+        "id": "761967cb-af22-42f2-8750-01fb2a4d34e1",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-08T12:22:27.989Z",
+        "endTime": "2026-09-08T14:31:10.616Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-08T12:22:28.282Z",
+        "updatedAt": "2026-09-08T14:31:10.883Z"
+      },
+      {
+        "id": "18619a1a-841b-45e8-b384-e4cc6fdee8aa",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-08T06:49:48.685Z",
+        "endTime": "2026-09-08T08:18:54.308Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-08T06:49:48.906Z",
+        "updatedAt": "2026-09-08T08:18:54.545Z"
+      },
+      {
+        "id": "e571cd12-c077-49bb-a915-9fb6fcdc782e",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-07T18:02:39.100Z",
+        "endTime": "2026-09-08T04:00:00.000Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-07T18:02:39.424Z",
+        "updatedAt": "2026-09-08T04:44:50.155Z"
+      },
+      {
+        "id": "394eb2b6-4d5b-4901-ab75-21fb0c3e9cc7",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-07T12:03:05.277Z",
+        "endTime": "2026-09-07T14:04:33.942Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-07T12:03:05.654Z",
+        "updatedAt": "2026-09-07T14:04:34.270Z"
+      },
+      {
+        "id": "0820258c-880a-4f3b-abd5-f993c647dd89",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-07T06:51:18.889Z",
+        "endTime": "2026-09-07T08:00:58.476Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-07T06:51:19.075Z",
+        "updatedAt": "2026-09-07T08:00:58.735Z"
+      },
+      {
+        "id": "a25b6c0e-2fef-4712-b55c-0f982a26fc5c",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-06T18:37:49.818Z",
+        "endTime": "2026-09-07T04:30:00.000Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-06T18:37:50.043Z",
+        "updatedAt": "2026-09-07T06:52:14.301Z"
+      },
+      {
+        "id": "081b8597-9f8d-4d47-b45d-facd610ae5c0",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-06T12:43:00.000Z",
+        "endTime": "2026-09-06T15:21:00.000Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-06T12:43:33.725Z",
+        "updatedAt": "2026-09-06T18:38:10.007Z"
+      },
+      {
+        "id": "a3209ebb-2de9-48e6-a4d1-4aec6ca033e7",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-06T06:57:13.357Z",
+        "endTime": "2026-09-06T07:58:32.075Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-06T06:57:13.575Z",
+        "updatedAt": "2026-09-06T07:58:32.364Z"
+      },
+      {
+        "id": "a6ddcc81-6420-4804-b07f-eed81f79b482",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-05T18:18:54.075Z",
+        "endTime": "2026-09-06T03:59:11.016Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-05T18:18:54.283Z",
+        "updatedAt": "2026-09-06T03:59:11.139Z"
+      },
+      {
+        "id": "1fef5b98-6340-4b15-b409-ba346cffa16d",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-05T12:39:54.025Z",
+        "endTime": "2026-09-05T14:22:32.646Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-05T12:39:59.776Z",
+        "updatedAt": "2026-09-05T14:22:32.884Z"
+      },
+      {
+        "id": "fba7e6db-8faf-4cd4-b180-a990636e4882",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-05T06:24:27.873Z",
+        "endTime": "2026-09-05T08:24:01.314Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-05T06:24:28.056Z",
+        "updatedAt": "2026-09-05T08:24:01.579Z"
+      },
+      {
+        "id": "25d5d7ff-f6ae-4ba2-bf1e-989d06a678a0",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-04T18:30:26.700Z",
+        "endTime": "2026-09-05T03:45:07.789Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-04T18:30:27.137Z",
+        "updatedAt": "2026-09-05T03:45:07.889Z"
+      },
+      {
+        "id": "6583ba2a-dc94-4fa3-9c67-425c875cd1ee",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-04T12:26:46.922Z",
+        "endTime": "2026-09-04T14:13:19.235Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-04T12:26:47.219Z",
+        "updatedAt": "2026-09-04T14:13:19.601Z"
+      },
+      {
+        "id": "38d69e62-b482-403a-86f3-ac6dba78a5b5",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-04T07:09:11.923Z",
+        "endTime": "2026-09-04T08:51:17.955Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-04T07:09:12.193Z",
+        "updatedAt": "2026-09-04T08:51:18.234Z"
+      },
+      {
+        "id": "4ce35290-aa37-4fc0-b4e6-5dc990c91cd1",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-03T23:20:44.249Z",
+        "endTime": "2026-09-04T04:35:52.017Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-03T23:20:44.518Z",
+        "updatedAt": "2026-09-04T04:35:52.264Z"
+      },
+      {
+        "id": "94f60813-94e9-4547-aa24-ccf1bfca79a0",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-03T18:10:01.010Z",
+        "endTime": "2026-09-03T22:50:00.000Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-03T18:10:01.290Z",
+        "updatedAt": "2026-09-03T23:18:22.296Z"
+      },
+      {
+        "id": "50f24b48-a515-4122-b4fd-5f77bc501682",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-03T12:27:00.000Z",
+        "endTime": "2026-09-03T13:36:00.000Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-03T13:50:53.404Z",
+        "updatedAt": "2026-09-03T13:51:13.396Z"
+      },
+      {
+        "id": "fea28580-c5b2-4e04-88f4-24651ca97200",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-03T07:07:08.725Z",
+        "endTime": "2026-09-03T09:22:09.035Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-03T07:07:09.057Z",
+        "updatedAt": "2026-09-03T09:22:09.366Z"
+      },
+      {
+        "id": "767e30cd-922d-443a-b8a6-609121e8bfd9",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-02T18:15:39.051Z",
+        "endTime": "2026-09-03T04:48:57.162Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-02T18:15:39.580Z",
+        "updatedAt": "2026-09-03T04:48:57.375Z"
+      },
+      {
+        "id": "a2351b9a-e474-4313-bf93-c9261b110375",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-02T12:40:38.354Z",
+        "endTime": "2026-09-02T13:58:57.679Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-02T12:40:38.643Z",
+        "updatedAt": "2026-09-02T13:58:57.983Z"
+      },
+      {
+        "id": "29c51c25-2f09-4c10-bbec-ceae145c4432",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-02T07:03:18.950Z",
+        "endTime": "2026-09-02T09:41:00.000Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-02T07:03:19.226Z",
+        "updatedAt": "2026-09-02T09:41:45.592Z"
+      },
+      {
+        "id": "b7d61cf0-19fd-4e05-8520-78cd5817f35f",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-02T01:48:39.788Z",
+        "endTime": "2026-09-02T04:29:00.000Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-02T01:48:40.003Z",
+        "updatedAt": "2026-09-02T04:38:10.216Z"
+      },
+      {
+        "id": "f94ae1bd-eb65-4896-9b9e-fccd1ae93d23",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-02T00:25:22.506Z",
+        "endTime": "2026-09-02T00:45:00.000Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-02T00:25:22.693Z",
+        "updatedAt": "2026-09-02T01:03:53.322Z"
+      },
+      {
+        "id": "ceae2128-63ac-4f19-983b-7d0d194cb9f4",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-01T18:16:15.490Z",
+        "endTime": "2026-09-01T23:18:00.000Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-01T18:16:15.777Z",
+        "updatedAt": "2026-09-01T23:42:35.158Z"
+      },
+      {
+        "id": "d9ef8261-1fa9-4b43-a1f5-57265444a6a7",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-01T11:46:27.640Z",
+        "endTime": "2026-09-01T14:20:04.939Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-01T11:46:27.933Z",
+        "updatedAt": "2026-09-01T14:20:05.203Z"
+      },
+      {
+        "id": "e4aaeec1-5b0e-4709-85b5-89ef04c367ff",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-09-01T07:06:44.191Z",
+        "endTime": "2026-09-01T08:18:00.193Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-01T07:06:44.447Z",
+        "updatedAt": "2026-09-01T08:18:00.478Z"
+      },
+      {
+        "id": "55420d05-30db-4182-ba1f-ad7aa6d2b5f3",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-31T18:24:01.660Z",
+        "endTime": "2026-09-01T04:27:09.675Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-31T18:24:01.931Z",
+        "updatedAt": "2026-09-01T04:27:09.747Z"
+      },
+      {
+        "id": "d361bbf1-3347-4cfb-9ee9-cb23c2229857",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-31T12:40:49.652Z",
+        "endTime": "2026-08-31T14:30:10.611Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-31T12:40:49.962Z",
+        "updatedAt": "2026-08-31T14:30:10.867Z"
+      },
+      {
+        "id": "6e39427f-2558-4b8a-86c4-cf40df15e021",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-31T07:07:45.228Z",
+        "endTime": "2026-08-31T09:42:30.394Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-31T07:07:45.446Z",
+        "updatedAt": "2026-08-31T09:42:30.691Z"
+      },
+      {
+        "id": "8af73413-b0e0-40fc-b97e-7bd9e1fe4575",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-30T18:25:21.072Z",
+        "endTime": "2026-08-31T04:08:55.736Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-30T18:25:21.257Z",
+        "updatedAt": "2026-08-31T04:08:55.829Z"
+      },
+      {
+        "id": "134c5c63-4bf5-47c3-a65d-d07e5ca3dbe5",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-30T11:58:18.995Z",
+        "endTime": "2026-08-30T14:31:04.736Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-30T11:58:19.198Z",
+        "updatedAt": "2026-08-30T14:31:04.980Z"
+      },
+      {
+        "id": "55b9d724-8e72-4fd7-aa05-973d1cca1d9c",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-30T07:07:04.120Z",
+        "endTime": "2026-08-30T08:12:35.312Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-30T07:07:04.407Z",
+        "updatedAt": "2026-08-30T08:12:35.575Z"
+      },
+      {
+        "id": "78430d5d-73c8-49bf-b605-f1307e338e78",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-29T18:14:29.402Z",
+        "endTime": "2026-08-30T03:29:00.000Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-29T18:14:29.594Z",
+        "updatedAt": "2026-08-30T04:09:21.701Z"
+      },
+      {
+        "id": "34a75905-30f1-4bb1-8b9b-9bd40d91d227",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-29T12:50:16.924Z",
+        "endTime": "2026-08-29T13:55:47.118Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-29T12:50:17.142Z",
+        "updatedAt": "2026-08-29T13:55:47.389Z"
+      },
+      {
+        "id": "ea1f23e6-74c6-4cea-b469-7b32466c88dd",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-29T07:17:46.757Z",
+        "endTime": "2026-08-29T09:20:00.000Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-29T07:17:46.962Z",
+        "updatedAt": "2026-08-29T12:50:36.635Z"
+      },
+      {
+        "id": "b4a6d011-3de9-47bf-b668-049921769c61",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-28T18:34:27.948Z",
+        "endTime": "2026-08-29T04:03:00.000Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-28T18:34:28.147Z",
+        "updatedAt": "2026-08-29T05:47:34.709Z"
+      },
+      {
+        "id": "fa63e471-2d38-48f4-a439-c5a6ad97f276",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-28T12:22:46.298Z",
+        "endTime": "2026-08-28T14:32:50.480Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-28T12:22:46.511Z",
+        "updatedAt": "2026-08-28T14:32:50.758Z"
+      },
+      {
+        "id": "e93efd61-6b76-4cd2-a8e2-52cff29e71c4",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-28T07:49:28.750Z",
+        "endTime": "2026-08-28T08:47:15.644Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-28T07:49:28.946Z",
+        "updatedAt": "2026-08-28T08:47:15.862Z"
+      },
+      {
+        "id": "981bdb63-3f7b-4a58-8277-25c17e11729c",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-28T03:25:00.000Z",
+        "endTime": "2026-08-28T05:22:04.632Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-28T03:37:20.492Z",
+        "updatedAt": "2026-08-28T05:22:04.861Z"
+      },
+      {
+        "id": "fc8a4670-b9e7-4323-b043-2faa3ab733bb",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-27T18:05:41.759Z",
+        "endTime": "2026-08-28T03:09:00.000Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-27T18:05:42.022Z",
+        "updatedAt": "2026-08-28T03:37:47.947Z"
+      },
+      {
+        "id": "e4b0a072-2039-423c-9106-11022daec8b2",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-27T12:04:37.470Z",
+        "endTime": "2026-08-27T14:16:34.965Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-27T12:04:37.741Z",
+        "updatedAt": "2026-08-27T14:16:35.183Z"
+      },
+      {
+        "id": "65c91d25-cac5-4f18-80a8-363f390dc5c2",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-27T07:27:20.248Z",
+        "endTime": "2026-08-27T08:39:27.666Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-27T07:27:20.547Z",
+        "updatedAt": "2026-08-27T08:39:27.916Z"
+      },
+      {
+        "id": "d306cd50-75a0-405e-a1bb-6f0adda522cf",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-26T18:09:08.824Z",
+        "endTime": "2026-08-27T04:51:21.415Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-26T18:09:09.085Z",
+        "updatedAt": "2026-08-27T04:51:21.509Z"
+      },
+      {
+        "id": "b991479d-d69d-4f5f-9483-6fb3e4e7a0a6",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-26T12:35:05.030Z",
+        "endTime": "2026-08-26T14:00:02.719Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-26T12:35:05.260Z",
+        "updatedAt": "2026-08-26T14:00:02.984Z"
+      },
+      {
+        "id": "39915760-fb4f-4559-8196-aa0219a8d89e",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-26T07:12:58.910Z",
+        "endTime": "2026-08-26T08:31:23.743Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-26T07:12:59.148Z",
+        "updatedAt": "2026-08-26T08:31:23.976Z"
+      },
+      {
+        "id": "25759cc2-5117-4bf6-a202-a7255f60607a",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-25T18:28:47.151Z",
+        "endTime": "2026-08-26T04:39:01.773Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-25T18:28:47.414Z",
+        "updatedAt": "2026-08-26T04:39:01.926Z"
+      },
+      {
+        "id": "7b66c8b4-d6cb-44a2-b0c5-4416fed010b2",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-25T11:46:00.000Z",
+        "endTime": "2026-08-25T14:31:37.265Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-25T11:48:25.477Z",
+        "updatedAt": "2026-08-25T14:31:37.539Z"
+      },
+      {
+        "id": "ab5ca658-a01f-4594-94dd-59ae778d75ea",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-25T07:00:58.335Z",
+        "endTime": "2026-08-25T07:47:00.000Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-25T07:00:58.582Z",
+        "updatedAt": "2026-08-25T07:59:02.572Z"
+      },
+      {
+        "id": "6f7d4c50-2d22-46a1-b920-5c9e4ab45b7e",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-25T01:47:00.000Z",
+        "endTime": "2026-08-25T04:24:53.525Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-25T01:49:34.858Z",
+        "updatedAt": "2026-08-25T04:24:53.645Z"
+      },
+      {
+        "id": "8616f8fd-e77f-4ad4-b8a5-abdeaa6463d0",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-24T18:21:21.406Z",
+        "endTime": "2026-08-25T01:20:00.000Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-24T18:21:21.763Z",
+        "updatedAt": "2026-08-25T01:49:32.879Z"
+      },
+      {
+        "id": "7e3c6b58-c556-4c08-bcb8-b2a66fbd830c",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-24T12:33:00.000Z",
+        "endTime": "2026-08-24T14:25:00.000Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-24T14:32:44.002Z",
+        "updatedAt": "2026-08-24T14:34:06.494Z"
+      },
+      {
+        "id": "db46de78-1a7e-4e32-83f6-4c0e5b7da56b",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-24T07:16:00.000Z",
+        "endTime": "2026-08-24T08:44:56.706Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-24T07:12:09.197Z",
+        "updatedAt": "2026-08-24T08:44:57.005Z"
+      },
+      {
+        "id": "b529bb6b-9201-4658-b757-281e5fa76668",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-23T18:33:00.000Z",
+        "endTime": "2026-08-24T04:31:57.207Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-23T19:23:05.645Z",
+        "updatedAt": "2026-08-24T04:31:57.352Z"
+      },
+      {
+        "id": "7eec4679-2f87-4805-991c-7acf523c589a",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-23T12:19:15.500Z",
+        "endTime": "2026-08-23T13:19:29.576Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-23T12:19:15.685Z",
+        "updatedAt": "2026-08-23T13:19:30.045Z"
+      },
+      {
+        "id": "db8ceb88-e455-4c66-8ba6-6b312406ff98",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-23T06:54:01.445Z",
+        "endTime": "2026-08-23T08:11:30.918Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-23T06:54:01.731Z",
+        "updatedAt": "2026-08-23T08:11:31.184Z"
+      },
+      {
+        "id": "dd4e6720-b4c1-40fa-89ab-11a0d310d435",
+        "childId": "child_legacy_fam_9daa5fe46e2b4040907cd3faa58c95dc",
+        "startTime": "2026-08-22T18:00:00.000Z",
+        "endTime": "2026-08-23T04:04:48.157Z",
+        "note": "",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-23T00:07:52.137Z",
+        "updatedAt": "2026-08-23T04:04:48.276Z"
+      }
+    ]
+  }
+}
