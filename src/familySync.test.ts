@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { clearLocalDiary, createFamily, flushPending, getSyncStore, isEmptyStarterData, leaveFamily, makeOperations, mergeRemote, pullRemote, reconcileAccountFamily, resolveSyncConflict, saveLocalData } from './familySync'
+import { clearLocalDiary, createFamily, flushPending, getFamilyReplacementReadiness, getSyncStore, isEmptyStarterData, leaveFamily, makeOperations, mergeRemote, pullRemote, reconcileAccountFamily, resolveSyncConflict, saveLocalData } from './familySync'
 import { DataStorageError, STORAGE_KEY, createDefaultData, loadData, loadSafetyBackup, saveSafetyBackup } from './storage'
 import { API_TIMEOUT_MS } from './apiTransport'
 import type { AppData, ChildProfile, SleepSession } from './types'
@@ -424,6 +424,7 @@ describe('Family Sync offline queue', () => {
 
     expect(getSyncStore().pending).toHaveLength(1)
     expect(getSyncStore().pending[0]).toMatchObject({ method: 'POST', path: '/v1/sessions', sessionId: 'offline-sleep' })
+    expect(getFamilyReplacementReadiness()).toMatchObject({ scope: 'family', ready: false, reason: 'offline' })
 
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true, data: { revision: 2, session: null } }), {
       status: 200,
@@ -431,11 +432,13 @@ describe('Family Sync offline queue', () => {
     }))
     Object.defineProperty(globalThis, 'fetch', { configurable: true, value: fetchMock })
     online = true
+    expect(getFamilyReplacementReadiness()).toMatchObject({ scope: 'family', ready: false, reason: 'pending' })
 
     await flushPending()
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(getSyncStore().pending).toEqual([])
+    expect(getFamilyReplacementReadiness()).toMatchObject({ scope: 'family', ready: true })
   })
 
   it('creates operations only for the child whose data changed', () => {

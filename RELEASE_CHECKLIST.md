@@ -1,6 +1,6 @@
 # Solemi Sleep — belső verziótól a kiadásig
 
-Utolsó frissítés: 2026-09-22
+Utolsó frissítés: 2026-09-23
 
 Ez az operatív lista a `SOLEMI_EXECUTION_PLAN.md` és a `SOLEMI_MASTER_ROADMAP.md` kiadási pontjait rendezi végrehajtási sorrendbe.
 
@@ -16,7 +16,7 @@ vagy kifejezett, indokolt termékdöntés kell; a puszta priorizálás nem lezá
 
 - [x] A01 — Sérült helyi napló megőrzése, automatikus felülírás megakadályozása. 195/195 teszt, typecheck és két build sikeres.
 - [x] A02 — Többlapos mentés, quota/crash és tartós napló–outbox egység. Egyetlen böngészőlap írhat; az atomi helyi envelope, hibainjektálás és kétlapos átvételi próba sikeres (198/198 teszt).
-- [ ] A03 — Import/törlés családi hatása és visszaállítható biztonsági mentés. Implementáció, commit/push, staging Worker/Pages build és javított smoke kész; a kéttelefonos import/törlés/offline/pending/restore elfogadás folyamatban.
+- [ ] A03 — Import/törlés családi hatása és visszaállítható biztonsági mentés. Implementáció, commit/push, staging Worker/Pages build és javított smoke kész. 2026-09-23-án két fiókkal Chrome+Edge alatt a szinkron, a csak Chrome-ot érintő helyi törlés és újracsatlakozás sikeres volt; mindkét oldalról export készült. A családi importelőnézet 0, majd egy tesztalvás után 1 törlést jelzett; az import mindkét oldalon 1800-ról 1799-re vitt. Az Edge 1800-as import előtti pontjából a családi visszaállítás mindkét oldalon újra 1800-at eredményezett, majd a tesztalvás törlésével a napló visszaállt 1799-re. A családi törlés előnézete/adminhatára helyes. Chrome-lapon emulált offline állapotban a helyi tesztalvás megmaradt, a családi importot a rendszer elutasította, online állapotban a módosítás mindkét böngészőre felment, majd törléssel visszaállt a 1799-es állapot. Az online, de még pending importgátat célzott teszt igazolja (29/29, typecheck sikeres); külön kézi próba nincs. Tényleges családi törlés kis staging családon vagy ellenőrzött szerveres restore mellett még nyitott.
 - [ ] A04 — Valódi account-szintű családi kilépés, pending adatok védelme. Implementáció, regresszió és `3114711` commit/push kész: külön eszközleválasztás/újracsatlakozás, account-kilépés, választható vagy automatikus adminátadás, utolsó tag blokkolása, régi device-tokenek visszavonása és utolsó fizető utáni pause. Staging kétaccountos elfogadás hiányzik.
 - [ ] A05 — Fiókváltás/guest kapcsolat és helyi adatok elkülönítése. Implementáció, regresszió és `3665d25` commit/push kész: accountonként külön diary+sync workspace, explicit vendégnapló-átvétel, kijelentkezéskori megtartás/törlés, pending megőrzés, többtabos írózár, quota- és crash-helyreállítás. Staging A→logout→B/guest elfogadás hiányzik.
 - [ ] A06 — Legacy API fizetős sync-megkerülés lezárása, kompatibilis átállás. Implementáció, regresszió és `eac16ef` commit/push kész: enforcement mellett kötelező account+device+membership+családi entitlement; atomi, fizetős accountos családlétrehozás; raw legacy create/join/sync és invite tiltás; meglévő család adatvesztés nélküli claimje. Staging build és kézi elfogadás nincs rögzítve.

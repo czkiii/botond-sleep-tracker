@@ -1,10 +1,10 @@
 # Solemi Sleep — Codex projektállapot
 
-**Utolsó frissítés:** 2026-09-22
+**Utolsó frissítés:** 2026-09-23
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
 **Teljes audit alapja:** `e9374f4` (`Add verified store billing foundation`); az akkori helyi origin-refhez képest 0 ahead / 0 behind.
-**Ellenőrzött HEAD:** `1b59031` (`Restore family sync routes through secure proxy`). A munkafa a következő javítás előtt tiszta volt. A tulajdonos további mobilpróbájában Family+ előnézet mellett a Családi megosztás tévesen Family-jogosultságot kért; az induláskori account/entitlement ellenőrzés helyi javítása munkafában van, commit/push/deploy nélkül. Az A03–A06 kéttelefonos elfogadása továbbra is nyitott.
+**Ellenőrzött HEAD:** `03190aa` a `feat/child-profile-v4` ágon; a 2026-09-23-i teszt előtt a munkafa tiszta volt. A két Google-fiókos Chrome+Edge staging próba igazolta a családi alvás indításának, leállításának és törlésének szinkronját, továbbá a helyi törlés elkülönített hatását és az eszköz újracsatlakozását. Az A03 teljes elfogadása továbbra is nyitott.
 
 ## Legfrissebb checkpoint — A03–A06 staging elfogadás, A07 helyi előkészítés
 
@@ -14,6 +14,9 @@
 - A helyi törlés egy atomi helyi írással leválasztja az eszközt és törli a naplót, cloud törlést nem képez. A családi törlés D1 batchben tombstone-olja a közös gyermek- és alvásadatokat, majd üres kezdőprofilt hoz létre. Törlés után rejtett safety backup nem marad; import/restore előtt igen.
 - Az A03 commit/push megtörtént. A `6675fe2` Worker- és Pages-buildje sikeres; a régi smoke szkript revízió nélküli módosításai miatt bukott, amit a `c9d5af9` javított. A frissített smoke helyben a staging Worker ellen minden ponton átment.
 - **A03 még nem lezárt:** a kéttelefonos import/törlés/offline/pending/restore elfogadás folyamatban van. Éles környezet nem változott.
+- **2026-09-23, részleges kétböngészős staging elfogadás:** Edge-ben az admin és Chrome-ban a második családtag ugyanazt a Boti-profilt és 1799 alvást látta. Külön néven mindkét böngészőből export készült. Az alvás indítása, leállítása és törlése mindkét oldalon szinkronizált. Chrome-ban a helyi törlés után üres, leválasztott napló látszott, Edge-ben a családi 1799 alvás változatlan maradt. Chrome-ban az eszköz újracsatlakoztatása visszahozta Botit és az 1799 alvást; az átmeneti Névtelen profil eltűnt. A régi Edge-export importelőnézete változatlan naplón 0 eltérést, majd egy új tesztalvás után pontosan 1 törlést jelzett. A családi import után mindkét böngésző 1799 alvást mutatott; az Edge-en előtte készült 1800-as visszaállítási ponttal mindkét oldalon újra 1800 lett. A tesztalvás végső törlése után mindkét böngésző visszaállt 1799-re. A családi törlés előnézete helyesen 1799 alvás és Boti törlését, egy új kezdőprofil létrehozását, minden eszközre kiterjedő hatást, külön exportot és pontos családnév-megerősítést mutatott; a tagi Chrome-ban nem volt családi törlés gomb. A tényleges családi törlés még nyitott. A Chrome-ban őrzött 0 alvásos automatikus visszaállítási pontot nem szabad a családi naplóra alkalmazni.
+- **2026-09-23, Chrome DevTools offline próba:** a Chrome-lap önálló Offline módjában egy helyi tesztalvás 1800-ra növelte a Chrome naplóját, míg az online Edge 1799-en maradt. Az offline családi importot az app „internetkapcsolat szükséges; a napló nem változott” üzenettel megállította. A Chrome hálózatának visszaállítása után a függő módosítás feltöltődött, mindkét böngésző 1800-at és friss szinkront mutatott; a tesztalvás törlése után mindkettő ismét 1799-et. Az offline tiltás és queue-flush elfogadva, de a külön, **online és még pending** állapotban végzett import-/törlésgát tesztje nyitott.
+- A meglévő offline queue regressziót kiegészítettük azzal, hogy ugyanaz a családi adatcsere-védelem offline állapotban `offline`, a hálózat visszatérése után, de még ki nem ürült outbox mellett `pending`, sikeres flush után pedig `ready` állapotot ad. A célzott 29/29 teszt és a frontend typecheck sikeres; a külön online-pending **kézi** próba még nincs rögzítve.
 - **A13–A14 commit/push kész:** a `c5ccd23` tartalmazza az aktív alvás jegyzetének/típusának atomi indítását és az utolsó gyermek párhuzamos törlésének védelmét. Staging telefonos regresszió még nincs rögzítve.
 - **A04 commit/push kész (`3114711`):** az eszközleválasztás és az account-szintű családi kilépés külön művelet. Függő módosítás, konfliktus, sérült sync-állapot vagy offline helyzet nem dobható el csendben; sikertelen szerveres leválasztás megtartja a kapcsolatot. A leválasztott eszköz újratöltéskor nem csatlakozik vissza automatikusan, de külön gombbal újracsatlakoztatható.
 - Account-kilépéskor minden account-owned legacy családi eszköz visszavonódik, a membership history `LEFT` állapotban megmarad, és a helyi napló a telefonon marad. Admin előbb választhat utódot; választás nélkül a legrégebbi aktív tag kapja az adminjogot. Az utolsó tag csak a külön családmegszüntetési folyamaton távozhat. Az utolsó fizető kilépése a syncet szünetelteti, az adatot nem törli.
@@ -561,10 +564,17 @@ auditkapu az irányadó, különösen az adatmegőrzési és hozzáférési hib�
 
 ## Következő konkrét feladat
 
-A `1b59031` utáni induláskori jogosultság-javítás tulajdonosi commit/pushja és
-staging Pages buildje szükséges. Ezután a meglévő családi napló visszatöltését
-és a kéttelefonos szinkront kell ellenőrizni. Az A03–A06
-kéttelefonos, bejelentkezett staging elfogadása továbbra is nyitott.
+Az A03 tényleges családi törlését kis, elkülönített staging családon vagy ellenőrzött
+szerveres restore mellett kell kipróbálni. A jelenlegi 1799 alvásos család exportjának
+visszatöltése nem egy atomi szerveres rollback: a kliens külön sync műveleteket képez
+a bejegyzésekhez, ezért az export önmagában nem elég garancia egy teljes törléses
+próbához. A Cloudflare D1 Time Travel elvileg szerveres visszaállítási út, de a
+2026-09-23-i olvasási staging D1-info próba lejárt/érvénytelen Wrangler OAuth-token
+miatt `Authentication error [code: 10000]` hibát kapott; a konkrét staging DB
+visszaállítási képessége nincs igazolva. Következő kapu: az A03 tényleges családi
+törlés elkülönített staging próbája, ehhez a staging D1 hitelesítés és igazolt
+rollback szükséges. A külön online-pending kézi gát és az A04–A06 kétfiókos
+staging elfogadása szintén nyitott.
 A valódi éles host, Worker, OAuth és cookie-környezet kialakításához külön
 kiadási döntés és kézi iOS-próba kell.
 
