@@ -4,7 +4,7 @@
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
 **Teljes audit alapja:** `e9374f4` (`Add verified store billing foundation`); az akkori helyi origin-refhez képest 0 ahead / 0 behind.
-**Ellenőrzött HEAD:** `d090ad8` (`Record A03 staging results and verify pending sync guard`) a `feat/child-profile-v4` ágon. A két Google-fiókos Chrome+Edge staging próba igazolta a családi alvás indításának, leállításának és törlésének szinkronját, a helyi törlés/újracsatlakozás hatását, valamint az import/restore és offline queue működését. Az A03 teljes elfogadása továbbra is nyitott.
+**Ellenőrzött HEAD:** `b08cd41` a `feat/child-profile-v4` ágon. A két Google-fiókos Chrome+Edge staging próba igazolta a családi alvás indításának, leállításának és törlésének szinkronját, a helyi törlés/újracsatlakozás hatását, valamint az import/restore és offline queue működését. A staging D1 teljes SQL-exportja helyi visszatöltéssel ellenőrzött; az A03 teljes elfogadása továbbra is nyitott.
 
 ## Legfrissebb checkpoint — A03–A06 staging elfogadás, A07 helyi előkészítés
 
@@ -14,6 +14,7 @@
 - A helyi törlés egy atomi helyi írással leválasztja az eszközt és törli a naplót, cloud törlést nem képez. A családi törlés D1 batchben tombstone-olja a közös gyermek- és alvásadatokat, majd üres kezdőprofilt hoz létre. Törlés után rejtett safety backup nem marad; import/restore előtt igen.
 - Az A03 commit/push megtörtént. A `6675fe2` Worker- és Pages-buildje sikeres; a régi smoke szkript revízió nélküli módosításai miatt bukott, amit a `c9d5af9` javított. A frissített smoke helyben a staging Worker ellen minden ponton átment.
 - **A03 még nem lezárt:** a kéttelefonos import/törlés/offline/pending/restore elfogadás folyamatban van. Éles környezet nem változott.
+- **Elkülönített törlési próba előfeltétele:** a két jelenlegi tesztfiók átköltöztetése még nem biztonságos visszaút nélkül. Az utolsó tag nem hagyhatja el az új családot a még hiányzó családmegszüntetési folyamat nélkül. Az Opo család 1799 alvását és a feleség telefonjának tagságát megtartjuk; a staging D1 mentési ellenőrzését és a tesztfiók-korlátot a [STAGING_D1_RECOVERY_2026-09-23.md](STAGING_D1_RECOVERY_2026-09-23.md) rögzíti.
 - **2026-09-23, részleges kétböngészős staging elfogadás:** Edge-ben az admin és Chrome-ban a második családtag ugyanazt a Boti-profilt és 1799 alvást látta. Külön néven mindkét böngészőből export készült. Az alvás indítása, leállítása és törlése mindkét oldalon szinkronizált. Chrome-ban a helyi törlés után üres, leválasztott napló látszott, Edge-ben a családi 1799 alvás változatlan maradt. Chrome-ban az eszköz újracsatlakoztatása visszahozta Botit és az 1799 alvást; az átmeneti Névtelen profil eltűnt. A régi Edge-export importelőnézete változatlan naplón 0 eltérést, majd egy új tesztalvás után pontosan 1 törlést jelzett. A családi import után mindkét böngésző 1799 alvást mutatott; az Edge-en előtte készült 1800-as visszaállítási ponttal mindkét oldalon újra 1800 lett. A tesztalvás végső törlése után mindkét böngésző visszaállt 1799-re. A családi törlés előnézete helyesen 1799 alvás és Boti törlését, egy új kezdőprofil létrehozását, minden eszközre kiterjedő hatást, külön exportot és pontos családnév-megerősítést mutatott; a tagi Chrome-ban nem volt családi törlés gomb. A tényleges családi törlés még nyitott. A Chrome-ban őrzött 0 alvásos automatikus visszaállítási pontot nem szabad a családi naplóra alkalmazni.
 - **2026-09-23, Chrome DevTools offline próba:** a Chrome-lap önálló Offline módjában egy helyi tesztalvás 1800-ra növelte a Chrome naplóját, míg az online Edge 1799-en maradt. Az offline családi importot az app „internetkapcsolat szükséges; a napló nem változott” üzenettel megállította. A Chrome hálózatának visszaállítása után a függő módosítás feltöltődött, mindkét böngésző 1800-at és friss szinkront mutatott; a tesztalvás törlése után mindkettő ismét 1799-et. Az offline tiltás és queue-flush elfogadva, de a külön, **online és még pending** állapotban végzett import-/törlésgát tesztje nyitott.
 - A meglévő offline queue regressziót kiegészítettük azzal, hogy ugyanaz a családi adatcsere-védelem offline állapotban `offline`, a hálózat visszatérése után, de még ki nem ürült outbox mellett `pending`, sikeres flush után pedig `ready` állapotot ad. A célzott 29/29 teszt és a frontend typecheck sikeres; a külön online-pending **kézi** próba még nincs rögzítve.
@@ -564,16 +565,15 @@ auditkapu az irányadó, különösen az adatmegőrzési és hozzáférési hib�
 
 ## Következő konkrét feladat
 
-Az A03 tényleges családi törlését kis, elkülönített staging családon vagy ellenőrzött
-szerveres restore mellett kell kipróbálni. A jelenlegi 1799 alvásos család exportjának
-visszatöltése nem egy atomi szerveres rollback: a kliens külön sync műveleteket képez
-a bejegyzésekhez, ezért az export önmagában nem elég garancia egy teljes törléses
-próbához. A 2026-09-23-i lejárt Wrangler OAuth-belépést a tulajdonos megújította;
-utána a `solemi-sleep-db-staging` D1-info és az aktuális Time Travel könyvjelző
-csak olvasási lekérdezése sikeres volt. A konkrét staging DB **visszaállítása
-nem volt kipróbálva**. Következő kapu: az A03 tényleges családi törlés
-elkülönített staging próbája, előtte export és igazolt rollback. A külön
-online-pending kézi gát és az A04–A06 kétfiókos staging elfogadása is nyitott.
+Az A03 tényleges családi törlését kis, elkülönített staging családon kell
+kipróbálni. A jelenlegi 1799 alvásos család exportjának visszatöltése nem atomi
+szerveres rollback; a D1 Time Travel az egész, több családot tartalmazó staging
+adatbázist visszatekerné. A [STAGING_D1_RECOVERY_2026-09-23.md](STAGING_D1_RECOVERY_2026-09-23.md)
+rögzíti a megújított Wrangler-belépést, a teljes SQL-exportot, a sikeres helyi
+visszatöltést, a 0 idegenkulcs-hibát és a vizsgált család 1799 aktív alvását.
+**Távoli D1 restore nem történt.** Következő kapu: kis staging tesztcsaládon
+az A03 családi törlés és újraimport kézi próbája. A külön online-pending kézi
+gát és az A04–A06 kétfiókos staging elfogadása is nyitott.
 A valódi éles host, Worker, OAuth és cookie-környezet kialakításához külön
 kiadási döntés és kézi iOS-próba kell.
 

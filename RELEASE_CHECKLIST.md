@@ -38,7 +38,7 @@ vagy kifejezett, indokolt termékdöntés kell; a puszta priorizálás nem lezá
 - [ ] A22 — Telefonos teljesítményprofil, másodpercenkénti elemzés újraszámolás rendezése.
 - [ ] A23 — Terv–funkciómátrix–ár/paywall ígéretek tételes lezárása a tulajdonossal.
 - [ ] A24 — Lockfile, CI-hez kötött release, pontos SHA és PWA upgrade.
-- [ ] A25 — Teljes sémaleltár, migrációs terv, staging restore és rollback főpróba. A Wrangler-belépés 2026-09-23-án megújult; a staging D1-info és aktuális Time Travel könyvjelző olvasása sikeres. Export-ellenőrzés és tényleges restore/rollback főpróba még hiányzik.
+- [ ] A25 — Teljes sémaleltár, migrációs terv, staging restore és rollback főpróba. A Wrangler-belépés 2026-09-23-án megújult. A staging D1 teljes SQL-exportja a Gitből kizárt helyi mappában megvan; memóriabeli SQLite-visszatöltés, integritás- és idegenkulcs-ellenőrzés sikeres ([checkpoint](STAGING_D1_RECOVERY_2026-09-23.md)). Távoli D1 restore/rollback főpróba még hiányzik; a Time Travel az összes staging családot érintené.
 - [ ] A26 — Support/monitoring, staging adatkezelés és két store beadási bizonyíték.
 - [ ] A27 — Family+ számítási audit S01–S15 lezárása az alábbi bontásban.
 
