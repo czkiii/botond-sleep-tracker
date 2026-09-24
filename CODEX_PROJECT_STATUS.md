@@ -4,9 +4,9 @@
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
 **Teljes audit alapja:** `e9374f4` (`Add verified store billing foundation`); az akkori helyi origin-refhez képest 0 ahead / 0 behind.
-**Kiinduló HEAD a legújabb helyi javításhoz:** `98a8a71` a `feat/child-profile-v4` ágon. Az eszközkötési javítás stagingen sikeres: a külön tesztcsalád létrejött. Az utolsó tag családmegszüntetési folyamata `badb0a9` óta stagingen van, kézi elfogadása nyitott. Az új, névtelen profil visszaállítását javító Worker-módosítás helyi; commit/push és staging elfogadás szükséges. Részletek: [FAMILY_DISSOLUTION_CHECKPOINT_2026-09-23.md](FAMILY_DISSOLUTION_CHECKPOINT_2026-09-23.md).
+**Aktuális HEAD:** `fb64e1b` a `feat/child-profile-v4` ágon. Az eszközkötési és a névtelen profil visszaállítását javító Worker-módosítás stagingen sikeres. Az utolsó tag családmegszüntetési folyamata `badb0a9` óta stagingen van, kézi elfogadása nyitott. Részletek: [FAMILY_DISSOLUTION_CHECKPOINT_2026-09-23.md](FAMILY_DISSOLUTION_CHECKPOINT_2026-09-23.md).
 
-**2026-09-24-es staging megálló — [GPT-6 Astra · high] javítás, [GPT-6 Sol · medium] kézi folytatás:** a `Solemi törlési próba` családban ugyanazon tesztfiók Chrome és Edge InPrivate eszközei sikeresen szinkronizáltak egy Tesztbaba-profilt és 1 alvást. A tényleges családi naplótörlés mindkét oldalt 0-ra vitte, a kis export visszaimportja mindkettőt 1-re állította. Az üres visszaállítási pont alkalmazásakor viszont az InPrivate helyileg 0-ra váltott, 2 feltöltés elakadt, a Chrome 1-en maradt. Helyi kliens+Worker tesztben reprodukált ok: a gyermeklétrehozás az érvényes üres nevet `400 INVALID_REQUEST` hibával elutasította. A javítás create/patch esetén engedi az üres nevet, a típus- és 60 karakteres korlátot megtartja. A már mentett két művelet változatlan újrapróbálása is tesztelt. Teljes helyi ellenőrzés: 27 fájl, 296/296 teszt; frontend és Worker typecheck sikeres. Staging újrapróba még nem történt. Az eredeti Opo családot nem módosítottuk.
+**2026-09-24-es staging eredmény — [GPT-6 Astra · high] javítás, [GPT-6 Sol · medium] kézi folytatás:** a `Solemi törlési próba` családban a tényleges családi naplótörlés mindkét eszközt 0 alvásra vitte, a kis export visszaimportja mindkettőt 1-re állította. Az üres visszaállítási pont szinkronja először `INVALID_REQUEST` hibával elakadt, mert a szerver az érvényes üres gyermeknevet elutasította. A `fb64e1b` javítás után mindkét eszköz névtelen profilt, 0 alvást és friss szinkront mutat; az elakadt szinkron kétböngészős próbája sikeres. Teljes helyi ellenőrzés: 27 fájl, 296/296 teszt; frontend és Worker typecheck sikeres. Az eredeti Opo családot nem módosítottuk.
 
 ## Legfrissebb checkpoint — A03–A06 staging elfogadás, A07 helyi előkészítés
 
@@ -567,10 +567,10 @@ auditkapu az irányadó, különösen az adatmegőrzési és hozzáférési hib�
 
 ## Következő konkrét feladat
 
-**[GPT-6 Sol · medium]** A helyi névtelenprofil-javítás commit/push és sikeres staging Worker-deploy után a már várakozó két művelet újrapróbálása, majd két böngészőn a névtelen profil / 0 alvás / üres feltöltési sor ellenőrzése. Új importot vagy törlést előtte nem indítunk. Ezután a kis export visszaállítása és az utolsó tag családmegszüntetési próbája következik. A03 teljes elfogadása még nyitott.
+**[GPT-6 Sol · medium]** A külön tesztcsalád teljes kézi staging lánca sikeres: 1 gyermek/1 alvásos szerveres export, végleges családmegszüntetés, mindkét tesztböngésző családi kapcsolatának megszűnése, bejelentkezett fiók és helyi Tesztbaba / 1 alvás megőrzése, Chrome külön helyi törlése, majd tiszta visszacsatlakozás az Opo családba. A végén normál Edge és Chrome egyaránt Opo/Boti/1799 alvást és friss szinkront mutat. Külön nyitott az A03 online-pending kézi tiltás, a Free utolsó admin, a régi meghívó elutasítása és a feleség tagságának aktuális képi ellenőrzése.
 
 Az A03 tényleges családi törlése és a kis export újraimportja stagingen sikeres;
-az üres visszaállítási pont szinkronja a fenti javítás után ellenőrizendő.
+az üres visszaállítási pont szinkronja a `fb64e1b` javítás után mindkét böngészőn sikeres.
 A jelenlegi 1799 alvásos család exportjának visszatöltése nem atomi
 szerveres rollback; a D1 Time Travel az egész, több családot tartalmazó staging
 adatbázist visszatekerné. A [STAGING_D1_RECOVERY_2026-09-23.md](STAGING_D1_RECOVERY_2026-09-23.md)
