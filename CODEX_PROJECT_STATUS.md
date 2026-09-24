@@ -4,7 +4,9 @@
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
 **Teljes audit alapja:** `e9374f4` (`Add verified store billing foundation`); az akkori helyi origin-refhez képest 0 ahead / 0 behind.
-**Kiinduló HEAD a legújabb helyi munkához:** `c2bccdc` a `feat/child-profile-v4` ágon. Az utolsó tag családmegszüntetési folyamata helyben elkészült; commit/push és staging elfogadás szükséges. Részletek: [FAMILY_DISSOLUTION_CHECKPOINT_2026-09-23.md](FAMILY_DISSOLUTION_CHECKPOINT_2026-09-23.md). Az A03 teljes elfogadása továbbra is nyitott.
+**Kiinduló HEAD a legújabb helyi javításhoz:** `b94d2b0` a `feat/child-profile-v4` ágon. Az utolsó tag családmegszüntetési folyamata `badb0a9` commitban felkerült stagingre; kézi elfogadása nyitott. A 2026-09-24-i eszközkötési javítás még helyi, commit/push és staging elfogadás szükséges. Részletek: [FAMILY_DISSOLUTION_CHECKPOINT_2026-09-23.md](FAMILY_DISSOLUTION_CHECKPOINT_2026-09-23.md). Az A03 teljes elfogadása továbbra is nyitott.
+
+**2026-09-24-es staging megálló:** a `b94d2b0` internal buildben a nem admin tesztfiók kilépett az Opo családból, a saját 1799 alvását exportálta, majd csak a Chrome helyi naplóját törölte. Az eredeti Edge-admin Opo naplója 1799 alvással változatlan. Az új kis tesztcsalád létrehozása `409 ACCOUNT_DEVICE_ALREADY_LINKED` hibával állt meg: az A04 account-kilépés revokálta a régi eszközt, de a régi eszköz–család hozzárendelést meghagyta. A helyi javítás ezt a hozzárendelést kilépéskor törli, a már korábban beragadt, revokált/inaktív hozzárendelést pedig új család létrehozásakor vagy meghívós csatlakozáskor atomi műveletben felszabadítja. A külön család **még nem jött létre**; a törlés/import kézi elfogadása a javított staging Worker után folytatandó.
 
 ## Legfrissebb checkpoint — A03–A06 staging elfogadás, A07 helyi előkészítés
 

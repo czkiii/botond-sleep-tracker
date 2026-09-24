@@ -886,9 +886,7 @@ async function createAccountFamily(request: Request, env: Env, access: AccountAc
   }
   const existingMembership = await service.activeMembership(access.account.id)
   if (existingMembership) throw new ApiError(409, 'ACCOUNT_ALREADY_IN_FAMILY')
-  const existingMapping = await env.DB.prepare(`SELECT family_id FROM account_family_devices
-    WHERE account_device_id = ?`).bind(access.deviceId).first<{ family_id: string }>()
-  if (existingMapping) throw new ApiError(409, 'ACCOUNT_DEVICE_ALREADY_LINKED')
+  const staleMappingCleanup = await reusableAccountDeviceMapping(env, access)
 
   const body = await readJson(request)
   const familyName = requireString(body.familyName, 'familyName', 60)
@@ -907,6 +905,7 @@ async function createAccountFamily(request: Request, env: Env, access: AccountAc
   const createdAt = nowIso()
 
   await env.DB.batch([
+    ...(staleMappingCleanup ? [staleMappingCleanup] : []),
     env.DB.prepare('INSERT INTO families (id, name, revision, created_at) VALUES (?, ?, 0, ?)')
       .bind(familyId, familyName, createdAt),
     env.DB.prepare(`INSERT INTO children
@@ -932,6 +931,31 @@ async function createAccountFamily(request: Request, env: Env, access: AccountAc
     connection: { familyId, familyName, deviceId, deviceToken: token, revision: 0 },
     child: { id: childId, name: childName, birthDate }
   }, 201)
+}
+
+async function reusableAccountDeviceMapping(env: Env, access: AccountAccess) {
+  const mapping = await env.DB.prepare(`SELECT afd.family_id, d.revoked_at,
+      EXISTS (SELECT 1 FROM legacy_family_memberships m
+        WHERE m.family_id = afd.family_id AND m.account_id = afd.account_id
+          AND m.status = 'ACTIVE') AS active_membership
+    FROM account_family_devices afd JOIN devices d ON d.id = afd.legacy_device_id
+    WHERE afd.account_device_id = ? AND afd.account_id = ?`)
+    .bind(access.deviceId, access.account.id)
+    .first<{ family_id: string; revoked_at: string | null; active_membership: number }>()
+  if (!mapping) return null
+  if (!mapping.revoked_at || mapping.active_membership) {
+    throw new ApiError(409, 'ACCOUNT_DEVICE_ALREADY_LINKED')
+  }
+  // Older leave operations left this row behind. Reuse only a device whose old
+  // family token was revoked and whose account membership is no longer active.
+  return env.DB.prepare(`DELETE FROM account_family_devices
+    WHERE account_device_id = ? AND account_id = ? AND family_id = ?
+      AND EXISTS (SELECT 1 FROM devices d
+        WHERE d.id = account_family_devices.legacy_device_id AND d.revoked_at IS NOT NULL)
+      AND NOT EXISTS (SELECT 1 FROM legacy_family_memberships m
+        WHERE m.family_id = account_family_devices.family_id
+          AND m.account_id = account_family_devices.account_id AND m.status = 'ACTIVE')`)
+    .bind(access.deviceId, access.account.id, mapping.family_id)
 }
 
 const REFRESH_COOKIE = 'solemi_refresh'
@@ -1144,6 +1168,7 @@ async function joinAccountFamily(request: Request, env: Env, access: AccountAcce
     WHERE family_id = ? AND role = 'ADMIN' AND status = 'ACTIVE' LIMIT 1`)
     .bind(invite.family_id).first<{ id: string }>()
   if (!owner) throw new ApiError(409, 'FAMILY_OWNER_ACCOUNT_REQUIRED')
+  const staleMappingCleanup = await reusableAccountDeviceMapping(env, access)
 
   const membershipId = newId('mem')
   const deviceId = newId('dev')
@@ -1153,6 +1178,7 @@ async function joinAccountFamily(request: Request, env: Env, access: AccountAcce
   const joinedAt = nowIso()
   try {
     const results = await env.DB.batch([
+      ...(staleMappingCleanup ? [staleMappingCleanup] : []),
       env.DB.prepare(`INSERT INTO legacy_family_memberships
         (id, family_id, account_id, role, status, joined_at, ended_at)
         SELECT ?, i.family_id, ?, 'MEMBER', 'ACTIVE', ?, NULL
@@ -1177,7 +1203,7 @@ async function joinAccountFamily(request: Request, env: Env, access: AccountAcce
           AND EXISTS (SELECT 1 FROM account_family_devices WHERE account_device_id = ?)`)
         .bind(joinedAt, codeHash, joinedAt, access.deviceId)
     ])
-    if (results[3].meta.changes !== 1) throw new ApiError(409, 'INVITE_ALREADY_USED')
+    if (results[results.length - 1].meta.changes !== 1) throw new ApiError(409, 'INVITE_ALREADY_USED')
   } catch (error) {
     if (error instanceof ApiError) throw error
     if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
@@ -1303,6 +1329,11 @@ async function leaveAccountFamily(request: Request, env: Env, access: AccountAcc
       )`)
       .bind(revokedAt, revokedAt, access.account.id, membership.family_id, membership.id)
   )
+  statements.push(env.DB.prepare(`DELETE FROM account_family_devices
+    WHERE account_id = ? AND family_id = ?
+      AND EXISTS (SELECT 1 FROM legacy_family_memberships
+        WHERE id = ? AND status = 'LEFT')`)
+    .bind(access.account.id, membership.family_id, membership.id))
 
   const results = await env.DB.batch(statements)
   if (results[0].meta.changes !== 1) {

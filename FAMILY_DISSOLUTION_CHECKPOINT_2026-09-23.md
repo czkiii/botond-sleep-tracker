@@ -1,7 +1,7 @@
 # Család megszüntetése — helyi megvalósítás és staging próba
 
 Dátum: 2026-09-23. Kiinduló commit: `c2bccdc`, ág: `feat/child-profile-v4`.
-Állapot: helyi implementáció és automatizált ellenőrzés; commit/push és staging elfogadás még szükséges. Távoli adatváltoztatás vagy deploy nem történt.
+Állapot: a családmegszüntetés `badb0a9` commitban stagingre került; a 2026-09-24-i eszközkötési javítás helyi, commit/push és staging elfogadás még szükséges. A 2026-09-23-i megvalósítás során távoli adatváltoztatás vagy deploy nem történt.
 
 ## Megvalósított viselkedés
 
@@ -50,3 +50,13 @@ Az A03 családi naplótörlés és ez a megszüntetés külön művelet: az elő
 8. Visszaút: zárjuk be az InPrivate tesztablakot. Chrome-ban szükség szerint töröljük csak a helyi tesztnaplót, majd az eredeti Edge-admin új Opo-meghívójával csatlakozzunk vissza. Ellenőrizzük a családi adatok egyezését. A feleség tagságát ez a lépéssor nem módosítja.
 
 A kézi lépéseket a tulajdonossal kis adagokban végezzük; nem jelölhetők késznek pusztán a kód vagy az automatizált teszt alapján.
+
+## 2026-09-24-es staging megálló és javítás
+
+Az első három kézi lépés közül az Opo export, a nem admin Chrome-fiók kilépése és a Chrome kizárólag helyi törlése sikeres volt. Az Edge-admin Opo családja továbbra is 1799 alvást mutat. A tesztcsalád létrehozása `409 ACCOUNT_DEVICE_ALREADY_LINKED` hibával megállt; a frissítés után a Chrome-ban nem látszott családi tagság, ezért nem indult családi törlés vagy import.
+
+Ok: a korábbi account-kilépés minden régi tokent visszavont, de az `account_family_devices` kapcsolatot meghagyta. Az új család létrehozása ezt aktív eszközkötésnek értelmezte. Helyi javítás: a kilépés végén ugyanabban a D1 batchben törlődnek a kilépő account eszközkötései; a már régebbről megmaradt kapcsolat csak akkor szabadul fel új család létrehozásakor vagy meghívós csatlakozáskor, ha a régi token visszavont és nincs aktív tagság. A régi család, saját fiók, revokált eszköz és más családtagok adatai megmaradnak. Az internal felület ezentúl a szerver hibakódját is megmutatja.
+
+Következő kapu: a javítás commit/push, új staging Worker- és Pages-build, zöld ellenőrzések. Utána Chrome-ban az üres naplóból egyszer újra létrehozni a `Solemi törlési próba` családot; az Edge Opo családját nem módosítani. Csak a sikeres, szinkronizált tesztcsalád után folytatni a 3–8. kézi lépést.
+
+Helyi ellenőrzés: frontend és Worker TypeScript sikeres; a teljes verziókezelt Vitest-készlet 27 fájlban 292/292 sikeres; az internal/staging frontend build sikeres. A célzott tesztek igazolják az account-kilépés utáni kapcsolatlezárást, a régi Worker által meghagyott revokált kapcsolat újrahasználatát és a meghívós visszacsatlakozást a régi token feltámasztása nélkül. Kézi staging eredmény még nincs.

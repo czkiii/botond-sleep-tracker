@@ -154,7 +154,7 @@ export default function FamilySyncLayer() {
     if (code.endsWith('_PENDING')) return text.leavePending
     if (code.endsWith('_ATTENTION') || code.endsWith('_BLOCKED')) return text.leaveAttention
     if (!navigator.onLine || err instanceof TypeError || apiError?.code === 'API_TIMEOUT' || apiError?.code === 'NETWORK_ERROR') return text.networkError
-    return text.error
+    return internalPreview && /^[A-Z_0-9]{1,64}$/.test(code) ? `${text.error} · ${code}` : text.error
   }
 
   const markSynced = () => {

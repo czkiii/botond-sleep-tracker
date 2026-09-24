@@ -506,7 +506,7 @@ describe('account auth routes', () => {
       method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${ownerSecond}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ deviceName: 'Owner second phone' })
     })
-    const restoredBody = await restored.json() as { data: { connection: { deviceToken: string } } }
+    const restoredBody = await restored.json() as { data: { connection: { deviceId: string; deviceToken: string } } }
     await seedInvite(inviteCode)
     const member = await accountAccess('acc_member', 'adev_member', 'leave_member')
     expect((await fetch('/v1/auth/family/join', {
@@ -524,9 +524,11 @@ describe('account auth routes', () => {
         { account_id: 'acc_member', role: 'ADMIN', status: 'ACTIVE' },
         { account_id: 'acc_owner', role: 'ADMIN', status: 'LEFT' }
       ])
-    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM devices d
-      JOIN account_family_devices afd ON afd.legacy_device_id = d.id
-      WHERE afd.account_id = 'acc_owner' AND d.revoked_at IS NOT NULL`).get()).toEqual({ count: 2 })
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM devices
+      WHERE id IN ('dev_legacy', ?) AND revoked_at IS NOT NULL`)
+      .get(restoredBody.data.connection.deviceId)).toEqual({ count: 2 })
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM account_family_devices
+      WHERE account_id = 'acc_owner'`).get()).toEqual({ count: 0 })
 
     const noReconnect = await fetch('/v1/auth/family/bootstrap', {
       method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${ownerSecond}`, 'Content-Type': 'application/json' },
@@ -538,6 +540,68 @@ describe('account auth routes', () => {
     })
     expect(revokedSync.status).toBe(403)
     expect(await revokedSync.json()).toMatchObject({ error: { code: 'DEVICE_REVOKED' } })
+  })
+
+  it('reuses a device after an older leave left a revoked family mapping behind', async () => {
+    env.ENTITLEMENT_ENFORCEMENT = 'true'
+    env.ENTITLEMENT_TEST_MODE = 'true'
+    await seedLegacyFamily('stale_owner_token')
+    const owner = await accountAccess('acc_owner', 'adev_owner', 'stale_owner')
+    const ownerHeaders = { Origin: origin, Authorization: `Bearer ${owner}`, 'Content-Type': 'application/json' }
+    expect((await fetch('/v1/auth/family/claim', { method: 'POST', headers: ownerHeaders,
+      body: JSON.stringify({ familyDeviceToken: 'stale_owner_token' }) })).status).toBe(200)
+    await seedInvite('STALE01')
+    const member = await accountAccess('acc_member', 'adev_member', 'stale_member')
+    const memberHeaders = { Origin: origin, Authorization: `Bearer ${member}`, 'Content-Type': 'application/json' }
+    const joined = await fetch('/v1/auth/family/join', { method: 'POST', headers: memberHeaders,
+      body: JSON.stringify({ code: 'STALE01' }) })
+    expect(joined.status).toBe(201)
+    const oldDevice = (await joined.json() as { data: { connection: { deviceId: string } } }).data.connection.deviceId
+    expect((await fetch('/v1/auth/family/leave', { method: 'POST', headers: memberHeaders, body: '{}' })).status).toBe(200)
+    // Reproduce the mapping left by the previous Worker version.
+    sqlite.prepare(`UPDATE legacy_family_memberships SET status = 'ACTIVE', ended_at = NULL
+      WHERE account_id = 'acc_member'`).run()
+    sqlite.prepare(`INSERT INTO account_family_devices
+      (account_device_id, account_id, family_id, legacy_device_id, created_at, updated_at)
+      VALUES ('adev_member', 'acc_member', 'fam_test', ?, 1, 1)`).run(oldDevice)
+    sqlite.prepare(`UPDATE legacy_family_memberships SET status = 'LEFT', ended_at = 2
+      WHERE account_id = 'acc_member'`).run()
+    expect((await setTestPlan(member, 'familyPlus')).status).toBe(200)
+    const created = await fetch('/v1/auth/family/create', { method: 'POST', headers: memberHeaders,
+      body: JSON.stringify({ familyName: 'Separate test', childId: 'new_test_child' }) })
+    expect(created.status).toBe(201)
+    expect(sqlite.prepare(`SELECT family_id FROM account_family_devices
+      WHERE account_device_id = 'adev_member'`).get()).not.toEqual({ family_id: 'fam_test' })
+    expect(sqlite.prepare(`SELECT revoked_at FROM devices WHERE id = ?`).get(oldDevice))
+      .toMatchObject({ revoked_at: expect.any(String) })
+    expect(sqlite.prepare(`SELECT status FROM legacy_family_memberships
+      WHERE account_id = 'acc_owner'`).get()).toEqual({ status: 'ACTIVE' })
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM families`).get()).toEqual({ count: 2 })
+  })
+
+  it('can rejoin a family on the same device after leaving, without reviving its old token', async () => {
+    await seedLegacyFamily('rejoin_owner_token')
+    const owner = await accountAccess('acc_owner', 'adev_owner', 'rejoin_owner')
+    const ownerHeaders = { Origin: origin, Authorization: `Bearer ${owner}`, 'Content-Type': 'application/json' }
+    expect((await fetch('/v1/auth/family/claim', { method: 'POST', headers: ownerHeaders,
+      body: JSON.stringify({ familyDeviceToken: 'rejoin_owner_token' }) })).status).toBe(200)
+    await seedInvite('REJOIN01')
+    const member = await accountAccess('acc_member', 'adev_member', 'rejoin_member')
+    const memberHeaders = { Origin: origin, Authorization: `Bearer ${member}`, 'Content-Type': 'application/json' }
+    const first = await fetch('/v1/auth/family/join', { method: 'POST', headers: memberHeaders,
+      body: JSON.stringify({ code: 'REJOIN01' }) })
+    expect(first.status).toBe(201)
+    const oldToken = (await first.json() as { data: { connection: { deviceToken: string } } }).data.connection.deviceToken
+    expect((await fetch('/v1/auth/family/leave', { method: 'POST', headers: memberHeaders, body: '{}' })).status).toBe(200)
+    await seedInvite('REJOIN02')
+    const second = await fetch('/v1/auth/family/join', { method: 'POST', headers: memberHeaders,
+      body: JSON.stringify({ code: 'REJOIN02' }) })
+    expect(second.status).toBe(201)
+    const newToken = (await second.json() as { data: { connection: { deviceToken: string } } }).data.connection.deviceToken
+    expect(newToken).not.toBe(oldToken)
+    expect((await fetch('/v1/sync?after=0', { headers: { Authorization: `Bearer ${oldToken}` } })).status).toBe(403)
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM account_family_devices
+      WHERE account_device_id = 'adev_member'`).get()).toEqual({ count: 1 })
   })
 
   it('lists possible successors and honors the admin selected for transfer', async () => {
