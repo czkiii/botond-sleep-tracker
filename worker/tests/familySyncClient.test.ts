@@ -6,6 +6,7 @@ import { sqliteBinding } from './sqliteD1'
 import { flushPending, getSyncStore, pullRemote, resolveSyncConflict, restoreMissingSession, saveLocalData } from '../../src/familySync'
 import { REMOTE_DATA_EVENT, STORAGE_KEY, loadData } from '../../src/storage'
 import type { AppData } from '../../src/types'
+import { prepareFamilyReplacement } from '../../src/dataReplacement'
 
 class DeviceStorage implements Storage {
   private values = new Map<string, string>()
@@ -88,6 +89,109 @@ async function editOffline(index: number, startTime: string, note: string) {
 }
 
 describe('two device client + Worker reconciliation', () => {
+  it('accepts clearing a child name while preserving its sleep on both devices', async () => {
+    useDevice(0, false)
+    const before = loadData()
+    saveLocalData(before, { ...before, children: before.children.map((child) => ({ ...child, name: '' })) })
+    await flushPending()
+    useDevice(0, true)
+    await pullRemote()
+    expect(getSyncStore().pending).toEqual([])
+    useDevice(1, true)
+    await pullRemote()
+    expect(loadData().children[0].name).toBe('')
+    expect(loadData().sessions).toHaveLength(1)
+  })
+
+  it('still rejects missing, non-string and oversized child names without writing data', async () => {
+    const request = (path: string, method: string, body: unknown) => worker.fetch(new Request(`https://sync.example${path}`, {
+      method, headers: { Authorization: 'Bearer test-device-token-0', 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }), env)
+    for (const name of [undefined, null, 123, {}, [], 'a'.repeat(61)]) {
+      const create = await request('/v1/children', 'POST', {
+        operationId: 'invalid-child-create', child: { id: 'invalid-child', name }
+      })
+      expect(create.status).toBe(400)
+      const patch = await request('/v1/children/child-a', 'PATCH', {
+        operationId: 'invalid-child-patch', patch: { name }
+      })
+      expect(patch.status).toBe(400)
+    }
+    expect(sqlite.prepare('SELECT id, name FROM children').all()).toEqual([{ id: 'child-a', name: 'Baba' }])
+    expect(sqlite.prepare('SELECT revision FROM families').get()).toEqual({ revision: 2 })
+    expect(sqlite.prepare('SELECT id FROM operations').all()).toEqual([])
+  })
+
+  it('restores an unnamed empty diary and can import and restore it again on both devices', async () => {
+    const empty: AppData = {
+      ...structuredClone(initial),
+      settings: { ...initial.settings, activeChildId: 'old-empty-child' },
+      children: [{ ...initial.children[0], id: 'old-empty-child', name: '' }],
+      sessions: []
+    }
+    // The saved empty profile was deleted by the preceding import.
+    sqlite.prepare(`INSERT INTO children
+      (id, family_id, name, birth_date, created_at, updated_at, deleted_at, revision)
+      VALUES ('old-empty-child', 'family-a', '', NULL, ?, ?, ?, 2)`).run(at, at, at)
+
+    for (const snapshot of [empty, initial, empty]) {
+      useDevice(0, false)
+      const before = loadData()
+      const next = prepareFamilyReplacement(before, snapshot)
+      expect(next.children[0].id).not.toBe(snapshot.children[0].id)
+      saveLocalData(before, next)
+      await flushPending()
+      useDevice(0, true)
+      await pullRemote()
+      expect(getSyncStore().pending).toEqual([])
+      expect(getSyncStore().failure).toBeUndefined()
+      expect(loadData().children.map((child) => child.name)).toEqual([snapshot.children[0].name])
+      expect(loadData().sessions).toHaveLength(snapshot.sessions.length)
+
+      useDevice(1, true)
+      await pullRemote()
+      expect(loadData().children).toEqual(devices[0].displayed.children)
+      expect(loadData().sessions).toEqual(devices[0].displayed.sessions)
+      expect(loadData().sessions).toHaveLength(snapshot.sessions.length)
+    }
+  })
+
+  it('retries the already persisted two-operation restore after the Worker accepts empty names', async () => {
+    useDevice(0, false)
+    const before = loadData()
+    const next = prepareFamilyReplacement(before, {
+      ...before, children: [{ ...before.children[0], id: 'saved-empty', name: '' }], sessions: []
+    })
+    saveLocalData(before, next)
+    await flushPending()
+    const queued = structuredClone(getSyncStore().pending)
+    expect(queued).toHaveLength(2)
+    vi.stubGlobal('fetch', () => Promise.resolve(new Response(JSON.stringify({
+      ok: false, error: { code: 'INVALID_REQUEST', message: 'Invalid child.name.' }
+    }), { status: 400, headers: { 'Content-Type': 'application/json' } })))
+    useDevice(0, true)
+    await expect(pullRemote()).rejects.toThrow()
+    expect(getSyncStore().pending).toEqual(queued)
+    expect(getSyncStore().failure).toMatchObject({ code: 'INVALID_REQUEST', status: 400 })
+    expect(sqlite.prepare('SELECT id FROM children WHERE deleted_at IS NULL').all()).toEqual([{ id: 'child-a' }])
+
+    // A Worker-only update must accept the original request IDs and payloads.
+    const retried: unknown[] = []
+    vi.stubGlobal('fetch', (url: string, options: RequestInit) => {
+      if (options.method === 'POST' || options.method === 'DELETE') retried.push(JSON.parse(String(options.body)))
+      return worker.fetch(new Request(url, options), env)
+    })
+    await pullRemote()
+    expect(retried).toEqual(queued.map((operation) => operation.body))
+    expect(getSyncStore().pending).toEqual([])
+    expect(getSyncStore().failure).toBeUndefined()
+    useDevice(1, true)
+    await pullRemote()
+    expect(loadData().children.map((child) => child.name)).toEqual([''])
+    expect(loadData().sessions).toEqual([])
+  })
+
   it('creates an active sleep with its note and manual type in the first start operation', async () => {
     useDevice(0, false)
     const local = loadData()

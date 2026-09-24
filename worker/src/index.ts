@@ -171,6 +171,15 @@ function requireString(value: unknown, field: string, maxLength = 200) {
   return value.trim()
 }
 
+function childNameFrom(value: unknown) {
+  // An unnamed profile is valid diary data (including the default profile
+  // saved before a family import). Keep create and patch consistent with it.
+  if (typeof value !== 'string' || value.length > 60) {
+    throw new ApiError(400, 'INVALID_REQUEST', 'Invalid child.name.')
+  }
+  return value.trim()
+}
+
 async function readJson(request: Request): Promise<Record<string, unknown>> {
   const contentType = request.headers.get('Content-Type') ?? ''
   if (!contentType.includes('application/json')) throw new ApiError(400, 'INVALID_REQUEST', 'JSON body required.')
@@ -536,7 +545,7 @@ async function createChildProfile(request: Request, env: Env, auth: DeviceAuth) 
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new ApiError(400, 'INVALID_REQUEST', 'Invalid child.')
   const input = value as Record<string, unknown>
   const childId = requireString(input.id, 'child.id', 100)
-  const name = requireString(input.name, 'child.name', 60)
+  const name = childNameFrom(input.name)
   const birthDate = input.birthDate === undefined ? null : input.birthDate
   if (!isBirthDate(birthDate)) throw new ApiError(400, 'INVALID_REQUEST', 'Invalid child.birthDate.')
 
@@ -574,7 +583,7 @@ async function patchChildProfile(request: Request, env: Env, auth: DeviceAuth, c
   const keys = Object.keys(patch)
   if (!keys.length || keys.some((key) => !['name', 'birthDate'].includes(key))) throw new ApiError(400, 'INVALID_REQUEST', 'Unsupported patch fields.')
   const current = await requireActiveChild(env, auth.familyId, childId)
-  const name = 'name' in patch ? requireString(patch.name, 'name', 60) : current.name
+  const name = 'name' in patch ? childNameFrom(patch.name) : current.name
   const birthDate = 'birthDate' in patch ? patch.birthDate : current.birth_date
   if (!isBirthDate(birthDate)) throw new ApiError(400, 'INVALID_REQUEST', 'Invalid birthDate.')
 

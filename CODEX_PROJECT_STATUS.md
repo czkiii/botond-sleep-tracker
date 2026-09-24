@@ -1,12 +1,12 @@
 # Solemi Sleep — Codex projektállapot
 
-**Utolsó frissítés:** 2026-09-23
+**Utolsó frissítés:** 2026-09-24
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
 **Teljes audit alapja:** `e9374f4` (`Add verified store billing foundation`); az akkori helyi origin-refhez képest 0 ahead / 0 behind.
-**Kiinduló HEAD a legújabb helyi javításhoz:** `b94d2b0` a `feat/child-profile-v4` ágon. Az utolsó tag családmegszüntetési folyamata `badb0a9` commitban felkerült stagingre; kézi elfogadása nyitott. A 2026-09-24-i eszközkötési javítás még helyi, commit/push és staging elfogadás szükséges. Részletek: [FAMILY_DISSOLUTION_CHECKPOINT_2026-09-23.md](FAMILY_DISSOLUTION_CHECKPOINT_2026-09-23.md). Az A03 teljes elfogadása továbbra is nyitott.
+**Kiinduló HEAD a legújabb helyi javításhoz:** `98a8a71` a `feat/child-profile-v4` ágon. Az eszközkötési javítás stagingen sikeres: a külön tesztcsalád létrejött. Az utolsó tag családmegszüntetési folyamata `badb0a9` óta stagingen van, kézi elfogadása nyitott. Az új, névtelen profil visszaállítását javító Worker-módosítás helyi; commit/push és staging elfogadás szükséges. Részletek: [FAMILY_DISSOLUTION_CHECKPOINT_2026-09-23.md](FAMILY_DISSOLUTION_CHECKPOINT_2026-09-23.md).
 
-**2026-09-24-es staging megálló:** a `b94d2b0` internal buildben a nem admin tesztfiók kilépett az Opo családból, a saját 1799 alvását exportálta, majd csak a Chrome helyi naplóját törölte. Az eredeti Edge-admin Opo naplója 1799 alvással változatlan. Az új kis tesztcsalád létrehozása `409 ACCOUNT_DEVICE_ALREADY_LINKED` hibával állt meg: az A04 account-kilépés revokálta a régi eszközt, de a régi eszköz–család hozzárendelést meghagyta. A helyi javítás ezt a hozzárendelést kilépéskor törli, a már korábban beragadt, revokált/inaktív hozzárendelést pedig új család létrehozásakor vagy meghívós csatlakozáskor atomi műveletben felszabadítja. A külön család **még nem jött létre**; a törlés/import kézi elfogadása a javított staging Worker után folytatandó.
+**2026-09-24-es staging megálló — [GPT-6 Astra · high] javítás, [GPT-6 Sol · medium] kézi folytatás:** a `Solemi törlési próba` családban ugyanazon tesztfiók Chrome és Edge InPrivate eszközei sikeresen szinkronizáltak egy Tesztbaba-profilt és 1 alvást. A tényleges családi naplótörlés mindkét oldalt 0-ra vitte, a kis export visszaimportja mindkettőt 1-re állította. Az üres visszaállítási pont alkalmazásakor viszont az InPrivate helyileg 0-ra váltott, 2 feltöltés elakadt, a Chrome 1-en maradt. Helyi kliens+Worker tesztben reprodukált ok: a gyermeklétrehozás az érvényes üres nevet `400 INVALID_REQUEST` hibával elutasította. A javítás create/patch esetén engedi az üres nevet, a típus- és 60 karakteres korlátot megtartja. A már mentett két művelet változatlan újrapróbálása is tesztelt. Teljes helyi ellenőrzés: 27 fájl, 296/296 teszt; frontend és Worker typecheck sikeres. Staging újrapróba még nem történt. Az eredeti Opo családot nem módosítottuk.
 
 ## Legfrissebb checkpoint — A03–A06 staging elfogadás, A07 helyi előkészítés
 
@@ -567,14 +567,16 @@ auditkapu az irányadó, különösen az adatmegőrzési és hozzáférési hib�
 
 ## Következő konkrét feladat
 
-Az A03 tényleges családi törlését kis, elkülönített staging családon kell
-kipróbálni. A jelenlegi 1799 alvásos család exportjának visszatöltése nem atomi
+**[GPT-6 Sol · medium]** A helyi névtelenprofil-javítás commit/push és sikeres staging Worker-deploy után a már várakozó két művelet újrapróbálása, majd két böngészőn a névtelen profil / 0 alvás / üres feltöltési sor ellenőrzése. Új importot vagy törlést előtte nem indítunk. Ezután a kis export visszaállítása és az utolsó tag családmegszüntetési próbája következik. A03 teljes elfogadása még nyitott.
+
+Az A03 tényleges családi törlése és a kis export újraimportja stagingen sikeres;
+az üres visszaállítási pont szinkronja a fenti javítás után ellenőrizendő.
+A jelenlegi 1799 alvásos család exportjának visszatöltése nem atomi
 szerveres rollback; a D1 Time Travel az egész, több családot tartalmazó staging
 adatbázist visszatekerné. A [STAGING_D1_RECOVERY_2026-09-23.md](STAGING_D1_RECOVERY_2026-09-23.md)
 rögzíti a megújított Wrangler-belépést, a teljes SQL-exportot, a sikeres helyi
 visszatöltést, a 0 idegenkulcs-hibát és a vizsgált család 1799 aktív alvását.
-**Távoli D1 restore nem történt.** Következő kapu: kis staging tesztcsaládon
-az A03 családi törlés és újraimport kézi próbája. A külön online-pending kézi
+**Távoli D1 restore nem történt.** A külön online-pending kézi
 gát és az A04–A06 kétfiókos staging elfogadása is nyitott.
 A valódi éles host, Worker, OAuth és cookie-környezet kialakításához külön
 kiadási döntés és kézi iOS-próba kell.
