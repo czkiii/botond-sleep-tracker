@@ -606,9 +606,10 @@ export default function FamilySyncLayer() {
           <strong>{accountMembership?.role === 'ADMIN' ? text.leaveAdminTitle : text.leaveAccount}</strong>
           <p>{accountMembership?.role === 'ADMIN' ? text.leaveAdminHelp : text.leaveAccountConfirm}</p>
           <button className="family-sync-secondary" onClick={() => exportData(loadData())} disabled={busy}>{dissolutionText.localExport}</button>
-          {accountMembership?.role === 'ADMIN' && leaveCandidates.map((member) => <button className="family-sync-secondary" key={member.accountId}
+          {accountMembership?.role === 'ADMIN' && leaveCandidates.map((member) => <button className="family-sync-secondary family-sync-member-choice" key={member.accountId}
             onClick={() => performAccountLeave(member.accountId)} disabled={busy}>
-            {member.name || member.email || member.accountId}
+            <span>{member.name || member.email || member.accountId}</span>
+            {member.name && member.name !== member.email && <span className="family-sync-member-identity">{member.email || member.accountId}</span>}
           </button>)}
           <button className="family-sync-secondary" onClick={() => performAccountLeave()} disabled={busy}>{accountMembership?.role === 'ADMIN' ? text.leaveAdminAuto : text.leaveAccount}</button>
           <button className="family-sync-link" onClick={() => setMode('home')} disabled={busy}>{text.cancel}</button>
