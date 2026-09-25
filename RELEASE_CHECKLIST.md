@@ -1,12 +1,12 @@
 # Solemi Sleep — belső verziótól a kiadásig
 
-Utolsó frissítés: 2026-09-23
+Utolsó frissítés: 2026-09-25
 
 Ez az operatív lista a `SOLEMI_EXECUTION_PLAN.md` és a `SOLEMI_MASTER_ROADMAP.md` kiadási pontjait rendezi végrehajtási sorrendbe.
 
 **Modellajánlás:** minden nyitott jelölőnégyzetnél szerepel a javasolt modell és gondolkodási erősség (`medium` = közepes, `high` = erős). Ez tervezési segítség, nem készültségi fok vagy a tesztelés helyettesítője. Ha egy feladat közben adatvesztési, biztonsági vagy több rendszerre kiterjedő döntés merül fel, Solból Astrára válthatunk. Az elvégzett, pipált történeti pontokhoz nem rendeltünk új modellt.
 
-**2026-09-20 tulajdonosi pontosítás:** [OWNER_DECISIONS_REVIEW_2026-09-20.md](OWNER_DECISIONS_REVIEW_2026-09-20.md) és az ott hivatkozott öt TXT elsőbbséget élvez az eltérő régi termékígéretekkel szemben. PDF/Google+Apple login/havi+éves/trial V1-ben; emlékeztetők és életkori norma nélkül. A03 helyi implementációja elkészült, staging elfogadása nyitott. A saját domain megvásárlása rögzítve, bekötése és a privacy/retention tényleges megvalósítása még nyitott. Ettől auditkapu nem válik automatikusan teljesítetté.
+**2026-09-20 tulajdonosi pontosítás:** [OWNER_DECISIONS_REVIEW_2026-09-20.md](OWNER_DECISIONS_REVIEW_2026-09-20.md) és az ott hivatkozott öt TXT elsőbbséget élvez az eltérő régi termékígéretekkel szemben. PDF/Google+Apple login/havi+éves/trial V1-ben; emlékeztetők és életkori norma nélkül. A03 helyi implementációja és staging elfogadása elkészült. A saját domain megvásárlása rögzítve, bekötése és a privacy/retention tényleges megvalósítása még nyitott. Ettől a többi auditkapu nem válik automatikusan teljesítetté.
 
 ## Elsődleges kiadási kapu — teljes audit, 2026-09-20
 
@@ -18,9 +18,9 @@ vagy kifejezett, indokolt termékdöntés kell; a puszta priorizálás nem lezá
 
 - [x] A01 — Sérült helyi napló megőrzése, automatikus felülírás megakadályozása. 195/195 teszt, typecheck és két build sikeres.
 - [x] A02 — Többlapos mentés, quota/crash és tartós napló–outbox egység. Egyetlen böngészőlap írhat; az atomi helyi envelope, hibainjektálás és kétlapos átvételi próba sikeres (198/198 teszt).
-- [ ] **[GPT-6 Astra · high]** A03 — Import/törlés családi hatása és visszaállítható biztonsági mentés. A kétfiókos Opo-próbán az import, visszaállítás és offline tiltás sikeres. A külön kis staging családon a tényleges közös naplótörlés, 1 alvásos export visszaimportja és a biztonsági pont ismételt kétböngészős visszaállítása is sikeres. Az üres profil szinkronhibája `fb64e1b` javítással megoldva (296/296 helyi teszt). **Még nyitott:** online, de feltöltésre váró családi import/törlés kézi tiltása; ezt célzott automatizált teszt már fedi. [Kézi checkpoint](FAMILY_DISSOLUTION_CHECKPOINT_2026-09-23.md).
+- [x] A03 — Import/törlés családi hatása és visszaállítható biztonsági mentés. A kétfiókos Opo-próbán az import, visszaállítás és offline tiltás sikeres. A külön kis staging családon a tényleges közös naplótörlés, 1 alvásos export visszaimportja és a biztonsági pont ismételt kétböngészős visszaállítása sikeres. Az üres profil szinkronhibája `fb64e1b` javítással megoldva (296/296 helyi teszt). Online, 1 várakozó feltöltés mellett a családi importot a Chrome a várt üzenettel letiltotta; a blokkolás feloldása után a tesztalvás mindkét böngészőben megjelent, célzott törlése után mindkettő visszatért Boti/1799-re. A pending családi törlés gátját célzott automatizált teszt fedi. [Kézi checkpoint](FAMILY_DISSOLUTION_CHECKPOINT_2026-09-23.md).
 - [ ] **[GPT-6 Astra · high]** A04 — Valódi account-szintű családi kilépés, pending adatok védelme. Implementáció, regresszió és `3114711` commit/push kész: külön eszközleválasztás/újracsatlakozás, account-kilépés, választható vagy automatikus adminátadás, utolsó tag blokkolása, régi device-tokenek visszavonása és utolsó fizető utáni pause. A nem admin kilépése és visszacsatlakozása Opo mellett, valamint az utolsó admin külön tesztcsaládjának megszüntetése és tiszta Opo-visszaút sikeres. Másik adminátadás és Free utolsó admin kézi próbája még nyitott.
-    - [x] **[GPT-6 Sol · medium]** 2026-09-24-es kézi próba: `98a8a71` stagingen a külön tesztcsalád létrehozása, tényleges családi naplótörlése és az 1 alvásos kis export újraimportja mindkét böngészőn sikeres. A névtelen / 0 alvásos visszaállítás `INVALID_REQUEST` hibáját **[GPT-6 Astra · high]** feladatként a `fb64e1b` javította; 296/296 helyi teszt és mindkét typecheck sikeres. A javítás után Chrome és Edge InPrivate névtelen profilt, 0 alvást és friss szinkront mutat. Az A03 maradék online-pending kézi próba külön nyitott.
+    - [x] **[GPT-6 Sol · medium]** 2026-09-24-es kézi próba: `98a8a71` stagingen a külön tesztcsalád létrehozása, tényleges családi naplótörlése és az 1 alvásos kis export újraimportja mindkét böngészőn sikeres. A névtelen / 0 alvásos visszaállítás `INVALID_REQUEST` hibáját **[GPT-6 Astra · high]** feladatként a `fb64e1b` javította; 296/296 helyi teszt és mindkét typecheck sikeres. A javítás után Chrome és Edge InPrivate névtelen profilt, 0 alvást és friss szinkront mutat. Az A03 online-pending kézi próba 2026-09-25-én külön lezárult.
     - [x] **[GPT-6 Sol · medium]** Az utolsó tag külön `Solemi törlési próba` családjának staging megszüntetése: 1 gyermek/1 alvás szerveres előnézet, letöltött export, két eszköz kapcsolatának lezárása és a Solemi-fiók/helyi 1 alvás megőrzése sikeres. A Chrome helyi próbanaplójának törlése után az Opo családba visszacsatlakozott; normál Edge és Chrome egyaránt Opo/Boti/1799 alvást és friss szinkront mutat. A régi meghívó érvénytelensége, Free utolsó admin és feleség tagságának külön ellenőrzése nyitott; a fióktörlés recovery és backup-retention követelményeit ez nem zárja le. [Checkpoint és tesztlépések](FAMILY_DISSOLUTION_CHECKPOINT_2026-09-23.md).
 - [ ] **[GPT-6 Sol · high]** A05 — Fiókváltás/guest kapcsolat és helyi adatok elkülönítése. Implementáció, regresszió és `3665d25` commit/push kész: accountonként külön diary+sync workspace, explicit vendégnapló-átvétel, kijelentkezéskori megtartás/törlés, pending megőrzés, többtabos írózár, quota- és crash-helyreállítás. Staging A→logout→B/guest elfogadás hiányzik.
 - [ ] **[GPT-6 Astra · high]** A06 — Legacy API fizetős sync-megkerülés lezárása, kompatibilis átállás. Implementáció, regresszió és `eac16ef` commit/push kész: enforcement mellett kötelező account+device+membership+családi entitlement; atomi, fizetős accountos családlétrehozás; raw legacy create/join/sync és invite tiltás; meglévő család adatvesztés nélküli claimje. Staging build és kézi elfogadás nincs rögzítve.
@@ -76,7 +76,7 @@ próba az audit bizonyítéka, nem a hibák lezárása. Minden alábbi tétel ny
 
 Javítás után közös tesztnapló minden kártyán, HU/EN/DE szövegek és célzott
 kéttelefonos elfogadás szükséges. Nincs automatikus kiadás utáni halasztás;
-az adatmegőrzési sorrend az A03 staging elfogadásával folytatódik.
+az A03 staging elfogadása elkészült, az A04–A06 elfogadása folytatódik.
 
 ## Célállapotok
 
@@ -294,7 +294,7 @@ engedélyez automatikus halasztást. A meglévő Prediction kommunikációját i
 
 ## Következő konkrét munkamenet
 
-**Elsőbbség 2026-09-24-én — [GPT-6 Sol · medium]:** a külön tesztcsalád törlése, biztonsági visszaállítása és végleges megszüntetése két böngészőn sikeres; a Chrome az eredeti Opo családba 1799 alvással visszacsatlakozott. Következő az A03 online-pending kézi tiltás, az A04 Free utolsó admin és régi meghívó külön ellenőrzése, majd az A04–A06, A13–A16 maradék kétböngészős/telefonos elfogadása,
+**Elsőbbség 2026-09-25-én — [GPT-6 Sol · medium]:** az A03 online-pending importtiltás kézi próbája a tesztalvás feltöltésével és törlésével együtt lezárult; Edge és Chrome ismét Boti/1799-et mutat. Következő az A04 Free utolsó admin és régi meghívó külön ellenőrzése, valamint az Opo családtagok aktuális tagságának ellenőrzése, majd az A04–A06, A13–A16 maradék kétböngészős/telefonos elfogadása,
 az A15/A27 adat- és statisztikai javításai, valamint a biztonsági, adatkezelési és
 migrációs kapuk következnek. Az A08–A10 javítások a valódi store-adapterek előtt
 kötelezők. Az alábbi számozott korábbi pontok történeti részletek; a fenti

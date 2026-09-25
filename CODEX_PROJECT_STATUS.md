@@ -95,7 +95,7 @@ Jelentés: [FAMILY_PLUS_STATISTICS_AUDIT_2026-09-20.md](FAMILY_PLUS_STATISTICS_A
   nem részei a normál tesztcsomagnak. Csak dokumentáció és bizonyíték változott.
 - Javítás, commit/push, deploy és adatbázis-módosítás nem történt.
 
-**A01–A02 elkészült. Az A03–A06 staging elfogadása folyamatban; az A13–A14 és
+**A01–A03 elkészült. Az A04–A06 staging elfogadása folyamatban; az A13–A14 és
 A04–A06 commit/push kész. Az A07 kiadási konfiguráció helyi védelme elkészült,
 de a production infrastruktúra nincs beállítva.** Következő kapu: az A07 helyi
 commit/push és a staging ellenőrzés, majd a kéttelefonos elfogadás, amikor
@@ -567,7 +567,7 @@ auditkapu az irányadó, különösen az adatmegőrzési és hozzáférési hib�
 
 ## Következő konkrét feladat
 
-**[GPT-6 Sol · medium]** A külön tesztcsalád teljes kézi staging lánca sikeres: 1 gyermek/1 alvásos szerveres export, végleges családmegszüntetés, mindkét tesztböngésző családi kapcsolatának megszűnése, bejelentkezett fiók és helyi Tesztbaba / 1 alvás megőrzése, Chrome külön helyi törlése, majd tiszta visszacsatlakozás az Opo családba. A végén normál Edge és Chrome egyaránt Opo/Boti/1799 alvást és friss szinkront mutat. Külön nyitott az A03 online-pending kézi tiltás, a Free utolsó admin, a régi meghívó elutasítása és a feleség tagságának aktuális képi ellenőrzése.
+**[GPT-6 Sol · medium]** A külön tesztcsalád teljes kézi staging lánca sikeres: 1 gyermek/1 alvásos szerveres export, végleges családmegszüntetés, mindkét tesztböngésző családi kapcsolatának megszűnése, bejelentkezett fiók és helyi Tesztbaba / 1 alvás megőrzése, Chrome külön helyi törlése, majd tiszta visszacsatlakozás az Opo családba. A03 online-pending importtiltás is kézzel igazolt: Chrome online, `sessions` feltöltés blokkolva, 1 várakozó módosítás, a friss Opo-export importját az app a várt üzenettel megállította. A blokkolás feloldása után a tesztalvás mindkét böngészőben megjelent, majd az azonosított 21:15–21:18-as próbasor törlése után Edge és Chrome egyaránt Boti/1799-et mutat. Ez a kézi próbakör lezárva. Következő külön kapu: A04 Free utolsó admin és régi meghívó elutasítása, valamint a feleség tagságának aktuális képi ellenőrzése.
 
 Az A03 tényleges családi törlése és a kis export újraimportja stagingen sikeres;
 az üres visszaállítási pont szinkronja a `fb64e1b` javítás után mindkét böngészőn sikeres.
@@ -576,8 +576,8 @@ szerveres rollback; a D1 Time Travel az egész, több családot tartalmazó stag
 adatbázist visszatekerné. A [STAGING_D1_RECOVERY_2026-09-23.md](STAGING_D1_RECOVERY_2026-09-23.md)
 rögzíti a megújított Wrangler-belépést, a teljes SQL-exportot, a sikeres helyi
 visszatöltést, a 0 idegenkulcs-hibát és a vizsgált család 1799 aktív alvását.
-**Távoli D1 restore nem történt.** A külön online-pending kézi
-gát és az A04–A06 kétfiókos staging elfogadása is nyitott.
+**Távoli D1 restore nem történt.** Az A03 online-pending kézi
+importgát elfogadva; az A04–A06 fennmaradó staging elfogadása nyitott.
 A valódi éles host, Worker, OAuth és cookie-környezet kialakításához külön
 kiadási döntés és kézi iOS-próba kell.
 
