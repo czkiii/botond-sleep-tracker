@@ -1,0 +1,169 @@
+// Temporary audit probes: these assert the observed defects, not desired behavior.
+import { afterEach, expect, it, vi } from 'vitest'
+import { DatabaseSync } from 'node:sqlite'
+import { readFileSync } from 'node:fs'
+import { StoreBillingService } from './worker/src/storeBillingService'
+import { sqliteBinding } from './worker/tests/sqliteD1'
+import { loadData, saveData, createDefaultData, createSession, STORAGE_KEY } from './src/storage'
+import { onRequest } from './functions/api/[[path]]'
+import worker from './worker/src/index'
+import { makeOperations } from './src/familySync'
+import { getDataQualityReport, totalToday } from './src/utils'
+import { buildSleepDaySummaries, buildSleepDevelopment } from './src/sleepDevelopment'
+import { buildInsightsFoundation } from './src/insights'
+import { buildSimilarDaysInsight } from './src/similarDays'
+import { buildPredictionLite } from './src/prediction'
+import { buildSleepChangeInsight } from './src/sleepChange'
+import { buildMonthlyFamilyReport } from './src/monthlyReport'
+
+const now = 1_800_000_000_000
+const appleToken = '01990d45-a1b2-47e8-91f3-123456789abc'
+const googleToken = 'M7F8abCDefghijklmnop_QrsTuvwxyZ01234'
+const databases: DatabaseSync[] = []
+afterEach(() => { vi.unstubAllGlobals(); databases.splice(0).forEach(db => db.close()) })
+function fixture(provider = 'APPLE') {
+  const db = new DatabaseSync(':memory:'); databases.push(db)
+  for (const path of ['schema.sql', 'migrations/003_accounts_and_sessions.sql', 'migrations/006_subscriptions_and_entitlements.sql', 'migrations/007_store_billing_state.sql']) db.exec(readFileSync(`worker/${path}`, 'utf8'))
+  db.exec(`INSERT INTO accounts VALUES ('acc_a', NULL, NULL, NULL, 'hu', 'ACTIVE', 1, 1, 1, NULL)`)
+  const binding = sqliteBinding(db)
+  const service = new StoreBillingService(binding, { appleAccountToken: () => appleToken, googleAccountToken: () => googleToken, id: prefix => `${prefix}_${crypto.randomUUID()}` })
+  const snapshot: any = { provider, environment: 'SANDBOX', providerSubscriptionId: 'sub-original', providerTransactionId: 'transaction-1', externalAccountToken: provider === 'APPLE' ? appleToken : googleToken, product: 'FAMILY_PLUS', status: 'ACTIVE', autoRenews: true, startedAt: now - 1000, trialEndsAt: null, currentPeriodEndsAt: now + 100_000, accessUntil: now + 100_000, verifiedAt: now, replacementProviderSubscriptionId: null }
+  const event = (s: any, patch = {}) => ({ provider, providerEventId: crypto.randomUUID(), providerSubscriptionId: s.providerSubscriptionId, eventType: 'UPDATED', source: 'SERVER_NOTIFICATION', occurredAt: s.verifiedAt, receivedAt: s.verifiedAt, payloadHash: crypto.randomUUID(), ...patch })
+  const apply = (s: any, e = event(s)) => service.applyVerifiedSubscription({ accountId: 'acc_a', subscription: s, event: e })
+  const features = () => db.prepare('SELECT feature_key FROM account_entitlements WHERE revoked_at IS NULL').all().map(r => r.feature_key)
+  return { db, binding, service, snapshot, event, apply, features }
+}
+it('AUDIT: equal-time same-transaction ACTIVE resurrects a revoked subscription', async () => {
+  const f = fixture(); await f.service.getOrCreateAccountLink('acc_a', 'APPLE', now)
+  await f.apply({ ...f.snapshot, status: 'REVOKED' })
+  expect(f.features()).toEqual([])
+  await f.apply(f.snapshot)
+  expect(f.features()).toContain('FAMILY_PLUS_INSIGHTS')
+})
+it('AUDIT: Google linked replacement leaves old Plus grant after Family replacement', async () => {
+  const f = fixture('GOOGLE_PLAY'); await f.service.getOrCreateAccountLink('acc_a', 'GOOGLE_PLAY', now)
+  await f.apply(f.snapshot)
+  await f.apply({ ...f.snapshot, providerSubscriptionId: 'sub-new', providerTransactionId: 'transaction-2', product: 'FAMILY', replacementProviderSubscriptionId: 'sub-original', verifiedAt: now + 1 })
+  expect(f.features()).toContain('FAMILY_PLUS_INSIGHTS')
+  expect(f.db.prepare('SELECT COUNT(*) AS n FROM subscriptions WHERE status = \'ACTIVE\'').get()?.n).toBe(2)
+})
+it('AUDIT: same provider identity accepts a switch between production and sandbox', async () => {
+  const f = fixture(); await f.service.getOrCreateAccountLink('acc_a', 'APPLE', now)
+  await f.apply({ ...f.snapshot, environment: 'PRODUCTION' })
+  await f.apply({ ...f.snapshot, verifiedAt: now + 1 })
+  expect(f.db.prepare('SELECT environment FROM store_subscription_state').get()?.environment).toBe('SANDBOX')
+})
+it('AUDIT: conflicting event arriving between read and batch changes rights but cannot update event', async () => {
+  const f = fixture(); await f.service.getOrCreateAccountLink('acc_a', 'APPLE', now)
+  await f.apply(f.snapshot)
+  const incoming = { ...f.snapshot, status: 'REVOKED', verifiedAt: now + 1 }
+  const e = f.event(incoming, { providerEventId: 'racing-event', payloadHash: 'incoming-hash' })
+  const originalBatch = f.binding.batch.bind(f.binding)
+  f.binding.batch = async (statements: any) => {
+    const subId = f.db.prepare('SELECT id FROM subscriptions').get()?.id
+    f.db.prepare(`INSERT INTO subscription_events VALUES (?, 'APPLE', 'racing-event', ?, 'OTHER', ?, ?, 'other-hash', ?, NULL)`).run('evt_raced', subId as string, now, now, now)
+    return originalBatch(statements)
+  }
+  expect((await f.apply(incoming, e)).outcome).toBe('APPLIED')
+  expect(f.features()).toEqual([])
+  expect(f.db.prepare("SELECT payload_hash FROM subscription_events WHERE provider_event_id = 'racing-event'").get()?.payload_hash).toBe('other-hash')
+})
+function mockStorage() {
+  const values = new Map<string, string>()
+  vi.stubGlobal('localStorage', { getItem: (k: string) => values.get(k) ?? null, setItem: (k: string, v: string) => values.set(k, v) })
+  return values
+}
+it('AUDIT: invalid local diary gets overwritten with empty default by startup load/save', () => {
+  const values = mockStorage(); const original = '{"version":4,"sessions":[broken'
+  values.set(STORAGE_KEY, original)
+  const loaded = loadData(); expect(loaded.sessions).toHaveLength(0)
+  saveData(loaded)
+  expect(values.get(STORAGE_KEY)).not.toBe(original)
+})
+it('AUDIT: two stale tab snapshots overwrite one another even for independent new sleeps', () => {
+  mockStorage(); saveData(createDefaultData('hu'))
+  const tabA = loadData(); const tabB = loadData()
+  tabA.sessions.push(createSession(tabA.children[0].id, '2026-09-19T12:00:00Z', '2026-09-19T13:00:00Z'))
+  tabB.sessions.push(createSession(tabB.children[0].id, '2026-09-19T14:00:00Z', '2026-09-19T15:00:00Z'))
+  saveData(tabA); saveData(tabB)
+  expect(loadData().sessions.map(s => s.id)).toEqual([tabB.sessions[0].id])
+})
+it('AUDIT: Pages proxy rewrites a foreign Origin as the trusted internal Origin', async () => {
+  let forwardedOrigin: string | null = null
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    forwardedOrigin = new Request(input, init).headers.get('Origin')
+    return new Response('{}')
+  })
+  const response = await onRequest({ request: new Request('https://solemi-sleep-internal.pages.dev/api/v1/families', { method: 'POST', headers: { Origin: 'https://foreign.example' }, body: '{}' }) })
+  expect(response.status).toBe(200)
+  expect(forwardedOrigin).toBe('https://solemi-sleep-internal.pages.dev')
+})
+async function familyFixture() {
+  const f = fixture()
+  f.db.exec(readFileSync('worker/migrations/005_family_memberships.sql', 'utf8'))
+  const env = { DB: f.binding, TOKEN_PEPPER: 'audit-only', ALLOWED_ORIGINS: '', ENTITLEMENT_ENFORCEMENT: 'true' }
+  const create = await worker.fetch(new Request('https://local.test/v1/families', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ familyName: 'Audit', childId: 'child-a' }) }), env)
+  expect(create.status).toBe(201)
+  const family: any = (await create.json()).data
+  const req = (path: string, method = 'GET', body?: unknown) => worker.fetch(new Request(`https://local.test${path}`, { method, headers: { Authorization: `Bearer ${family.deviceToken}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) }), env)
+  return { ...f, env, family, req }
+}
+it('AUDIT: entitlement enforcement still lets an anonymous unclaimed family sync', async () => {
+  const f = await familyFixture()
+  expect((await f.req('/v1/sessions/start', 'POST', { operationId: 'start-a', sessionId: 'sleep-a', childId: 'child-a', startTime: '2026-09-19T12:00:00Z' })).status).toBe(201)
+  expect((await f.req('/v1/sync')).status).toBe(200)
+  expect(f.db.prepare('SELECT COUNT(*) AS n FROM legacy_family_memberships').get()?.n).toBe(0)
+})
+it('AUDIT: family leave revokes only device and preserves active account membership', async () => {
+  const f = await familyFixture()
+  f.db.prepare(`INSERT INTO legacy_family_memberships VALUES ('member-a', ?, 'acc_a', 'ADMIN', 'ACTIVE', ?, NULL)`).run(f.family.familyId, now)
+  expect((await f.req('/v1/device/leave', 'POST', {})).status).toBe(200)
+  expect(f.db.prepare('SELECT status FROM legacy_family_memberships').get()?.status).toBe('ACTIVE')
+  expect(f.db.prepare('SELECT revoked_at FROM devices').get()?.revoked_at).not.toBeNull()
+})
+it('AUDIT: concurrent child deletes can both pass the last-child precheck', async () => {
+  const f = await familyFixture()
+  expect((await f.req('/v1/children', 'POST', { operationId: 'create-b', child: { id: 'child-b', name: 'B' } })).status).toBe(201)
+  const originalBatch = f.binding.batch.bind(f.binding)
+  let injected = false
+  f.binding.batch = async (statements: any) => {
+    if (!injected) { injected = true; expect((await f.req('/v1/children/child-b', 'DELETE', { operationId: 'delete-b' })).status).toBe(200) }
+    return originalBatch(statements)
+  }
+  expect((await f.req('/v1/children/child-a', 'DELETE', { operationId: 'delete-a' })).status).toBe(200)
+  expect(f.db.prepare('SELECT COUNT(*) AS n FROM children WHERE deleted_at IS NULL').get()?.n).toBe(0)
+})
+it('AUDIT: a newly created active sleep drops its note and day/night override from the outbox', () => {
+  const before = createDefaultData('hu'); const after = structuredClone(before)
+  const sleep = createSession(before.children[0].id, '2026-09-19T12:00:00Z')
+  sleep.note = 'Audit note'; sleep.dayNightOverride = 'night'; after.sessions.push(sleep)
+  const operations = makeOperations(before, after)
+  expect(operations).toHaveLength(1)
+  expect(operations[0].path).toBe('/v1/sessions/start')
+  expect(JSON.stringify(operations)).not.toContain('Audit note')
+  expect(JSON.stringify(operations)).not.toContain('dayNightOverride')
+})
+it('AUDIT: new active sleep is marked invalid while the display clock is one tick behind', () => {
+  const sleep = createSession('a', new Date(now + 100).toISOString())
+  expect(getDataQualityReport([sleep], now).issues[0].kind).toBe('invalid-time')
+})
+it('AUDIT: overlapping records yield different Today and statistics totals', () => {
+  const a = createSession('a', '2026-09-19T12:00:00Z', '2026-09-19T13:00:00Z')
+  const b = { ...a, id: 'b', startTime: '2026-09-19T12:30:00Z', endTime: '2026-09-19T13:30:00Z' }
+  const clock = Date.parse('2026-09-19T15:00:00Z')
+  expect(totalToday([a, b], new Date(clock))).toBe(120 * 60_000)
+  expect(buildSleepDaySummaries([a, b], clock).reduce((sum, d) => sum + d.totalMs, 0)).toBe(90 * 60_000)
+})
+it('AUDIT observation: statistics computation cost with 1800 completed sleeps', () => {
+  const clock = Date.parse('2026-09-20T00:00:00Z')
+  const sleeps = Array.from({ length: 1800 }, (_, i) => createSession('a', new Date(clock - (i + 1) * 8 * 3600_000).toISOString(), new Date(clock - (i + 1) * 8 * 3600_000 + 2 * 3600_000).toISOString()))
+  const started = performance.now()
+  buildSleepDaySummaries(sleeps, clock)
+  buildInsightsFoundation(sleeps, clock)
+  buildSimilarDaysInsight(sleeps, clock, 14)
+  buildPredictionLite(sleeps, clock, 14)
+  buildSleepDevelopment(sleeps, clock, 12)
+  buildSleepChangeInsight(sleeps, clock)
+  buildMonthlyFamilyReport(sleeps, clock)
+  console.log(`AUDIT_STATS_1800_MS=${Math.round(performance.now() - started)}`)
+})

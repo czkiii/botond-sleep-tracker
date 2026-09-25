@@ -1,0 +1,191 @@
+SOLEMI SLEEP V1 – FIÓKTÖRLÉSI ÉS ADATEXPORT FELHASZNÁLÓI FOLYAMAT
+Dátum: 2026-09-20
+Státusz: jóváhagyott termékdöntésre épülő implementációs specifikáció
+
+CÉL
+A törlés legyen könnyen megtalálható, egyértelmű és biztonságos.
+Ne legyen sötét minta, fölösleges akadály vagy supporthoz kényszerítés.
+A felhasználó előbb kapjon lehetőséget arra, hogy az adatait magával vigye.
+
+1. BELÉPÉSI PONT
+
+Beállítások → Fiók → “Fiókom és adataim”
+
+Itt három külön művelet:
+- Teljes adataim exportálása
+- Kilépés a családból
+- Fiókom törlése
+
+A helyi adatkezelés külön blokk:
+- Csak ezen az eszközön lévő adatok törlése
+- Családi adatok törlése
+
+2. FIÓKTÖRLÉS – 1. KÉPERNYŐ
+
+Cím:
+“Fiókod törlése”
+
+Rövid magyarázat:
+“Letöltheted a Solemiben tárolt adataid másolatát, mielőtt törlöd a fiókodat.”
+
+Elsődleges lehetőség:
+“Teljes adataim exportálása”
+
+Tovább:
+“Folytatás a törléshez”
+
+3. FIÓKTÖRLÉS – MI FOG TÖRTÉNNI?
+
+Ha más családtag marad:
+- a te Solemi-fiókod és hozzáférésed megszűnik;
+- a közös gyermek- és alvásnapló a családban megmarad;
+- te többé nem férsz hozzá;
+- jogilag kötelező minimális billing/számviteli rekordok külön maradhatnak.
+
+Ha te vagy az utolsó családtag:
+- a család megszüntetésre kerül;
+- a gyermekprofilok és alvásnapló a választott törlési mód szerint törlődnek;
+- a teljes export újból felajánlandó.
+
+4. TÖRLÉSI MÓD KIVÁLASZTÁSA
+
+A) “Végleges törlés most”
+Magyarázat:
+“A vissza nem állítható Solemi-adatok törlését azonnal elindítjuk.
+A jogszabály alapján kötelezően megőrzendő minimális adatok kivételt képezhetnek.”
+
+B) “30 napos helyreállítás”
+Magyarázat:
+“A fiókod legfeljebb 30 napig helyreállítható. Ezalatt nem használható normál
+Solemi-fiókként. A 30. nap után a nem kötelezően megőrzendő adatok automatikusan
+végleg törlődnek.”
+
+Legyen jól látható:
+“A 30 nap maximum, nem kötelező várakozási idő.”
+
+5. MEGERŐSÍTÉS
+
+Fióktörlésnél újrahitelesítés vagy biztonságos megerősítés alkalmazható.
+
+Normál saját fióktörlésnél ne kérjünk szükségtelenül nehéz lépéseket.
+
+Ha a művelet az egész családi naplót törli:
+- külön figyelmeztetés;
+- export gomb;
+- a család nevének begépelése vagy hasonló második megerősítés;
+- egyértelmű szöveg: “Ez más családtagok közös adatait is törli.”
+
+6. 30 NAPOS RECOVERY ÁLLAPOT
+
+A recovery fiók:
+- nem használható normál naplózásra;
+- nem használható marketingre;
+- Family Sync ne írjon új adatot;
+- a felhasználó belépéskor csak recovery képernyőt kapjon.
+
+Két gomb:
+- “Fiókom helyreállítása”
+- “Végleges törlés most”
+
+A hátralévő idő legyen látható:
+“Fiókod még X napig helyreállítható.”
+
+7. HELYREÁLLÍTÁS
+
+A felhasználó saját maga végezheti.
+Sikeres azonosítás után:
+- account újra ACTIVE;
+- jogosultságok a store aktuális állapota alapján újraellenőrzendők;
+- Family tagság csak akkor állítható vissza automatikusan, ha az adott család
+  és tagság a szabályok szerint még létezik;
+- lejárt vagy visszavont előfizetés nem éledhet újra pusztán recovery miatt.
+
+8. 30. NAP – VÉGLEGESÍTÉS
+
+Automatikus végleges törlési folyamat:
+- fiók és személyes accountadatok törlése/anonimizálása;
+- auth/session tokenek végleges visszavonása;
+- ha utolsó családtag volt, családi napló törlése;
+- törlésből kivett, jogilag kötelező minimális rekordok elkülönített,
+  korlátozott kezelésben maradhatnak;
+- restore backup után a törlésnek újra érvényesülnie kell.
+
+9. KILÉPÉS A CSALÁDBÓL
+
+Kilépés előtt:
+- export lehetőség;
+- magyarázat arról, hogy a közös napló a családnál marad.
+
+Admin:
+- ajánljuk fel új admin kijelölését;
+- ha nem választ, a rögzített termékszabály alapján más aktív tag vegye át.
+
+Utolsó tag:
+- ne lehessen egyszerű “kilépés”;
+- külön “Család megszüntetése” folyamat induljon.
+
+Utolsó fizető:
+- Family Sync szünetel;
+- adat nem törlődik.
+
+10. HELYI VS. CSALÁDI TÖRLÉS
+
+“Csak ezen az eszközön lévő adatok törlése”
+- nem törli automatikusan a családi cloud naplót;
+- egyértelműen közölje, hogy Family Syncből később az adatok újra letöltődhetnek,
+  ha a felhasználó ugyanahhoz a családhoz visszacsatlakozik.
+
+“Családi adatok törlése”
+- családi cloud adatot is érint;
+- export;
+- második megerősítés;
+- családnév begépelése;
+- minden érintett eszközön konzisztens eredmény.
+
+11. WEBES TÖRLÉSI ÚTVONAL
+
+Publikus URL szükséges:
+[FIÓKTÖRLÉSI WEBOLDAL]
+
+Az oldal:
+- nevezze meg a Solemi Sleepet;
+- tegye jól láthatóvá a törlés kérését;
+- ne követelje meg az app újratelepítését;
+- biztosítson azonosítható, biztonságos folyamatot;
+- tartalmazza az export lehetőséget, ahol technikailag megvalósítható;
+- írja le a 30 napos recovery és az azonnali törlés lehetőségét.
+
+12. PLATFORM-SPECIFIKUS LÉPÉSEK
+
+iOS / Sign in with Apple:
+- accounttörléskor az Apple-hez kapcsolódó tokeneket vissza kell vonni.
+
+Android / Google Play:
+- appon belüli és külső webes account deletion útvonal szükséges;
+- a Play Console Data Safety részében a webes törlési URL-t meg kell adni.
+
+13. ELŐFIZETÉS ÉS FIÓKTÖRLÉS
+
+A fiók törlése önmagában nem feltétlenül azonos a store-előfizetés lemondásával.
+A felhasználót a törlés előtt tájékoztatni kell:
+- hol kezelheti/leállíthatja az Apple vagy Google előfizetést;
+- mi történik a már kifizetett időszakkal;
+- hogy a store és a Solemi-fiók külön rendszer.
+
+Ne tegyük a törlés feltételévé felesleges lépésként a support megkeresését.
+
+14. ELFOGADÁSI TESZTEK
+
+- export → azonnali törlés;
+- export → 30 nap recovery → saját visszaállítás;
+- recovery → végleges törlés a 30 nap előtt;
+- 30 nap lejárata;
+- családtag törlése más tag mellett;
+- utolsó tag törlése;
+- admin kilépése;
+- utolsó fizető kilépése;
+- aktív havi/éves előfizetés melletti accounttörlés;
+- Sign in with Apple token revoke;
+- Google külső deletion oldal;
+- backup restore után korábban törölt fiók nem éled vissza;
+- HU/EN/DE szövegek.

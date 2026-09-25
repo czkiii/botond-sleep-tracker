@@ -6,6 +6,7 @@
   "workers_dev": true,
   "preview_urls": true,
   "vars": {
+    "SOLEMI_ENVIRONMENT": "production",
     "ALLOWED_ORIGINS": "https://czkiii.github.io,http://localhost:5173"
   },
   "d1_databases": [

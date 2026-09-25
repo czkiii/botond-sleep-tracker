@@ -1,58 +1,91 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { AppData } from './types'
+import { t } from './i18n'
 import type { Locale } from './i18n'
-import { loadData } from './storage'
-import { createFamily, createInvite, getSyncStore, joinFamily, leaveFamily, pullRemote, queueLocalChange, refreshFamilyInfo } from './familySync'
+import { exportData, loadData } from './storage'
+import { familyDissolutionCopy } from './familyDissolutionCopy'
+import { dissolveFamily, prepareFamilyDissolution } from './familySync'
+import type { FamilyDissolutionPreview } from './familySync'
+import { createFamily, createInvite, getAccountFamilyMembers, getSyncStore, joinFamily, leaveAccountFamily, leaveFamily, pullRemote, reconcileAccountFamily, reconnectAccountFamily, refreshFamilyInfo, resolveSyncConflict, restoreMissingSession } from './familySync'
+import type { FamilyMemberChoice } from './familySync'
+import { ACCOUNT_ACCESS_EVENT, ACCOUNT_STATE_EVENT, getAccountAccess, restoreAccount, setInternalTestPlan } from './accountAuth'
+import type { AccountAccessState } from './accountAuth'
+import { INTERNAL_PLAN_PREVIEW_EVENT, INTERNAL_PLAN_PREVIEW_KEY, canUseFamilySync, parseProductPlan } from './entitlements'
+import type { ProductPlan } from './entitlements'
 
 const LAST_INVITE_KEY = 'solemiSleep:lastInvite'
 const LAST_SYNC_KEY = 'solemiSleep:lastSyncAt'
+const internalPreview = import.meta.env.VITE_INTERNAL_PREVIEW === 'true'
+
+function loadInternalPlanPreview(): ProductPlan {
+  if (!internalPreview) return 'free'
+  try {
+    return parseProductPlan(window.localStorage.getItem(INTERNAL_PLAN_PREVIEW_KEY)) ?? 'familyPlus'
+  } catch {
+    return 'familyPlus'
+  }
+}
 
 const copy = {
   hu: {
-    title: 'Családi szinkron', connected: 'Szinkron aktív', disconnected: 'Nincs összekapcsolva',
-    intro: 'Kapcsold össze a két telefont fiók és jelszó nélkül.', create: 'Új család létrehozása', join: 'Csatlakozás kóddal',
+    title: 'Családi megosztás', connected: 'A családi adatok megosztva', disconnected: 'Nincs család összekapcsolva',
+    intro: 'Kapcsold össze a család telefonjait, hogy ugyanazokat az alvásadatokat lássátok.', create: 'Új család létrehozása', join: 'Csatlakozás kóddal',
     familyName: 'Család neve', familyNamePlaceholder: 'Pl. Kovács család', createButton: 'Család létrehozása',
     codePlaceholder: 'Meghívókód', joinButton: 'Csatlakozás', cancel: 'Mégse', close: 'Bezárás',
-    inviteTitle: 'Meghívókód', inviteHelp: 'Ezt a kódot írd be a másik telefonon. 30 percig érvényes.',
-    newInvite: 'Új meghívókód', copyCode: 'Kód másolása', copied: 'Másolva ✓', leave: 'Eszköz leválasztása',
-    leaveConfirm: 'Leválasztod ezt a telefont a családi szinkronról?', syncing: 'Szinkronizálás…', offline: 'Offline', error: 'Nem sikerült a szinkronizálás.',
+    inviteTitle: 'Meghívókód', inviteHelp: 'A másik családtag lépjen be a saját Google-fiókjával, majd írja be ezt a kódot. 30 percig érvényes.',
+    newInvite: 'Új meghívókód', copyCode: 'Kód másolása', copied: 'Másolva ✓', leave: 'Eszköz leválasztása', reconnect: 'Eszköz újracsatlakoztatása', leaveAccount: 'Kilépés a családból',
+    leaveConfirm: 'Csak ezt a telefont választod le. A családi tagságod és a helyi napló megmarad. Később újracsatlakoztathatod az eszközt.', leaveAccountConfirm: 'Kilépsz a családból? Minden eszközöd elveszíti a családi hozzáférést, a telefon helyi naplója megmarad.', leaveAdminTitle: 'Ki legyen az új admin?', leaveAdminHelp: 'Válassz családtagot, vagy bízd a rendszerre. Automatikus választásnál a legrégebbi aktív tag lesz az admin.', leaveAdminAuto: 'Automatikus választás', leaveAdminFinalConfirm: 'Kilépsz a családból? Minden eszközöd elveszíti a családi hozzáférést, a telefon helyi naplója megmarad.', syncing: 'Adatok frissítése…', offline: 'Offline', error: 'Nem sikerült frissíteni a családi adatokat.',
     settingsHintConnected: 'A család eszközei ugyanazokat az alvásadatokat látják.', settingsHintDisconnected: 'Párosíts egy másik telefont meghívókóddal.', familyConnected: 'Család összekapcsolva',
     pendingOne: '1 módosítás várakozik', pendingMany: (count: number) => `${count} módosítás várakozik`,
+    conflictOne: '1 módosítás ütközik egy másik telefon változatával', conflictMany: (count: number) => `${count} módosítás ütközik egy másik telefon változatával`,
+    conflictTitle: 'Ugyanezt az alvást két telefonon módosítottátok.', conflictHelp: 'Válaszd ki, melyik változat maradjon meg. Egyiket sem írjuk felül a döntésed nélkül.', keepLocal: 'Ezen a telefonon lévő maradjon', keepFamily: 'A családi változat maradjon',
+    missingTitle: 'Egy korábbi alvás nincs meg a családi naplóban.', missingHelp: 'A helyi alvás és módosításai megmaradnak. A többi alvás szinkronizálása folytatódik. Ha ezt is meg szeretnéd osztani, ellenőrizd az időpontjait, és válaszd a megosztást.', shareMissing: 'Ezt az alvást is megosztom', retryMissing: 'Megosztás újrapróbálása', missingLocal: 'A telefon naplójában sem található; automatikusan nem állítjuk vissza.', activeSleep: 'Még alszik', missingCount: (count: number) => `${count} korábbi alvás megosztása ellenőrzést igényel`,
     offlineHint: 'A módosításokat elmentjük, és internetkapcsolatnál elküldjük.', syncIssue: 'Szinkron ellenőrzése szükséges',
     lastSyncNow: 'Utolsó szinkron: most', lastSyncMinutes: (minutes: number) => `Utolsó szinkron: ${minutes} perce`, lastSyncLongAgo: 'Utolsó szinkron: régebben',
     inviteNotFound: 'A meghívókód nem található. Ellenőrizd a kódot, vagy kérj újat.', inviteUsed: 'Ezt a meghívókódot már felhasználták. Kérj egy új kódot.', inviteExpired: 'A meghívókód lejárt. Kérj egy új kódot.',
-    deviceRevoked: 'Ez a telefon már le lett választva a családról.', invalidToken: 'A készülék kapcsolata már nem érvényes. Párosítsd újra a telefont.', networkError: 'Nincs kapcsolat a Solemi Sleep szerverével. Próbáld újra később.'
+    deviceRevoked: 'Ez a telefon már le lett választva a családról.', invalidToken: 'A készülék kapcsolata már nem érvényes. Párosítsd újra a telefont.', accountRequired: 'A meghívókód használatához előbb lépj be a saját Google-fiókoddal.', ownerAccountRequired: 'A család létrehozójának előbb össze kell kapcsolnia a családot a Solemi-fiókjával.', alreadyInFamily: 'Ez a Google-fiók már egy családhoz tartozik.', familyDissolutionRequired: 'Egyetlen megmaradt tagként külön a Család megszüntetése folyamatot kell használnod.', leaveOffline: 'Kilépés vagy leválasztás előtt csatlakozz az internethez.', leavePending: 'Kilépés vagy leválasztás előtt várd meg a függő módosítások szinkronizálását.', leaveAttention: 'Kilépés vagy leválasztás előtt rendezd a jelzett szinkronhibát vagy ütközést.', networkError: 'Nincs kapcsolat a Solemi Sleep szerverével. Próbáld újra később.',
+    locked: 'Zárolva', lockedHint: 'Ehhez a funkcióhoz Family vagy Family+ jogosultság szükséges.', lockedDescription: 'Family vagy Family+ csomaggal összekapcsolhatod a család telefonjait, hogy ugyanazokat az alvásadatokat lássátok.',
+    paused: 'A családi szinkron szünetel', pausedHint: 'A családban jelenleg nincs aktív Family vagy Family+ előfizetés. A helyi módosításaid megmaradnak.'
   },
   en: {
-    title: 'Family Sync', connected: 'Sync active', disconnected: 'Not connected',
-    intro: 'Connect two phones without an account or password.', create: 'Create a new family', join: 'Join with a code',
+    title: 'Family sharing', connected: 'Family data is shared', disconnected: 'No family connected',
+    intro: 'Connect the family’s phones so everyone sees the same sleep data.', create: 'Create a new family', join: 'Join with a code',
     familyName: 'Family name', familyNamePlaceholder: 'e.g. Smith family', createButton: 'Create family',
     codePlaceholder: 'Invite code', joinButton: 'Join', cancel: 'Cancel', close: 'Close',
-    inviteTitle: 'Invite code', inviteHelp: 'Enter this code on the other phone. It is valid for 30 minutes.',
-    newInvite: 'New invite code', copyCode: 'Copy code', copied: 'Copied ✓', leave: 'Disconnect this device',
-    leaveConfirm: 'Disconnect this phone from Family Sync?', syncing: 'Syncing…', offline: 'Offline', error: 'Sync failed.',
+    inviteTitle: 'Invite code', inviteHelp: 'The other family member should sign in with their own Google account, then enter this code. It is valid for 30 minutes.',
+    newInvite: 'New invite code', copyCode: 'Copy code', copied: 'Copied ✓', leave: 'Disconnect this device', reconnect: 'Reconnect this device', leaveAccount: 'Leave family',
+    leaveConfirm: 'Disconnect only this phone? Your family membership and local diary remain, and you can reconnect this device later.', leaveAccountConfirm: 'Leave the family? All your devices lose family access while this phone keeps its local diary.', leaveAdminTitle: 'Who should become admin?', leaveAdminHelp: 'Choose a family member or let Solemi decide. Automatic selection makes the oldest active member admin.', leaveAdminAuto: 'Choose automatically', leaveAdminFinalConfirm: 'Leave the family? All your devices lose family access while this phone keeps its local diary.', syncing: 'Updating family data…', offline: 'Offline', error: 'Could not update family data.',
     settingsHintConnected: 'Family devices see the same sleep data.', settingsHintDisconnected: 'Pair another phone with an invite code.', familyConnected: 'Family connected',
     pendingOne: '1 change waiting', pendingMany: (count: number) => `${count} changes waiting`,
+    conflictOne: '1 change conflicts with another phone’s version', conflictMany: (count: number) => `${count} changes conflict with another phone’s version`,
+    conflictTitle: 'The same sleep was changed on two phones.', conflictHelp: 'Choose which version to keep. Neither is overwritten without your decision.', keepLocal: 'Keep this phone’s version', keepFamily: 'Keep the family version',
+    missingTitle: 'An earlier sleep is missing from the family diary.', missingHelp: 'Your local sleep and changes are kept. Other sleeps continue to sync. To share this one too, check its times and choose to share it.', shareMissing: 'Share this sleep too', retryMissing: 'Retry sharing', missingLocal: 'It is also missing from this phone’s diary; it will not be restored automatically.', activeSleep: 'Still sleeping', missingCount: (count: number) => `Sharing ${count} earlier sleeps needs review`,
     offlineHint: 'Changes are saved and will be sent when the internet connection returns.', syncIssue: 'Sync needs attention',
     lastSyncNow: 'Last sync: now', lastSyncMinutes: (minutes: number) => `Last sync: ${minutes} min ago`, lastSyncLongAgo: 'Last sync: earlier',
     inviteNotFound: 'Invite code not found. Check the code or request a new one.', inviteUsed: 'This invite code has already been used. Request a new code.', inviteExpired: 'This invite code has expired. Request a new code.',
-    deviceRevoked: 'This phone has already been disconnected from the family.', invalidToken: 'This device connection is no longer valid. Pair the phone again.', networkError: 'Cannot reach the Solemi Sleep server. Try again later.'
+    deviceRevoked: 'This phone has already been disconnected from the family.', invalidToken: 'This device connection is no longer valid. Pair the phone again.', accountRequired: 'Sign in with your own Google account before using an invite code.', ownerAccountRequired: 'The family creator must connect the family to their Solemi account first.', alreadyInFamily: 'This Google account already belongs to a family.', familyDissolutionRequired: 'As the final member, use the separate Dissolve family flow.', leaveOffline: 'Connect to the internet before leaving or disconnecting.', leavePending: 'Wait for pending changes to sync before leaving or disconnecting.', leaveAttention: 'Resolve the sync error or conflict before leaving or disconnecting.', networkError: 'Cannot reach the Solemi Sleep server. Try again later.',
+    locked: 'Locked', lockedHint: 'A Family or Family+ subscription is required for this feature.', lockedDescription: 'With Family or Family+, you can connect the family’s phones so everyone sees the same sleep data.',
+    paused: 'Family sync is paused', pausedHint: 'No family member currently has an active Family or Family+ subscription. Your local changes are kept.'
   },
   de: {
-    title: 'Familien-Sync', connected: 'Sync aktiv', disconnected: 'Nicht verbunden',
-    intro: 'Verbinde zwei Telefone ohne Konto oder Passwort.', create: 'Neue Familie erstellen', join: 'Mit Code beitreten',
+    title: 'Familienfreigabe', connected: 'Familiendaten werden geteilt', disconnected: 'Keine Familie verbunden',
+    intro: 'Verbinde die Telefone der Familie, damit alle dieselben Schlafdaten sehen.', create: 'Neue Familie erstellen', join: 'Mit Code beitreten',
     familyName: 'Familienname', familyNamePlaceholder: 'z. B. Familie Müller', createButton: 'Familie erstellen',
     codePlaceholder: 'Einladungscode', joinButton: 'Beitreten', cancel: 'Abbrechen', close: 'Schließen',
-    inviteTitle: 'Einladungscode', inviteHelp: 'Gib diesen Code auf dem anderen Telefon ein. Er ist 30 Minuten gültig.',
-    newInvite: 'Neuer Einladungscode', copyCode: 'Code kopieren', copied: 'Kopiert ✓', leave: 'Dieses Gerät trennen',
-    leaveConfirm: 'Dieses Telefon vom Familien-Sync trennen?', syncing: 'Synchronisieren…', offline: 'Offline', error: 'Synchronisierung fehlgeschlagen.',
+    inviteTitle: 'Einladungscode', inviteHelp: 'Das andere Familienmitglied meldet sich mit dem eigenen Google-Konto an und gibt dann diesen Code ein. Er ist 30 Minuten gültig.',
+    newInvite: 'Neuer Einladungscode', copyCode: 'Code kopieren', copied: 'Kopiert ✓', leave: 'Dieses Gerät trennen', reconnect: 'Dieses Gerät wieder verbinden', leaveAccount: 'Familie verlassen',
+    leaveConfirm: 'Nur dieses Telefon trennen? Deine Familienmitgliedschaft und das lokale Tagebuch bleiben erhalten. Du kannst das Gerät später wieder verbinden.', leaveAccountConfirm: 'Familie verlassen? Alle deine Geräte verlieren den Familienzugriff, das lokale Tagebuch auf diesem Telefon bleibt erhalten.', leaveAdminTitle: 'Wer soll Admin werden?', leaveAdminHelp: 'Wähle ein Familienmitglied oder überlasse Solemi die Auswahl. Automatisch wird das älteste aktive Mitglied Admin.', leaveAdminAuto: 'Automatisch auswählen', leaveAdminFinalConfirm: 'Familie verlassen? Alle deine Geräte verlieren den Familienzugriff, das lokale Tagebuch bleibt erhalten.', syncing: 'Familiendaten werden aktualisiert…', offline: 'Offline', error: 'Familiendaten konnten nicht aktualisiert werden.',
     settingsHintConnected: 'Familiengeräte sehen dieselben Schlafdaten.', settingsHintDisconnected: 'Verbinde ein weiteres Telefon per Einladungscode.', familyConnected: 'Familie verbunden',
     pendingOne: '1 Änderung wartet', pendingMany: (count: number) => `${count} Änderungen warten`,
+    conflictOne: '1 Änderung steht im Konflikt mit der Version eines anderen Telefons', conflictMany: (count: number) => `${count} Änderungen stehen im Konflikt mit der Version eines anderen Telefons`,
+    conflictTitle: 'Derselbe Schlaf wurde auf zwei Telefonen geändert.', conflictHelp: 'Wähle aus, welche Version bleiben soll. Keine wird ohne deine Entscheidung überschrieben.', keepLocal: 'Version dieses Telefons behalten', keepFamily: 'Familienversion behalten',
+    missingTitle: 'Ein früherer Schlaf fehlt im Familientagebuch.', missingHelp: 'Dein lokaler Schlaf und deine Änderungen bleiben erhalten. Andere Schlafdaten werden weiter synchronisiert. Prüfe die Zeiten, bevor du auch diesen Schlaf teilst.', shareMissing: 'Diesen Schlaf auch teilen', retryMissing: 'Teilen erneut versuchen', missingLocal: 'Auch im Tagebuch dieses Telefons fehlt der Schlaf; er wird nicht automatisch wiederhergestellt.', activeSleep: 'Schläft noch', missingCount: (count: number) => `Das Teilen von ${count} früheren Schlafzeiten muss geprüft werden`,
     offlineHint: 'Änderungen werden gespeichert und bei Internetverbindung übertragen.', syncIssue: 'Sync muss geprüft werden',
     lastSyncNow: 'Letzter Sync: gerade eben', lastSyncMinutes: (minutes: number) => `Letzter Sync: vor ${minutes} Min.`, lastSyncLongAgo: 'Letzter Sync: vor längerer Zeit',
     inviteNotFound: 'Einladungscode nicht gefunden. Prüfe den Code oder fordere einen neuen an.', inviteUsed: 'Dieser Einladungscode wurde bereits verwendet. Fordere einen neuen an.', inviteExpired: 'Dieser Einladungscode ist abgelaufen. Fordere einen neuen an.',
-    deviceRevoked: 'Dieses Telefon wurde bereits von der Familie getrennt.', invalidToken: 'Diese Geräteverbindung ist nicht mehr gültig. Kopple das Telefon erneut.', networkError: 'Der Solemi-Sleep-Server ist nicht erreichbar. Versuche es später erneut.'
+    deviceRevoked: 'Dieses Telefon wurde bereits von der Familie getrennt.', invalidToken: 'Diese Geräteverbindung ist nicht mehr gültig. Kopple das Telefon erneut.', accountRequired: 'Melde dich mit deinem eigenen Google-Konto an, bevor du einen Einladungscode verwendest.', ownerAccountRequired: 'Der Ersteller der Familie muss die Familie zuerst mit dem Solemi-Konto verbinden.', alreadyInFamily: 'Dieses Google-Konto gehört bereits zu einer Familie.', familyDissolutionRequired: 'Als letztes Mitglied musst du den separaten Ablauf Familie auflösen verwenden.', leaveOffline: 'Stelle vor dem Verlassen oder Trennen eine Internetverbindung her.', leavePending: 'Warte vor dem Verlassen oder Trennen, bis ausstehende Änderungen synchronisiert sind.', leaveAttention: 'Behebe vor dem Verlassen oder Trennen den Sync-Fehler oder Konflikt.', networkError: 'Der Solemi-Sleep-Server ist nicht erreichbar. Versuche es später erneut.',
+    locked: 'Gesperrt', lockedHint: 'Für diese Funktion ist ein Family- oder Family+-Abo erforderlich.', lockedDescription: 'Mit Family oder Family+ kannst du die Telefone der Familie verbinden, damit alle dieselben Schlafdaten sehen.',
+    paused: 'Familiensynchronisierung pausiert', pausedHint: 'Derzeit hat kein Familienmitglied ein aktives Family- oder Family+-Abo. Lokale Änderungen bleiben erhalten.'
   }
 } as const
 
@@ -67,42 +100,149 @@ function deviceName() {
 
 export default function FamilySyncLayer() {
   const [open, setOpen] = useState(false)
-  const [mode, setMode] = useState<'home' | 'create' | 'join' | 'invite'>('home')
+  const [mode, setMode] = useState<'home' | 'create' | 'join' | 'invite' | 'leave-admin' | 'dissolve'>('home')
+  const [dissolution, setDissolution] = useState<FamilyDissolutionPreview | null>(null)
+  const [typedFamilyName, setTypedFamilyName] = useState('')
+  const [connectionEnded, setConnectionEnded] = useState(() => Boolean(getSyncStore().connectionEnded))
   const [code, setCode] = useState('')
   const [familyName, setFamilyName] = useState('')
-  const [inviteCode, setInviteCode] = useState(() => sessionStorage.getItem(LAST_INVITE_KEY) || '')
+  const [inviteCode, setInviteCode] = useState(() => getSyncStore().connectionEnded ? '' : sessionStorage.getItem(LAST_INVITE_KEY) || '')
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState('')
   const [connected, setConnected] = useState(() => Boolean(getSyncStore().connection))
   const [pendingCount, setPendingCount] = useState(() => getSyncStore().pending.length)
+  const [conflictCount, setConflictCount] = useState(() => getSyncStore().conflicts.length)
+  const [missingSessions, setMissingSessions] = useState(() => getSyncStore().missingSessions)
   const [online, setOnline] = useState(() => navigator.onLine)
   const [lastSyncAt, setLastSyncAt] = useState(() => Number(localStorage.getItem(LAST_SYNC_KEY) || 0))
   const [syncIssue, setSyncIssue] = useState(false)
+  const [uploadFailure, setUploadFailure] = useState(() => getSyncStore().failure?.code || '')
   const [, setClock] = useState(0)
   const [settingsTarget, setSettingsTarget] = useState<Element | null>(() => document.querySelector('.settings-screen'))
   const [connectionName, setConnectionName] = useState(() => getSyncStore().connection?.familyName || '')
+  const [previewPlan, setPreviewPlan] = useState<ProductPlan>(() => loadInternalPlanPreview())
+  const [serverFamilySync, setServerFamilySync] = useState<boolean | null>(null)
+  const [accessChecking, setAccessChecking] = useState(import.meta.env.VITE_ACCOUNT_AUTH === 'true')
+  const [accessCheckFailed, setAccessCheckFailed] = useState(false)
+  const [serverPaused, setServerPaused] = useState(false)
+  const [accountMembership, setAccountMembership] = useState<null | { familyId: string; role: 'ADMIN' | 'MEMBER' }>(null)
+  const [leaveCandidates, setLeaveCandidates] = useState<FamilyMemberChoice[]>([])
   const locale = loadData().settings.locale as Locale
   const text = copy[locale]
+  const dissolutionText = familyDissolutionCopy[locale]
+  const familySyncAvailable = import.meta.env.VITE_ACCOUNT_AUTH === 'true'
+    ? !accessChecking && !accessCheckFailed && serverFamilySync === true
+    : internalPreview && canUseFamilySync(previewPlan)
 
   const friendlyError = (err: unknown) => {
     const apiError = err as SyncError
-    if (apiError?.code === 'INVITE_NOT_FOUND') return text.inviteNotFound
-    if (apiError?.code === 'INVITE_ALREADY_USED') return text.inviteUsed
-    if (apiError?.code === 'INVITE_EXPIRED') return text.inviteExpired
-    if (apiError?.code === 'DEVICE_REVOKED') return text.deviceRevoked
-    if (apiError?.code === 'INVALID_DEVICE_TOKEN') return text.invalidToken
-    if (!navigator.onLine || err instanceof TypeError) return text.networkError
-    return text.error
+    const code = apiError?.code || (err instanceof Error ? err.message : '')
+    if (code === 'INVITE_NOT_FOUND') return text.inviteNotFound
+    if (code === 'INVITE_ALREADY_USED') return text.inviteUsed
+    if (code === 'INVITE_EXPIRED') return text.inviteExpired
+    if (code === 'DEVICE_REVOKED') return text.deviceRevoked
+    if (code === 'INVALID_DEVICE_TOKEN') return text.invalidToken
+    if (code === 'SESSION_INVALID') return text.accountRequired
+    if (code === 'FAMILY_OWNER_ACCOUNT_REQUIRED') return text.ownerAccountRequired
+    if (code === 'ACCOUNT_ALREADY_IN_FAMILY' || code === 'ACCOUNT_ALREADY_IN_OTHER_FAMILY') return text.alreadyInFamily
+    if (code === 'FAMILY_DISSOLUTION_REQUIRED') return text.familyDissolutionRequired
+    if (code === 'FAMILY_DISSOLUTION_CHANGED') return dissolutionText.changed
+    if (code === 'FAMILY_HAS_OTHER_MEMBERS') return dissolutionText.otherMembers
+    if (code === 'FAMILY_ADMIN_REQUIRED') return dissolutionText.adminRequired
+    if (code.endsWith('_OFFLINE')) return text.leaveOffline
+    if (code.endsWith('_PENDING')) return text.leavePending
+    if (code.endsWith('_ATTENTION') || code.endsWith('_BLOCKED')) return text.leaveAttention
+    if (!navigator.onLine || err instanceof TypeError || apiError?.code === 'API_TIMEOUT' || apiError?.code === 'NETWORK_ERROR') return text.networkError
+    return internalPreview && /^[A-Z_0-9]{1,64}$/.test(code) ? `${text.error} · ${code}` : text.error
   }
 
   const markSynced = () => {
+    const store = getSyncStore()
+    setPendingCount(store.pending.length)
+    setConflictCount(store.conflicts.length)
+    setMissingSessions(store.missingSessions)
+    setUploadFailure(store.failure?.code || '')
+    setSyncIssue(Boolean(store.failure))
+    if (store.pending.length || store.conflicts.length || store.failure || store.missingSessions.length) return
     const now = Date.now()
     localStorage.setItem(LAST_SYNC_KEY, String(now))
     setLastSyncAt(now)
     setSyncIssue(false)
-    setPendingCount(getSyncStore().pending.length)
   }
+
+  useEffect(() => {
+    if (!internalPreview) return
+    const onPlanChange = (event: Event) => {
+      const plan = parseProductPlan((event as CustomEvent<unknown>).detail)
+      if (plan) {
+        setPreviewPlan(plan)
+      }
+    }
+    window.addEventListener(INTERNAL_PLAN_PREVIEW_EVENT, onPlanChange)
+    return () => window.removeEventListener(INTERNAL_PLAN_PREVIEW_EVENT, onPlanChange)
+  }, [])
+
+  useEffect(() => {
+    if (import.meta.env.VITE_ACCOUNT_AUTH !== 'true') return
+    let running = false
+    let stopped = false
+    const reconcile = async (account: unknown) => {
+      if (!account || running || stopped) return
+      running = true
+      setAccessChecking(true)
+      setAccessCheckFailed(false)
+      try {
+        if (internalPreview) await setInternalTestPlan(previewPlan)
+        const access = await getAccountAccess()
+        if (stopped) return
+        setServerFamilySync(access.features.includes('FAMILY_SYNC'))
+        setServerPaused(access.familySync.status === 'PAUSED')
+        setAccountMembership(access.membership)
+        if (!access.features.includes('FAMILY_SYNC') && !getSyncStore().connection) return
+        const result = await reconcileAccountFamily()
+        setConnected(Boolean(getSyncStore().connection))
+        if (result.connected) {
+          const next = getSyncStore().connection
+          setConnected(Boolean(next))
+          setConnectionName(next?.familyName || '')
+          markSynced()
+        }
+      } catch {
+        if (!stopped) { setSyncIssue(true); setAccessCheckFailed(true) }
+      } finally {
+        running = false
+        if (!stopped) setAccessChecking(false)
+      }
+    }
+    const onAccount = (event: Event) => {
+      const account = (event as CustomEvent<{ account?: unknown }>).detail?.account
+      if (account) void reconcile(account)
+      else {
+        setServerFamilySync(false)
+        setAccountMembership(null)
+        setAccessChecking(false)
+      }
+    }
+    window.addEventListener(ACCOUNT_STATE_EVENT, onAccount)
+    void restoreAccount().then((account) => {
+      if (stopped) return
+      if (account) void reconcile(account)
+      else { setServerFamilySync(false); setAccessChecking(false) }
+    }).catch(() => { if (!stopped) { setAccessCheckFailed(true); setAccessChecking(false) } })
+    return () => { stopped = true; window.removeEventListener(ACCOUNT_STATE_EVENT, onAccount) }
+  }, [previewPlan])
+
+  useEffect(() => {
+    const onAccess = (event: Event) => {
+      const access = (event as CustomEvent<{ access?: AccountAccessState | null }>).detail?.access
+      setServerFamilySync(Boolean(access?.features.includes('FAMILY_SYNC')))
+      setServerPaused(access?.familySync.status === 'PAUSED')
+      setAccountMembership(access?.membership ?? null)
+    }
+    window.addEventListener(ACCOUNT_ACCESS_EVENT, onAccess)
+    return () => window.removeEventListener(ACCOUNT_ACCESS_EVENT, onAccess)
+  }, [])
 
   useEffect(() => {
     const refreshTarget = () => setSettingsTarget(document.querySelector('.settings-screen'))
@@ -115,7 +255,7 @@ export default function FamilySyncLayer() {
   useEffect(() => {
     if (inviteCode) {
       sessionStorage.removeItem(LAST_INVITE_KEY)
-      setMode('invite')
+      setMode(missingSessions.length || conflictCount ? 'home' : 'invite')
       setOpen(true)
     }
   }, [])
@@ -123,30 +263,32 @@ export default function FamilySyncLayer() {
   useEffect(() => {
     const onState = () => {
       const store = getSyncStore()
+      setConnectionEnded(Boolean(store.connectionEnded))
+      if (store.connectionEnded) {
+        setInviteCode('')
+        sessionStorage.removeItem(LAST_INVITE_KEY)
+        setMode('home')
+      }
       const next = store.connection
       setConnected(Boolean(next))
       setConnectionName(next?.familyName || '')
       setPendingCount(store.pending.length)
-    }
-    const onSaved = (event: Event) => {
-      const detail = (event as CustomEvent<{ previous: AppData; next: AppData }>).detail
-      if (detail?.previous && detail?.next) {
-        queueLocalChange(detail.previous, detail.next)
-        setPendingCount(getSyncStore().pending.length)
-      }
+      setConflictCount(store.conflicts.length)
+      setMissingSessions(store.missingSessions)
+      if (store.missingSessions.length || store.conflicts.length) setMode('home')
+      setUploadFailure(store.failure?.code || '')
+      setSyncIssue(Boolean(store.failure))
     }
     window.addEventListener('solemi-sync-state', onState)
-    window.addEventListener('solemi-data-saved', onSaved)
     return () => {
       window.removeEventListener('solemi-sync-state', onState)
-      window.removeEventListener('solemi-data-saved', onSaved)
     }
   }, [])
 
   useEffect(() => {
-    if (!connected || connectionName) return
+    if (!familySyncAvailable || !connected || connectionName) return
     void refreshFamilyInfo().catch(() => {})
-  }, [connected, connectionName])
+  }, [familySyncAvailable, connected, connectionName])
 
   useEffect(() => {
     const refreshNetwork = () => setOnline(navigator.onLine)
@@ -159,22 +301,57 @@ export default function FamilySyncLayer() {
   }, [])
 
   useEffect(() => {
+    if (import.meta.env.VITE_ACCOUNT_AUTH !== 'true' || !connected) return
+    let stopped = false
+    const refreshAccess = async () => {
+      if (!navigator.onLine || stopped) return
+      try {
+        const access = await getAccountAccess()
+        if (stopped) return
+        setServerFamilySync(access.features.includes('FAMILY_SYNC'))
+        setServerPaused(access.familySync.status === 'PAUSED')
+        setAccountMembership(access.membership)
+        if (!access.membership && getSyncStore().connection) await reconcileAccountFamily()
+      } catch { /* account restoration and the sync loop surface connection errors */ }
+    }
+    void refreshAccess()
+    const interval = window.setInterval(refreshAccess, 15000)
+    const onFocus = () => void refreshAccess()
+    window.addEventListener('focus', onFocus)
+    window.addEventListener('online', onFocus)
+    document.addEventListener('visibilitychange', onFocus)
+    return () => {
+      stopped = true
+      window.clearInterval(interval)
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('online', onFocus)
+      document.removeEventListener('visibilitychange', onFocus)
+    }
+  }, [connected])
+
+  useEffect(() => {
     const interval = window.setInterval(() => setClock((value) => value + 1), 30000)
     return () => window.clearInterval(interval)
   }, [])
 
   useEffect(() => {
-    if (!connected) return
+    if (!familySyncAvailable || !connected) return
     let stopped = false
     const run = async () => {
       if (!navigator.onLine || stopped) return
       try {
-        const changed = await pullRemote()
+        await pullRemote()
         if (stopped) return
         markSynced()
-        if (changed) window.location.reload()
-      } catch {
-        if (!stopped) setSyncIssue(true)
+      } catch (error) {
+        if (!stopped) {
+          const apiError = error as SyncError
+          if (apiError.code === 'FAMILY_SYNC_PAUSED') {
+            setServerFamilySync(false)
+            setServerPaused(true)
+          }
+          setSyncIssue(true)
+        }
       }
     }
     void run()
@@ -190,7 +367,7 @@ export default function FamilySyncLayer() {
       window.removeEventListener('online', onFocus)
       document.removeEventListener('visibilitychange', onFocus)
     }
-  }, [connected])
+  }, [familySyncAvailable, connected])
 
   const lastSyncLabel = useMemo(() => {
     if (!lastSyncAt) return ''
@@ -201,21 +378,35 @@ export default function FamilySyncLayer() {
   }, [lastSyncAt, text])
 
   const status = useMemo(() => {
+    if (accessChecking) return text.syncing
+    if (accessCheckFailed) return text.syncIssue
+    if (serverPaused) return text.paused
+    if (!familySyncAvailable) return text.locked
     if (!connected) return text.disconnected
     if (!online) return text.offline
-    if (pendingCount) return text.syncing
+    if (conflictCount) return text.syncIssue
+    if (missingSessions.length) return text.syncIssue
     if (syncIssue) return text.syncIssue
+    if (pendingCount) return text.syncing
     return text.connected
-  }, [connected, online, pendingCount, syncIssue, text])
+  }, [accessChecking, accessCheckFailed, serverPaused, familySyncAvailable, connected, online, conflictCount, missingSessions, pendingCount, syncIssue, text])
 
   const detailHint = useMemo(() => {
+    if (accessChecking) return text.syncing
+    if (accessCheckFailed) return text.error
+    if (serverPaused) return text.pausedHint
+    if (connectionEnded && !connected) return dissolutionText.ended
+    if (!familySyncAvailable) return text.lockedHint
     if (!connected) return text.settingsHintDisconnected
     if (!online) return text.offlineHint
+    if (conflictCount === 1) return text.conflictOne
+    if (conflictCount > 1) return text.conflictMany(conflictCount)
+    if (missingSessions.length) return text.missingCount(missingSessions.length)
     if (pendingCount === 1) return text.pendingOne
     if (pendingCount > 1) return text.pendingMany(pendingCount)
     if (syncIssue) return text.syncIssue
     return lastSyncLabel || text.settingsHintConnected
-  }, [connected, online, pendingCount, syncIssue, lastSyncLabel, text])
+  }, [accessChecking, accessCheckFailed, serverPaused, familySyncAvailable, connected, online, conflictCount, missingSessions, pendingCount, syncIssue, lastSyncLabel, text, connectionEnded, dissolutionText])
 
   const handleCreate = async () => {
     if (!familyName.trim()) return
@@ -263,23 +454,105 @@ export default function FamilySyncLayer() {
 
   const handleLeave = async () => {
     if (!window.confirm(text.leaveConfirm)) return
-    setBusy(true)
-    await leaveFamily()
-    localStorage.removeItem(LAST_SYNC_KEY)
-    window.location.reload()
+    setBusy(true); setError('')
+    try {
+      await leaveFamily()
+      localStorage.removeItem(LAST_SYNC_KEY)
+      window.location.reload()
+    } catch (err) {
+      setError(friendlyError(err))
+      setBusy(false)
+    }
   }
 
-  const openPanel = () => { setOpen(true); setMode(inviteCode ? 'invite' : 'home'); setError('') }
+  const handleReconnect = async () => {
+    setBusy(true); setError('')
+    try {
+      const result = await reconnectAccountFamily()
+      if (!result.connected) throw new Error('FAMILY_MEMBERSHIP_CHANGED')
+      window.location.reload()
+    } catch (err) {
+      setError(friendlyError(err))
+      setBusy(false)
+    }
+  }
+
+  const performAccountLeave = async (successorAccountId?: string) => {
+    if (!window.confirm(accountMembership?.role === 'ADMIN' ? text.leaveAdminFinalConfirm : text.leaveAccountConfirm)) return
+    setBusy(true); setError('')
+    try {
+      await leaveAccountFamily(successorAccountId)
+      await getAccountAccess()
+      localStorage.removeItem(LAST_SYNC_KEY)
+      window.location.reload()
+    } catch (err) {
+      setError(friendlyError(err))
+      setBusy(false)
+    }
+  }
+
+  const handleAccountLeave = async () => {
+    setBusy(true); setError('')
+    try {
+      const members = await getAccountFamilyMembers()
+      if (!members.length) {
+        setDissolution(await prepareFamilyDissolution())
+        setTypedFamilyName('')
+        setMode('dissolve')
+        return
+      }
+      setLeaveCandidates(members)
+      setMode('leave-admin')
+    } catch (err) {
+      setError(friendlyError(err))
+    } finally { setBusy(false) }
+  }
+
+  const handleDissolve = async () => {
+    if (!dissolution || typedFamilyName !== dissolution.familyName) return
+    setBusy(true); setError('')
+    try {
+      await dissolveFamily(dissolution)
+      sessionStorage.removeItem(LAST_INVITE_KEY)
+      localStorage.removeItem(LAST_SYNC_KEY)
+      window.location.reload()
+    } catch (err) {
+      setError(friendlyError(err))
+      setBusy(false)
+    }
+  }
+
+  const handleConflict = async (resolution: 'local' | 'family') => {
+    const conflict = getSyncStore().conflicts[0]
+    if (!conflict) return
+    setBusy(true); setError('')
+    try {
+      await resolveSyncConflict(conflict.operationId, resolution)
+      markSynced()
+    } catch (err) {
+      setError(friendlyError(err))
+    }
+    finally { setBusy(false) }
+  }
+
+  const openPanel = () => { setOpen(true); setMode(!missingSessions.length && !conflictCount && inviteCode ? 'invite' : 'home'); setError('') }
+
+  const handleMissing = async (sessionId: string) => {
+    setBusy(true); setError('')
+    try { await restoreMissingSession(sessionId); markSynced() }
+    catch (err) { setError(friendlyError(err)) }
+    finally { setBusy(false) }
+  }
 
   const settingsEntry = settingsTarget ? createPortal(
     <div className="settings-card family-sync-settings-card">
       <button className="family-sync-settings-button" onClick={openPanel} aria-label={text.title}>
-        <span className={`family-sync-settings-icon ${connected ? 'connected' : ''}`}>☁</span>
+        <span className={`family-sync-settings-icon ${familySyncAvailable && connected ? 'connected' : ''} ${!familySyncAvailable && !accessChecking && !accessCheckFailed ? 'locked' : ''}`}>{familySyncAvailable || accessChecking || accessCheckFailed ? '☁' : '🔒'}</span>
         <span className="family-sync-settings-copy">
           <strong>{connected && connectionName ? connectionName : text.title}</strong>
           <small>{detailHint}</small>
         </span>
-        <span className={`family-sync-settings-state ${connected && online && !syncIssue ? 'connected' : ''}`}>{status}</span>
+        <span className={`family-sync-settings-state ${familySyncAvailable && connected && online && !syncIssue ? 'connected' : ''}`}>{status}</span>
         <span className="family-sync-settings-chevron">›</span>
       </button>
     </div>,
@@ -292,29 +565,83 @@ export default function FamilySyncLayer() {
       <section className="family-sync-sheet" onClick={(event) => event.stopPropagation()}>
         <div className="family-sync-handle" />
         <header><div><small>{status}</small><h2>{text.title}</h2></div><button onClick={() => setOpen(false)} disabled={busy}>×</button></header>
-        {mode === 'home' && !connected && <div className="family-sync-content">
+        {(accessChecking || accessCheckFailed) && <div className="family-sync-content family-sync-locked">
+          <strong>{accessChecking ? text.syncing : text.error}</strong>
+          {accessCheckFailed && <button className="family-sync-secondary" onClick={() => window.location.reload()}>{t(locale, 'retry')}</button>}
+        </div>}
+        {!accessChecking && !accessCheckFailed && !familySyncAvailable && mode !== 'leave-admin' && mode !== 'dissolve' && <div className="family-sync-content family-sync-locked">
+          <div className="family-sync-lock-icon">🔒</div>
+          <strong>{serverPaused ? text.paused : text.lockedHint}</strong>
+          <p>{serverPaused ? text.pausedHint : text.lockedDescription}</p>
+          {accountMembership && <>
+            {connected
+              ? <button className="family-sync-secondary" onClick={handleLeave} disabled={busy}>{text.leave}</button>
+              : <button className="family-sync-secondary" onClick={handleReconnect} disabled={busy || !online}>{text.reconnect}</button>}
+            <button className="family-sync-link danger" onClick={handleAccountLeave} disabled={busy || !online}>{text.leaveAccount}</button>
+          </>}
+        </div>}
+        {familySyncAvailable && mode === 'home' && !connected && accountMembership && <div className="family-sync-content">
+          <p>{text.settingsHintDisconnected}</p>
+          <button className="family-sync-primary" onClick={handleReconnect} disabled={busy || !online}>{busy ? text.syncing : text.reconnect}</button>
+          <button className="family-sync-link danger" onClick={handleAccountLeave} disabled={busy || !online}>{text.leaveAccount}</button>
+        </div>}
+        {familySyncAvailable && mode === 'home' && !connected && !accountMembership && <div className="family-sync-content">
           <p>{text.intro}</p>
           <button className="family-sync-primary" onClick={() => setMode('create')} disabled={busy}>{text.create}</button>
           <button className="family-sync-secondary" onClick={() => setMode('join')} disabled={busy}>{text.join}</button>
         </div>}
-        {mode === 'create' && !connected && <div className="family-sync-content">
+        {familySyncAvailable && mode === 'create' && !connected && <div className="family-sync-content">
           <p>{text.familyName}</p>
           <input className="family-sync-name-input" value={familyName} onChange={(event) => setFamilyName(event.target.value.slice(0, 60))} placeholder={text.familyNamePlaceholder} autoCorrect="off" />
           <button className="family-sync-primary" onClick={handleCreate} disabled={busy || !familyName.trim()}>{busy ? text.syncing : text.createButton}</button>
           <button className="family-sync-link" onClick={() => setMode('home')} disabled={busy}>{text.cancel}</button>
         </div>}
-        {mode === 'join' && !connected && <div className="family-sync-content">
+        {familySyncAvailable && mode === 'join' && !connected && <div className="family-sync-content">
           <p>{text.join}</p>
           <input className="family-sync-code-input" value={code} onChange={(event) => setCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10))} placeholder={text.codePlaceholder} autoCapitalize="characters" autoCorrect="off" />
           <button className="family-sync-primary" onClick={handleJoin} disabled={busy || !code.trim()}>{busy ? text.syncing : text.joinButton}</button>
           <button className="family-sync-link" onClick={() => setMode('home')} disabled={busy}>{text.cancel}</button>
         </div>}
-        {mode === 'home' && connected && <div className="family-sync-content">
-          <div className="family-sync-status-card"><span>{online && !syncIssue ? '✓' : '↻'}</span><div><strong>{connectionName || text.connected}</strong><small>{detailHint}</small></div></div>
-          <button className="family-sync-primary" onClick={handleInvite} disabled={busy || !online}>{busy ? text.syncing : text.newInvite}</button>
-          <button className="family-sync-link danger" onClick={handleLeave} disabled={busy}>{text.leave}</button>
+        {mode === 'leave-admin' && <div className="family-sync-content">
+          <strong>{accountMembership?.role === 'ADMIN' ? text.leaveAdminTitle : text.leaveAccount}</strong>
+          <p>{accountMembership?.role === 'ADMIN' ? text.leaveAdminHelp : text.leaveAccountConfirm}</p>
+          <button className="family-sync-secondary" onClick={() => exportData(loadData())} disabled={busy}>{dissolutionText.localExport}</button>
+          {accountMembership?.role === 'ADMIN' && leaveCandidates.map((member) => <button className="family-sync-secondary family-sync-member-choice" key={member.accountId}
+            onClick={() => performAccountLeave(member.accountId)} disabled={busy}>
+            <span>{member.name || member.email || member.accountId}</span>
+            {member.name && member.name !== member.email && <span className="family-sync-member-identity">{member.email || member.accountId}</span>}
+          </button>)}
+          <button className="family-sync-secondary" onClick={() => performAccountLeave()} disabled={busy}>{accountMembership?.role === 'ADMIN' ? text.leaveAdminAuto : text.leaveAccount}</button>
+          <button className="family-sync-link" onClick={() => setMode('home')} disabled={busy}>{text.cancel}</button>
         </div>}
-        {mode === 'invite' && <div className="family-sync-content invite-view">
+        {mode === 'dissolve' && dissolution && <div className="family-sync-content">
+          <strong>{dissolutionText.title}: {dissolution.familyName}</strong>
+          <p>{dissolutionText.explanation}</p>
+          <p>{dissolutionText.kept}</p>
+          <p>{dissolutionText.children}: {dissolution.childCount} · {dissolutionText.sleeps}: {dissolution.data.sessions.length}</p>
+          <button className="family-sync-secondary" onClick={() => exportData(dissolution.data)} disabled={busy}>{dissolutionText.export}</button>
+          <label className="family-name-confirm">{dissolutionText.confirmName} <strong>{dissolution.familyName}</strong>
+            <input className="family-sync-name-input" value={typedFamilyName} onChange={(event) => setTypedFamilyName(event.target.value)} autoComplete="off" disabled={busy} />
+          </label>
+          <button className="family-sync-secondary danger" onClick={handleDissolve}
+            disabled={busy || !online || pendingCount > 0 || conflictCount > 0 || typedFamilyName !== dissolution.familyName}>{busy ? text.syncing : dissolutionText.confirm}</button>
+          <button className="family-sync-link" onClick={() => { setMode('home'); setDissolution(null) }} disabled={busy}>{text.cancel}</button>
+        </div>}
+        {mode === 'home' && connectionEnded && <div className="family-sync-content"><p role="status">{dissolutionText.ended}</p></div>}
+        {familySyncAvailable && mode === 'home' && connected && conflictCount > 0 && <div className="family-sync-content">
+          <div className="family-sync-status-card"><span>!</span><div><strong>{text.conflictTitle}</strong><small>{text.conflictHelp}</small></div></div>
+          <button className="family-sync-primary" onClick={() => handleConflict('local')} disabled={busy}>{text.keepLocal}</button>
+          <button className="family-sync-secondary" onClick={() => handleConflict('family')} disabled={busy}>{text.keepFamily}</button>
+        </div>}
+        {familySyncAvailable && mode === 'home' && connected && conflictCount === 0 && <div className="family-sync-content">
+          <div className="family-sync-status-card"><span>{missingSessions.length ? '!' : online && !syncIssue ? '✓' : '↻'}</span><div><strong>{connectionName || text.connected}</strong><small>{detailHint}</small></div></div>
+          {!missingSessions.length && <>
+            <button className="family-sync-primary" onClick={handleInvite} disabled={busy || !online}>{busy ? text.syncing : text.newInvite}</button>
+            <button className="family-sync-link danger" onClick={handleLeave} disabled={busy}>{text.leave}</button>
+            {accountMembership && <button className="family-sync-link danger" onClick={handleAccountLeave} disabled={busy || !online}>{text.leaveAccount}</button>}
+          </>}
+        </div>}
+        {familySyncAvailable && mode === 'invite' && <div className="family-sync-content invite-view">
           {connectionName && <strong className="family-sync-family-name">{connectionName}</strong>}
           <p>{text.inviteHelp}</p>
           <button className="invite-code" onClick={handleCopy}>{inviteCode}</button>
@@ -322,6 +649,32 @@ export default function FamilySyncLayer() {
           {connected && <button className="family-sync-link" onClick={() => { setInviteCode(''); setMode('home') }}>{text.close}</button>}
         </div>}
         {error && <div className="family-sync-error">{error}</div>}
+        {familySyncAvailable && mode === 'home' && connected && missingSessions.map((missing) => {
+          const local = loadData().sessions.find((item) => item.id === missing.sessionId)
+          const reviewed = missing.repairOperationIds?.length ? missing.localValue : local
+          const format = (value: string) => Number.isFinite(Date.parse(value))
+            ? new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)) : '—'
+          return <div className="family-sync-content family-sync-missing" key={missing.sessionId}>
+            <strong>{text.missingTitle}</strong>
+            <p>{text.missingHelp}</p>
+            {reviewed && <div className="family-sync-status-card"><div>
+              <strong>{loadData().children.find((child) => child.id === reviewed.childId)?.name || '—'}</strong>
+              <small>{format(reviewed.startTime)} – {reviewed.endTime ? format(reviewed.endTime) : text.activeSleep}</small>
+              {reviewed.note && <small>{reviewed.note}</small>}
+            </div></div>}
+            {local ? <button className="family-sync-primary" disabled={busy || !online || conflictCount > 0}
+              onClick={() => handleMissing(missing.sessionId)}>
+              {missing.repairOperationIds?.length ? text.retryMissing : text.shareMissing}
+            </button> : <p>{text.missingLocal}</p>}
+            {missing.errorCode && <div className="family-sync-error">
+              {friendlyError({ code: missing.errorCode })}{internalPreview && <small> · {missing.errorCode}</small>}
+            </div>}
+          </div>
+        })}
+        {uploadFailure && !error && <div className="family-sync-error">
+          {friendlyError({ code: uploadFailure })}
+          {internalPreview && <small> · {uploadFailure}</small>}
+        </div>}
       </section>
     </div>}
   </>

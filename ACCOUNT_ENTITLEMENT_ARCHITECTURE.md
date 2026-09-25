@@ -1,16 +1,44 @@
 # Solemi Sleep — végleges account, membership, subscription és entitlement D1 architektúra
 
-Státusz: **ARCHITEKTÚRA LEZÁRVA — implementáció előtt**
+Státusz: **ARCHITEKTÚRA LEZÁRVA — account/session, Google-auth és staging entitlement enforcement implementálva**
 
 Dátum: 2026-08-24
+
+**Termékdöntés-változás — 2026-09-17; staging elfogadás — 2026-09-19:** a `PRODUCT_DIRECTION.md` és a frissített `FEATURE_ENTITLEMENT_MATRIX.md` irányadó. Bármely aktív tag érvényes előfizetése az egész aktív családnak biztosítja az adott csomag funkcióit, Family+ Insights esetén is. A létrehozó/admin szerepe nem feltétel. A subscription és grant továbbra is a vásárló account tulajdona; az effektív használati jog családi tagságon keresztül származik. A Worker és a kliens ezt számolja, és a teljes Free/Family/Family+ kétaccountos staging mátrixot két telefonon elfogadtuk.
 Ellenőrzött GitHub-alap: `main` / `37d1728` (`Lock Free Family Family+ feature matrix`)
 
 Ez a dokumentum a következő backend-implementáció normatív terve. Nem migráció és nem módosítja a live Cloudflare D1-et vagy Workert. A jelenlegi prototípus `worker/schema.sql` és `worker/src/index.ts` fájljait a célarchitektúrára való átálláskor, külön ellenőrzött migrációkkal kell módosítani.
 
 Kapcsolódó lezárt döntések: `FEATURE_ENTITLEMENT_MATRIX.md`, `PRODUCT_DESIGN_LOCK.md`, `TECHNICAL_COLLISION_AUDIT.md`.
 
+### Implementációs állapot — 2026-09-15
+
+A `worker/migrations/003_accounts_and_sessions.sql` az identity séma additív
+implementációja; a 002-es sorszámot már a Child Profile V4 migráció használja.
+A `worker/src/accountStore.ts` az új táblák adatelérési alapja. A még nem
+deployolt Worker-kód Google-tokenellenőrzést, session-tokenkiadást,
+refresh-rotációt és két aktív eszközös korlátot használó auth-végpontokat ad.
+Az interaktív eszközcsere-folyamat még nincs bekötve a kliensbe.
+
+A normatív sémához képest két integritási pontosítás került a migrációba:
+az eszközlimit UPDATE-ellenőrzése accountváltásra is kiterjed, a session pedig
+összetett `(account_id, device_id)` idegen kulccsal csak a saját account eszközére
+hivatkozhat. Az új szöveges elsődleges kulcsok explicit `NOT NULL` mezők.
+
+A helyi SQLite-tesztek ellenőrzik a legacy adatok/séma változatlanságát, a
+jogosultsági határokat és a tranzakciós visszaállást. A 003/004 staging D1
+migráció before/after exporttal és változatlan legacy hash-ekkel sikeres volt.
+Az account/session, Google-login, accountos family claim/bootstrap és két külön
+Google-accountos meghívás staging próbája sikeres. A
+`006_subscriptions_and_entitlements.sql` implementálja a providerfüggetlen
+billing- és granttáblákat. A Worker a család összes aktív tagja alapján
+számolja a fizetős funkciók effektív hozzáférését, miközben a vásárló saját
+grantjait külön megőrzi. A staging `MANUAL` forrás a bolti
+életciklusokat szimulálja; valódi Apple/Google provider adapter még nincs.
+
 ## 1. Lezárt termékszabályok
 
+- A Free csomag fiók nélkül, local-first módon használható. Fiók csak Family Synchez, vásárláshoz és előfizetés-visszaállításhoz kötelező.
 - V1-ben kizárólag Google-belépés van. A Google csak identitásszolgáltató, nem alvásadat-tároló.
 - Egy embernek egy Solemi accountja van; egy accountnak legfeljebb 2 aktív eszköze lehet.
 - Egy account egyszerre legfeljebb 1 aktív Family tagja lehet. A korábbi tagságok historyként megmaradnak.
@@ -23,7 +51,7 @@ Kapcsolódó lezárt döntések: `FEATURE_ENTITLEMENT_MATRIX.md`, `PRODUCT_DESIG
 - A Family végleges törlését csak admin indíthatja, friss újraazonosítás és erős megerősítés után.
 - Family Sync akkor aktív, ha legalább egy aktív tag rendelkezik érvényes Family vagy Family+ eredetű `FAMILY_SYNC` entitlementtel.
 - Ha az utolsó fizető tag kilép vagy az entitlementje lejár, a sync azonnal szünetel. A cloud adat és a Family-kapcsolat megmarad.
-- Family+ Insights account-szintű, személyes jogosultság. Nem öröklődik a többi családtagra.
+- Bármely aktív tag Family+ grantja minden aktív családtagnak Family+ Insights-hozzáférést ad. A vásárlás és a grant tulajdonosa ettől továbbra is a fizető account.
 - Trial: 7 nap Family+. Offline entitlement cache: legfeljebb 30 nap, de soha nem nyúlhat túl a szerver által engedélyezett hozzáférési időn.
 - A Free account alvásadata local-first. Az account önmagában nem jelent automatikus cloud backupot.
 
@@ -38,8 +66,8 @@ Google ID token
 Billing provider event
   -> subscription (billing truth)
   -> account entitlement grants
-     -> személyes feature gate
-     -> aktív membershipen keresztül Family Sync hozzájárulás
+     -> a vásárló saját grantjai
+     -> aktív membershipen keresztül családi effektív feature-hozzáférés
 
 Sleep data
   Free: local-first
@@ -431,10 +459,17 @@ accountCanUse(accountId, featureKey, now)
 familyCanSync(familyId, now)
   = van aktív membershipű account,
     amelyre accountCanUse(FAMILY_SYNC) igaz
+
+familyCanUse(familyId, featureKey, now)
+  = van aktív membershipű account,
+    amelyre accountCanUse(featureKey) igaz
+
+effectiveFeatures(accountId, now)
+  = saját account feature-ök uniója az aktív család family feature-jeivel
 ```
 
-- Family+ Insights mindig a bejelentkezett account saját `FAMILY_PLUS_INSIGHTS` grantját ellenőrzi.
-- Egy Free account aktív syncű Family tagjaként megkaphatja a kanonikus raw adatot, de PDF-et és Family+ view-kat csak saját entitlementtel használhat.
+- Family+ Insights az aktív család `FAMILY_PLUS_INSIGHTS` hozzájárulását ellenőrzi; a létrehozó/admin és a fizető személye nem feltétel.
+- Egy Free account aktív Family tagjaként megkapja a család legmagasabb aktív csomagjának effektív funkcióit, miközben saját billing/grant listája üres maradhat.
 - A sync API minden read és write kérésnél szerveroldalon számolja a `familyCanSync` értéket. A kliens UI cache nem jogosít szerverírásra.
 
 ### 30 napos offline cache
@@ -558,8 +593,8 @@ Minimum stabil hibakódok:
 - Member invite-ot készíthet és a kód admin-jóváhagyás nélkül, pontosan egyszer váltható be.
 - Nem-admin más tagot nem távolíthat el; admin igen; mindenki saját magát kiléptetheti.
 - Family végleges törlés admin + friss reauth nélkül tiltott, és nem törli az accountot/subscriptiont.
-- Family subscriber + Free member esetén mindkettő szinkronizálhat, de a Free member PDF/Insights gate-je zárt.
-- Family+ subscriber mellett csak a subscriber account kap `FAMILY_PLUS_INSIGHTS` hozzáférést.
+- Family subscriber + Free member esetén mindkettő szinkronizálhat és mindkettő megkapja a Family képességeket, Family+ Insights nélkül.
+- Family+ subscriber mellett minden aktív családtag megkapja a `FAMILY_PLUS_INSIGHTS` hozzáférést.
 - Az utolsó entitlement lejárata és a fizető kilépése azonnal pause-olja a syncet, adat- és membership-törlés nélkül.
 - Másik aktív fizető tag mellett az első fizető kilépése nem állítja le a syncet.
 - Trial pontosan a provider által igazolt végéig aktív; cancellation a `access_until` végéig nem vesz el hozzáférést; revoke azonnal igen.
