@@ -9,8 +9,11 @@ export function sqliteBinding(sqlite: DatabaseSync): D1Database {
     async first() { return sqlite.prepare(this.sql).get(...this.values) ?? null }
     async all() { return { results: sqlite.prepare(this.sql).all(...this.values) } }
     async run() {
-      const result = sqlite.prepare(this.sql).run(...this.values)
-      return { success: true, meta: { changes: Number(result.changes) } }
+      // D1 counts trigger and foreign-key cascade changes as well as direct writes.
+      const totalChanges = () => Number(sqlite.prepare('SELECT total_changes() AS n').get()!.n)
+      const before = totalChanges()
+      sqlite.prepare(this.sql).run(...this.values)
+      return { success: true, meta: { changes: totalChanges() - before } }
     }
   }
   return {

@@ -116,8 +116,18 @@ describe('last-member family dissolution', () => {
     expect(await preview.json()).toMatchObject({ data: { familyId: 'fam_test', revision: 2,
       children: [{ id: 'child_dissolve' }], sessions: [{ id: 'sleep_dissolve', note: 'Export me' }] } })
     sqlite.prepare(`INSERT INTO families VALUES ('untouched', 'Other', 0, '2026-09-23')`).run()
+    const batch = env.DB.batch.bind(env.DB)
+    let familyDeleteChanges = 0
+    env.DB.batch = (async (statements: D1PreparedStatement[]) => {
+      const results = await batch(statements)
+      familyDeleteChanges = results[results.length - 1].meta.changes
+      return results
+    }) as D1Database['batch']
     const response = await fetch('/v1/auth/family/dissolve', { method: 'POST', headers, body: body() })
+    // The family and its membership are both removed by the final DELETE.
+    expect(familyDeleteChanges).toBeGreaterThan(1)
     expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ data: { dissolved: true, familyId: 'fam_test' } })
     for (const table of tableNames.filter(t => t !== 'families')) {
       expect(sqlite.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get()).toEqual({ n: 0 })
     }

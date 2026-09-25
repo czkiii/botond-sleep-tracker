@@ -1419,7 +1419,9 @@ async function dissolveAccountFamily(request: Request, env: Env, access: Account
   statements.push(env.DB.prepare(`DELETE FROM families WHERE id = ? AND ${guard}`)
     .bind(familyId, familyId, name, revision, access.account.id))
   const results = await env.DB.batch(statements)
-  if (results[results.length - 1].meta.changes !== 1) throw new ApiError(409, 'FAMILY_DISSOLUTION_CHANGED')
+  // D1 includes cascaded membership deletions in meta.changes. The guarded
+  // primary-key DELETE succeeds with any positive count; zero means stale state.
+  if (results[results.length - 1].meta.changes < 1) throw new ApiError(409, 'FAMILY_DISSOLUTION_CHANGED')
   return ok(request, env, { dissolved: true, familyId })
 }
 
