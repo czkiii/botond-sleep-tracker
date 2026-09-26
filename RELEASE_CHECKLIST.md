@@ -41,7 +41,7 @@ vagy kifejezett, indokolt termékdöntés kell; a puszta priorizálás nem lezá
 - [ ] **[GPT-6 Sol · high]** A21 — Statisztikai összegek/szűrés és időpontjelzések egyeztetése.
 - [ ] **[GPT-6 Sol · high]** A22 — Telefonos teljesítményprofil, másodpercenkénti elemzés újraszámolás rendezése.
 - [ ] **[GPT-6 Sol · medium]** A23 — Terv–funkciómátrix–ár/paywall ígéretek tételes lezárása a tulajdonossal.
-- [ ] **[GPT-6 Sol · medium]** A24 — Lockfile, CI-hez kötött release, pontos SHA és PWA upgrade.
+- [ ] **[GPT-6 Sol · medium]** A24 — Lockfile, CI-hez kötött release, pontos SHA és PWA upgrade. A frontend és a Worker lockfile-ja elkészült; a CI, a belső preview és a Pages build rögzített `npm ci` telepítésre váltott. Mindkét lockfile külön, tiszta könyvtárban sikeres `npm ci --dry-run` ellenőrzést kapott. A kötelező zöld merge-check, a pontos SHA-hoz kötött production deploy, a staging smoke commit-egyezése és a PWA upgrade/rollback még nyitott.
 - [ ] **[GPT-6 Astra · high]** A25 — Teljes sémaleltár, migrációs terv, staging restore és rollback főpróba. A Wrangler-belépés 2026-09-23-án megújult. A staging D1 teljes SQL-exportja a Gitből kizárt helyi mappában megvan; memóriabeli SQLite-visszatöltés, integritás- és idegenkulcs-ellenőrzés sikeres ([checkpoint](STAGING_D1_RECOVERY_2026-09-23.md)). Távoli D1 restore/rollback főpróba még hiányzik; a Time Travel az összes staging családot érintené.
 - [ ] **[GPT-6 Sol · medium]** A26 — Support/monitoring, staging adatkezelés és két store beadási bizonyíték.
 - [ ] **[GPT-6 Astra · high]** A27 — Family+ számítási audit S01–S15 lezárása az alábbi bontásban.
@@ -104,7 +104,7 @@ Az ellenőrzött release candidate kontrollált backend-migrációval, smoke tes
 
 ## B. Automatikus GitHub-ellenőrzés
 
-- [ ] **[GPT-6 Sol · medium]** Reprodukálható dependency lock létrehozása/ellenőrzése a frontendhez és a Workerhez.
+- [x] **[GPT-6 Sol · medium]** Reprodukálható dependency lock létrehozása/ellenőrzése a frontendhez és a Workerhez; mindkét tiszta `npm ci --dry-run` sikeres (2026-09-26). A CI és a két build workflow is `npm ci`-t használ.
 - [x] PR-re és branch pushra futó GitHub Actions workflow létrehozása.
 - [x] Frontend TypeScript typecheck hozzáadása a CI-hez.
 - [x] Worker TypeScript typecheck hozzáadása a CI-hez.

@@ -28,10 +28,10 @@ jobs:
           node-version: 22
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Install Worker test dependencies
-        run: npm --prefix worker install
+        run: npm --prefix worker ci
 
       - name: Typecheck
         run: npm run typecheck
