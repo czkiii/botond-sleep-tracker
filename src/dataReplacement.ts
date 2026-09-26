@@ -40,13 +40,17 @@ function replacementId(prefix: 'child' | 'sleep') {
 // import/restore gives only those incoming records fresh IDs.
 export function prepareFamilyReplacement(current: AppData, incoming: AppData): AppData {
   const currentChildIds = new Set(current.children.map((child) => child.id))
-  const currentSessionIds = new Set(current.sessions.map((session) => session.id))
+  const currentSessions = new Map(current.sessions.map((session) => [session.id, session]))
   const childIds = new Map(incoming.children.map((child) => [child.id,
     currentChildIds.has(child.id) ? child.id : replacementId('child')]))
   const children = incoming.children.map((child) => ({ ...child, id: childIds.get(child.id)! }))
   const sessions = incoming.sessions.map((session) => ({
     ...session,
-    id: currentSessionIds.has(session.id) ? session.id : replacementId('sleep'),
+    // A closed sleep cannot be reopened by PATCH. Import it as a new active
+    // record, with the old closed ID removed by the normal replacement plan.
+    id: currentSessions.has(session.id) && currentSessions.get(session.id)!.childId === childIds.get(session.childId)
+      && !(currentSessions.get(session.id)!.endTime && !session.endTime)
+      ? session.id : replacementId('sleep'),
     childId: childIds.get(session.childId)!
   }))
   return {

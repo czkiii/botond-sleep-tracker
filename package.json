@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:pwa": "node scripts/check-pwa-lifecycle.mjs",
+    "test:family-join": "node scripts/check-family-bootstrap.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

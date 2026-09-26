@@ -8,7 +8,8 @@ import { DataStorageError, REMOTE_DATA_EVENT, createChild, createDefaultData, cr
 import type { ImportDiagnostic, ImportInspection, SafetyBackup, SafetyBackupReason } from './storage'
 import { deleteChildPhoto, loadChildPhoto, prepareChildPhoto, saveChildPhoto } from './photoStore'
 import type { AvatarCrop } from './photoStore'
-import { removeChildProfile } from './childProfiles'
+import { mergeChildDraft, removeChildProfile } from './childProfiles'
+import { familyBootstrapCopy } from './familyBootstrapCopy'
 import { buildInsightsFoundation } from './insights'
 import { buildSimilarDaysInsight } from './similarDays'
 import { buildPredictionLite } from './prediction'
@@ -756,9 +757,18 @@ function SettingsPage({ data, setData, onBack, familySyncAvailable, familyRole }
     {safetyBackup && <p className="muted safety-backup-hint">{t(locale, 'safetyBackupAvailable', { date: new Intl.DateTimeFormat(localeTag(locale), { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(safetyBackup.exportedAt)), count: safetyBackup.data.sessions.length })}</p>}
     <p className="muted">{t(locale, replacementReadiness.scope === 'family' ? 'familyDataShared' : 'localOnly', { family: replacementReadiness.familyName || '' })}</p></section>
     {editingChild && <ChildEditor child={editingChild === 'new' ? null : editingChild as ChildProfile} locale={locale} onClose={() => setEditingChild(null)} onSave={(next) => {
-      if (editingChild === 'new') setData({ ...data, children: [...data.children, next], settings: { ...data.settings, activeChildId: next.id } })
-      else setData({ ...data, children: data.children.map((child) => child.id === next.id ? next : child) })
+      const current = loadData()
+      if (editingChild === 'new') setData({ ...current, children: [...current.children, next], settings: { ...current.settings, activeChildId: next.id } })
+      else {
+        const merged = mergeChildDraft(current.children.find(child => child.id === next.id), editingChild, next)
+        if (!merged) {
+          window.alert(familyBootstrapCopy[locale].editorChanged)
+          return false
+        }
+        setData({ ...current, children: current.children.map(child => child.id === next.id ? merged : child) })
+      }
       setEditingChild(null)
+      return true
     }} onDelete={editingChild === 'new' ? undefined : () => {
       const child = editingChild as ChildProfile
       if (data.children.length <= 1) return window.alert(t(locale, 'deleteLastChild'))
@@ -904,7 +914,7 @@ function PhotoCropper({ candidate, locale, onCancel, onDone }: { candidate: Crop
   </div></div>
 }
 
-function ChildEditor({ child, locale, onClose, onSave, onDelete }: { child: ChildProfile | null; locale: Locale; onClose: () => void; onSave: (child: ChildProfile) => void; onDelete?: () => void }) {
+function ChildEditor({ child, locale, onClose, onSave, onDelete }: { child: ChildProfile | null; locale: Locale; onClose: () => void; onSave: (child: ChildProfile) => boolean; onDelete?: () => void }) {
   const draft = useRef(child ?? createChild()).current
   const [name, setName] = useState(child?.name ?? '')
   const [birthDate, setBirthDate] = useState(child?.birthDate ?? '')
@@ -931,7 +941,10 @@ function ChildEditor({ child, locale, onClose, onSave, onDelete }: { child: Chil
     setSaving(true)
     try {
       const storedPhotoRef = photoFile ? await saveChildPhoto(draft.id, photoFile) : photoRef
-      onSave({ ...draft, name: name.trim(), birthDate: birthDate || null, photoRef: storedPhotoRef, updatedAt: new Date().toISOString() })
+      if (onSave({ ...draft, name: name.trim(), birthDate: birthDate || null, photoRef: storedPhotoRef, updatedAt: new Date().toISOString() }) === false) {
+        if (photoFile && storedPhotoRef) void deleteChildPhoto(storedPhotoRef).catch(() => {})
+        setSaving(false)
+      }
     } catch {
       setSaving(false)
       window.alert(t(locale, 'photoSaveError'))

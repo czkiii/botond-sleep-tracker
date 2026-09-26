@@ -500,25 +500,27 @@ async function sync(request: Request, env: Env, auth: DeviceAuth) {
   const after = Number(afterRaw)
   if (!Number.isInteger(after) || after < 0) throw new ApiError(400, 'INVALID_REQUEST', 'Invalid revision.')
 
-  const [family, children, sessions] = await Promise.all([
-    env.DB.prepare('SELECT name, revision FROM families WHERE id = ?').bind(auth.familyId).first<{ name: string; revision: number }>(),
+  // D1 batch is one transaction: rows and the cursor describe the same snapshot.
+  const [families, children, sessions] = await env.DB.batch([
+    env.DB.prepare('SELECT name, revision FROM families WHERE id = ?').bind(auth.familyId),
     env.DB.prepare(
       `SELECT id, family_id, name, birth_date, created_at, updated_at, deleted_at, revision
        FROM children WHERE family_id = ? ORDER BY created_at ASC`
-    ).bind(auth.familyId).all<ChildRow>(),
+    ).bind(auth.familyId),
     env.DB.prepare(
       `SELECT id, family_id, child_id, start_time, end_time, note, day_night_override, created_at, updated_at, deleted_at, revision
        FROM sleep_sessions
        WHERE family_id = ? AND revision > ?
        ORDER BY revision ASC`
-    ).bind(auth.familyId, after).all<SessionRow>()
+    ).bind(auth.familyId, after)
   ])
+  const family = families.results[0] as { name: string; revision: number } | undefined
 
   return ok(request, env, {
     familyName: family?.name ?? auth.familyName,
     revision: family?.revision ?? auth.familyRevision,
-    children: children.results.map(childDto),
-    sessions: sessions.results.map(sessionDto)
+    children: (children.results as unknown as ChildRow[]).map(childDto),
+    sessions: (sessions.results as unknown as SessionRow[]).map(sessionDto)
   })
 }
 
@@ -576,6 +578,13 @@ async function createChildProfile(request: Request, env: Env, auth: DeviceAuth) 
   return ok(request, env, { revision: child.revision, child: childDto(child) }, 201)
 }
 
+function insertActiveChildOperation(env: Env, auth: DeviceAuth, operationId: string, childId: string, type: string, at: string) {
+  return env.DB.prepare(`INSERT INTO operations (id, family_id, device_id, operation_type, created_at)
+    SELECT ?, ?, ?, ?, ? WHERE EXISTS (
+      SELECT 1 FROM children WHERE id = ? AND family_id = ? AND deleted_at IS NULL
+    )`).bind(operationId, auth.familyId, auth.deviceId, type, at, childId, auth.familyId)
+}
+
 async function patchChildProfile(request: Request, env: Env, auth: DeviceAuth, childId: string) {
   const body = await readJson(request)
   const operationId = operationIdFrom(body)
@@ -594,16 +603,41 @@ async function patchChildProfile(request: Request, env: Env, auth: DeviceAuth, c
     return ok(request, env, { revision: await currentRevision(env, auth.familyId), child: existing ? childDto(existing) : null, idempotent: true })
   }
 
+  const baseRevision = baseRevisionFrom(body, env)
+  const expected = body.expected as Record<string, unknown> | undefined
+  if (expected !== undefined && (!expected || typeof expected !== 'object' || Array.isArray(expected)
+    || Object.keys(expected).length !== keys.length || keys.some(key => !(key in expected))
+    || ('name' in expected && typeof expected.name !== 'string')
+    || ('birthDate' in expected && !isBirthDate(expected.birthDate)))) throw new ApiError(400, 'INVALID_REQUEST', 'Invalid expected child fields.')
+  // Compare only edited fields so a concurrent birthday edit does not conflict
+  // with a rename. Legacy clients fall back to the record revision guard.
+  const predicates = baseRevision === null ? '' : expected
+    ? keys.map(key => ` AND ${key === 'name' ? 'name' : 'birth_date'} IS ?`).join('')
+    : ' AND revision <= ?'
+  const expectedValues = baseRevision === null ? [] : expected ? keys.map(key => expected[key]) : [baseRevision]
+
   const at = nowIso()
-  await env.DB.batch([
-    env.DB.prepare('INSERT INTO operations (id, family_id, device_id, operation_type, created_at) VALUES (?, ?, ?, ?, ?)')
-      .bind(operationId, auth.familyId, auth.deviceId, 'PATCH_CHILD', at),
-    env.DB.prepare('UPDATE families SET revision = revision + 1 WHERE id = ?').bind(auth.familyId),
+  const results = await env.DB.batch([
+    env.DB.prepare(`INSERT INTO operations (id, family_id, device_id, operation_type, created_at)
+      SELECT ?, ?, ?, 'PATCH_CHILD', ? WHERE EXISTS (
+        SELECT 1 FROM children WHERE id = ? AND family_id = ? AND deleted_at IS NULL${predicates}
+      )`).bind(operationId, auth.familyId, auth.deviceId, at, childId, auth.familyId, ...expectedValues),
+    advanceFamilyForOperation(env, auth, operationId),
     env.DB.prepare(
-      `UPDATE children SET name = ?, birth_date = ?, updated_at = ?, revision = (SELECT revision FROM families WHERE id = ?)
-       WHERE id = ? AND family_id = ? AND deleted_at IS NULL`
-    ).bind(name, birthDate, at, auth.familyId, childId, auth.familyId)
+      `UPDATE children SET name = CASE WHEN ? THEN ? ELSE name END,
+       birth_date = CASE WHEN ? THEN ? ELSE birth_date END,
+       updated_at = ?, revision = (SELECT revision FROM families WHERE id = ?)
+       WHERE id = ? AND family_id = ? AND deleted_at IS NULL
+         AND EXISTS (SELECT 1 FROM operations WHERE id = ? AND family_id = ?)`
+    ).bind('name' in patch ? 1 : 0, name, 'birthDate' in patch ? 1 : 0, birthDate, at, auth.familyId, childId, auth.familyId, operationId, auth.familyId)
   ])
+  if (results[0].meta.changes < 1) {
+    const latest = await requireActiveChild(env, auth.familyId, childId)
+    throw new ApiError(409, 'SYNC_CONFLICT', 'This child profile changed on another device.', {
+      conflict: { entityType: 'CHILD', entityId: childId, baseRevision: baseRevision ?? 0,
+        serverRevision: latest.revision, serverValue: childDto(latest) }
+    })
+  }
 
   const child = await getChild(env, auth.familyId, childId)
   if (!child) throw new ApiError(404, 'CHILD_NOT_FOUND')
@@ -685,18 +719,19 @@ async function startSleep(request: Request, env: Env, auth: DeviceAuth) {
 
   const at = nowIso()
   try {
-    await env.DB.batch([
-      env.DB.prepare(
-        'INSERT INTO operations (id, family_id, device_id, operation_type, created_at) VALUES (?, ?, ?, ?, ?)'
-      ).bind(operationId, auth.familyId, auth.deviceId, 'START_SLEEP', at),
-      env.DB.prepare('UPDATE families SET revision = revision + 1 WHERE id = ?').bind(auth.familyId),
+    const results = await env.DB.batch([
+      insertActiveChildOperation(env, auth, operationId, childId, 'START_SLEEP', at),
+      advanceFamilyForOperation(env, auth, operationId),
       env.DB.prepare(
         `INSERT INTO sleep_sessions
          (id, family_id, child_id, start_time, end_time, note, day_night_override, created_at, updated_at, deleted_at, revision)
-         VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, NULL, (SELECT revision FROM families WHERE id = ?))`
-      ).bind(sessionId, auth.familyId, childId, startTime, note, dayNightOverride, at, at, auth.familyId)
+         SELECT ?, ?, ?, ?, NULL, ?, ?, ?, ?, NULL, (SELECT revision FROM families WHERE id = ?)
+         WHERE EXISTS (SELECT 1 FROM operations WHERE id = ? AND family_id = ?)`
+      ).bind(sessionId, auth.familyId, childId, startTime, note, dayNightOverride, at, at, auth.familyId, operationId, auth.familyId)
     ])
-  } catch {
+    if (results[0].meta.changes < 1) throw new ApiError(404, 'CHILD_NOT_FOUND')
+  } catch (error) {
+    if (error instanceof ApiError) throw error
     const authoritative = await getActiveSession(env, auth.familyId, childId)
     if (authoritative) throw new ApiError(409, 'ACTIVE_SLEEP_EXISTS', 'An active sleep session already exists.', {
       revision: await currentRevision(env, auth.familyId),
@@ -734,17 +769,19 @@ async function createCompletedSleep(request: Request, env: Env, auth: DeviceAuth
 
   const at = nowIso()
   try {
-    await env.DB.batch([
-      env.DB.prepare('INSERT INTO operations (id, family_id, device_id, operation_type, created_at) VALUES (?, ?, ?, ?, ?)')
-        .bind(operationId, auth.familyId, auth.deviceId, 'CREATE_SLEEP', at),
-      env.DB.prepare('UPDATE families SET revision = revision + 1 WHERE id = ?').bind(auth.familyId),
+    const results = await env.DB.batch([
+      insertActiveChildOperation(env, auth, operationId, childId, 'CREATE_SLEEP', at),
+      advanceFamilyForOperation(env, auth, operationId),
       env.DB.prepare(
         `INSERT INTO sleep_sessions
          (id, family_id, child_id, start_time, end_time, note, day_night_override, created_at, updated_at, deleted_at, revision)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, (SELECT revision FROM families WHERE id = ?))`
-      ).bind(sessionId, auth.familyId, childId, startTime, endTime, note, dayNightOverride, at, at, auth.familyId)
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, (SELECT revision FROM families WHERE id = ?)
+         WHERE EXISTS (SELECT 1 FROM operations WHERE id = ? AND family_id = ?)`
+      ).bind(sessionId, auth.familyId, childId, startTime, endTime, note, dayNightOverride, at, at, auth.familyId, operationId, auth.familyId)
     ])
-  } catch {
+    if (results[0].meta.changes < 1) throw new ApiError(404, 'CHILD_NOT_FOUND')
+  } catch (error) {
+    if (error instanceof ApiError) throw error
     throw new ApiError(409, 'SESSION_CREATE_CONFLICT', 'Session ID already exists.')
   }
 

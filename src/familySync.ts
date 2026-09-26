@@ -1,7 +1,8 @@
 import type { AppData, ChildProfile, SleepSession } from './types'
-import { createDefaultData, getLocalMetadata, loadData, saveDataAfterDeletion, saveDataWithMetadata, saveLocalMetadata, saveRemoteData, saveSafetyBackup } from './storage'
+import { createDefaultData, getLocalMetadata, inspectBackup, loadData, saveDataAfterDeletion, saveDataWithMetadata, saveLocalMetadata, saveRemoteData, saveSafetyBackup } from './storage'
 import { accountDeviceName, accountRequest } from './accountAuth'
 import { fetchJson } from './apiTransport'
+import { getActiveAccountWorkspaceId } from './accountWorkspace'
 
 const API_BASE = (import.meta.env.VITE_SYNC_API_BASE || 'https://solemi-sleep-sync.czki-adam.workers.dev').replace(/\/$/, '')
 const SYNC_KEY = 'solemiSleep:sync:v1'
@@ -52,15 +53,16 @@ export type MissingSession = {
 
 export type SyncConflict = {
   operationId: string
-  entityType: 'SESSION'
   entityId: string
   baseRevision: number
   serverRevision: number
-  serverValue: RemoteSession
-}
+} & ({ entityType: 'SESSION'; serverValue: RemoteSession } | { entityType: 'CHILD'; serverValue: RemoteChild })
 
 type SyncStore = {
   connection: SyncConnection | null
+  // Membership/device creation may succeed before the first download. Keep its
+  // credentials durable without enabling uploads from the unrelated local diary.
+  bootstrapConnection?: SyncConnection
   pending: PendingOperation[]
   conflicts: SyncConflict[]
   sessionRevisions?: Record<string, number>
@@ -108,6 +110,11 @@ function validPendingOperation(value: unknown): value is PendingOperation {
 function parseStore(value: unknown): SyncStore {
   if (!value || typeof value !== 'object') return corruptStore()
   const parsed = value as SyncStore
+  if (parsed.bootstrapConnection && (parsed.connection
+    || typeof parsed.bootstrapConnection.familyId !== 'string'
+    || typeof parsed.bootstrapConnection.deviceId !== 'string'
+    || typeof parsed.bootstrapConnection.deviceToken !== 'string'
+    || !Number.isInteger(parsed.bootstrapConnection.revision))) return corruptStore()
   if (parsed.connection !== null && parsed.connection !== undefined) {
     if (typeof parsed.connection !== 'object'
       || typeof parsed.connection.familyId !== 'string'
@@ -132,6 +139,7 @@ function parseStore(value: unknown): SyncStore {
     ? { code: parsed.failure.code, status: parsed.failure.status } : undefined
   const missingSessions = (parsed.missingSessions ?? []).filter((item) => item && typeof item.sessionId === 'string')
   return { connection, pending, conflicts: parsed.conflicts ?? [], sessionRevisions, failure, missingSessions,
+    bootstrapConnection: parsed.bootstrapConnection,
     connectionEnded: parsed.connectionEnded === true }
 }
 
@@ -247,8 +255,9 @@ function releaseRevokedConnection(token: string, error: unknown) {
   const code = (error as { code?: string })?.code
   if (code !== 'INVALID_DEVICE_TOKEN' && code !== 'DEVICE_REVOKED') return false
   const store = readStore()
-  if (store.corrupt || store.connection?.deviceToken !== token) return false
-  localStorage.setItem(DETACHED_FAMILY_KEY, store.connection.familyId)
+  const connection = store.connection ?? store.bootstrapConnection
+  if (store.corrupt || connection?.deviceToken !== token) return false
+  localStorage.setItem(DETACHED_FAMILY_KEY, connection.familyId)
   // The diary already contains every local edit. Old-family operations cannot be replayed
   // elsewhere; keep the diary as local data and surface that transition explicitly.
   writeStore({ ...defaultStore(), connectionEnded: true })
@@ -293,8 +302,14 @@ export function getFamilyReplacementReadiness(): FamilyReplacementReadiness {
   return { scope: 'family', ready: true, familyName }
 }
 
-export async function reconcileAccountFamily() {
+export function reconcileAccountFamily() {
+  return serializeSync(reconcileAccountFamilyNow)
+}
+
+async function reconcileAccountFamilyNow() {
   const store = readStore()
+  if (store.corrupt) throw new Error(CORRUPT_SYNC_STORE)
+  if (store.bootstrapConnection) return finishEmptyBootstrap()
   if (store.connection) {
     try {
       await accountRequest('/v1/auth/family/claim', {
@@ -316,7 +331,8 @@ export async function reconcileAccountFamily() {
     localStorage.removeItem(DETACHED_FAMILY_KEY)
   }
 
-  saveSafetyBackup(loadData(), 'before-family-bootstrap')
+  assertCanBootstrap()
+  const workspace = getActiveAccountWorkspaceId()
   const result = await accountRequest<{
     membership: null | { familyId: string; familyName: string; role: 'ADMIN' | 'MEMBER' }
     connection?: SyncConnection
@@ -324,14 +340,83 @@ export async function reconcileAccountFamily() {
     method: 'POST', body: JSON.stringify({ deviceName: accountDeviceName() })
   })
   if (!result.membership || !result.connection) return { claimed: false, connected: false, changed: false }
-  writeStore({ connection: result.connection, pending: [], conflicts: [], missingSessions: [] })
-  const changed = await pullRemote(true)
-  return { claimed: false, connected: true, changed }
+  stageBootstrap(result.connection, workspace)
+  return finishEmptyBootstrap()
 }
 
 export async function reconnectAccountFamily() {
   localStorage.removeItem(DETACHED_FAMILY_KEY)
   return reconcileAccountFamily()
+}
+
+function assertCanBootstrap() {
+  const store = readStore()
+  if (store.corrupt || store.connection || store.pending.length || store.conflicts.length || store.missingSessions.length) {
+    throw new Error('FAMILY_BOOTSTRAP_BLOCKED')
+  }
+}
+
+function stageBootstrap(connection: SyncConnection, workspace: string | null) {
+  if (getActiveAccountWorkspaceId() !== workspace) throw new Error('FAMILY_BOOTSTRAP_CHANGED')
+  assertCanBootstrap()
+  writeStore({ ...defaultStore(), bootstrapConnection: { ...connection, revision: 0 } })
+  localStorage.removeItem(DETACHED_FAMILY_KEY)
+}
+
+export type FamilyBootstrapPreview = {
+  connection: SyncConnection
+  workspace: string | null
+  local: AppData
+  data: AppData
+}
+
+// Download first, choose second, then commit diary + cursor + connection together.
+// A failed/abandoned download never turns unrelated local profiles into cloud data.
+export async function prepareFamilyBootstrap(): Promise<FamilyBootstrapPreview> {
+  assertCanBootstrap()
+  const connection = readStore().bootstrapConnection
+  if (!connection) throw new Error('FAMILY_BOOTSTRAP_CHANGED')
+  if (!navigator.onLine) throw new Error('FAMILY_BOOTSTRAP_OFFLINE')
+  const local = loadData()
+  const workspace = getActiveAccountWorkspaceId()
+  const result = await request<{ revision: number; familyName?: string; children: RemoteChild[]; sessions: RemoteSession[] }>(
+    '/v1/sync?after=0', {}, connection.deviceToken)
+  if (!sameConnection(connection, readStore().bootstrapConnection ?? null)
+    || getActiveAccountWorkspaceId() !== workspace || JSON.stringify(local) !== JSON.stringify(loadData())) {
+    throw new Error('FAMILY_BOOTSTRAP_CHANGED')
+  }
+  if (!Number.isInteger(result.revision) || result.revision < 0 || !Array.isArray(result.children) || !Array.isArray(result.sessions)) {
+    throw new Error('FAMILY_BOOTSTRAP_INVALID')
+  }
+  const children = result.children.filter(child => !child.deletedAt).map(child =>
+    toLocalChild(child, local.children.find(existing => existing.id === child.id)))
+  const data = inspectBackup({ format: 'solemi-sleep-backup', version: 4, exportedAt: new Date().toISOString(), data: {
+    ...local, children, sessions: result.sessions.filter(session => !session.deletedAt).map(toRemoteLocal),
+    settings: { ...local.settings, activeChildId: children.some(child => child.id === local.settings.activeChildId)
+      ? local.settings.activeChildId : children[0]?.id }
+  } }).data
+  return { connection: { ...connection, familyName: result.familyName ?? connection.familyName, revision: result.revision }, workspace, local, data }
+}
+
+export function acceptFamilyBootstrap(preview: FamilyBootstrapPreview) {
+  assertCanBootstrap()
+  if (!sameConnection(preview.connection, readStore().bootstrapConnection ?? null)
+    || getActiveAccountWorkspaceId() !== preview.workspace || JSON.stringify(loadData()) !== JSON.stringify(preview.local)) {
+    throw new Error('FAMILY_BOOTSTRAP_CHANGED')
+  }
+  // If quota prevents either write, the active diary and pending connection remain.
+  saveSafetyBackup(preview.local, 'before-family-bootstrap')
+  saveDataWithMetadata(preview.data, SYNC_METADATA_KEY, { ...defaultStore(), connection: preview.connection })
+  announceDiaryReplacement()
+  window.dispatchEvent(new CustomEvent('solemi-sync-state'))
+}
+
+async function finishEmptyBootstrap() {
+  // Named profiles, photos and active sleeps all require an explicit choice.
+  if (!isEmptyStarterData(loadData())) return { claimed: false, connected: false, changed: false, needsReview: true }
+  const preview = await prepareFamilyBootstrap()
+  acceptFamilyBootstrap(preview)
+  return { claimed: false, connected: true, changed: true }
 }
 
 export function isEmptyStarterData(data: AppData) {
@@ -344,6 +429,7 @@ function isEmptyLocalProfile(child: ChildProfile) {
 }
 
 export async function createFamily(familyName: string, deviceName: string) {
+  if (readStore().bootstrapConnection) throw new Error('FAMILY_BOOTSTRAP_BLOCKED')
   const local = loadData()
   saveSafetyBackup(local, 'before-family-bootstrap')
   const primaryChild = local.children.find((child) => child.id === local.settings.activeChildId) ?? local.children[0]
@@ -383,9 +469,16 @@ function applyAuthoritativeChild(child?: RemoteChild | null) {
   return changed
 }
 
-export async function joinFamily(code: string, deviceName: string) {
+export function joinFamily(code: string, deviceName: string) {
+  return serializeSync(() => joinFamilyNow(code, deviceName))
+}
+
+async function joinFamilyNow(code: string, deviceName: string) {
+  assertCanBootstrap()
+  if (readStore().bootstrapConnection) return finishEmptyBootstrap()
+  if (!navigator.onLine) throw new Error('FAMILY_BOOTSTRAP_OFFLINE')
+  const workspace = getActiveAccountWorkspaceId()
   const normalizedCode = code.trim().toUpperCase()
-  saveSafetyBackup(loadData(), 'before-family-bootstrap')
   let connection: SyncConnection
   if (import.meta.env.VITE_ACCOUNT_AUTH === 'true') {
     const joined = await accountRequest<{ connection: SyncConnection }>('/v1/auth/family/join', {
@@ -399,13 +492,8 @@ export async function joinFamily(code: string, deviceName: string) {
     connection = { familyId: joined.familyId, familyName: joined.familyName,
       deviceId: joined.device.id, deviceToken: joined.deviceToken, revision: 0 }
   }
-  localStorage.removeItem(DETACHED_FAMILY_KEY)
-  writeStore({ connection, pending: [], conflicts: [], missingSessions: [] })
-
-  // Merge the cloud family into the device without silently discarding an
-  // existing local diary. A dedicated, confirmed import flow can resolve any
-  // unrelated pre-pairing data in a later release.
-  return pullRemote()
+  stageBootstrap(connection, workspace)
+  return finishEmptyBootstrap()
 }
 
 export async function refreshFamilyInfo() {
@@ -595,7 +683,8 @@ export function makeOperations(previous: AppData, next: AppData, baseRevision = 
         method: 'PATCH',
         path: `/v1/children/${encodeURIComponent(child.id)}`,
         childId: child.id,
-        body: { operationId: opId('mut'), patch }
+        body: { operationId: opId('mut'), patch,
+          expected: Object.fromEntries(Object.keys(patch).map(key => [key, old[key as 'name' | 'birthDate']])) }
       })
     }
   }
@@ -801,7 +890,7 @@ async function flushPendingNow() {
       }
       if (apiError.code === 'FAMILY_SYNC_PAUSED' || apiError.code === 'RECONCILIATION_REQUIRED') break
       if (apiError.code === 'SYNC_CONFLICT') {
-        const conflict = apiError.data?.conflict as Omit<SyncConflict, 'operationId'> | undefined
+        const conflict = apiError.data?.conflict as SyncConflict | undefined
         if (conflict) {
           store = readStore()
           store.failure = undefined
@@ -838,17 +927,21 @@ async function resolveSyncConflictNow(operationId: string, resolution: 'local' |
 
   if (resolution === 'local') {
     store.pending = store.pending.map((item) => item.id === operationId
-      ? { ...item, body: { ...item.body, baseRevision: conflict.serverRevision } }
+      ? { ...item, body: { ...item.body, baseRevision: conflict.serverRevision,
+        ...(conflict.entityType === 'CHILD' ? { expected: Object.fromEntries(Object.keys(item.body.patch as object)
+          .map(key => [key, conflict.serverValue[key as 'name' | 'birthDate']])) } : {}) } }
       : item)
     store.conflicts = store.conflicts.filter((item) => item.operationId !== operationId)
     writeStore(store)
   } else {
-    store.pending = store.pending.filter((item) => item.sessionId !== conflict.entityId)
-    store.conflicts = store.conflicts.filter((item) => item.entityId !== conflict.entityId)
-    store.missingSessions = store.missingSessions.filter((item) => item.sessionId !== conflict.entityId)
-    store.sessionRevisions = { ...store.sessionRevisions, [conflict.entityId]: conflict.serverRevision }
+    store.pending = store.pending.filter((item) => (conflict.entityType === 'CHILD' ? item.childId : item.sessionId) !== conflict.entityId)
+    store.conflicts = store.conflicts.filter((item) => item.entityType !== conflict.entityType || item.entityId !== conflict.entityId)
+    if (conflict.entityType === 'SESSION') {
+      store.missingSessions = store.missingSessions.filter((item) => item.sessionId !== conflict.entityId)
+      store.sessionRevisions = { ...store.sessionRevisions, [conflict.entityId]: conflict.serverRevision }
+    }
     writeStore(store)
-    changedLocal = applyAuthoritativeSession(conflict.serverValue)
+    changedLocal = conflict.entityType === 'CHILD' ? applyAuthoritativeChild(conflict.serverValue) : applyAuthoritativeSession(conflict.serverValue)
   }
 
   return (await pullRemoteNow()) || changedLocal
@@ -879,10 +972,11 @@ async function pullRemoteNow(forceFromZero = false) {
   const merged = mergeRemote(current, result.sessions.filter((item) => !protectedIds.has(item.id)),
     (result.children ?? []).filter((item) => !item.deletedAt || !protectedChildIds.has(item.id)))
   const changed = JSON.stringify(merged) !== JSON.stringify(current)
-  if (changed) writeRemoteData(merged)
   // /v1/sync is the only authoritative place allowed to advance the cursor.
   latest.connection.revision = result.revision
   if (result.familyName) latest.connection.familyName = result.familyName
-  writeStore(latest)
+  saveDataWithMetadata(merged, SYNC_METADATA_KEY, latest)
+  if (changed) announceDiaryReplacement()
+  window.dispatchEvent(new CustomEvent('solemi-sync-state'))
   return changed || changedLocal
 }

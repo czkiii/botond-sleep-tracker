@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { removeChildProfile } from './childProfiles'
+import { mergeChildDraft, removeChildProfile } from './childProfiles'
 import type { AppData, ChildProfile, SleepSession } from './types'
 
 const at = '2026-08-26T10:00:00.000Z'
@@ -22,5 +22,21 @@ describe('removeChildProfile', () => {
 
   it('does not allow deleting the final profile', () => {
     expect(removeChildProfile({ ...data, children: [data.children[0]], sessions: [data.sessions[0]], settings: { ...data.settings, activeChildId: 'a' } }, 'a')).toBeNull()
+  })
+})
+
+describe('child editor during a family update', () => {
+  it('keeps the downloaded birthday when the open draft only changed the name', () => {
+    const original = child('a')
+    const current = { ...original, birthDate: '2025-08-23' }
+    expect(mergeChildDraft(current, original, { ...original, name: 'Helyi név' }))
+      .toMatchObject({ name: 'Helyi név', birthDate: '2025-08-23' })
+  })
+  it('does not overwrite a conflicting name downloaded while the editor was open', () => {
+    const original = child('a')
+    expect(mergeChildDraft({ ...original, name: 'Családi név' }, original, { ...original, name: 'Helyi név' })).toBeNull()
+  })
+  it('does not restore a child that was deleted while its editor was open', () => {
+    expect(mergeChildDraft(undefined, child('a'), { ...child('a'), name: 'Helyi név' })).toBeNull()
   })
 })

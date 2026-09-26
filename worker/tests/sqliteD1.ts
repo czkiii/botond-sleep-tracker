@@ -12,8 +12,9 @@ export function sqliteBinding(sqlite: DatabaseSync): D1Database {
       // D1 counts trigger and foreign-key cascade changes as well as direct writes.
       const totalChanges = () => Number(sqlite.prepare('SELECT total_changes() AS n').get()!.n)
       const before = totalChanges()
-      sqlite.prepare(this.sql).run(...this.values)
-      return { success: true, meta: { changes: totalChanges() - before } }
+      const statement = sqlite.prepare(this.sql)
+      const results = statement.columns().length ? statement.all(...this.values) : (statement.run(...this.values), [])
+      return { success: true, results, meta: { changes: totalChanges() - before } }
     }
   }
   return {

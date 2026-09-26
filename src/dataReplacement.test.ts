@@ -38,4 +38,12 @@ describe('data replacement planning', () => {
     expect(prepared.sessions.map((item) => item.id)).toEqual(['kept-sleep', 'sleep_restore_22222222222242228222222222222222'])
     expect(prepared.sessions[1].childId).toBe(prepared.children[1].id)
   })
+
+  it('rekeys a sleep reassigned to a different child so it is not silently kept under the original child', () => {
+    const current = data([child('one'), child('two')], [sleep('same-sleep', 'one')])
+    const incoming = data(current.children, [sleep('same-sleep', 'two')])
+    const prepared = prepareFamilyReplacement(current, incoming)
+    expect(prepared.sessions[0].id).not.toBe('same-sleep')
+    expect(prepared.sessions[0].childId).toBe('two')
+  })
 })

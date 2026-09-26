@@ -4,6 +4,9 @@ import { t } from './i18n'
 import type { Locale } from './i18n'
 import { exportData, loadData } from './storage'
 import { familyDissolutionCopy } from './familyDissolutionCopy'
+import { familyBootstrapCopy } from './familyBootstrapCopy'
+import { acceptFamilyBootstrap, prepareFamilyBootstrap } from './familySync'
+import type { FamilyBootstrapPreview } from './familySync'
 import { dissolveFamily, prepareFamilyDissolution } from './familySync'
 import type { FamilyDissolutionPreview } from './familySync'
 import { createFamily, createInvite, getAccountFamilyMembers, getSyncStore, joinFamily, leaveAccountFamily, leaveFamily, pullRemote, reconcileAccountFamily, reconnectAccountFamily, refreshFamilyInfo, resolveSyncConflict, restoreMissingSession } from './familySync'
@@ -100,7 +103,9 @@ function deviceName() {
 
 export default function FamilySyncLayer() {
   const [open, setOpen] = useState(false)
-  const [mode, setMode] = useState<'home' | 'create' | 'join' | 'invite' | 'leave-admin' | 'dissolve'>('home')
+  const [mode, setMode] = useState<'home' | 'create' | 'join' | 'invite' | 'leave-admin' | 'dissolve' | 'bootstrap'>('home')
+  const [bootstrap, setBootstrap] = useState<FamilyBootstrapPreview | null>(null)
+  const [bootstrapPending, setBootstrapPending] = useState(() => Boolean(getSyncStore().bootstrapConnection))
   const [dissolution, setDissolution] = useState<FamilyDissolutionPreview | null>(null)
   const [typedFamilyName, setTypedFamilyName] = useState('')
   const [connectionEnded, setConnectionEnded] = useState(() => Boolean(getSyncStore().connectionEnded))
@@ -131,6 +136,9 @@ export default function FamilySyncLayer() {
   const locale = loadData().settings.locale as Locale
   const text = copy[locale]
   const dissolutionText = familyDissolutionCopy[locale]
+  const bootstrapText = familyBootstrapCopy[locale]
+  const firstConflict = getSyncStore().conflicts[0]
+  const childConflict = firstConflict?.entityType === 'CHILD' ? firstConflict : null
   const familySyncAvailable = import.meta.env.VITE_ACCOUNT_AUTH === 'true'
     ? !accessChecking && !accessCheckFailed && serverFamilySync === true
     : internalPreview && canUseFamilySync(previewPlan)
@@ -138,6 +146,7 @@ export default function FamilySyncLayer() {
   const friendlyError = (err: unknown) => {
     const apiError = err as SyncError
     const code = apiError?.code || (err instanceof Error ? err.message : '')
+    if (code === 'FAMILY_BOOTSTRAP_CHANGED') return bootstrapText.changed
     if (code === 'INVITE_NOT_FOUND') return text.inviteNotFound
     if (code === 'INVITE_ALREADY_USED') return text.inviteUsed
     if (code === 'INVITE_EXPIRED') return text.inviteExpired
@@ -263,6 +272,7 @@ export default function FamilySyncLayer() {
   useEffect(() => {
     const onState = () => {
       const store = getSyncStore()
+      setBootstrapPending(Boolean(store.bootstrapConnection))
       setConnectionEnded(Boolean(store.connectionEnded))
       if (store.connectionEnded) {
         setInviteCode('')
@@ -382,6 +392,7 @@ export default function FamilySyncLayer() {
     if (accessCheckFailed) return text.syncIssue
     if (serverPaused) return text.paused
     if (!familySyncAvailable) return text.locked
+    if (bootstrapPending) return bootstrapText.review
     if (!connected) return text.disconnected
     if (!online) return text.offline
     if (conflictCount) return text.syncIssue
@@ -389,7 +400,7 @@ export default function FamilySyncLayer() {
     if (syncIssue) return text.syncIssue
     if (pendingCount) return text.syncing
     return text.connected
-  }, [accessChecking, accessCheckFailed, serverPaused, familySyncAvailable, connected, online, conflictCount, missingSessions, pendingCount, syncIssue, text])
+  }, [accessChecking, accessCheckFailed, serverPaused, familySyncAvailable, connected, online, conflictCount, missingSessions, pendingCount, syncIssue, text, bootstrapPending, bootstrapText])
 
   const detailHint = useMemo(() => {
     if (accessChecking) return text.syncing
@@ -397,6 +408,7 @@ export default function FamilySyncLayer() {
     if (serverPaused) return text.pausedHint
     if (connectionEnded && !connected) return dissolutionText.ended
     if (!familySyncAvailable) return text.lockedHint
+    if (bootstrapPending) return bootstrapText.waiting
     if (!connected) return text.settingsHintDisconnected
     if (!online) return text.offlineHint
     if (conflictCount === 1) return text.conflictOne
@@ -406,7 +418,7 @@ export default function FamilySyncLayer() {
     if (pendingCount > 1) return text.pendingMany(pendingCount)
     if (syncIssue) return text.syncIssue
     return lastSyncLabel || text.settingsHintConnected
-  }, [accessChecking, accessCheckFailed, serverPaused, familySyncAvailable, connected, online, conflictCount, missingSessions, pendingCount, syncIssue, lastSyncLabel, text, connectionEnded, dissolutionText])
+  }, [accessChecking, accessCheckFailed, serverPaused, familySyncAvailable, connected, online, conflictCount, missingSessions, pendingCount, syncIssue, lastSyncLabel, text, connectionEnded, dissolutionText, bootstrapPending, bootstrapText])
 
   const handleCreate = async () => {
     if (!familyName.trim()) return
@@ -425,13 +437,35 @@ export default function FamilySyncLayer() {
     if (!code.trim()) return
     setBusy(true); setError('')
     try {
-      await joinFamily(code, deviceName())
+      const result = await joinFamily(code, deviceName())
+      if (!result.connected) {
+        setMode('bootstrap')
+        setBootstrap(await prepareFamilyBootstrap())
+        setBusy(false)
+        return
+      }
       markSynced()
       window.location.reload()
     } catch (err) {
       setError(friendlyError(err))
       setBusy(false)
     }
+  }
+
+  const handleBootstrapReview = async () => {
+    setBusy(true); setError(''); setBootstrap(null); setMode('bootstrap')
+    try { setBootstrap(await prepareFamilyBootstrap()) }
+    catch (err) { setError(friendlyError(err)) }
+    finally { setBusy(false) }
+  }
+
+  const handleBootstrapAccept = () => {
+    if (!bootstrap) return
+    setBusy(true); setError('')
+    try {
+      acceptFamilyBootstrap(bootstrap)
+      window.location.reload()
+    } catch (err) { setError(friendlyError(err)); setBootstrap(null); setBusy(false) }
   }
 
   const handleInvite = async () => {
@@ -469,6 +503,12 @@ export default function FamilySyncLayer() {
     setBusy(true); setError('')
     try {
       const result = await reconnectAccountFamily()
+      if ('needsReview' in result && result.needsReview) {
+        setMode('bootstrap')
+        setBootstrap(await prepareFamilyBootstrap())
+        setBusy(false)
+        return
+      }
       if (!result.connected) throw new Error('FAMILY_MEMBERSHIP_CHANGED')
       window.location.reload()
     } catch (err) {
@@ -580,12 +620,34 @@ export default function FamilySyncLayer() {
             <button className="family-sync-link danger" onClick={handleAccountLeave} disabled={busy || !online}>{text.leaveAccount}</button>
           </>}
         </div>}
-        {familySyncAvailable && mode === 'home' && !connected && accountMembership && <div className="family-sync-content">
+        {familySyncAvailable && mode === 'home' && bootstrapPending && <div className="family-sync-content">
+          <p>{bootstrapText.waiting}</p>
+          <button className="family-sync-primary" onClick={handleBootstrapReview} disabled={busy || !online}>{bootstrapText.review}</button>
+          {accountMembership && <button className="family-sync-link danger" onClick={handleAccountLeave} disabled={busy || !online}>{text.leaveAccount}</button>}
+        </div>}
+        {familySyncAvailable && mode === 'bootstrap' && <div className="family-sync-content">
+          <strong>{bootstrapText.title}</strong><p>{bootstrapText.help}</p>
+          {bootstrap && <>
+            <div className="family-sync-status-card"><div><strong>{bootstrapText.local}</strong>
+              <small>{bootstrapText.children}: {bootstrap.local.children.length} · {bootstrapText.sleeps}: {bootstrap.local.sessions.length}</small>
+              {bootstrap.local.children.map(child => <small key={child.id}>{child.name || bootstrapText.unnamed}{child.birthDate ? ` · ${child.birthDate}` : ''}</small>)}
+            </div></div>
+            <div className="family-sync-status-card"><div><strong>{bootstrapText.family}: {bootstrap.connection.familyName}</strong>
+              <small>{bootstrapText.children}: {bootstrap.data.children.length} · {bootstrapText.sleeps}: {bootstrap.data.sessions.length}</small>
+              {bootstrap.data.children.map(child => <small key={child.id}>{child.name || bootstrapText.unnamed}{child.birthDate ? ` · ${child.birthDate}` : ''}</small>)}
+            </div></div>
+            <button className="family-sync-secondary" onClick={() => exportData(bootstrap.local)} disabled={busy}>{bootstrapText.export}</button>
+            <button className="family-sync-primary" onClick={handleBootstrapAccept} disabled={busy}>{bootstrapText.accept}</button>
+          </>}
+          {!bootstrap && <button className="family-sync-primary" onClick={handleBootstrapReview} disabled={busy || !online}>{busy ? text.syncing : bootstrapText.review}</button>}
+          <button className="family-sync-link" onClick={() => { setMode('home'); setBootstrap(null) }} disabled={busy}>{bootstrapText.later}</button>
+        </div>}
+        {familySyncAvailable && mode === 'home' && !connected && !bootstrapPending && accountMembership && <div className="family-sync-content">
           <p>{text.settingsHintDisconnected}</p>
           <button className="family-sync-primary" onClick={handleReconnect} disabled={busy || !online}>{busy ? text.syncing : text.reconnect}</button>
           <button className="family-sync-link danger" onClick={handleAccountLeave} disabled={busy || !online}>{text.leaveAccount}</button>
         </div>}
-        {familySyncAvailable && mode === 'home' && !connected && !accountMembership && <div className="family-sync-content">
+        {familySyncAvailable && mode === 'home' && !connected && !bootstrapPending && !accountMembership && <div className="family-sync-content">
           <p>{text.intro}</p>
           <button className="family-sync-primary" onClick={() => setMode('create')} disabled={busy}>{text.create}</button>
           <button className="family-sync-secondary" onClick={() => setMode('join')} disabled={busy}>{text.join}</button>
@@ -598,6 +660,7 @@ export default function FamilySyncLayer() {
         </div>}
         {familySyncAvailable && mode === 'join' && !connected && <div className="family-sync-content">
           <p>{text.join}</p>
+          <p>{bootstrapText.intro}</p>
           <input className="family-sync-code-input" value={code} onChange={(event) => setCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10))} placeholder={text.codePlaceholder} autoCapitalize="characters" autoCorrect="off" />
           <button className="family-sync-primary" onClick={handleJoin} disabled={busy || !code.trim()}>{busy ? text.syncing : text.joinButton}</button>
           <button className="family-sync-link" onClick={() => setMode('home')} disabled={busy}>{text.cancel}</button>
@@ -629,7 +692,11 @@ export default function FamilySyncLayer() {
         </div>}
         {mode === 'home' && connectionEnded && <div className="family-sync-content"><p role="status">{dissolutionText.ended}</p></div>}
         {familySyncAvailable && mode === 'home' && connected && conflictCount > 0 && <div className="family-sync-content">
-          <div className="family-sync-status-card"><span>!</span><div><strong>{text.conflictTitle}</strong><small>{text.conflictHelp}</small></div></div>
+          <div className="family-sync-status-card"><span>!</span><div><strong>{childConflict ? bootstrapText.conflictTitle : text.conflictTitle}</strong><small>{childConflict ? bootstrapText.conflictHelp : text.conflictHelp}</small></div></div>
+          {childConflict && <div className="family-sync-status-card"><div>
+            <strong>{bootstrapText.local}</strong><small>{loadData().children.find(child => child.id === childConflict.entityId)?.name || bootstrapText.unnamed} · {loadData().children.find(child => child.id === childConflict.entityId)?.birthDate || '—'}</small>
+            <strong>{bootstrapText.family}</strong><small>{childConflict.serverValue.name || bootstrapText.unnamed} · {childConflict.serverValue.birthDate || '—'}</small>
+          </div></div>}
           <button className="family-sync-primary" onClick={() => handleConflict('local')} disabled={busy}>{text.keepLocal}</button>
           <button className="family-sync-secondary" onClick={() => handleConflict('family')} disabled={busy}>{text.keepFamily}</button>
         </div>}

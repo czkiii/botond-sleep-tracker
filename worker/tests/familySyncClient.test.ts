@@ -3,8 +3,8 @@ import { DatabaseSync } from 'node:sqlite'
 import { readFileSync } from 'node:fs'
 import worker from '../src/index'
 import { sqliteBinding } from './sqliteD1'
-import { flushPending, getSyncStore, pullRemote, resolveSyncConflict, restoreMissingSession, saveLocalData } from '../../src/familySync'
-import { REMOTE_DATA_EVENT, STORAGE_KEY, loadData } from '../../src/storage'
+import { acceptFamilyBootstrap, flushPending, getSyncStore, joinFamily, prepareFamilyBootstrap, pullRemote, resolveSyncConflict, restoreMissingSession, saveLocalData } from '../../src/familySync'
+import { REMOTE_DATA_EVENT, STORAGE_KEY, loadData, loadSafetyBackup } from '../../src/storage'
 import type { AppData } from '../../src/types'
 import { prepareFamilyReplacement } from '../../src/dataReplacement'
 
@@ -89,6 +89,181 @@ async function editOffline(index: number, startTime: string, note: string) {
 }
 
 describe('two device client + Worker reconciliation', () => {
+  const api = (path: string, method: string, body: unknown) => worker.fetch(new Request(`https://sync.example${path}`, {
+    method, headers: { Authorization: 'Bearer test-device-token-0', 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  }), env)
+
+  it('joins a real family without uploading or mixing a different same-name local child', async () => {
+    const response = await api('/v1/invites', 'POST', {})
+    const invite = await response.json() as { data: { code: string } }
+    useDevice(1, true)
+    devices[1].storage.removeItem('solemiSleep:sync:v1')
+    const local: AppData = { ...initial, children: [{ ...initial.children[0], id: 'foreign-child' }],
+      settings: { ...initial.settings, activeChildId: 'foreign-child' },
+      sessions: [{ ...initial.sessions[0], id: 'foreign-sleep', childId: 'foreign-child', endTime: null }] }
+    devices[1].storage.setItem(STORAGE_KEY, JSON.stringify(local))
+    expect(await joinFamily(invite.data.code, 'New phone')).toMatchObject({ needsReview: true })
+    const preview = await prepareFamilyBootstrap()
+    expect(loadData()).toEqual(local)
+    expect(preview.data.children.map(c => c.id)).toEqual(['child-a'])
+    acceptFamilyBootstrap(preview)
+    await pullRemote()
+    expect(loadData().sessions.map(s => s.id)).toEqual(['shared-sleep'])
+    expect(loadSafetyBackup()?.data).toEqual(local)
+    expect(sqlite.prepare('SELECT id FROM children WHERE deleted_at IS NULL').all()).toEqual([{ id: 'child-a' }])
+    expect(sqlite.prepare('SELECT id FROM sleep_sessions WHERE deleted_at IS NULL').all()).toEqual([{ id: 'shared-sleep' }])
+  })
+
+  it('preserves both fields when another child patch commits after the first request read', async () => {
+    const originalBatch = env.DB.batch.bind(env.DB)
+    let injected = false
+    env.DB.batch = async statements => {
+      if (!injected) {
+        injected = true
+        expect((await api('/v1/children/child-a', 'PATCH', { operationId: 'birthday', baseRevision: 2, expected: { birthDate: null }, patch: { birthDate: '2025-08-23' } })).status).toBe(200)
+      }
+      return originalBatch(statements)
+    }
+    expect((await api('/v1/children/child-a', 'PATCH', { operationId: 'rename', baseRevision: 2, expected: { name: 'Baba' }, patch: { name: 'Boti' } })).status).toBe(200)
+    expect(sqlite.prepare("SELECT name, birth_date FROM children WHERE id = 'child-a'").get())
+      .toEqual({ name: 'Boti', birth_date: '2025-08-23' })
+    useDevice(0, true); await pullRemote()
+    expect(loadData().children[0]).toMatchObject({ name: 'Boti', birthDate: '2025-08-23' })
+  })
+
+  it.each(['start', 'completed', 'patch-child'])('rejects %s if the child was deleted between validation and commit', async kind => {
+    await api('/v1/children', 'POST', { operationId: 'add-b', child: { id: 'child-b', name: 'Másik' } })
+    const originalBatch = env.DB.batch.bind(env.DB)
+    let injected = false
+    let revisionAfterDelete = 0
+    env.DB.batch = async statements => {
+      if (!injected) {
+        injected = true
+        expect((await api('/v1/children/child-a', 'DELETE', { operationId: 'remove-a' })).status).toBe(200)
+        revisionAfterDelete = Number(sqlite.prepare("SELECT revision FROM families WHERE id = 'family-a'").get()!.revision)
+      }
+      return originalBatch(statements)
+    }
+    const response = kind === 'patch-child'
+      ? await api('/v1/children/child-a', 'PATCH', { operationId: 'losing-op', baseRevision: 3, patch: { name: 'Too late' } })
+      : kind === 'start'
+        ? await api('/v1/sessions/start', 'POST', { operationId: 'losing-op', sessionId: 'new-sleep', childId: 'child-a', startTime: at })
+        : await api('/v1/sessions', 'POST', { operationId: 'losing-op', session: { ...initial.sessions[0], id: 'new-sleep' } })
+    expect(response.status).toBe(kind === 'patch-child' ? 409 : 404)
+    expect(await response.json()).toMatchObject({ error: { code: kind === 'patch-child' ? 'CHILD_DELETED' : 'CHILD_NOT_FOUND' } })
+    expect(sqlite.prepare("SELECT id FROM operations WHERE id = 'losing-op'").get()).toBeUndefined()
+    expect(sqlite.prepare("SELECT id FROM sleep_sessions WHERE child_id = 'child-a' AND deleted_at IS NULL").all()).toEqual([])
+    expect(Number(sqlite.prepare("SELECT revision FROM families WHERE id = 'family-a'").get()!.revision)).toBe(revisionAfterDelete)
+  })
+
+  it('includes a start committed just before a child deletion in the cascade', async () => {
+    await api('/v1/children', 'POST', { operationId: 'add-b', child: { id: 'child-b', name: 'Másik' } })
+    const originalBatch = env.DB.batch.bind(env.DB)
+    let injected = false
+    env.DB.batch = async statements => {
+      if (!injected) {
+        injected = true
+        expect((await api('/v1/sessions/start', 'POST', { operationId: 'start-first', sessionId: 'new-sleep', childId: 'child-a', startTime: at })).status).toBe(201)
+      }
+      return originalBatch(statements)
+    }
+    expect((await api('/v1/children/child-a', 'DELETE', { operationId: 'delete-after-start' })).status).toBe(200)
+    expect(sqlite.prepare("SELECT deleted_at FROM sleep_sessions WHERE id = 'new-sleep'").get()!.deleted_at).not.toBeNull()
+  })
+
+  it.each(['local', 'family'] as const)('resolves two offline edits of the same child name by explicit %s choice', async choice => {
+    for (const index of [0, 1]) {
+      useDevice(index, false)
+      const before = loadData()
+      saveLocalData(before, { ...before, children: before.children.map(c => ({ ...c, name: index === 0 ? 'Első név' : 'Második név' })) })
+      await flushPending()
+    }
+    useDevice(0, true); await pullRemote()
+    useDevice(1, true); await pullRemote()
+    const conflict = getSyncStore().conflicts[0]
+    expect(conflict).toMatchObject({ entityType: 'CHILD', entityId: 'child-a', serverValue: { name: 'Első név' } })
+    expect(loadData().children[0].name).toBe('Második név')
+    expect(getSyncStore().pending).toHaveLength(1)
+    await resolveSyncConflict(conflict.operationId, choice)
+    expect(getSyncStore().conflicts).toEqual([])
+    expect(getSyncStore().pending).toEqual([])
+    expect(loadData().children[0].name).toBe(choice === 'local' ? 'Második név' : 'Első név')
+    useDevice(0, true); await pullRemote()
+    expect(loadData().children[0].name).toBe(choice === 'local' ? 'Második név' : 'Első név')
+    expect(loadData().sessions).toHaveLength(1)
+  })
+
+  it('detects a same-field write committed after child validation without consuming the losing operation', async () => {
+    const originalBatch = env.DB.batch.bind(env.DB)
+    let injected = false
+    env.DB.batch = async statements => {
+      if (!injected) {
+        injected = true
+        await api('/v1/children/child-a', 'PATCH', { operationId: 'winner', baseRevision: 2,
+          expected: { name: 'Baba' }, patch: { name: 'Másik telefon' } })
+      }
+      return originalBatch(statements)
+    }
+    const response = await api('/v1/children/child-a', 'PATCH', { operationId: 'loser', baseRevision: 2,
+      expected: { name: 'Baba' }, patch: { name: 'Helyi név' } })
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({ data: { conflict: { entityType: 'CHILD', serverValue: { name: 'Másik telefon' } } } })
+    expect(sqlite.prepare("SELECT id FROM operations WHERE id = 'loser'").get()).toBeUndefined()
+    expect(sqlite.prepare("SELECT revision FROM families WHERE id = 'family-a'").get()!.revision).toBe(3)
+  })
+
+  it('uses the revision guard for queued child patches from the previous client version', async () => {
+    await api('/v1/children/child-a', 'PATCH', { operationId: 'first', baseRevision: 2, patch: { name: 'Új név' } })
+    const stale = await api('/v1/children/child-a', 'PATCH', { operationId: 'old-client', baseRevision: 2, patch: { name: 'Régi változat' } })
+    expect(stale.status).toBe(409)
+    expect(sqlite.prepare("SELECT name FROM children WHERE id = 'child-a'").get()!.name).toBe('Új név')
+  })
+
+  it('imports a formerly completed sleep as active and converges on both devices', async () => {
+    useDevice(0, false)
+    const before = loadData()
+    const incoming = { ...before, sessions: before.sessions.map(s => ({ ...s, endTime: null, note: 'Visszaállított aktív alvás' })) }
+    const next = prepareFamilyReplacement(before, incoming)
+    expect(next.sessions[0].id).not.toBe(before.sessions[0].id)
+    saveLocalData(before, next)
+    await flushPending()
+    useDevice(0, true); await pullRemote()
+    expect(getSyncStore().pending).toEqual([])
+    expect(loadData().sessions).toHaveLength(1)
+    expect(loadData().sessions[0]).toMatchObject({ endTime: null, note: 'Visszaállított aktív alvás' })
+    const activeId = loadData().sessions[0].id
+    useDevice(1, true); await pullRemote()
+    expect(loadData().sessions).toHaveLength(1)
+    expect(loadData().sessions[0]).toMatchObject({ id: activeId, endTime: null })
+    expect(sqlite.prepare("SELECT deleted_at FROM sleep_sessions WHERE id = 'shared-sleep'").get()!.deleted_at).not.toBeNull()
+  })
+
+  it.each(['before', 'after'])('keeps the cursor consistent with a write immediately %s the download snapshot', async boundary => {
+    useDevice(0, true)
+    const originalBatch = env.DB.batch.bind(env.DB)
+    let injected = false
+    const mutate = () => {
+      sqlite.prepare("UPDATE families SET revision = 3 WHERE id = 'family-a'").run()
+      sqlite.prepare("UPDATE sleep_sessions SET note = 'Next revision', revision = 3 WHERE id = 'shared-sleep'").run()
+    }
+    env.DB.batch = async statements => {
+      if (injected) return originalBatch(statements)
+      injected = true
+      if (boundary === 'before') mutate()
+      const result = await originalBatch(statements)
+      if (boundary === 'after') mutate()
+      return result
+    }
+    await pullRemote()
+    expect(injected).toBe(true)
+    expect(getSyncStore().connection?.revision).toBe(boundary === 'before' ? 3 : 2)
+    expect(loadData().sessions[0].note).toBe(boundary === 'before' ? 'Next revision' : '')
+    await pullRemote()
+    expect(loadData().sessions[0].note).toBe('Next revision')
+    expect(getSyncStore().connection?.revision).toBe(3)
+  })
+
   it('accepts clearing a child name while preserving its sleep on both devices', async () => {
     useDevice(0, false)
     const before = loadData()
