@@ -13,12 +13,16 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       VitePWA({
-        registerType: 'autoUpdate',
+        // Native registration waits for all old windows to close. Never take
+        // over/reload an open diary while it may contain an unsaved draft.
+        registerType: 'prompt',
+        injectRegister: false,
         includeAssets: ['app-icon.png'],
         workbox: {
           cleanupOutdatedCaches: true,
-          clientsClaim: true,
-          skipWaiting: true
+          clientsClaim: false,
+          skipWaiting: false,
+          navigateFallbackDenylist: [/^\/api(?:\/|$)/]
         },
         manifest: {
           name: 'Solemi Sleep',

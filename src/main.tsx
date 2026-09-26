@@ -1,7 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { useEffect, useState } from 'react'
-import { registerSW } from 'virtual:pwa-register'
+import { registerPwa } from './pwaRegistration'
 import App from './App'
 import type { WriteAccess } from './App'
 import FamilySyncLayer from './FamilySyncLayer'
@@ -26,7 +26,7 @@ const buildSha = import.meta.env.VITE_BUILD_SHA?.slice(0, 7) || 'local'
 installAssetCssVariables()
 recoverAccountWorkspaceSwitch()
 
-if (!internalPreview) registerSW({ immediate: true })
+if (!internalPreview) void registerPwa(import.meta.env.BASE_URL, navigator.serviceWorker)
 
 function SolemiRoot() {
   const [accountReady, setAccountReady] = useState(!accountAuthEnabled)

@@ -8,6 +8,7 @@
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:pwa": "node scripts/check-pwa-lifecycle.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

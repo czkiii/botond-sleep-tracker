@@ -25,7 +25,7 @@ type AccessResponse = { account: SignedInAccount; deviceId: string; sessionId?: 
 type ApiEnvelope<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string }; data?: unknown }
 
 export class AccountAuthError extends Error {
-  constructor(readonly code: string, readonly data?: unknown) { super(code) }
+  constructor(readonly code: string, readonly data?: unknown, readonly status?: number) { super(code) }
 }
 
 async function request<T>(path: string, options: RequestInit = {}) {
@@ -34,7 +34,7 @@ async function request<T>(path: string, options: RequestInit = {}) {
   })
   if (!response.ok || !envelope.ok) {
     const failure = envelope as Extract<ApiEnvelope<T>, { ok: false }>
-    throw new AccountAuthError(failure.error?.code || 'ACCOUNT_AUTH_FAILED', failure.data)
+    throw new AccountAuthError(failure.error?.code || 'ACCOUNT_AUTH_FAILED', failure.data, response.status)
   }
   return envelope.data
 }
@@ -81,6 +81,7 @@ export function restoreAccount() {
 }
 
 async function restoreAccountOnce() {
+  if (!navigator.onLine) return deferAccountRestore()
   const saved = readAccess()
   if (saved && saved.accessExpiresAt > Date.now() + 5_000) {
     let current: { account: SignedInAccount } | null = null
@@ -88,7 +89,10 @@ async function restoreAccountOnce() {
       current = await request<{ account: SignedInAccount }>('/v1/auth/me', {
         headers: { Authorization: `Bearer ${saved.accessToken}` }
       })
-    } catch { sessionStorage.removeItem(ACCESS_KEY) }
+    } catch (error) {
+      if (!isRejectedSession(error)) return deferAccountRestore()
+      sessionStorage.removeItem(ACCESS_KEY)
+    }
     if (current) {
       activateRestoredAccountWorkspace(current.account.id)
       restoredAccount = current.account
@@ -100,7 +104,9 @@ async function restoreAccountOnce() {
   let refreshed: AccessResponse
   try {
     refreshed = await request<AccessResponse>('/v1/auth/refresh', { method: 'POST' })
-  } catch {
+  } catch (error) {
+    if (!isRejectedSession(error)) return deferAccountRestore()
+    sessionStorage.removeItem(ACCESS_KEY)
     activateSignedOutWorkspace()
     restoredAccount = null
     restoreCompleted = true
@@ -114,6 +120,22 @@ async function restoreAccountOnce() {
   restoreCompleted = true
   announceAccount(account)
   return account
+}
+
+function isRejectedSession(error: unknown) {
+  return error instanceof AccountAuthError && error.status === 401
+    && (error.code === 'SESSION_INVALID' || error.code === 'REFRESH_REUSED')
+}
+
+function deferAccountRestore() {
+  // A failed network check is not a logout. Keep the active account's diary
+  // and outbox visible, without granting authenticated access or paid features.
+  // A later online attempt must be able to retry instead of caching a logout.
+  restoredAccount = null
+  restoreCompleted = false
+  announceAccess(null)
+  announceAccount(null)
+  return null
 }
 
 export async function beginGoogleSignIn(
