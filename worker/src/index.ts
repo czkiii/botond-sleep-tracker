@@ -1,6 +1,7 @@
 import { AuthError, AuthService, SESSION_MS } from './authService'
 import { EntitlementService } from './entitlementService'
 import type { TestPlan } from './entitlementService'
+import { buildSha } from './buildIdentity'
 
 interface Env {
   DB: D1Database
@@ -90,6 +91,7 @@ function corsHeaders(request: Request, env: Env) {
   const headers = new Headers({
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
+    'X-Solemi-Build-Sha': buildSha(),
     'Vary': 'Origin'
   })
 
@@ -1607,7 +1609,7 @@ async function route(request: Request, env: Env) {
   }
 
   if (request.method === 'GET' && path === '/health') {
-    return ok(request, env, { service: 'solemi-sleep-sync', status: 'ok' })
+    return ok(request, env, { service: 'solemi-sleep-sync', status: 'ok', buildSha: buildSha() })
   }
 
   if (path.startsWith('/v1/auth/')) return accountAuthRoute(request, env, path)

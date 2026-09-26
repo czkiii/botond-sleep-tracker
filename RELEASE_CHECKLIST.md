@@ -1,6 +1,6 @@
 # Solemi Sleep — belső verziótól a kiadásig
 
-Utolsó frissítés: 2026-09-25
+Utolsó frissítés: 2026-09-26
 
 Ez az operatív lista a `SOLEMI_EXECUTION_PLAN.md` és a `SOLEMI_MASTER_ROADMAP.md` kiadási pontjait rendezi végrehajtási sorrendbe.
 
@@ -41,7 +41,7 @@ vagy kifejezett, indokolt termékdöntés kell; a puszta priorizálás nem lezá
 - [ ] **[GPT-6 Sol · high]** A21 — Statisztikai összegek/szűrés és időpontjelzések egyeztetése.
 - [ ] **[GPT-6 Sol · high]** A22 — Telefonos teljesítményprofil, másodpercenkénti elemzés újraszámolás rendezése.
 - [ ] **[GPT-6 Sol · medium]** A23 — Terv–funkciómátrix–ár/paywall ígéretek tételes lezárása a tulajdonossal.
-- [ ] **[GPT-6 Sol · medium]** A24 — Lockfile, CI-hez kötött release, pontos SHA és PWA upgrade. A frontend és a Worker lockfile-ja elkészült; a CI, a belső preview és a Pages build rögzített `npm ci` telepítésre váltott. Mindkét lockfile külön, tiszta könyvtárban sikeres `npm ci --dry-run` ellenőrzést kapott. A Pages deploy workflow már csak kézzel, `main` ágon indul, és a saját commitján typechecket, tesztet és production buildet futtat. A jelenlegi A07 konfigurációs kapu még blokkolja az éles buildet. Az internal artifact build a fiókos staging kapcsolókat használja, az ikonlinkek mindkét alapútvonalon javítva és helyi builddel ellenőrizve. A GitHubon futó új workflow, a külső kötelező merge-check, a staging smoke commit-egyezése és a PWA upgrade/rollback még nyitott.
+- [ ] **[GPT-6 Astra · high]** A24 — Lockfile, CI-hez kötött release, pontos SHA és PWA upgrade. A frontend és a Worker lockfile-ja elkészült; a CI, a belső preview és a Pages build rögzített `npm ci` telepítésre váltott. Mindkét lockfile külön, tiszta könyvtárban sikeres `npm ci --dry-run` ellenőrzést kapott. A Pages deploy workflow már csak kézzel, `main` ágon indul, és a saját commitján typechecket, tesztet és production buildet futtat. A jelenlegi A07 konfigurációs kapu még blokkolja az éles buildet. Az internal artifact build fiókos staging kapcsolói és ikonlinkjei helyben ellenőrizve. A Worker commitazonosítója a staging csomag része; a smoke a várt GitHub SHA-ra vár és minden válasznál ellenőrzi. Régi, hiányzó vagy közben változó verzió nem adhat sikeres eredményt. 28 fájl / 324 teszt, mindkét typecheck és a helyi Worker-csomagolás sikeres. Az új commit-kapu valós Cloudflare/GitHub futása, a külső kötelező merge-check és a PWA upgrade/rollback még nyitott.
 - [ ] **[GPT-6 Astra · high]** A25 — Teljes sémaleltár, migrációs terv, staging restore és rollback főpróba. A Wrangler-belépés 2026-09-23-án megújult. A staging D1 teljes SQL-exportja a Gitből kizárt helyi mappában megvan; memóriabeli SQLite-visszatöltés, integritás- és idegenkulcs-ellenőrzés sikeres ([checkpoint](STAGING_D1_RECOVERY_2026-09-23.md)). Távoli D1 restore/rollback főpróba még hiányzik; a Time Travel az összes staging családot érintené.
 - [ ] **[GPT-6 Sol · medium]** A26 — Support/monitoring, staging adatkezelés és két store beadási bizonyíték.
 - [ ] **[GPT-6 Astra · high]** A27 — Family+ számítási audit S01–S15 lezárása az alábbi bontásban.
@@ -293,6 +293,8 @@ engedélyez automatikus halasztást. A meglévő Prediction kommunikációját i
 ---
 
 ## Következő konkrét munkamenet
+
+**2026-09-26 — [GPT-6 Astra · high]:** az A24 staging commit-kapu helyben elkészült, 324/324 teszttel és csomagolt artifact-ellenőrzéssel. Commit/push után a pontos SHA-hoz tartozó Cloudflare-deploy és GitHub smoke eredménye csak olvasással ellenőrizendő (**[GPT-6 Sol · medium]**). A tulajdonos most nem tud kézzel tesztelni. Következő önálló feladat: **A24 PWA-frissítés/visszaállás kódellenőrzése és a függő helyi adatok megőrzése — [GPT-6 Astra · high]**. A lentebb felsorolt kézi elfogadások a tulajdonos jelzésére folytatódnak.
 
 **Adminátadás lezárva — [GPT-6 Astra · high]:** Az emailes utódválasztó `dcbc7ca` javítása és a kifejezett Edge → Chrome → Edge adminátadás stagingen elfogadva. Mindkét kilépés megőrizte a helyi Boti/1799 naplót. A végső visszacsatlakozás után mindkettő Opo/Boti/1799 és friss szinkron; Edge ismét admin, Chrome tag. Az automatikus utódválasztást ebben a kézi körben nem próbáltuk. Korábbi ellenőrzések: typecheck, 34/34 account-route teszt és internal build sikeres. A családmegszüntetés utáni téves hibaválasz helyben javítva: a D1 a családsorral együtt kaszkádolt tagsági törléseket is beleszámolja a meta.changes értékbe, ezért a korábbi pontosan 1-es ellenőrzés siker után is 409-et adott. A feltétel most pozitív módosításszámot fogad el, a nulla továbbra is ütközés. A tesztadapter D1-kompatibilis számlálást használ; a régi kód két meglévő Free/fizetős megszüntetési tesztben reprodukálta a hibát. Javítás után 27 fájl / 296 teszt és Worker typecheck sikeres. A tulajdonosi commit/push `028d25e` megtörtént. Következő: staging Worker-verzió ellenőrzése, majd amikor a tulajdonos tud tesztelni, külön kis tesztcsalád megszüntetése és a hibamentes válasz kézi ellenőrzése. Staging elfogadás még nincs; A04 nyitott.
 

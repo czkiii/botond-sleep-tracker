@@ -60,3 +60,6 @@ jobs:
 
       - name: Typecheck
         run: npm --prefix worker run typecheck
+
+      - name: Package the identified staging Worker without deploying
+        run: npm --prefix worker run deploy:staging -- --dry-run

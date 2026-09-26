@@ -7,7 +7,7 @@
     "dev": "wrangler dev",
     "dev:staging": "wrangler dev --config wrangler.staging.jsonc",
     "deploy": "wrangler deploy",
-    "deploy:staging": "wrangler deploy --config wrangler.staging.jsonc",
+    "deploy:staging": "node ./scripts/deploy-staging.mjs",
     "typecheck": "tsc --noEmit",
     "types": "wrangler types",
     "db:create": "wrangler d1 create solemi-sleep-db",
