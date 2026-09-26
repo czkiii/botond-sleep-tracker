@@ -36,6 +36,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Typecheck Worker
+        run: npm --prefix worker run typecheck
+
       - name: Test
         run: npm test
 
@@ -43,6 +46,9 @@ jobs:
         run: npm run build
         env:
           VITE_INTERNAL_PREVIEW: 'true'
+          VITE_ACCOUNT_AUTH: 'true'
+          VITE_ACCOUNT_API_BASE: /api
+          VITE_SYNC_API_BASE: https://solemi-sleep-sync-staging.czki-adam.workers.dev
           VITE_BUILD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           VITE_BASE_PATH: /
 
