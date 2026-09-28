@@ -1,5 +1,7 @@
 # A15 — meglévő napló csatlakozása és gyermekprofilok
 
+**Aktuális kézi folytatás (2026-09-26):** [összevont tesztmenet](MANUAL_ACCEPTANCE_2026-09-26.md). Az alábbi régebbi következő-feladat mondatok történetiek. A tulajdonos már commitolta az A15-öt (`a83b39a`), a Pages-verzió mindkét böngészőben igazolt. A már elfogadott tagi kilépést nem ismételjük; a kis tesztcsalád megszüntetése utáni visszaúton megmaradó helyi próbanaplóval vizsgáljuk az új A15 áttekintést.
+
 Dátum: 2026-09-26. Feladatszint: GPT-6 Astra · erős (high).
 Alap: `1547fa7`, `feat/child-profile-v4`. A változások helyiek; commit/push a tulajdonos feladata.
 
@@ -44,3 +46,9 @@ A böngészős próba ugyanúgy külső Playwright futtatókörnyezetet használ
 Javasolt commit Summary: `Protect existing diaries during family join and resolve child profile conflicts`
 
 **Következő önálló feladat:** A16 — offline jogosultság és párhuzamos bejelentkezés-frissítés ellenőrzése, automatikus próbákkal. **Feladatszint: GPT-6 Astra · erős.**
+
+## 2026-09-26 — commit és közös elfogadás előkészítése
+
+A tulajdonos commitolta az A15-öt: `a83b39aae98fb808610bb591acda7e5a29d5e86d`. A staging Worker `/health` válaszának törzse és fejléce ezt a teljes SHA-t adta. Az erre a SHA-ra futtatott helyi staging smoke sikeres: health/CORS, névtelen legacy create/join tiltás, account/family/test-plan hitelesítési határok. Családi adatot a próba nem módosított. A GitHub saját futásrekordját és a felhasználó böngészőjében betöltött Pages-verziót ez nem igazolja.
+
+A tulajdonos ismét tud kézzel tesztelni. Az A16 új fejlesztése elé a nagyrészt elkészült pontok közös elfogadása kerül: elsőként az A04 családmegszüntetési hibaválasz javításának rövid visszatesztje külön, kis tesztcsaláddal. Előtte mindkét böngésző aktuális verzióját, fiókját és családi naplóállapotát ellenőrizzük. Új kézi eredmény még nincs; a korábban sikeresen lezárt próbákat nem ismételjük teljes egészében.

@@ -1,0 +1,136 @@
+# Összevont kézi elfogadás — 2026-09-26
+
+Feladatszint: GPT-6 Astra · erős. Staging: `a83b39a`.
+
+**Legfrissebb megálló — 2026-09-28-án rögzítve a megszakítás előtti képekből:** az InPrivate már `czki.adam@gmail.com` fiókkal belépve, Boti / 1799 alvás; a normál Chrome `readi.studio@gmail.com`, Próbababa helyi nyer / 2026-01-01 / 1 alvás. A vendégnapló hozzárendelési kérdése valóban megjelent. Következő M4: B→guest→A visszaút, a Vendég M4 és a korábban félretett függő változás megőrzésének ellenőrzése. A két napos megszakítás után előbb tisztázni kell, hogy megmaradt-e ugyanaz az InPrivate ablak és a célzott kérésblokkolás. A régi képek nem a szeptember 28-i élő állapot bizonyítékai. Az alábbi korábbi megállók történetiek.
+
+## Aktuális megálló és elsőbbség
+
+Ez a dokumentum a kézi tesztelés aktuális sorrendje. A régebbi checkpointok történeti bizonyítékok; a bennük maradt „következő” és „nyitott” mondatok nem indítanak újabb teljes tesztkört. A kiadási kapuk állapotát továbbra is a RELEASE_CHECKLIST.md tartalmazza. A terv nem sikeres teszteredmény.
+
+A tulajdonos kérésére az ismétléseket összevonjuk. Már sikeres lépést csak konkrét érintett kódváltozás, új hiba vagy hiányzó bizonyíték miatt ismétlünk. Előtte megnevezzük az okot. A tesztkörnyezet előkészítését nem számoljuk új funkciótesztnek. Egy megfigyelést minden érintett auditponthoz felhasználunk, de nem állítjuk vele nem vizsgált feltételek teljesülését.
+
+**Jelenlegi állapot:** a 2026-09-26-i `codex-clipboard-7ebe119d-0cca-44e1-aad5-0a665d225d86.png` képen Edge: Opo, Boti / 1799, adminművelet és friss szinkron. Chrome: Boti / 1799 helyben, helyi import, nincs család összekapcsolva. Mindkettő `a83b39a`. Ez a korábban már igazolt tagi kilépés/helyi megőrzés ismételt eredménye; nem új lezárt auditpont. A képből az új exportfájl letöltése és a bejelentkezés fennmaradása önmagában nem állapítható meg.
+
+## Meglévő eredmények — nem kérjük újra végig
+
+| Bizonyíték | Felhasználás | Forrás |
+| --- | --- | --- |
+| Import, visszaállítás, helyi és külön családi törlés; offline és online-pending importtiltás; feltöltés utáni 1799-re visszatérés | A03 lezárt; kapcsolódó adatvédelem bizonyítéka | FAMILY_DISSOLUTION_CHECKPOINT_2026-09-23.md, szeptember 23–25. |
+| Tagi kilépés, helyi napló megmaradása, visszacsatlakozás | A04 már elfogadott rész | Ugyanott; mai kép ismételten megerősíti |
+| Kifejezett Edge → Chrome → Edge adminátadás, emailes utódazonosítás | A04 már elfogadott rész | Ugyanott, `dcbc7ca` |
+| Utolsó tag és Free utolsó admin külön családjának tényleges megszűnése; régi meghívó elutasítása | A04 már elfogadott rész; a téves siker utáni hibajelzés javítása külön retest | Ugyanott |
+| Worker pontos `a83b39a` SHA és helyi staging auth-boundary smoke; két böngésző Pages-verziója | A06/A24 részbizonyíték; nem teljes hitelesített jogosultsági mátrix vagy GitHub-futásigazolás | FAMILY_JOIN_CHECKPOINT_2026-09-26.md és mai képek |
+| 371 helyi automatikus teszt, A15 elkülönített felületpróba; két útvonalas PWA A/B próba | Versenyek, mentési hibák és ismétlések gépi bizonyítékai | A15 és PWA checkpoint |
+
+## Egy előkészítés, három összefüggő blokk
+
+Az eredeti Edge/Opo és a feleség tagsága marad. Chrome-ban egyszer készítünk kis külön tesztcsaládot. Második eszköznek külön Edge InPrivate ablak használható a Chrome tesztfiókjával; ez nem a normál Edge munkaterülete. Ugyanazon fiók két eszköze nem bizonyít két külön account elkülönítését.
+
+Előkészítés: meglevő, ellenőrzött 1799-es export megőrzése; ha a most kért export már elkészült, nem kérünk újat. A családon kívüli Chrome helyi naplóját egyszer ürítjük, majd kis, egyértelműen elnevezett próbaprofilt és külön `Solemi közös próba` családot készítünk. Az Opo-export nem kerül a próbacsaládba. A konkrét gombokat a felület aktuális állapota alapján, rövid részletekben adjuk meg.
+
+### 1. Közös alvás és gyermekprofilok
+
+- [ ] **M1 / A13:** új, még aktív alvás már a létrehozáskor egyedi jegyzettel és kézi típussal. Másik eszközön és újratöltés után egyezzen. Egy feltöltési megszakítás/újrapróbálás ugyanennek a sornak a megmaradását és duplikációmentességét vizsgálja; a sima start/stop tesztet nem ismételjük önállóan.
+- [x] **M2 / A15, A20 része:** ugyanebben a családban gyermeknév és születési dátum eltérő eszközös szerkesztése, majd ugyanazon mező két eltérő értéke; a helyi/családi választás és az érthető összehasonlítás ellenőrzése. Mindhárom rész sikeres `a83b39a` stagingen, 2026-09-26. Részletes képi bizonyíték lent. Ez az M2 forgatókönyvet zárja le, nem a teljes A15/A20 auditot.
+- [ ] **M3 / A14:** ugyanitt két kifejezetten próba gyermekkel a két törlés ütközésének staging próbája; legalább egy aktív profil marad, a vesztes művelet érthető. Pusztán két gyors kattintás nem bizonyít adatbázis-versenyt: ha nem hozható létre az ütközés, nincs végtelen kézi ismétlés; a determinisztikus helyi regresszió mellé célzott staging bizonyíték szükséges. A megmaradó gyermekhez tartozó alvások kontrollja is kell.
+
+### 2. Fiókok és megőrzött változások ugyanebben a környezetben
+
+- [ ] **M4 / A05, A06/A18 működési részbizonyíték:** egy függő módosítás mellett kijelentkezés helyi megtartással; vendég, majd másik ismert saját fiók eltérő naplója; visszatérés az eredeti tesztfiókhoz. A pending változás csak a megfelelő családhoz kerülhet. A másik fiók Opo naplóját nem módosítjuk. A vendégnapló kifejezett átvételi döntését külön megfigyeljük, nem következtetjük ki a sima logoutból.
+- A működő login/sync a proxy megengedett útjának bizonyítéka, nem igazolja önmagában a tiltott Origin vagy a visszavont token elutasítását. Ezeket az agent célzott gépi ellenőrzéssel vizsgálja, megfelelő izolációval; nem kér a tulajdonostól nyers API-kérések kézi másolgatását.
+
+### 3. A próbacsalád lezárása és az A15 visszaút
+
+- [ ] **M5 / A04 javítás retest:** a még meglevő kis próbacsalád megszüntetése. Konkrét ismétlési ok: a `028d25e` javítás után először kell stagingen igazolni, hogy a sikeres véglegesítés nem ad téves „adatok megváltoztak” hibát. Helyi napló és account megmarad, mindkét próbaeszköz családi kapcsolata lezárul. A már sikeres teljes családi naplóürítés/import/restore kör nem része ennek.
+- [ ] **M6 / A15, A04 visszaút:** a Chrome megmaradt kis helyi próbanaplójával csatlakozás az Opóhoz: eltérő profilok áttekintése → elhalasztás/újranyitás → helyi mentés → családi napló választása. Ezzel egyetlen szükséges visszaút vizsgálja az új csatlakozási folyamatot is. A próbanaplót előtte nem töröljük ki, és nem importáljuk az Opóba. Végül Edge admin / Chrome tag, mindkettő Boti / 1799. Az InPrivate ablakot a már lezárt próbakapcsolat ellenőrzése után bezárjuk.
+
+## Mi marad külön, és mi nem jelent újabb teljes kézi kört?
+
+- A04 automatikus adminutód és utolsó fizető kilépésének teljes bizonyítékát az agent először összeveti a meglévő determinisztikus tesztekkel. A jelenlegi család egyfiókos/többeszközös próbája ezt nem fedi. Ha külön kézi kapu szükséges, az csak külön kontrollált tagságokkal végezhető, nem az Opo véletlen utódválasztásával.
+- A05 újratelepítés; A15 valódi telefon/hálózat és D1-terhelés; A24 telepített telefonos frissítés/történeti visszaállás külön környezeti bizonyíték. Ezeket egy későbbi telefonos blokkba rendezzük; desktop screenshot nem váltja ki őket.
+- A16 még fejlesztési munka, a store/native/éles konfiguráció és a statisztikai audit nem zárható le ezzel a hat ellenőrzéssel.
+- Ha egy blokk hibát talál: a javítás után az érintett lépés és közvetlen következménye ismétlendő, nem a teljes három blokk.
+- Minden eredményhez build, környezet, várt/tényleges viselkedés és bizonyíték kell. Most **1/6 új összevont ellenőrzés kész (M2)**; M1 két eszközös szinkronja és a frissítés utáni folytatás is igazolt, az újrapróbálás bizonyíték-összesítése még nyitott. A korábbi sikeres próbák érvényes történeti eredmények. A hat sor nem hat beszélgetést és nem hat teljes auditkapu lezárását jelenti.
+
+## Előkészítés eredménye
+
+2026-09-26, `codex-clipboard-3f02efa1-e9a1-4fd7-842a-e35d672bd362.png`: Chrome `a83b39a`, `Próbababa` / 0 alvás, nincs születési dátum; külön család a felületen `Solemi közös próba.` néven (záró ponttal), friss szinkron és adminművelet. Edge továbbra is `a83b39a`, Opo/Boti/1799 és friss szinkron. A tulajdonos a létrehozást megerősítette. Meghívókódot nem rögzítünk a repóban. A második próbaeszköz és az M1 eredménye még nincs igazolva. Második eszköznek Edge InPrivate, ugyanazzal a Chrome-os Solemi-fiókkal; a saját család fiókból helyreállítható, ehhez új tag meghívása nem szükséges.
+
+### Második próbaeszköz: eszközkorlát és részleges M1
+
+2026-09-26, `codex-clipboard-45177f93-a712-4801-8eac-10d3ebe8f8e1.png`: az InPrivate belépés két korábbi eszközt listáz (`Edge · Windows`, `Chrome · Windows`) és kifejezett megtartási döntést kér. A kezdeti leírás ezt kihagyta. A felhasználó szerint választás nélkül kijelentkezett állapotba kerül. A képen az új ablak belépése még nem teljes; más meglévő eszköz kijelentkeztetése ebből nem igazolt.
+
+A forrás (`AccountCard.tsx`, `accountDeviceSelection.ts`, `authService.ts`) szerint a kiválasztott régi eszköz marad, a másik régi eszköz az új Google-megerősítés sikeres tranzakciójakor visszavonódik. A lista az adott Google-fiókhoz tartozik. Következő: `Chrome · Windows` megtartása, majd ugyanazzal a Chrome-os Google-fiókkal új megerősítés. A normál Opo Edge másik fiókjának kapcsolatát ez a művelet nem célozza. A harmadik-eszköz választó megjelenése A16 részbizonyíték; a csere eredménye és az elutasított régi eszköz hozzáférése még nincs igazolva, A16 ettől nem zárható le.
+
+Chrome-ban már látható egy aktív, `20:54 – most` próbaalvás `M1 közös próba` jegyzettel. A kézi típus a listán nem olvasható, a második eszközös egyezés és reload még nyitott. Új próbaalvást nem hozunk létre: ezzel az egy meglévő sorral folytatjuk.
+
+### M1: aktív alvás egyezése két böngészőkörnyezetben
+
+2026-09-26, `codex-clipboard-ef3cbec5-c74c-4b35-bc7b-6fc847f919a7.png`: Edge InPrivate és Chrome egyaránt `a83b39a`; a részletekben szeptember 26. 20:54-es kezdés, bekapcsolt „Jelenleg is alszik”, kijelölt `Nappali` és pontosan `M1 közös próba` megjegyzés látszik. A két eszközös aktív note/type szinkron elfogadott részeredmény. Újratöltést előzőleg kértünk, de a kép annak megtörténtét önmagában nem bizonyítja, a tulajdonos külön nem erősítette meg; célzott megszakítás/újrapróbálás sem történt még ebben a kézi körben. Az M2 előtti közös frissítésnél ugyanennek a bejegyzésnek a megmaradását is ellenőrizzük, új sort nem hozunk létre.
+
+A tulajdonos külön jelezte, hogy eszközválasztás után újra be kell jelentkeznie. Ez megfelel a jelenlegi megvalósítás új Google-megerősítésének, de körülményes UX. A20-hoz feljegyzett javítandó/értékelendő pont: az eszközválasztás és a befejezetlen belépés folyamatának érthetősége. A két jelenlegi eszköz működése látható, a régi visszavont eszköz elutasítása továbbra sem ellenőrzött. Ezzel nem zárjuk le A16-ot.
+
+### M2: eltérő mezők megőrzése sikeres; M1 frissítés utáni kontroll
+
+2026-09-26, `codex-clipboard-1b0b7a2a-90bb-42b9-bf0e-1b91b65d0757.png`: mindkét ablak `a83b39a`, ugyanazzal a tesztfiókkal bejelentkezve. Mindkét gyermekprofil-kártyán `Próbababa M2`, `2026-01-01`, 1 alvás látszik. A felhasználó a frissítés és a két előre megnyitott szerkesztő eltérő mezős mentésének lépéseire „szuper és az alvás szépen megy tovább” visszajelzést adott. Az eltérő mezők közös megmaradása képen, az aktív alvás folytatódása tulajdonosi visszajelzéssel igazolt. Az előző körben kért frissítés utáni alváskontrollt e visszajelzésként rögzítjük, nem kérjük újra. Az M1 célzott hálózati újrapróbálásának bizonyíték-összesítése még nyitott.
+
+M2 azonos mezős ütközésének és mindkét feloldási irányának próbája még hátra van. Ugyanazt a profilt és alvást használjuk. Első irány: kizárólag InPrivate DevTools Offline → ott `Próbababa helyi` név helyi mentése → az online Chrome-ban `Próbababa családi` mentése és friss szinkron → InPrivate No throttling, konfliktus megnyitása a családi kártyán. A két változatról kép, majd `A családi változat maradjon`; mindkét oldalon a családi név, változatlan dátum és 1 alvás a várt eredmény. E lépések még csak terv, nem eredmény.
+
+### M2: azonos névmező ütközése, családi feloldás sikeres
+
+2026-09-26, `codex-clipboard-7cf2c61b-0f9d-48ad-b1e5-fb9c8662819e.png`: az InPrivate családi panel gyermekprofil-ütközést jelez. Külön látszik a helyi `Próbababa helyi` és a családi `Próbababa családi`, mindkettő `2026-01-01` dátummal; mindkét döntési gomb elérhető. A Network gyermekmódosítása 409-et mutat, miközben a hozzáférés/szinkron lekérések sikeresek. Ez ebben a helyzetben a várt ütközésjelzés.
+
+A `codex-clipboard-6e3e4059-669d-4bb9-af60-44f6db500ee0.png` képen a kért családi választás után mindkét profil `Próbababa családi` / `2026-01-01` / 1 alvás; a felhasználó a várt működést megerősítette. A családi feloldási irány elfogadott. A15 és A20 összehasonlíthatósági részbizonyíték; a helyi választási irány még nyitott. A régi 409 sor a hálózati naplóban történeti, önmagában nem új hiba.
+
+**Tulajdonosi UX-ötlet / A20:** a Családi megosztás/szinkron kártya közvetlenül a Gyerekek rész alá, az export/import/törlési műveletek elé kerülhetne. Indok: a kapcsolódás és a szinkronprobléma hamarabb észrevehető, közel a profilokhoz. Ötletként rögzítve; alkalmazáskód és a most tesztelt build nem változott. A jelenlegi kör után értékelendő a többi felületi észrevétellel együtt.
+
+### M2 lezárva; felületi észrevételek és a folytatás sorrendje
+
+2026-09-26, `codex-clipboard-8f27ebfa-962b-4c97-9779-0501c38f74b7.png`: a kért helyi feloldás után mindkét ablak `a83b39a`, `Próbababa helyi nyer` / `2026-01-01` / 1 alvás; a két családi kártya friss szinkront mutat. A tulajdonos kifejezetten sikeresnek jelölte az ellenőrzést. A helyi választás és a másik eszközre feltöltés elfogadva. M2 eltérő mezős szerkesztése és mindkét konfliktusfeloldási iránya lezárt, nem ismétlendő új ok nélkül.
+
+**További tulajdonosi felületi kérés / A20:** a nyelvválasztó legyen legalul. A szinkronkártya Gyerekek alá helyezésével együtt rögzítve a későbbi felületi rendezéshez; a nyelvválasztó és a jelenleg vele egy kártyán lévő „Még alszik?” kapcsoló elhelyezése külön kezelendő. Alkalmazáskód nem változott.
+
+**Sorrendpontosítás:** M4 megelőzi M3-at, hogy a meglévő profil és aktív alvás megmaradjon a fiókelkülönítési próbához. Utána következik a próbagyermekek törlési vizsgálata, majd a család megszüntetése és az A15 visszaút. Új család nem szükséges.
+
+M4 első szakasza: az InPrivate Network már megfigyelt `child_…` kérésének pontos URL-jét blokkoljuk (helyi DevTools „Block request URL”), a hálózat egyébként No throttling marad. Itt egy új `Próbababa függő` névváltozás várakozik, az online Chrome neve változatlan. A várakozó állapot ellenőrzése után InPrivate kijelentkezés a `Maradjon ezen a telefonon` döntéssel. A vendégfelületnek nem szabad a tesztfiók naplóját mutatnia; a fiókhoz tartozó várakozó változásnak meg kell maradnia későbbi visszalépésre. A blokkolás maradjon meg addig. Ez még terv, nem igazolt eredmény. Teljes Offline mód nem jó ehhez, mert a kijelentkezés szerverhívást igényel.
+
+### M4: függő módosítás után kijelentkezés és külön vendégnapló igazolt
+
+2026-09-26: `codex-clipboard-8d878205-c575-42ec-a051-98ec207ab0c8.png` mutatja az InPrivate `Próbababa függő` / `2026-01-01` / 1 alvás állapotát és 1 várakozó módosítást, bekapcsolt Request conditions blokkolással, miközben Chrome `Próbababa helyi nyer` / 1 alvás és friss szinkron marad. A minta teljes URL-je nem olvasható, de a célzott függő állapot igazolt.
+
+A `codex-clipboard-28bbcaaf-810a-4d1d-8f90-b35a405acb20.png` a helyi napló megtartása/törlése döntést mutatja a tesztfiókhoz. A `codex-clipboard-a121342e-bdfb-45cf-81b8-08faa2f99804.png` már kijelentkezett Google-belépőgombot és névtelen / 0 alvásos, helyi vendégnaplót mutat, Chrome változatlan. A tulajdonos attól tartott, hogy hibázott a kijelentkezéssel; ez pontosan a kért lépés és várt külön vendégállapot. A fiók függő sorának tartós megmaradását a visszabelépés előtt még nem állítjuk bizonyítottnak.
+
+**Folytatás egyetlen fiókváltási körben:** InPrivate vendégprofilt `Vendég M4` névre nevezni (0 alvás); ugyanitt a normál Edge-ben használt másik saját fiókkal (`czki.adam@gmail.com`) belépni. A vendégnapló hozzárendelési kérdésénél `Mégse`, így külön marad; a belépés ettől folytatódik. Várt B-fiók: Opo / Boti / 1799, a vendég és a readi-fiók függő adatai nélkül. Ha ennél a másik fióknál eszközválasztó jelenik meg, előbb a képet azonosítjuk; névazonosság esetén nem választunk találomra régi eszközt. Ezután B kijelentkezés helyi megtartással, vendégjelölés kontrollja, végül vissza readi-fiókhoz a még blokkolt függő sor ellenőrzésére és feloldására. A sorrend A→guest→B→guest→A, nem külön megismételt A→guest→A kör. A normál Chrome változatlan kontroll marad, az InPrivate ablakot nem zárjuk be.
+
+### M4: vendégjelölés megvan, B-belépés eszközválasztásnál
+
+2026-09-26, új képek: `codex-clipboard-35879b91-edfe-4ab8-bee1-e66269363cbb.png` helyi naplótörlési előnézetet mutat (1 profil cseréje, 0 alvás), nem a belépéskori vendégátvételi kérdést. A tulajdonos szerint Mégsét választott; a következő képeken `Vendég M4` / 0 alvás megmaradt, ezért a vendégnapló átvételének elutasítását még nem jelöljük teljesítettnek.
+
+A `codex-clipboard-457effa8-4ee5-41fe-b492-565a42c5a58a.png` köztes Google-belépési hibát jelez: lejárt vagy érvénytelen kérés. Pontos hibakód/ok nem látszik. A `codex-clipboard-b28cc4e0-9506-4402-becb-36da56f10107.png` már az eszközkorlát választóját mutatja: `Edge · Windows` (szept. 23. 20:07) és `Chrome · iPhone` (szept. 22. 22:08). A B-fiók végleges belépése még nincs igazolva, email nem látható a választón. A normál Chrome továbbra is az egyalvásos próbacsalád változatlan kontrollja; a blokkolás bekapcsolva maradt.
+
+Következő lépés a korábban kért `czki.adam@gmail.com` fiókkal: `Edge · Windows` megtartása, majd új Google-megerősítés. A kijelzett `Chrome · iPhone` korábbi eszközbelépése ennek sikerénél visszavonódik; ezt előre egyértelműen közöljük. A normál Edge-belépést így megtartjuk. A később megjelenő, kifejezetten vendégnapló hozzárendeléséről kérdező ablakban Mégse, majd email/Opo/Boti/1799 kontroll. Nincs szükség új helyi törlésre. Az M4 és a régi eszköz hozzáférésének elutasítása továbbra is részleges bizonyíték.
+
+### Megszakítás előtti utolsó eredmény és folytatási összefoglaló
+
+Rögzítve: 2026-09-28, a keretelfogyás miatt félbeszakadt összefoglaló befejezéseként. HEAD továbbra is `a83b39a`; kizárólag dokumentáció változott, új kód/build/tesztfuttatás/commit/push nem történt.
+
+- `codex-clipboard-d636dc3b-61de-4b10-ad7b-15aeeb7da0dc.png`: most valóban a vendégnapló hozzárendelési kérdése látszik, a háttérben Vendég M4 / 0 alvás. A korábbi helyi törlési ablak ettől külön művelet volt.
+- `codex-clipboard-ff750dec-d83b-47b7-9c51-86ceb7921b80.png`: InPrivate bejelentkezve `czki.adam@gmail.com`, Boti / 2025-08-23 / 1799 alvás; normál Chrome bejelentkezve `readi.studio@gmail.com`, Próbababa helyi nyer / 2026-01-01 / 1 alvás. Mindkettő `a83b39a`, az InPrivate Request conditions blokkolása továbbra is bekapcsolva. Az Opo-kártya neve ezen a képen nincs a látható részben, a B-fiók és annak helyes naplója viszont igen.
+- B sikeres belépése és a helyes fióknapló megjelenése igazolt; a tényleges Mégse-kattintás nincs külön megnevezve a legutóbbi üzenetben. Vendég M4 elkülönített megőrzését a következő kijelentkezéskor ellenőrizzük. A readi-fiók félretett `Próbababa függő` változásának megmaradása szintén még nyitott.
+
+**Elfogadott és újra nem indítandó:** M2 mindhárom része (eltérő mezők; családi és helyi konfliktusfeloldás). M1 aktív állapot/jegyzet/Nappali típus két eszközös egyezése és frissítés utáni folytatása. M4 első szakaszának 1 függő módosítása, kijelentkezés, külön vendégfelület, majd B-fiók helyes naplója. M1 újrapróbálási bizonyítékainak összesítése és M4 visszaút még nyitott; a hat forgatókönyvből csak M2 teljesen lezárt. A korábbi A03 és adminátadási próbák továbbra is elfogadottak.
+
+**Pontos visszaút, ha ugyanaz az InPrivate munkamenet megvan:**
+
+1. Ellenőrizni a jelenlegi fiókot és a kérésblokkolást; egyelőre ne oldjuk fel a blokkolást.
+2. InPrivate B-fiók kijelentkezése `Maradjon ezen a telefonon` választással → Vendég M4 / 0 alvás kontroll. Más eredménynél rögzíteni és kivizsgálni, nem automatikusan új vendégprofilt létrehozni.
+3. Ugyanitt visszabelépés a readi-fiókba. Ha eszközválasztás szükséges, a működő normál Chrome Windows kapcsolatát kell megtartani; eltérő/azonos nevű listánál előbb azonosítani. A mentett readi-munkaterület miatt a kód szerint új vendégátvételi döntés általában nem szükséges.
+4. Még blokkolt gyermek-URL mellett várt: Próbababa függő / 2026-01-01 / 1 alvás, 1 várakozó módosítás. Normál Chrome egyelőre Próbababa helyi nyer. Ezzel bizonyítható a félretett sor fiókváltáson át megmaradása.
+5. Ezután blokkolás kikapcsolása → mindkét próbaeszközön Próbababa függő és friss szinkron, változatlan 1 alvás. Az alvás a szünet alatt hosszúra nyúlhatott; ez próbaadat, a tényleges állapotát ellenőrizni kell.
+
+**Ha az összes InPrivate ablak közben bezárult vagy a böngésző/gép újraindult:** a privát helyi tár és a benne parkolt függő/vendégmunkaterületek elveszhettek. Ez önmagában nem alkalmazáshiba, és a Gitbe mentett tesztnapló nem menti a böngésző adatait. Az eredeti pending tartóssági próba ilyenkor nem zárható le; csak az M4 szükséges helyi előkészítését ismételjük, a már elfogadott M2-t és más teszteket nem. A felhőben levő külön próbacsalád és a normál Chrome állapotát először felmérjük.
+
+**Utána:** M3 utolsóprofil-védelem (előbb a kliens elutasított törlésének kezelése és a gépi bizonyíték áttekintendő), M5 sikeres családmegszüntetés hibajelzésének retestje, M6 meglévő helyi naplós Opo-visszacsatlakozás. Nem kell új teljes import/törlés/restore kört kezdeni. Felületi teendők megőrizve: szinkronkártya a Gyerekek alá; nyelvválasztó legalulra; eszközválasztás utáni új Google-belépés érthetősége. Ezek még nem kódmódosítások.
+
+**Következő feladat:** M4/A05 — a meglévő InPrivate állapot ellenőrzése, majd vendég→readi visszatérés és a függő módosítás feltöltésének igazolása. **Feladatszint: GPT-6 Astra · erős.**
