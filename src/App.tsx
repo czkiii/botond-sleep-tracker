@@ -776,8 +776,8 @@ function SettingsPage({ data, setData, onBack, familySyncAvailable, familyRole }
       if (!window.confirm(t(locale, 'deleteChildConfirm', { name: child.name || t(locale, 'unnamedChild'), count }))) return
       const next = removeChildProfile(data, child.id)
       if (!next) return
-      if (child.photoRef) void deleteChildPhoto(child.photoRef).catch(() => {})
       setData(next)
+      if (child.photoRef && !getSyncStore().connection) void deleteChildPhoto(child.photoRef).catch(() => {})
       setEditingChild(null)
     }} />}
     {pendingReplacement && <DataReplacementDialog locale={locale} source={pendingReplacement.source}

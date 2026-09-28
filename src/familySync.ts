@@ -3,6 +3,7 @@ import { createDefaultData, getLocalMetadata, inspectBackup, loadData, saveDataA
 import { accountDeviceName, accountRequest } from './accountAuth'
 import { fetchJson } from './apiTransport'
 import { getActiveAccountWorkspaceId } from './accountWorkspace'
+import { deleteChildPhoto } from './photoStore'
 
 const API_BASE = (import.meta.env.VITE_SYNC_API_BASE || 'https://solemi-sleep-sync.czki-adam.workers.dev').replace(/\/$/, '')
 const SYNC_KEY = 'solemiSleep:sync:v1'
@@ -41,6 +42,8 @@ type PendingOperation = {
   childId?: string
   repairsMissingSession?: string
   replacesOperationIds?: string[]
+  rejectedLastChild?: boolean
+  deletedPhotoRef?: string | null
 }
 
 export type MissingSession = {
@@ -70,6 +73,7 @@ type SyncStore = {
   missingSessions: MissingSession[]
   corrupt?: boolean
   connectionEnded?: boolean
+  childDeletionRejected?: boolean
 }
 
 type RemoteSession = Omit<SleepSession, 'childId' | 'dayNightOverride'> & {
@@ -140,6 +144,7 @@ function parseStore(value: unknown): SyncStore {
   const missingSessions = (parsed.missingSessions ?? []).filter((item) => item && typeof item.sessionId === 'string')
   return { connection, pending, conflicts: parsed.conflicts ?? [], sessionRevisions, failure, missingSessions,
     bootstrapConnection: parsed.bootstrapConnection,
+    childDeletionRejected: parsed.childDeletionRejected === true,
     connectionEnded: parsed.connectionEnded === true }
 }
 
@@ -275,6 +280,11 @@ function applyAuthoritativeSession(session?: RemoteSession | null) {
 }
 
 export function getSyncStore() { return readStore() }
+export function dismissChildDeletionNotice() {
+  const store = readStore()
+  store.childDeletionRejected = false
+  writeStore(store)
+}
 export function getSessionSyncRevision(sessionId: string) {
   const store = readStore()
   if (!store.connection) return undefined
@@ -691,7 +701,8 @@ export function makeOperations(previous: AppData, next: AppData, baseRevision = 
 
   for (const child of previous.children) {
     if (removedChildIds.has(child.id)) {
-      operations.push({ id: opId('op_child_delete'), method: 'DELETE', path: `/v1/children/${encodeURIComponent(child.id)}`, childId: child.id, body: { operationId: opId('mut') } })
+      operations.push({ id: opId('op_child_delete'), method: 'DELETE', path: `/v1/children/${encodeURIComponent(child.id)}`, childId: child.id,
+        deletedPhotoRef: child.photoRef, body: { operationId: opId('mut') } })
     }
   }
 
@@ -801,6 +812,48 @@ export function restoreMissingSession(sessionId: string) {
   })
 }
 
+// A rejected deletion is never retried as a mutation: another child could have
+// been added meanwhile. Download the old sleeps too, without advancing the
+// global cursor or replacing unrelated local edits. Recovery and acknowledgement
+// share one durable write; a failed download/save leaves recovery retryable.
+async function recoverRejectedChildDeletion(store: SyncStore, operation: PendingOperation) {
+  const current = loadData()
+  const result = await request<{ children: RemoteChild[]; sessions: RemoteSession[] }>(
+    '/v1/sync?after=0', {}, store.connection!.deviceToken)
+  const latest = readStore()
+  if (!sameConnection(store.connection, latest.connection)
+    || JSON.stringify(store.pending) !== JSON.stringify(latest.pending)
+    || JSON.stringify(current) !== JSON.stringify(loadData())) return false
+  const child = result.children?.find(item => item.id === operation.childId)
+  if (!child || !Array.isArray(result.sessions)) throw new Error('CHILD_RECOVERY_INCOMPLETE')
+  const remaining = latest.pending.filter(item => item.id !== operation.id)
+  const laterChildEdit = remaining.some(item => item.childId === child.id)
+  let recovered = current
+  if (!laterChildEdit) {
+    const existing = current.children.find(item => item.id === child.id)
+    const children = current.children.filter(item => item.id !== child.id)
+    if (!child.deletedAt) children.push({ ...toLocalChild(child, existing),
+      photoRef: existing?.photoRef ?? operation.deletedPhotoRef ?? null })
+    const protectedSessions = new Set([
+      ...remaining.map(item => item.sessionId), ...latest.missingSessions.map(item => item.sessionId)
+    ])
+    const sessions = new Map(current.sessions.map(item => [item.id, item]))
+    for (const remote of result.sessions.filter(item => item.childId === child.id)) {
+      if (protectedSessions.has(remote.id)) continue
+      if (child.deletedAt || remote.deletedAt) sessions.delete(remote.id)
+      else sessions.set(remote.id, toRemoteLocal(remote))
+    }
+    recovered = { ...current, children, sessions: Array.from(sessions.values()),
+      settings: { ...current.settings, activeChildId: children.some(item => item.id === current.settings.activeChildId)
+        ? current.settings.activeChildId : (children[0]?.id ?? current.settings.activeChildId) } }
+  }
+  saveDataWithMetadata(recovered, SYNC_METADATA_KEY, { ...latest, pending: remaining,
+    failure: undefined, childDeletionRejected: true })
+  announceDiaryReplacement()
+  window.dispatchEvent(new CustomEvent('solemi-sync-state'))
+  return true
+}
+
 async function flushPendingNow() {
   let store = readStore()
   if (!store.connection || !store.pending.length || store.conflicts.length || !navigator.onLine) return false
@@ -809,6 +862,12 @@ async function flushPendingNow() {
     const operation = store.pending.find((item) => !blockedByMissingSession(store, item))
     if (!operation) break
     try {
+      if (operation.rejectedLastChild && operation.childId && operation.method === 'DELETE') {
+        if (!await recoverRejectedChildDeletion(store, operation)) return changedLocal
+        changedLocal = true
+        store = readStore()
+        continue
+      }
       const result = await request<MutationResult>(operation.path, { method: operation.method, body: JSON.stringify(operation.body) }, store.connection.deviceToken)
       const resultRevision = result?.session?.revision ?? result?.child?.revision ?? result?.revision
       const latest = readStore()
@@ -846,9 +905,21 @@ async function flushPendingNow() {
       }
       store.conflicts = store.conflicts.filter((item) => item.operationId !== operation.id)
       writeStore(store)
+      // Keep local photos until the family has accepted the deletion.
+      if (operation.deletedPhotoRef && result.child?.deletedAt && !hasLaterSameEntity
+        && !loadData().children.some(child => child.photoRef === operation.deletedPhotoRef)) {
+        void deleteChildPhoto(operation.deletedPhotoRef).catch(() => {})
+      }
     } catch (error) {
       const apiError = error as Error & { code?: string; data?: any; status?: number }
       if (!sameConnection(store.connection, readStore().connection)) return changedLocal
+      if (apiError.code === 'LAST_CHILD' && operation.method === 'DELETE' && operation.childId) {
+        store = readStore()
+        store.pending = store.pending.map(item => item.id === operation.id ? { ...item, rejectedLastChild: true } : item)
+        store.failure = { code: 'LAST_CHILD', status: 409 }
+        writeStore(store)
+        continue
+      }
       if (apiError.code === 'SESSION_NOT_FOUND' && operation.sessionId && !operation.repairsMissingSession) {
         store = readStore()
         const localValue = loadData().sessions.find((item) => item.id === operation.sessionId) ?? null

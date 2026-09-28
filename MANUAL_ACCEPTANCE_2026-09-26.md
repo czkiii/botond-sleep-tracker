@@ -2,7 +2,7 @@
 
 Feladatszint: GPT-6 Astra · erős. Staging: `a83b39a`.
 
-**Legfrissebb megálló — 2026-09-28-án rögzítve a megszakítás előtti képekből:** az InPrivate már `czki.adam@gmail.com` fiókkal belépve, Boti / 1799 alvás; a normál Chrome `readi.studio@gmail.com`, Próbababa helyi nyer / 2026-01-01 / 1 alvás. A vendégnapló hozzárendelési kérdése valóban megjelent. Következő M4: B→guest→A visszaút, a Vendég M4 és a korábban félretett függő változás megőrzésének ellenőrzése. A két napos megszakítás után előbb tisztázni kell, hogy megmaradt-e ugyanaz az InPrivate ablak és a célzott kérésblokkolás. A régi képek nem a szeptember 28-i élő állapot bizonyítékai. Az alábbi korábbi megállók történetiek.
+**Legfrissebb megálló — 2026-09-28, A14 helyi javítás kész:** LAST_CHILD után a kliens visszatölti a profilt és a régi alvásokat, megőrzi a fotót, tartós jelzést ad és folytatja a szinkront. Teljes 31 fájl / 379 teszt, mindkét typecheck, build és elkülönített 393×852 Edge felületpróba PASS. M1/M2/M4 továbbra is 3/6 összevont kész forgatókönyv; M3 staging még nyitott. A javítás helyi, HEAD/staging még 71f5846; következő tulajdonosi commit/push, sikeres új staging build ellenőrzése, majd csak M3 célzott kézi próbája. M5 és M6 utána. Részletek és korlátok a dokumentum végén.
 
 ## Aktuális megálló és elsőbbség
 
@@ -31,13 +31,13 @@ Előkészítés: meglevő, ellenőrzött 1799-es export megőrzése; ha a most k
 
 ### 1. Közös alvás és gyermekprofilok
 
-- [ ] **M1 / A13:** új, még aktív alvás már a létrehozáskor egyedi jegyzettel és kézi típussal. Másik eszközön és újratöltés után egyezzen. Egy feltöltési megszakítás/újrapróbálás ugyanennek a sornak a megmaradását és duplikációmentességét vizsgálja; a sima start/stop tesztet nem ismételjük önállóan.
+- [x] **M1 / A13:** stagingen két böngészőn egyező aktív alvás, jegyzet, kézi típus és frissítés utáni folytatás; a megszakított feltöltés újrapróbálását 2026-09-28-án valódi helyi kliens–Worker–SQLite teszt egészíti ki. Szerveres mentés után elveszett válasz, azonos művelet újraküldése, pontosan egy aktív sor, változatlan mezők és második eszközös egyezés: PASS. Nem állítunk új kézi hálózati próbát.
 - [x] **M2 / A15, A20 része:** ugyanebben a családban gyermeknév és születési dátum eltérő eszközös szerkesztése, majd ugyanazon mező két eltérő értéke; a helyi/családi választás és az érthető összehasonlítás ellenőrzése. Mindhárom rész sikeres `a83b39a` stagingen, 2026-09-26. Részletes képi bizonyíték lent. Ez az M2 forgatókönyvet zárja le, nem a teljes A15/A20 auditot.
-- [ ] **M3 / A14:** ugyanitt két kifejezetten próba gyermekkel a két törlés ütközésének staging próbája; legalább egy aktív profil marad, a vesztes művelet érthető. Pusztán két gyors kattintás nem bizonyít adatbázis-versenyt: ha nem hozható létre az ütközés, nincs végtelen kézi ismétlés; a determinisztikus helyi regresszió mellé célzott staging bizonyíték szükséges. A megmaradó gyermekhez tartozó alvások kontrollja is kell.
+- [ ] **M3 / A14:** utolsó gyermek párhuzamos törlése. A klienselakadást 2026-09-28-án helyben javítottuk; a teljes tesztcsomag 379/379 és a valódi React felület helyi Edge próbája PASS. Feltöltés után még célzott staging elfogadás kell két elkülönített readi-eszközön, kizárólag a kis próbacsaládban. A szerveren maradó gyermek régi alvását, a visszaálló helyi profilt, a megszűnő pending sort és az elutasítás érthető jelzését ellenőrizzük. Nem kell végtelenül gyors kattintásokat ismételni; kontrollált offline/online sorrenddel determinisztikus a vesztes törlés.
 
 ### 2. Fiókok és megőrzött változások ugyanebben a környezetben
 
-- [ ] **M4 / A05, A06/A18 működési részbizonyíték:** egy függő módosítás mellett kijelentkezés helyi megtartással; vendég, majd másik ismert saját fiók eltérő naplója; visszatérés az eredeti tesztfiókhoz. A pending változás csak a megfelelő családhoz kerülhet. A másik fiók Opo naplóját nem módosítjuk. A vendégnapló kifejezett átvételi döntését külön megfigyeljük, nem következtetjük ki a sima logoutból.
+- [x] **M4 / A05, A06/A18 működési részbizonyíték:** a stagingen külön vendégfelület, tényleges vendégátvételi kérdés, B-fiók helyes Boti/1799 naplója és a normál Chrome-ban kijelentkezésen át megőrzött, később feltöltött függő változás igazolt. A vendég Mégse utáni megőrzését és az A→B→A pending-elkülönítést a 7 sikeres accountWorkspace gépi próba egészíti ki. Az eredeti Vendég M4 marker kézi visszaútját a gépújraindítás megszakította; ezt nem állítjuk kézzel ellenőrzöttnek, és nem ismételtetjük végig. Ez az összevont funkcionális forgatókönyv lezárása, nem a teljes A05/A06/A18 audit.
 - A működő login/sync a proxy megengedett útjának bizonyítéka, nem igazolja önmagában a tiltott Origin vagy a visszavont token elutasítását. Ezeket az agent célzott gépi ellenőrzéssel vizsgálja, megfelelő izolációval; nem kér a tulajdonostól nyers API-kérések kézi másolgatását.
 
 ### 3. A próbacsalád lezárása és az A15 visszaút
@@ -51,7 +51,7 @@ Előkészítés: meglevő, ellenőrzött 1799-es export megőrzése; ha a most k
 - A05 újratelepítés; A15 valódi telefon/hálózat és D1-terhelés; A24 telepített telefonos frissítés/történeti visszaállás külön környezeti bizonyíték. Ezeket egy későbbi telefonos blokkba rendezzük; desktop screenshot nem váltja ki őket.
 - A16 még fejlesztési munka, a store/native/éles konfiguráció és a statisztikai audit nem zárható le ezzel a hat ellenőrzéssel.
 - Ha egy blokk hibát talál: a javítás után az érintett lépés és közvetlen következménye ismétlendő, nem a teljes három blokk.
-- Minden eredményhez build, környezet, várt/tényleges viselkedés és bizonyíték kell. Most **1/6 új összevont ellenőrzés kész (M2)**; M1 két eszközös szinkronja és a frissítés utáni folytatás is igazolt, az újrapróbálás bizonyíték-összesítése még nyitott. A korábbi sikeres próbák érvényes történeti eredmények. A hat sor nem hat beszélgetést és nem hat teljes auditkapu lezárását jelenti.
+- Minden eredményhez build, környezet, várt/tényleges viselkedés és bizonyíték kell. **3/6 összevont ellenőrzés kész (M1, M2, M4)**, kézi és célzott gépi bizonyítékok együtt. Nyitott: M3 (helyi javítás már kész, staging elfogadás kell), M5 (családmegszüntetés javításának staging retestje), M6 (eltérő helyi naplóval visszacsatlakozás). Ez nem a teljes kiadás százaléka, és nem három új beszélgetés előírása.
 
 ## Előkészítés eredménye
 
@@ -134,3 +134,56 @@ Rögzítve: 2026-09-28, a keretelfogyás miatt félbeszakadt összefoglaló befe
 **Utána:** M3 utolsóprofil-védelem (előbb a kliens elutasított törlésének kezelése és a gépi bizonyíték áttekintendő), M5 sikeres családmegszüntetés hibajelzésének retestje, M6 meglévő helyi naplós Opo-visszacsatlakozás. Nem kell új teljes import/törlés/restore kört kezdeni. Felületi teendők megőrizve: szinkronkártya a Gyerekek alá; nyelvválasztó legalulra; eszközválasztás utáni új Google-belépés érthetősége. Ezek még nem kódmódosítások.
 
 **Következő feladat:** M4/A05 — a meglévő InPrivate állapot ellenőrzése, majd vendég→readi visszatérés és a függő módosítás feltöltésének igazolása. **Feladatszint: GPT-6 Astra · erős.**
+
+### M4 hiányzó visszatérésének pótlása normál Chrome-ban
+
+2026-09-28, codex-clipboard-f72cc303-b76e-41c0-8cfe-99ac4f02b915.png: a mai normál Chrome állapota a fenti aktuális megálló szerint igazolt, a readi-fiókot a tulajdonos szövegesen megerősítette. Az Edge saját fiókja és Boti/1799 látható. A 71f5846 commit csak öt dokumentumot érint; új regressziós tesztkör nem indokolt pusztán a buildazonosító változása miatt. A Worker mai pontos SHA-ját ebben a lépésben nem ellenőriztük újra.
+
+Következő tervezett rövid kör, kizárólag normál Chrome: Network megnyitása; online névváltoztatás Próbababa M4 alap névre a gyermek PATCH kérésének megjelenítéséhez. A friss child_… kérés pontos URL-jének blokkolása jobb kattintással, egyéb hálózat No throttling. Ezután Próbababa függő név mentése, 1 pending kontroll. Kijelentkezés Maradjon ezen a telefonon választással, majd visszalépés ugyanabba a readi-fiókba, blokkolás folyamatosan bekapcsolva. Várt a függő név, ugyanaz az 1 alvás és 1 várakozó módosítás visszatérése; erről bizonyíték kell még a blokkolás feloldása előtt. Utána blokkolás kikapcsolása, friss szinkron és várakozó sor megszűnése. A B-fiókos kitérőt nem ismételjük, mert annak helyes naplóját már igazoltuk. Az eredmények még nincsenek meg; nem jelöljük lezártnak M4-et.
+
+### M4: normál Chrome-ban a pending sor kijelentkezés után visszatért
+
+2026-09-28, codex-clipboard-10684dd6-4ff5-4920-8320-79196afc8f5a.png, 71f5846: a tulajdonos a teljes kért lépéssort elvégezte. Próbababa függő / 2026-01-01 / 1 alvás, családi kártyán 1 módosítás várakozik. A Network logout, challenge, google, access/plan/claim és ismét blokkolt child-kérést mutat. A readi-fiók új belépését a lépéssor elvégzéséről szóló visszajelzés támasztja alá; az email ezen a képen nincs a látható részben. A kijelentkezésen át megőrzött és visszatért függő változás elfogadott részeredmény.
+
+A Request conditions alatt két bekapcsolt szabály van: korábbi session-minta (0 affected) és gyermek-URL (3 affected). A Response panel egy korábbi Próbababa M4 alap / revision 7 választ mutat; ez önmagában nem a függő név feltöltésének bizonyítéka. Következő a teljes Enable blocking and throttling pipa kivétele, várakozás friss szinkronig, majd oldalfrissítés. Várt név továbbra is Próbababa függő, dátum 2026-01-01, 1 alvás, nincs várakozó módosítás. Erről még kép szükséges. A régi blokkolt/piros hálózati sorok megmaradhatnak előzményként.
+
+### 2026-09-28 — M4 feltöltés és frissítés utáni megőrzés: PASS
+
+`codex-clipboard-0361ee91-29dc-4ae2-892d-ac7ba17f0bdf.png`, normál Chrome `71f5846`: Request conditions főkapcsoló kikapcsolva, Próbababa függő / 2026-01-01 / 1 alvás, Solemi közös próba. / Utolsó szinkron: most, nincs várakozó módosítás. A tulajdonos a kért feloldás→friss szinkron→F5 sorra „így történt” visszajelzést adott. A Network későbbi sync-kérései after=8-ig jutnak. A kijelölt Response továbbra is régi Próbababa M4 alap / revision 7 adat; ezt nem tekintjük a legutóbbi válasznak. A megőrzött függő név feltöltése és frissítés utáni megmaradása elfogadva.
+
+### Gépi bizonyítékok összevonása — 41/41 PASS
+
+Célzott futtatás: `npx vitest run src/accountWorkspace.test.ts worker/tests/familySyncClient.test.ts`, 2026-09-28. 7 fiókmunkaterület-próba és 34 kliens–Worker–SQLite próba sikeres. Az új, repóban maradó A13 teszt: `retries an active sleep after a lost acknowledgement without duplicating or losing its initial fields`. A valódi Worker elmenti az aktív sort, a teszt ezután eldobja a választ. A kliens megőrzi a helyi sort és a pontos függő műveletet, majd ugyanazzal a payload/műveletazonosítóval újraküldi; egy aktív sor marad, jegyzet és kézi típus egyezik, a második szimulált eszköz is ugyanazt kapja. A szerver létrehozási/frissítési időpontjai szerver által kiosztott adatok, nem a helyi draft időpontjai.
+
+M1 és M4 lezárása vegyes bizonyítékú: a valós staging képek mellé a kimaradt determinisztikus szélső eseteket géppel ellenőriztük. Ez nem állít valódi telefonos, újratelepítési, teljes hitelesítési vagy adatbázisterhelési elfogadást. Az alkalmazás futó kódja nem változott; teszt és dokumentáció módosult. Commit/push továbbra is a tulajdonos feladata.
+
+### M3 / A14 előellenőrzés: reprodukált klienshiba, még nincs javítva
+
+A korábbi teszt az atomi szervervédelmet vizsgálta, az optimista kliensállapot helyreállítását nem. Egy ideiglenes, a valódi kliens és Worker fölött futó SQLite próba az alábbi lépéssorral a várt helyreállítás helyett `LAST_CHILD` hibával bukott:
+
+1. Szerveren child-a + shared-sleep, majd child-b létrehozása; kliens lehúzza mindkét profilt.
+2. Offline kliens `removeChildProfile(data, 'child-a')` + `saveLocalData`: helyben csak child-b és 0 alvás marad, child-a DELETE függőben.
+3. Másik eszköz szerveres child-b DELETE-je sikeres.
+4. Első kliens online `pullRemote()`: child-a DELETE 409 LAST_CHILD, a pending sor bennmarad; a letöltés a kivétel miatt nem fut le. A helyi profil és alvás nem áll helyre, későbbi szinkron is elakad.
+
+Forrás: `src/familySync.ts` → `flushPendingNow` általános hibakezelése és `pullRemoteNow` feltöltés-előtti letöltésgátja; `src/childProfiles.ts` → optimista profil/alvás eltávolítás. A szerveres védelem és a megmaradó alvás adatai biztonságban vannak, de a klienshelyreállítás kiadást blokkoló hiány. Az ideiglenes bukó próba nem maradt a rendes tesztcsomagban; a végső 41/41 PASS ezt az ismert hibát NEM minősíti javítottnak.
+
+**Következő feladat: A14 — LAST_CHILD után a megmaradó profil és régi alvásai biztonságos helyreállítása, az elutasított törlés sorból kivezetése, érthető felületi jelzés és tartós regresszió. Feladatszint: GPT-6 Astra · erős.** A javításnak a sikertelen letöltést/mentést, közben keletkező helyi módosítást, fiókváltást és újratöltést is kezelnie kell. A részleges (aktuális cursor utáni) sync önmagában nem hozza vissza az optimistán törölt régi alvásokat; nem szabad vakon üríteni az outboxot vagy más függő adatot felülírni. A profillal együtt kezelt helyi fotó sorsát is át kell tekinteni. Ehhez most nem kell tulajdonosi kézi törlés. M5 és M6 utána folytatható a meglevő kis próbacsaláddal.
+
+### 2026-09-28 — A14 klienshelyreállítás javítva helyben
+
+A fenti reprodukció után a javítás elkészült, még nincs commit/push/deploy. A korábbi „még nincs javítva” bekezdés történeti megálló, az aktuális állapotot ez a rész és a dokumentum eleje írja le.
+
+- A LAST_CHILD választ kapó DELETE tartósan helyreállítandó műveletté válik. Nem küldjük el újra törlésként, akkor sem, ha közben új gyermek jön létre és a törlés már átmenne.
+- Teljes szerveres snapshotból csak az érintett profilt és alvásait állítjuk helyre. A régi alvások is visszajönnek; a teljes letöltési cursor nem ugrik előre, más változások a szokásos pull során érkeznek.
+- A helyreállított napló és az elutasított sor kivezetése egy atomi helyi írás. Hálózati vagy mentési hiba esetén a helyreállítási sor megmarad. Letöltés közbeni munkaterületváltás vagy helyi változás elhalasztja az alkalmazást; más függő műveletek megmaradnak.
+- A törlendő profil fotóhivatkozása helyben az outboxhoz kerül, nem az API-payloadba. A fotó tényleges eltávolítását a szerveres törlés elfogadásáig halasztjuk; visszautasításkor a hivatkozás helyreáll. A régi kliens által korábban már törölt fotófájlt ez nem tudja utólag visszahozni.
+- HU/EN/DE tájékoztatás és Értem gomb került a családi panelbe. A jelzés újratöltés után is megmarad, de nem blokkolja a szinkront; a kártyán is látszik, hogy a törlést nem hajtottuk végre.
+
+Ellenőrzések: `npx vitest run` → 31 fájl, **379/379 PASS**. A hét új A14 eset: profil/régi alvás/fotó helyreállítás és jelzés; hálózati hiba; mentési hiba; munkaterületváltás a kérés közben; helyi szerkesztés a kérés közben; más függő írás megőrzése; fotó eltávolítása csak sikeres törlés után. Frontend és Worker typecheck PASS; `npm run build` PASS (ismert nagy-bundle figyelmeztetés).
+
+`node scripts/check-child-deletion.mjs` → **PASS**, elkülönített headless Edge 154.0.4258.37, 393×852. Valódi React felületen törlésgomb/megerősítés → helyi szimulált API 409 → megmaradó profil és régi aktív alvás → tájékoztatás → újratöltés → Értem; pontosan egy DELETE, nincs váratlan külső kérés vagy futási hiba. Kép: `.private-backups/a14-child-deletion.png`, vizuálisan ellenőrizve. Ez nem staging OAuth vagy valódi D1-terhelési bizonyíték. A parancs külső Playwrightot használ (`SOLEMI_PLAYWRIGHT_MODULE`, opcionális `SOLEMI_BROWSER_CHANNEL=msedge`), új projektfüggőség nincs.
+
+**Következő feladat: A14/M3 — tulajdonosi commit/push és az új staging build után célzott kétböngészős elfogadás. Feladatszint: GPT-6 Astra · erős.** Javasolt commitcím: `Recover rejected last-child deletions without losing local data`.
+
+A következő kézi kör terve (csak az új build után, kis Solemi közös próba. család): Chrome readi és külön Edge InPrivate readi, normál Edge/Opo/Boti/1799 érintetlen. Új InPrivate belépéskor esetleges eszközválasztásnál a normál Chrome Windows kapcsolat maradjon, majd a szükséges új Google-megerősítés. Más listánál előbb azonosítjuk a fiókot/eszközöket. A meglévő, 1 alvásos gyermek mellé egy üres próbagyermek. InPrivate Offline módban a meglévő, alvásos gyermek törlése; online Chrome-ban az üres második gyermek törlése. Ezután InPrivate No throttling: a szerver LAST_CHILD-dal védi az alvásos profilt; a kliens visszahozza azt és az 1 alvást. Kontroll mindkét oldalon, jelzés/Értem és F5. Külön alvást nem indítunk és a családi naplóürítés gombját nem használjuk. M5-höz/M6-hoz az egyalvásos napló megmarad. Ezt rövid lépésekben adjuk ki a tényleges új build és bejelentkezett fiókok alapján; még nem elvégzett próba.

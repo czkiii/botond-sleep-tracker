@@ -3,10 +3,14 @@ import { DatabaseSync } from 'node:sqlite'
 import { readFileSync } from 'node:fs'
 import worker from '../src/index'
 import { sqliteBinding } from './sqliteD1'
-import { acceptFamilyBootstrap, flushPending, getSyncStore, joinFamily, prepareFamilyBootstrap, pullRemote, resolveSyncConflict, restoreMissingSession, saveLocalData } from '../../src/familySync'
+import { acceptFamilyBootstrap, dismissChildDeletionNotice, flushPending, getSyncStore, joinFamily, prepareFamilyBootstrap, pullRemote, resolveSyncConflict, restoreMissingSession, saveLocalData } from '../../src/familySync'
 import { REMOTE_DATA_EVENT, STORAGE_KEY, loadData, loadSafetyBackup } from '../../src/storage'
 import type { AppData } from '../../src/types'
 import { prepareFamilyReplacement } from '../../src/dataReplacement'
+import { removeChildProfile } from '../../src/childProfiles'
+import { deleteChildPhoto } from '../../src/photoStore'
+
+vi.mock('../../src/photoStore', () => ({ deleteChildPhoto: vi.fn().mockResolvedValue(undefined) }))
 
 class DeviceStorage implements Storage {
   private values = new Map<string, string>()
@@ -31,6 +35,7 @@ let env: { DB: D1Database; TOKEN_PEPPER: string; ALLOWED_ORIGINS: string; RECONC
 let devices: { storage: DeviceStorage; window: EventTarget; displayed: AppData; updates: number }[]
 
 beforeEach(async () => {
+  vi.clearAllMocks()
   vi.stubEnv('VITE_ACCOUNT_AUTH', 'false')
   sqlite = new DatabaseSync(':memory:')
   sqlite.exec(readFileSync(new URL('../schema.sql', import.meta.url), 'utf8'))
@@ -391,6 +396,190 @@ describe('two device client + Worker reconciliation', () => {
       FROM sleep_sessions WHERE id = 'active-with-fields'`).get()).toEqual({
       end_time: null, note: active.note, day_night_override: 'night'
     })
+  })
+
+  it('retries an active sleep after a lost acknowledgement without duplicating or losing its initial fields', async () => {
+    useDevice(0, false)
+    const before = loadData()
+    const active = { ...before.sessions[0], id: 'active-lost-response', endTime: null,
+      note: 'M1 interrupted upload', dayNightOverride: 'day' as const }
+    saveLocalData(before, { ...before, sessions: [...before.sessions, active] })
+    await flushPending()
+    const queued = getSyncStore().pending[0]
+    const sent: unknown[] = []
+    let loseResponse = true
+    vi.stubGlobal('fetch', async (url: string, options: RequestInit) => {
+      const response = await worker.fetch(new Request(url, options), env)
+      if (url.endsWith('/v1/sessions/start')) {
+        sent.push(JSON.parse(String(options.body)))
+        if (loseResponse) {
+          loseResponse = false
+          expect(response.status).toBe(201)
+          throw new TypeError('Response lost after commit')
+        }
+      }
+      return response
+    })
+    useDevice(0, true)
+    await expect(pullRemote()).rejects.toThrow('Response lost after commit')
+    expect(getSyncStore().pending).toEqual([queued])
+    expect(loadData().sessions.find(sleep => sleep.id === active.id)).toEqual(active)
+
+    await pullRemote()
+    expect(sent).toEqual([queued.body, queued.body])
+    expect(getSyncStore().pending).toEqual([])
+    expect(getSyncStore().failure).toBeUndefined()
+    expect(sqlite.prepare('SELECT id, end_time, note, day_night_override FROM sleep_sessions WHERE end_time IS NULL').all())
+      .toEqual([{ id: active.id, end_time: null, note: active.note, day_night_override: 'day' }])
+    const acknowledged = loadData().sessions.find(sleep => sleep.id === active.id)!
+    expect(acknowledged).toMatchObject({ id: active.id, childId: active.childId, startTime: active.startTime,
+      endTime: null, note: active.note, dayNightOverride: 'day' })
+    useDevice(1, true)
+    await pullRemote()
+    expect(loadData().sessions.filter(sleep => sleep.id === active.id)).toEqual([acknowledged])
+  })
+
+  async function queueLosingChildDeletion() {
+    await api('/v1/children', 'POST', { operationId: 'create-b', child: { id: 'child-b', name: 'Other child' } })
+    useDevice(0, true)
+    await pullRemote()
+    useDevice(0, false)
+    const original = loadData()
+    const before = { ...original, children: original.children.map(child => child.id === 'child-a'
+      ? { ...child, photoRef: 'local-avatar:a' } : child) }
+    saveLocalData(original, before)
+    saveLocalData(before, removeChildProfile(before, 'child-a')!)
+    await flushPending()
+    expect(loadData().sessions).toEqual([])
+    expect((await api('/v1/children/child-b', 'DELETE', { operationId: 'other-device-delete-b' })).status).toBe(200)
+    useDevice(0, true)
+  }
+
+  it('restores the last child, its old sleeps and local photo after a rejected concurrent deletion', async () => {
+    await queueLosingChildDeletion()
+    await pullRemote()
+    expect(getSyncStore().pending).toEqual([])
+    expect(getSyncStore().failure).toBeUndefined()
+    expect(loadData().children).toEqual([{ ...initial.children[0], photoRef: 'local-avatar:a' }])
+    expect(loadData().sessions).toEqual(initial.sessions)
+    expect(loadData().settings.activeChildId).toBe('child-a')
+    expect(getSyncStore().childDeletionRejected).toBe(true)
+    expect(deleteChildPhoto).not.toHaveBeenCalled()
+    // Re-read durable state and poll again: no replay, duplication, or lost notice.
+    await pullRemote()
+    expect(loadData().sessions).toHaveLength(1)
+    expect(getSyncStore().childDeletionRejected).toBe(true)
+    dismissChildDeletionNotice()
+    expect(getSyncStore().childDeletionRejected).toBe(false)
+    useDevice(1, true)
+    await pullRemote()
+    expect(loadData().children.map(child => child.id)).toEqual(['child-a'])
+    expect(loadData().sessions).toEqual(initial.sessions)
+  })
+
+  it.each(['network', 'storage'] as const)('retains recovery after a %s failure and never retries the rejected DELETE', async failure => {
+    await queueLosingChildDeletion()
+    let failOnce = true
+    let deletes = 0
+    const originalSet = devices[0].storage.setItem.bind(devices[0].storage)
+    devices[0].storage.setItem = (key, value) => {
+      if (failure === 'storage' && failOnce && key === STORAGE_KEY
+        && JSON.parse(value).__solemiLocal?.familySyncV1?.childDeletionRejected) {
+        failOnce = false
+        throw new Error('quota')
+      }
+      originalSet(key, value)
+    }
+    vi.stubGlobal('fetch', async (url: string, options: RequestInit) => {
+      if (options.method === 'DELETE') deletes++
+      if (failure === 'network' && failOnce && url.endsWith('/v1/sync?after=0')) {
+        failOnce = false
+        throw new TypeError('offline')
+      }
+      return worker.fetch(new Request(url, options), env)
+    })
+    await expect(pullRemote()).rejects.toThrow()
+    expect(getSyncStore().pending[0].rejectedLastChild).toBe(true)
+    expect(loadData().sessions).toEqual([])
+    expect(deleteChildPhoto).not.toHaveBeenCalled()
+    // A new child would make another DELETE succeed, but rejection is final.
+    await api('/v1/children', 'POST', { operationId: 'create-c', child: { id: 'child-c', name: 'New child' } })
+    await pullRemote()
+    expect(deletes).toBe(1)
+    expect(getSyncStore().pending).toEqual([])
+    expect(loadData().children.map(child => child.id).sort()).toEqual(['child-a', 'child-c'])
+    expect(loadData().sessions).toEqual(initial.sessions)
+    expect(sqlite.prepare("SELECT deleted_at FROM children WHERE id = 'child-a'").get()).toEqual({ deleted_at: null })
+  })
+
+  it('does not apply recovery to another workspace while the snapshot is in flight', async () => {
+    await queueLosingChildDeletion()
+    const otherRaw = devices[1].storage.getItem(STORAGE_KEY)
+    vi.stubGlobal('fetch', async (url: string, options: RequestInit) => {
+      const response = await worker.fetch(new Request(url, options), env)
+      if (url.endsWith('/v1/sync?after=0')) useDevice(1, true)
+      return response
+    })
+    await pullRemote()
+    expect(devices[1].storage.getItem(STORAGE_KEY)).toBe(otherRaw)
+    expect(getSyncStore().pending).toEqual([])
+    useDevice(0, true)
+    expect(getSyncStore().pending[0].rejectedLastChild).toBe(true)
+    vi.stubGlobal('fetch', (url: string, options: RequestInit) => worker.fetch(new Request(url, options), env))
+    await pullRemote()
+    expect(loadData().sessions).toEqual(initial.sessions)
+  })
+
+  it('defers recovery when a local edit arrives during download and preserves that edit', async () => {
+    await queueLosingChildDeletion()
+    let editOnce = true
+    vi.stubGlobal('fetch', async (url: string, options: RequestInit) => {
+      const response = await worker.fetch(new Request(url, options), env)
+      if (editOnce && url.endsWith('/v1/sync?after=0')) {
+        editOnce = false
+        const current = loadData()
+        saveLocalData(current, { ...current, settings: { ...current.settings, longSleepReminderEnabled: true } })
+      }
+      return response
+    })
+    await pullRemote()
+    expect(getSyncStore().pending[0].rejectedLastChild).toBe(true)
+    await pullRemote()
+    expect(getSyncStore().pending).toEqual([])
+    expect(loadData().sessions).toEqual(initial.sessions)
+    expect(loadData().settings.longSleepReminderEnabled).toBe(true)
+  })
+
+  it('retains unrelated queued writes while recovering a rejected deletion', async () => {
+    await queueLosingChildDeletion()
+    useDevice(0, false)
+    const before = loadData()
+    const child = { ...initial.children[0], id: 'child-c', name: 'Local new child' }
+    saveLocalData(before, { ...before, children: [...before.children, child],
+      sessions: [{ ...initial.sessions[0], id: 'sleep-c', childId: child.id, note: 'Keep me' }] })
+    await flushPending()
+    useDevice(0, true)
+    await pullRemote()
+    expect(getSyncStore().pending).toEqual([])
+    expect(loadData().children.map(item => item.id).sort()).toEqual(['child-a', 'child-c'])
+    expect(loadData().sessions.map(item => item.id).sort()).toEqual(['shared-sleep', 'sleep-c'])
+    expect(loadData().sessions.find(item => item.id === 'sleep-c')?.note).toBe('Keep me')
+  })
+
+  it('removes a deleted profile photo only after the server accepts the deletion', async () => {
+    await api('/v1/children', 'POST', { operationId: 'create-b', child: { id: 'child-b', name: 'Other' } })
+    useDevice(0, true)
+    await pullRemote()
+    useDevice(0, false)
+    const before = loadData()
+    before.children[0].photoRef = 'local-avatar:a'
+    saveLocalData(before, removeChildProfile(before, 'child-a')!)
+    await flushPending()
+    expect(deleteChildPhoto).not.toHaveBeenCalled()
+    useDevice(0, true)
+    await pullRemote()
+    expect(deleteChildPhoto).toHaveBeenCalledWith('local-avatar:a')
+    expect(getSyncStore().pending).toEqual([])
   })
 
   it('keeps one child when another deletion commits after the last-child check', async () => {

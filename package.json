@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:pwa": "node scripts/check-pwa-lifecycle.mjs",
     "test:family-join": "node scripts/check-family-bootstrap.mjs",
+    "test:child-deletion": "node scripts/check-child-deletion.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

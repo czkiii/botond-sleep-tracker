@@ -6,6 +6,8 @@ import { exportData, loadData } from './storage'
 import { familyDissolutionCopy } from './familyDissolutionCopy'
 import { familyBootstrapCopy } from './familyBootstrapCopy'
 import { acceptFamilyBootstrap, prepareFamilyBootstrap } from './familySync'
+import { dismissChildDeletionNotice } from './familySync'
+import { childDeletionCopy } from './childDeletionCopy'
 import type { FamilyBootstrapPreview } from './familySync'
 import { dissolveFamily, prepareFamilyDissolution } from './familySync'
 import type { FamilyDissolutionPreview } from './familySync'
@@ -123,6 +125,7 @@ export default function FamilySyncLayer() {
   const [lastSyncAt, setLastSyncAt] = useState(() => Number(localStorage.getItem(LAST_SYNC_KEY) || 0))
   const [syncIssue, setSyncIssue] = useState(false)
   const [uploadFailure, setUploadFailure] = useState(() => getSyncStore().failure?.code || '')
+  const [childDeletionRejected, setChildDeletionRejected] = useState(() => Boolean(getSyncStore().childDeletionRejected))
   const [, setClock] = useState(0)
   const [settingsTarget, setSettingsTarget] = useState<Element | null>(() => document.querySelector('.settings-screen'))
   const [connectionName, setConnectionName] = useState(() => getSyncStore().connection?.familyName || '')
@@ -135,6 +138,7 @@ export default function FamilySyncLayer() {
   const [leaveCandidates, setLeaveCandidates] = useState<FamilyMemberChoice[]>([])
   const locale = loadData().settings.locale as Locale
   const text = copy[locale]
+  const deletionText = childDeletionCopy[locale]
   const dissolutionText = familyDissolutionCopy[locale]
   const bootstrapText = familyBootstrapCopy[locale]
   const firstConflict = getSyncStore().conflicts[0]
@@ -155,6 +159,7 @@ export default function FamilySyncLayer() {
     if (code === 'SESSION_INVALID') return text.accountRequired
     if (code === 'FAMILY_OWNER_ACCOUNT_REQUIRED') return text.ownerAccountRequired
     if (code === 'ACCOUNT_ALREADY_IN_FAMILY' || code === 'ACCOUNT_ALREADY_IN_OTHER_FAMILY') return text.alreadyInFamily
+    if (code === 'LAST_CHILD') return deletionText.recovering
     if (code === 'FAMILY_DISSOLUTION_REQUIRED') return text.familyDissolutionRequired
     if (code === 'FAMILY_DISSOLUTION_CHANGED') return dissolutionText.changed
     if (code === 'FAMILY_HAS_OTHER_MEMBERS') return dissolutionText.otherMembers
@@ -172,6 +177,7 @@ export default function FamilySyncLayer() {
     setConflictCount(store.conflicts.length)
     setMissingSessions(store.missingSessions)
     setUploadFailure(store.failure?.code || '')
+    setChildDeletionRejected(Boolean(store.childDeletionRejected))
     setSyncIssue(Boolean(store.failure))
     if (store.pending.length || store.conflicts.length || store.failure || store.missingSessions.length) return
     const now = Date.now()
@@ -287,6 +293,7 @@ export default function FamilySyncLayer() {
       setMissingSessions(store.missingSessions)
       if (store.missingSessions.length || store.conflicts.length) setMode('home')
       setUploadFailure(store.failure?.code || '')
+      setChildDeletionRejected(Boolean(store.childDeletionRejected))
       setSyncIssue(Boolean(store.failure))
     }
     window.addEventListener('solemi-sync-state', onState)
@@ -417,8 +424,9 @@ export default function FamilySyncLayer() {
     if (pendingCount === 1) return text.pendingOne
     if (pendingCount > 1) return text.pendingMany(pendingCount)
     if (syncIssue) return text.syncIssue
+    if (childDeletionRejected) return deletionText.title
     return lastSyncLabel || text.settingsHintConnected
-  }, [accessChecking, accessCheckFailed, serverPaused, familySyncAvailable, connected, online, conflictCount, missingSessions, pendingCount, syncIssue, lastSyncLabel, text, connectionEnded, dissolutionText, bootstrapPending, bootstrapText])
+  }, [accessChecking, accessCheckFailed, serverPaused, familySyncAvailable, connected, online, conflictCount, missingSessions, pendingCount, syncIssue, lastSyncLabel, text, connectionEnded, dissolutionText, bootstrapPending, bootstrapText, childDeletionRejected, deletionText])
 
   const handleCreate = async () => {
     if (!familyName.trim()) return
@@ -714,6 +722,10 @@ export default function FamilySyncLayer() {
           <button className="invite-code" onClick={handleCopy}>{inviteCode}</button>
           <button className="family-sync-primary" onClick={handleCopy}>{copied ? text.copied : text.copyCode}</button>
           {connected && <button className="family-sync-link" onClick={() => { setInviteCode(''); setMode('home') }}>{text.close}</button>}
+        </div>}
+        {connected && childDeletionRejected && <div className="family-sync-content" role="status">
+          <strong>{deletionText.title}</strong><p>{deletionText.recovered}</p>
+          <button className="family-sync-secondary" onClick={dismissChildDeletionNotice}>{deletionText.dismiss}</button>
         </div>}
         {error && <div className="family-sync-error">{error}</div>}
         {familySyncAvailable && mode === 'home' && connected && missingSessions.map((missing) => {
