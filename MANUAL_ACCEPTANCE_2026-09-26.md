@@ -2,7 +2,7 @@
 
 Feladatszint: GPT-6 Astra · erős. Staging: `a83b39a`.
 
-**Legfrissebb megálló — 2026-09-28, A14 helyi javítás kész:** LAST_CHILD után a kliens visszatölti a profilt és a régi alvásokat, megőrzi a fotót, tartós jelzést ad és folytatja a szinkront. Teljes 31 fájl / 379 teszt, mindkét typecheck, build és elkülönített 393×852 Edge felületpróba PASS. M1/M2/M4 továbbra is 3/6 összevont kész forgatókönyv; M3 staging még nyitott. A javítás helyi, HEAD/staging még 71f5846; következő tulajdonosi commit/push, sikeres új staging build ellenőrzése, majd csak M3 célzott kézi próbája. M5 és M6 utána. Részletek és korlátok a dokumentum végén.
+**Legfrissebb megálló — 2026-09-30:** a tulajdonos most nem tud kézzel tesztelni, M3/M5/M6 megálló megőrizve. M1/M2/M4 kész, 3/6. A14 javítás már `bc7b298` commitban; staging elfogadást ma nem állítunk. Közben önálló A20 beállítás- és profilszerkesztő-javítás készült, gépi ellenőrzésekkel: [mai checkpoint](SETTINGS_UX_CHECKPOINT_2026-09-30.md). Az új helyi felületen a családi megosztás közvetlenül a gyermeklista alatt van, a nyelv legalul. Az A22 helyi statisztikai frissítés és gépi mérés is elkészült: [A22 summary](STATISTICS_PERFORMANCE_CHECKPOINT_2026-09-30.md), 382/382 teszt és böngészőregresszió PASS. Következő önálló munka A27/S01; a kézi lépések csak akkor folytatódnak, amikor a tulajdonos ráér.
 
 ## Aktuális megálló és elsőbbség
 

@@ -1,4 +1,4 @@
-import { ChangeEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { ChangeEvent, PointerEvent as ReactPointerEvent, memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { languageOptions, localeTag, t } from './i18n'
 import type { Locale } from './i18n'
@@ -13,7 +13,7 @@ import { familyBootstrapCopy } from './familyBootstrapCopy'
 import { buildInsightsFoundation } from './insights'
 import { buildSimilarDaysInsight } from './similarDays'
 import { buildPredictionLite } from './prediction'
-import { buildSleepDaySummaries, buildSleepDevelopment } from './sleepDevelopment'
+import { buildSleepDaySource, buildSleepDevelopment } from './sleepDevelopment'
 import type { SleepDevelopmentMilestone } from './sleepDevelopment'
 import { buildSleepChangeInsight } from './sleepChange'
 import type { SleepChangeMetric, SleepChangeSignal } from './sleepChange'
@@ -23,6 +23,7 @@ import { INTERNAL_PLAN_PREVIEW_EVENT, INTERNAL_PLAN_PREVIEW_KEY, canUseFamilySyn
 import type { PremiumInsightFeature, ProductPlan } from './entitlements'
 import { DEFAULT_DAY_START_MINUTES, DEFAULT_NIGHT_START_MINUTES, LONG_SLEEP_GUARDRAIL_MS, awakeSince, durationOf, formatDateHeader, formatDuration, formatTime, formatTimer, getDataQualityWarnings, todaySessions, totalToday } from './utils'
 import SleepTimeline from './SleepTimeline'
+import { useStatisticsTime } from './useStatisticsTime'
 import { clearFamilyDiary, clearLocalDiary, getFamilyReplacementReadiness, getSessionSyncRevision, getSyncStore, saveLocalData } from './familySync'
 import { prepareFamilyReplacement, summarizeReplacement } from './dataReplacement'
 import type { ReplacementSummary } from './dataReplacement'
@@ -206,7 +207,7 @@ export default function App({ writeAccess = 'writer' }: { writeAccess?: WriteAcc
     <main className="app-main">
       {page === 'today' && <TodayPage data={data} child={activeChild} sessions={activeSessions} now={now} locale={locale} current={current} onSelectChild={(childId) => setData((previous) => ({ ...previous, settings: { ...previous.settings, activeChildId: childId } }))} onStart={startNow} onEnd={endNow} onAdjustStart={adjustCurrentStart} onOpenEditor={openEditor} onHistory={() => setPage('history')} onSettings={() => setPage('settings')} />}
       {page === 'history' && <HistoryPage sessions={activeSessions} locale={locale} onEdit={openEditor} onDelete={deleteSession} onNew={() => openEditor('new')} />}
-      {page === 'stats' && <StatsPage sessions={activeSessions} now={now} locale={locale} childName={activeChild.name} productPlan={previewPlan} premiumInsightsAvailable={accountAuthEnabled ? Boolean(accountAccess?.features.includes('FAMILY_PLUS_INSIGHTS')) : internalPreview && canUsePremiumInsights(previewPlan)} onPreviewPlanChange={internalPreview ? setPreviewPlan : undefined} />}
+      {page === 'stats' && <StatsPage sessions={activeSessions} locale={locale} childName={activeChild.name} productPlan={previewPlan} premiumInsightsAvailable={accountAuthEnabled ? Boolean(accountAccess?.features.includes('FAMILY_PLUS_INSIGHTS')) : internalPreview && canUsePremiumInsights(previewPlan)} onPreviewPlanChange={internalPreview ? setPreviewPlan : undefined} />}
       {page === 'settings' && <SettingsPage data={data} setData={setData} onBack={() => setPage('today')}
         familySyncAvailable={accountAuthEnabled ? Boolean(accountAccess?.features.includes('FAMILY_SYNC')) : internalPreview && canUseFamilySync(previewPlan)}
         familyRole={accountAccess?.membership?.role ?? null} />}
@@ -354,7 +355,8 @@ function dateKeyTime(value: string) {
   return new Date(year, month - 1, day, 0, 0, 0, 0).getTime()
 }
 
-function StatsPage({ sessions, now, locale, childName, productPlan, premiumInsightsAvailable, onPreviewPlanChange }: { sessions: SleepSession[]; now: number; locale: Locale; childName: string; productPlan: ProductPlan; premiumInsightsAvailable: boolean; onPreviewPlanChange?: (plan: ProductPlan) => void }) {
+const StatsPage = memo(function StatsPage({ sessions, locale, childName, productPlan, premiumInsightsAvailable, onPreviewPlanChange }: { sessions: SleepSession[]; locale: Locale; childName: string; productPlan: ProductPlan; premiumInsightsAvailable: boolean; onPreviewPlanChange?: (plan: ProductPlan) => void }) {
+  const now = useStatisticsTime(sessions)
   const availableStart = sessions.length > 0 ? dateKeyAt(Math.min(...sessions.map((session) => new Date(session.startTime).getTime()))) : dateKeyAt(now)
   const availableEnd = dateKeyAt(now)
   const [range, setRange] = useState<'day' | 'week' | 'month' | 'custom'>('week')
@@ -416,7 +418,8 @@ function StatsPage({ sessions, now, locale, childName, productPlan, premiumInsig
     setDevelopmentRange('custom')
     setDevelopmentPickerOpen(false)
   }
-  const sleepDaysByDate = useMemo(() => new Map(buildSleepDaySummaries(sessions, now).map((day) => [day.key, { total: day.totalMs, day: day.dayMs, night: day.nightMs }])), [sessions, now])
+  const sleepDaySource = useMemo(() => buildSleepDaySource(sessions, now), [sessions, now])
+  const sleepDaysByDate = useMemo(() => new Map(sleepDaySource.days.map((day) => [day.key, { total: day.totalMs, day: day.dayMs, night: day.nightMs }])), [sleepDaySource])
 
   const chart = useMemo(() => Array.from({ length: days }, (_, index) => {
     const date = range === 'custom' ? new Date(customStartTime) : new Date(now)
@@ -442,25 +445,25 @@ function StatsPage({ sessions, now, locale, childName, productPlan, premiumInsig
   const display = selectedStats ?? { total: sums.total / divisor, day: sums.day / divisor, night: sums.night / divisor, label: t(locale, 'average') }
   const timelineDate = selectedDate ?? (range === 'custom' ? customEnd : undefined)
   const chartUnit = locale === 'hu' ? 'ó' : locale === 'de' ? 'Std.' : 'hr'
-  const insights = useMemo(() => buildInsightsFoundation(sessions, now, { lookbackDays: insightsRange }), [sessions, now, insightsRange])
-  const similarDays = useMemo(() => buildSimilarDaysInsight(sessions, now, insightsRange), [sessions, now, insightsRange])
-  const prediction = useMemo(() => buildPredictionLite(sessions, now, insightsRange), [sessions, now, insightsRange])
-  const development = useMemo(() => buildSleepDevelopment(sessions, now, developmentRange === 'custom' ? 12 : developmentRange, developmentRange === 'custom' ? { startMonth: developmentStart, endMonth: developmentEnd } : undefined), [sessions, now, developmentRange, developmentStart, developmentEnd])
-  const sleepChange = useMemo(() => buildSleepChangeInsight(sessions, now), [sessions, now])
-  const monthlyReport = useMemo(() => buildMonthlyFamilyReport(sessions, now), [sessions, now])
-  const developmentChart = useMemo(() => development.months.map((item) => ({
+  const insights = useMemo(() => premiumInsightsAvailable ? buildInsightsFoundation(sessions, now, { lookbackDays: insightsRange }) : null, [premiumInsightsAvailable, sessions, now, insightsRange])
+  const similarDays = useMemo(() => premiumInsightsAvailable ? buildSimilarDaysInsight(sessions, now, insightsRange) : null, [premiumInsightsAvailable, sessions, now, insightsRange])
+  const prediction = useMemo(() => premiumInsightsAvailable ? buildPredictionLite(sessions, now, insightsRange) : null, [premiumInsightsAvailable, sessions, now, insightsRange])
+  const development = useMemo(() => premiumInsightsAvailable ? buildSleepDevelopment(sessions, now, developmentRange === 'custom' ? 12 : developmentRange, developmentRange === 'custom' ? { startMonth: developmentStart, endMonth: developmentEnd } : undefined, sleepDaySource) : null, [premiumInsightsAvailable, sessions, now, developmentRange, developmentStart, developmentEnd, sleepDaySource])
+  const sleepChange = useMemo(() => premiumInsightsAvailable ? buildSleepChangeInsight(sessions, now, sleepDaySource.days) : null, [premiumInsightsAvailable, sessions, now, sleepDaySource])
+  const monthlyReport = useMemo(() => premiumInsightsAvailable ? buildMonthlyFamilyReport(sessions, now, sleepDaySource.days) : null, [premiumInsightsAvailable, sessions, now, sleepDaySource])
+  const developmentChart = useMemo(() => (development?.months ?? []).map((item) => ({
     key: item.key,
     label: new Intl.DateTimeFormat(localeTag(locale), { month: 'short' }).format(new Date(item.year, item.month, 1)).replace('.', '').slice(0, 3),
     day: +(item.averageDayMs / 3600000).toFixed(2),
     night: +(item.averageNightMs / 3600000).toFixed(2)
-  })), [development.months, locale])
+  })), [development, locale])
   const developmentChartMax = Math.max(16, Math.ceil(Math.max(0, ...developmentChart.map((item) => item.day + item.night)) / 2) * 2)
   const selectedDevelopmentPoint = developmentChart.find((item) => item.key === selectedDevelopmentMonth) ?? null
-  const wakeWindow = insights.wakeWindow
-  const routine = insights.routine
-  const relevantWakeWindow = prediction.bucket ? wakeWindow.breakdown.find((item) => item.key === prediction.bucket) ?? null : null
-  const primaryWakeMs = relevantWakeWindow?.typicalMs ?? wakeWindow.typicalMs
-  const primaryWakeRange = relevantWakeWindow ? { lowMs: relevantWakeWindow.lowMs, highMs: relevantWakeWindow.highMs } : wakeWindow.typicalRange
+  const wakeWindow = insights?.wakeWindow
+  const routine = insights?.routine
+  const relevantWakeWindow = prediction?.bucket ? wakeWindow?.breakdown.find((item) => item.key === prediction.bucket) ?? null : null
+  const primaryWakeMs = relevantWakeWindow?.typicalMs ?? wakeWindow?.typicalMs ?? null
+  const primaryWakeRange = relevantWakeWindow ? { lowMs: relevantWakeWindow.lowMs, highMs: relevantWakeWindow.highMs } : wakeWindow?.typicalRange
   const primaryWakeLabel = relevantWakeWindow ? wakeBucketLabel(locale, relevantWakeWindow.key) : t(locale, 'typicalWakeWindow')
   return <section className="screen stats-screen"><header className="page-header centered-header"><h1>{t(locale, 'statistics')}</h1></header>
     {onPreviewPlanChange && <InternalPlanPreview locale={locale} plan={productPlan} onChange={onPreviewPlanChange} />}
@@ -469,7 +472,7 @@ function StatsPage({ sessions, now, locale, childName, productPlan, premiumInsig
     <div className="chart-card compact-chart-card"><h2>{t(locale, 'sleepDuration')}</h2><div className="bar-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={chart} margin={{ top: 8, right: 2, bottom: 0, left: -26 }}><XAxis dataKey="label" tickLine={false} axisLine={false} /><YAxis domain={[0, 14]} tickLine={false} axisLine={false} /><Tooltip contentStyle={{ background: '#0d1a2b', border: '1px solid #1c3352', borderRadius: 10 }} formatter={(value) => [`${value} ${chartUnit}`, t(locale, 'sleep')]} /><Bar dataKey="hours" fill="#579dff" radius={[4, 4, 1, 1]} maxBarSize={17} onClick={(entry: any) => setSelectedDate(entry?.payload?.dateKey ?? null)} /></BarChart></ResponsiveContainer></div></div>
     <h2 className="overview-title">{t(locale, 'overview24h')}</h2>
     <div className="overview-compact"><SleepTimeline sessions={sessions} now={now} day={timelineDate} locale={locale} /><div className="stats-row"><StatCard label={display.label} value={formatDuration(display.total, locale)} suffix={selectedStats ? undefined : t(locale, 'perDay')} /><StatCard label={t(locale, 'daytime')} value={formatDuration(display.day, locale)} icon="sun" /><StatCard label={t(locale, 'nighttime')} value={formatDuration(display.night, locale)} icon="moon" /></div></div>
-    {premiumInsightsAvailable ? <><div className="insights-card wake-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'wakeWindow')}</h2></div>{wakeWindow.confidence && <b>{t(locale, wakeWindow.confidence === 'medium' ? 'mediumConfidence' : 'lowConfidence')}</b>}</div>
+    {insights && similarDays && prediction && development && sleepChange && monthlyReport && wakeWindow && routine ? <><div className="insights-card wake-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'wakeWindow')}</h2></div>{wakeWindow.confidence && <b>{t(locale, wakeWindow.confidence === 'medium' ? 'mediumConfidence' : 'lowConfidence')}</b>}</div>
       <div className="insights-range" aria-label={t(locale, 'insightsRange')}>{([7, 14, 30] as const).map((value) => <button key={value} className={insightsRange === value ? 'active' : ''} onClick={() => setInsightsRange(value)}>{value} {t(locale, 'daysShort')}</button>)}</div>
       {primaryWakeMs !== null ? <div className="wake-window-hero"><span>{primaryWakeLabel}</span><strong>{formatDuration(primaryWakeMs, locale)}</strong>{primaryWakeRange && <small>{t(locale, 'typicalRange')}: {formatDuration(primaryWakeRange.lowMs, locale)}–{formatDuration(primaryWakeRange.highMs, locale)} · {t(locale, 'sampleCountShort', { count: relevantWakeWindow?.sampleCount ?? wakeWindow.sampleCount })}</small>}</div> : <p>{t(locale, 'wakeWindowCollecting', { count: wakeWindow.sampleCount })}</p>}
       {wakeWindow.currentMs !== null ? <div className="current-awake-status"><span>{t(locale, 'awakeForNow')}</span><strong>{formatDuration(wakeWindow.currentMs, locale)}</strong></div> : <p>{t(locale, 'wakeWindowUnavailable')}</p>}
@@ -531,7 +534,7 @@ function StatsPage({ sessions, now, locale, childName, productPlan, premiumInsig
     </div></> : <LockedInsightsOverview locale={locale} />}
     {developmentPickerOpen && <div className="development-picker-overlay" role="dialog" aria-modal="true" aria-labelledby="development-picker-title"><div className="development-picker-sheet"><header><h2 id="development-picker-title">{t(locale, 'customDevelopmentRange')}</h2><button type="button" aria-label={t(locale, 'cancel')} onClick={() => setDevelopmentPickerOpen(false)}><Icon name="close" size={18} /></button></header><div className="development-picker-fields"><label>{t(locale, 'fromDate')}<span className="month-stepper"><button type="button" aria-label={t(locale, 'previousMonth')} disabled={developmentDraftStartIndex <= 0} onClick={() => moveDevelopmentMonth('start', -1)}>‹</button><strong>{developmentMonthOptions[developmentDraftStartIndex]?.label ?? developmentDraftStart}</strong><button type="button" aria-label={t(locale, 'nextMonth')} disabled={developmentDraftStartIndex < 0 || developmentDraftStartIndex >= developmentDraftEndIndex} onClick={() => moveDevelopmentMonth('start', 1)}>›</button></span></label><label>{t(locale, 'toDate')}<span className="month-stepper"><button type="button" aria-label={t(locale, 'previousMonth')} disabled={developmentDraftEndIndex <= developmentDraftStartIndex} onClick={() => moveDevelopmentMonth('end', -1)}>‹</button><strong>{developmentMonthOptions[developmentDraftEndIndex]?.label ?? developmentDraftEnd}</strong><button type="button" aria-label={t(locale, 'nextMonth')} disabled={developmentDraftEndIndex < 0 || developmentDraftEndIndex >= developmentMonthOptions.length - 1} onClick={() => moveDevelopmentMonth('end', 1)}>›</button></span></label></div><small>{t(locale, 'selectedDevelopmentRange', { start: developmentMonthOptions[developmentDraftStartIndex]?.label ?? developmentDraftStart, end: developmentMonthOptions[developmentDraftEndIndex]?.label ?? developmentDraftEnd })}</small><div className="development-picker-actions"><button type="button" onClick={() => setDevelopmentPickerOpen(false)}>{t(locale, 'cancel')}</button><button type="button" className="primary" onClick={applyDevelopmentRange}>{t(locale, 'apply')}</button></div></div></div>}
   </section>
-}
+})
 
 function InternalPlanPreview({ locale, plan, onChange }: { locale: Locale; plan: ProductPlan; onChange: (plan: ProductPlan) => void }) {
   return <aside className="internal-plan-preview" aria-label={t(locale, 'internalPlanPreview')}>
@@ -743,19 +746,27 @@ function SettingsPage({ data, setData, onBack, familySyncAvailable, familyRole }
   return <><section className="screen settings-screen"><header className="page-header"><button className="back-button" onClick={onBack}>‹</button><h1>{t(locale, 'settings')}</h1><span className="header-spacer" /></header>
     {import.meta.env.VITE_ACCOUNT_AUTH === 'true' && <AccountCard locale={locale} />}
     <div className="settings-card settings-fields">
-      <label>{t(locale, 'language')}<select className="language-select" value={locale} onChange={changeLocale}>{languageOptions.map((language) => <option key={language.value} value={language.value}>{language.flag} {language.label}</option>)}</select></label>
       <label className="settings-toggle-row"><span><strong>{t(locale, 'longSleepReminder')}</strong><small>{t(locale, 'longSleepReminderHint')}</small></span><input type="checkbox" checked={data.settings.longSleepReminderEnabled} onChange={(event) => setData({ ...data, settings: { ...data.settings, longSleepReminderEnabled: event.target.checked } })} /></label>
     </div>
     <div className="settings-section-head"><div><h2>{t(locale, 'children')}</h2><p>{t(locale, 'childrenHint')}</p></div><button className="mini-add-button" onClick={() => setEditingChild('new')}><Icon name="plus" size={17} />{t(locale, 'addChild')}</button></div>
     <div className="settings-card child-list">{data.children.map((child) => {
       const count = data.sessions.filter((session) => session.childId === child.id).length
       const active = child.id === data.settings.activeChildId
-      return <button key={child.id} className={`child-list-row ${active ? 'active' : ''}`} onClick={() => setData({ ...data, settings: { ...data.settings, activeChildId: child.id } })}><ChildAvatar child={child} className="child-list-avatar" /><span><strong>{child.name || t(locale, 'unnamedChild')}</strong><small>{child.birthDate || t(locale, 'birthDateMissing')} · {t(locale, 'sleepEntries', { count })}</small></span>{active && <b>{t(locale, 'active')}</b>}<span className="child-edit-button" role="button" tabIndex={0} aria-label={t(locale, 'editChild')} onClick={(event) => { event.stopPropagation(); setEditingChild(child) }}><Icon name="edit" size={15} /></span></button>
+      return <div key={child.id} className={`child-list-row ${active ? 'active' : ''}`}>
+        <button type="button" className="child-select-button" aria-pressed={active} onClick={() => setData({ ...data, settings: { ...data.settings, activeChildId: child.id } })}>
+          <ChildAvatar child={child} className="child-list-avatar" /><span><strong>{child.name || t(locale, 'unnamedChild')}</strong><small>{child.birthDate || t(locale, 'birthDateMissing')} · {t(locale, 'sleepEntries', { count })}</small></span>{active && <b>{t(locale, 'active')}</b>}
+        </button>
+        <button type="button" className="child-edit-button" aria-label={`${t(locale, 'editChild')}: ${child.name || t(locale, 'unnamedChild')}`} onClick={() => setEditingChild(child)}><Icon name="edit" size={15} /></button>
+      </div>
     })}</div>
+    <div data-family-sync-slot />
     <div className="settings-card action-stack"><button onClick={() => exportData(data)}>{t(locale, 'exportData')}</button><label className="file-button">{t(locale, replacementReadiness.scope === 'family' ? 'importFamilyData' : 'importData')}<input type="file" accept="application/json" onChange={handleImport} /></label>{safetyBackup && <button className="safety-restore-button" onClick={() => openReplacement(safetyBackup.data, 'restore')}>{t(locale, 'restoreSafetyBackup')}</button>}{import.meta.env.VITE_INTERNAL_PREVIEW === 'true' && <button className="internal-demo-button" onClick={loadDemoData} disabled={loadingDemo}>{loadingDemo ? t(locale, 'loadingDemoData') : t(locale, 'loadDemoData')}</button>}<button className="danger" onClick={() => openReplacement(emptyDiary(), 'clear-local')}>{t(locale, 'clearLocalData')}</button>{replacementReadiness.scope === 'family' && familyRole === 'ADMIN' && <button className="danger danger-family" onClick={() => openReplacement(emptyDiary(), 'clear-family')}>{t(locale, 'clearFamilyData')}</button>}</div>
     {replacementReadiness.scope === 'family' && familyRole === 'MEMBER' && <p className="muted family-admin-hint">{t(locale, 'familyClearAdminOnly')}</p>}
     {safetyBackup && <p className="muted safety-backup-hint">{t(locale, 'safetyBackupAvailable', { date: new Intl.DateTimeFormat(localeTag(locale), { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(safetyBackup.exportedAt)), count: safetyBackup.data.sessions.length })}</p>}
-    <p className="muted">{t(locale, replacementReadiness.scope === 'family' ? 'familyDataShared' : 'localOnly', { family: replacementReadiness.familyName || '' })}</p></section>
+    <p className="muted">{t(locale, replacementReadiness.scope === 'family' ? 'familyDataShared' : 'localOnly', { family: replacementReadiness.familyName || '' })}</p>
+    <div className="settings-card settings-language-card">
+      <label>{t(locale, 'language')}<select className="language-select" value={locale} onChange={changeLocale}>{languageOptions.map((language) => <option key={language.value} value={language.value}>{language.flag} {language.label}</option>)}</select></label>
+    </div></section>
     {editingChild && <ChildEditor child={editingChild === 'new' ? null : editingChild as ChildProfile} locale={locale} onClose={() => setEditingChild(null)} onSave={(next) => {
       const current = loadData()
       if (editingChild === 'new') setData({ ...current, children: [...current.children, next], settings: { ...current.settings, activeChildId: next.id } })
@@ -915,6 +926,16 @@ function PhotoCropper({ candidate, locale, onCancel, onDone }: { candidate: Crop
 }
 
 function ChildEditor({ child, locale, onClose, onSave, onDelete }: { child: ChildProfile | null; locale: Locale; onClose: () => void; onSave: (child: ChildProfile) => boolean; onDelete?: () => void }) {
+  const dialog = useRef<HTMLDialogElement>(null)
+  useEffect(() => {
+    const previousFocus = document.activeElement
+    const modal = dialog.current!
+    modal.showModal()
+    return () => {
+      modal.close()
+      if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus()
+    }
+  }, [])
   const draft = useRef(child ?? createChild()).current
   const [name, setName] = useState(child?.name ?? '')
   const [birthDate, setBirthDate] = useState(child?.birthDate ?? '')
@@ -923,6 +944,12 @@ function ChildEditor({ child, locale, onClose, onSave, onDelete }: { child: Chil
   const [previewUrl, setPreviewUrl] = useState<string | null | undefined>(undefined)
   const [cropCandidate, setCropCandidate] = useState<CropCandidate | null>(null)
   const [saving, setSaving] = useState(false)
+  useEffect(() => {
+    if (!cropCandidate) return
+    const previousFocus = document.activeElement
+    dialog.current?.querySelector<HTMLButtonElement>('.photo-crop-screen button')?.focus()
+    return () => { if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus() }
+  }, [cropCandidate])
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl) }, [previewUrl])
   const choosePhoto = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -936,6 +963,7 @@ function ChildEditor({ child, locale, onClose, onSave, onDelete }: { child: Chil
     event.target.value = ''
   }
   const submit = async () => {
+    if (saving) return
     if (!name.trim()) return window.alert(t(locale, 'childNameRequired'))
     if (birthDate && new Date(`${birthDate}T00:00:00`).getTime() > Date.now()) return window.alert(t(locale, 'birthDateFuture'))
     setSaving(true)
@@ -951,7 +979,7 @@ function ChildEditor({ child, locale, onClose, onSave, onDelete }: { child: Chil
     }
   }
   const previewChild = { ...draft, name, photoRef }
-  return <div className="editor-overlay"><div className="editor-screen child-editor-screen"><header className="editor-header"><button onClick={onClose} disabled={saving}><Icon name="close" size={18} /></button><h1>{child ? t(locale, 'editChild') : t(locale, 'addChild')}</h1><span /></header><div className="editor-body child-editor-body"><div className="profile-preview"><ChildAvatar child={previewChild} className="profile-preview-avatar" previewUrl={previewUrl} /><strong>{name || t(locale, 'unnamedChild')}</strong><div className="photo-actions"><label className="photo-button">{photoRef || photoFile ? t(locale, 'changePhoto') : t(locale, 'addPhoto')}<input type="file" accept="image/*" onChange={choosePhoto} /></label>{(photoRef || photoFile) && <button type="button" onClick={() => { setPhotoFile(null); setPreviewUrl(null); setPhotoRef(null) }}>{t(locale, 'removePhoto')}</button>}</div><small>{t(locale, 'photoLocalHint')}</small></div><label>{t(locale, 'childName')}<input value={name} maxLength={60} onChange={(event) => setName(event.target.value)} placeholder={t(locale, 'childNamePlaceholder')} /></label><label>{t(locale, 'birthDate')} <small>{t(locale, 'optional')}</small><input type="date" value={birthDate} max={new Date().toISOString().slice(0, 10)} onChange={(event) => setBirthDate(event.target.value)} /></label>{birthDate && <p className="profile-info-note">{t(locale, 'birthDateAnalyticsHint')}</p>}</div><div className={`editor-actions centered-actions ${onDelete ? '' : 'single-action'}`}>{onDelete && <button className="delete-button" onClick={onDelete} disabled={saving}>{t(locale, 'deleteChild')}</button>}<button className="save-button" onClick={submit} disabled={saving}>{saving ? t(locale, 'saving') : t(locale, 'save')}</button></div></div>{cropCandidate && <PhotoCropper candidate={cropCandidate} locale={locale} onCancel={() => { URL.revokeObjectURL(cropCandidate.url); setCropCandidate(null) }} onDone={(blob) => { URL.revokeObjectURL(cropCandidate.url); setPhotoFile(blob); setPreviewUrl((previous) => { if (previous) URL.revokeObjectURL(previous); return URL.createObjectURL(blob) }); setCropCandidate(null) }} />}</div>
+  return <dialog ref={dialog} className="editor-overlay child-editor-dialog" aria-label={t(locale, child ? 'editChild' : 'addChild')} onCancel={(event) => { event.preventDefault(); if (saving) return; if (cropCandidate) { URL.revokeObjectURL(cropCandidate.url); setCropCandidate(null) } else onClose() }}><div className="editor-screen child-editor-screen" inert={Boolean(cropCandidate)}><header className="editor-header"><button aria-label={t(locale, 'cancel')} onClick={onClose} disabled={saving}><Icon name="close" size={18} /></button><h1>{child ? t(locale, 'editChild') : t(locale, 'addChild')}</h1><span /></header><div className="editor-body child-editor-body"><div className="profile-preview"><ChildAvatar child={previewChild} className="profile-preview-avatar" previewUrl={previewUrl} /><strong>{name || t(locale, 'unnamedChild')}</strong><div className="photo-actions"><label className="photo-button">{photoRef || photoFile ? t(locale, 'changePhoto') : t(locale, 'addPhoto')}<input type="file" accept="image/*" onChange={choosePhoto} /></label>{(photoRef || photoFile) && <button type="button" onClick={() => { setPhotoFile(null); setPreviewUrl(null); setPhotoRef(null) }}>{t(locale, 'removePhoto')}</button>}</div><small>{t(locale, 'photoLocalHint')}</small></div><label>{t(locale, 'childName')}<input value={name} maxLength={60} onKeyDown={(event) => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); void submit() } }} onChange={(event) => setName(event.target.value)} placeholder={t(locale, 'childNamePlaceholder')} /></label><label>{t(locale, 'birthDate')} <small>{t(locale, 'optional')}</small><input type="date" value={birthDate} max={new Date().toISOString().slice(0, 10)} onChange={(event) => setBirthDate(event.target.value)} /></label>{birthDate && <p className="profile-info-note">{t(locale, 'birthDateAnalyticsHint')}</p>}</div><div className={`editor-actions centered-actions ${onDelete ? '' : 'single-action'}`}>{onDelete && <button className="delete-button" onClick={onDelete} disabled={saving}>{t(locale, 'deleteChild')}</button>}<button className="save-button" onClick={submit} disabled={saving}>{saving ? t(locale, 'saving') : t(locale, 'save')}</button></div></div>{cropCandidate && <PhotoCropper candidate={cropCandidate} locale={locale} onCancel={() => { URL.revokeObjectURL(cropCandidate.url); setCropCandidate(null) }} onDone={(blob) => { URL.revokeObjectURL(cropCandidate.url); setPhotoFile(blob); setPreviewUrl((previous) => { if (previous) URL.revokeObjectURL(previous); return URL.createObjectURL(blob) }); setCropCandidate(null) }} />}</dialog>
 }
 
 type WheelItem = { value: string; label: string }

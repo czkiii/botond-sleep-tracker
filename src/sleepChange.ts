@@ -51,14 +51,13 @@ function thresholdFor(metric: SleepChangeMetric, baseline: number) {
   return Math.max(45 * 60 * 1000, baseline * 0.15)
 }
 
-export function buildSleepChangeInsight(sessions: SleepSession[], now = Date.now()): SleepChangeInsight {
+export function buildSleepChangeInsight(sessions: SleepSession[], now = Date.now(), days = buildSleepDaySummaries(sessions, now)): SleepChangeInsight {
   const today = new Date(now)
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
   const recentStartDate = new Date(todayStart); recentStartDate.setDate(recentStartDate.getDate() - 5)
   const baselineStartDate = new Date(recentStartDate); baselineStartDate.setDate(baselineStartDate.getDate() - 28)
   const recentStart = recentStartDate.getTime()
   const baselineStart = baselineStartDate.getTime()
-  const days = buildSleepDaySummaries(sessions, now)
   const recentDays = days.filter((day) => dayTime(day) >= recentStart && dayTime(day) < todayStart)
   const baselineDays = days.filter((day) => dayTime(day) >= baselineStart && dayTime(day) < recentStart)
 

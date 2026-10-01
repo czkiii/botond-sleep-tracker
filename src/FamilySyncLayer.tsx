@@ -127,7 +127,7 @@ export default function FamilySyncLayer() {
   const [uploadFailure, setUploadFailure] = useState(() => getSyncStore().failure?.code || '')
   const [childDeletionRejected, setChildDeletionRejected] = useState(() => Boolean(getSyncStore().childDeletionRejected))
   const [, setClock] = useState(0)
-  const [settingsTarget, setSettingsTarget] = useState<Element | null>(() => document.querySelector('.settings-screen'))
+  const [settingsTarget, setSettingsTarget] = useState<Element | null>(() => document.querySelector('[data-family-sync-slot]'))
   const [connectionName, setConnectionName] = useState(() => getSyncStore().connection?.familyName || '')
   const [previewPlan, setPreviewPlan] = useState<ProductPlan>(() => loadInternalPlanPreview())
   const [serverFamilySync, setServerFamilySync] = useState<boolean | null>(null)
@@ -260,7 +260,7 @@ export default function FamilySyncLayer() {
   }, [])
 
   useEffect(() => {
-    const refreshTarget = () => setSettingsTarget(document.querySelector('.settings-screen'))
+    const refreshTarget = () => setSettingsTarget(document.querySelector('[data-family-sync-slot]'))
     refreshTarget()
     const observer = new MutationObserver(refreshTarget)
     observer.observe(document.getElementById('root') ?? document.body, { childList: true, subtree: true })

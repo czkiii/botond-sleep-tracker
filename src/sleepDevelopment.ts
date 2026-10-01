@@ -118,7 +118,9 @@ function classifyUnion(pieces: ClassifiedInterval[]) {
   return { day, night }
 }
 
-function buildSleepDaySource(sessions: SleepSession[], now: number) {
+// One render snapshot can share this preparation across the chart and reports.
+// Consumers must use the same sessions/now and must not mutate the result.
+export function buildSleepDaySource(sessions: SleepSession[], now: number) {
   const intervals = sessions.flatMap((session) => {
     if (!session.endTime) return []
     const start = Date.parse(session.startTime)
@@ -168,8 +170,7 @@ export function buildSleepDaySummaries(sessions: SleepSession[], now = Date.now(
   return buildSleepDaySource(sessions, now).days
 }
 
-export function buildSleepDevelopment(sessions: SleepSession[], now = Date.now(), rangeMonths: 3 | 6 | 12 = 12, customRange?: { startMonth: string; endMonth: string }): SleepDevelopment {
-  const source = buildSleepDaySource(sessions, now)
+export function buildSleepDevelopment(sessions: SleepSession[], now = Date.now(), rangeMonths: 3 | 6 | 12 = 12, customRange?: { startMonth: string; endMonth: string }, source = buildSleepDaySource(sessions, now)): SleepDevelopment {
   const monthTotals = new Map<string, {
     year: number
     month: number

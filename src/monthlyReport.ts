@@ -81,10 +81,10 @@ function summarizeMonths(days: SleepDaySummary[]) {
   })).sort((left, right) => left.key.localeCompare(right.key))
 }
 
-export function buildMonthlyFamilyReport(sessions: SleepSession[], now = Date.now()): MonthlyFamilyReport {
+export function buildMonthlyFamilyReport(sessions: SleepSession[], now = Date.now(), days = buildSleepDaySummaries(sessions, now)): MonthlyFamilyReport {
   const current = new Date(now)
   const currentMonthKey = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`
-  const eligible = summarizeMonths(buildSleepDaySummaries(sessions, now))
+  const eligible = summarizeMonths(days)
     .filter((month) => month.key < currentMonthKey && month.recordedDays >= MIN_RECORDED_DAYS)
   const month = eligible[eligible.length - 1] ?? null
   const earlier = month ? eligible.filter((candidate) => candidate.key < month.key) : []
