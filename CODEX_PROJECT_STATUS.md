@@ -1,13 +1,13 @@
 # Solemi Sleep — Codex projektállapot
 
 **Utolsó frissítés:** 2026-10-01
-**Legfrissebb megálló:** A27/S01 közös nappal/éjjel bontása helyben javítva és géppel igazolva. [S01 checkpoint](DAY_NIGHT_BOUNDARIES_CHECKPOINT_2026-10-01.md): 23 új próba, 405/405 teljes teszt, typecheck, build és 1800/5000-es böngészőregresszió PASS. Az időbontás kb. 4,3× gyorsabb; a teljes prémium oldal első számítása továbbra is költséges. A27 közös telefonos kapuja és A22 valódi telefonos profilja nyitott. M3/M5/M6 parkol; most nincs tulajdonosi tesztfeladat.
+**Legfrissebb megálló:** 2026-10-01: [összevont kézi kör](MANUAL_ACCEPTANCE_2026-09-26.md) 6/6 lezárva kézi és meglévő gépi bizonyítékokkal. M6 után normál Edge 3acac04 és Chrome ae3dbac: Opo / Boti / 1799, bejelentkezve, friss szinkron; a külön helyi napló áttekintése és elhalasztása után sikeres családi naplóválasztás. M1–M6 nem ismétlendő konkrét új ok nélkül. A27/S01 helyi eredmény változatlan: 405/405 teszt, typecheck, build és böngészőregresszió PASS; [S01 checkpoint](DAY_NIGHT_BOUNDARIES_CHECKPOINT_2026-10-01.md). A teljes kiadás kapui, köztük A27/A22 telefonos ellenőrzései, továbbra is nyitottak.
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
 **Teljes audit alapja:** `e9374f4` (`Add verified store billing foundation`); az akkori helyi origin-refhez képest 0 ahead / 0 behind.
-**Aktuális HEAD:** `3acac04` — `Improve settings usability and reduce statistics recalculation`, `feat/child-profile-v4`. A20/A22 már commitban. A mostani S01 javítás helyi módosítás; commit/push/deploy nem történt, távoli staging verziót ebben a körben nem ellenőriztünk.
+**Aktuális HEAD:** `ae3dbac` — `Fix exact day/night boundaries and share sleep time splitting`, `feat/child-profile-v4`. A20/A22 és S01 commitban; M3/M5 alatt mindkét próbaböngésző ae3dbac, az M6 végállapotában normál Edge 3acac04 és Chrome ae3dbac. A jelenlegi M3/M5/M6 elfogadási dokumentálás helyi módosítás; ebben a körben nem végeztünk commit/push/deploy műveletet.
 
-**Következő feladat — GPT-6 Astra · erős:** A27/S02 — megszakított éjszaka és valódi reggeli ébredés elkülönítése, automatikus próbákkal, az ébrenléti szünet alvásként összeadása nélkül. Helyben nincs szükség tulajdonosi kézi tesztre. Később M3/M5/M6 a megőrzött megállótól folytatható; M1/M2/M4 nem ismétlendő.
+**Következő feladat — GPT-6 Astra · erős:** A27/S02 — megszakított éjszaka és valódi reggeli ébredés elkülönítése, automatikus próbákkal, az ébrenléti szünet alvásként összeadása nélkül. Ehhez most nem kell tulajdonosi kézi teszt. M1–M6 összevont kör lezárva; a fennmaradó kiadási kapuk a RELEASE_CHECKLIST.md-ben követhetők.
 
 **2026-09-24-es staging eredmény — [GPT-6 Astra · high] javítás, [GPT-6 Sol · medium] kézi folytatás:** a `Solemi törlési próba` családban a tényleges családi naplótörlés mindkét eszközt 0 alvásra vitte, a kis export visszaimportja mindkettőt 1-re állította. Az üres visszaállítási pont szinkronja először `INVALID_REQUEST` hibával elakadt, mert a szerver az érvényes üres gyermeknevet elutasította. A `fb64e1b` javítás után mindkét eszköz névtelen profilt, 0 alvást és friss szinkront mutat; az elakadt szinkron kétböngészős próbája sikeres. Teljes helyi ellenőrzés: 27 fájl, 296/296 teszt; frontend és Worker typecheck sikeres. Az eredeti Opo családot nem módosítottuk.
 

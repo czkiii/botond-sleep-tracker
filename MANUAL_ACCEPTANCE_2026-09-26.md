@@ -2,7 +2,7 @@
 
 Feladatszint: GPT-6 Astra · erős. Staging: `a83b39a`.
 
-**Legfrissebb megálló — 2026-10-01:** a tulajdonos most nem tud kézzel tesztelni, M3/M5/M6 megálló megőrizve. M1/M2/M4 kész, 3/6. A14 javítás már `bc7b298` commitban; staging elfogadást ma nem állítunk. Közben önálló A20 beállítás- és profilszerkesztő-javítás készült, gépi ellenőrzésekkel: [mai checkpoint](SETTINGS_UX_CHECKPOINT_2026-09-30.md). Az új helyi felületen a családi megosztás közvetlenül a gyermeklista alatt van, a nyelv legalul. Az A22 helyi statisztikai frissítés és gépi mérés is elkészült: [A22 summary](STATISTICS_PERFORMANCE_CHECKPOINT_2026-09-30.md), 382/382 teszt és böngészőregresszió PASS. Az A20/A22 csomag már `3acac04` commitban van. S01 pontos időbontása is helyben elkészült, 405/405 teszttel és gépi méréssel: [S01 checkpoint](DAY_NIGHT_BOUNDARIES_CHECKPOINT_2026-10-01.md). Következő önálló munka A27/S02; a kézi lépések csak akkor folytatódnak, amikor a tulajdonos ráér.
+**Legfrissebb megálló — 2026-10-01:** M6 funkcionális staging elfogadás kész; az összevont kör 6/6 lezárva kézi és meglévő gépi bizonyítékokkal. Chrome ae3dbac: a külön helyi Próbababa / 1 alvás napló áttekintése és elhalasztása után az Opo családi napló választása sikeres. Végül normál Edge 3acac04 és Chrome ae3dbac is Opo / Boti / 1799 alvás, bejelentkezve és friss szinkronnal. M1–M6 nem ismétlendő konkrét új ok nélkül. Következő önálló feladat A27/S02; ez nem a teljes kiadás lezárása.
 
 ## Aktuális megálló és elsőbbség
 
@@ -33,7 +33,7 @@ Előkészítés: meglevő, ellenőrzött 1799-es export megőrzése; ha a most k
 
 - [x] **M1 / A13:** stagingen két böngészőn egyező aktív alvás, jegyzet, kézi típus és frissítés utáni folytatás; a megszakított feltöltés újrapróbálását 2026-09-28-án valódi helyi kliens–Worker–SQLite teszt egészíti ki. Szerveres mentés után elveszett válasz, azonos művelet újraküldése, pontosan egy aktív sor, változatlan mezők és második eszközös egyezés: PASS. Nem állítunk új kézi hálózati próbát.
 - [x] **M2 / A15, A20 része:** ugyanebben a családban gyermeknév és születési dátum eltérő eszközös szerkesztése, majd ugyanazon mező két eltérő értéke; a helyi/családi választás és az érthető összehasonlítás ellenőrzése. Mindhárom rész sikeres `a83b39a` stagingen, 2026-09-26. Részletes képi bizonyíték lent. Ez az M2 forgatókönyvet zárja le, nem a teljes A15/A20 auditot.
-- [ ] **M3 / A14:** utolsó gyermek párhuzamos törlése. A klienselakadást 2026-09-28-án helyben javítottuk; a teljes tesztcsomag 379/379 és a valódi React felület helyi Edge próbája PASS. Feltöltés után még célzott staging elfogadás kell két elkülönített readi-eszközön, kizárólag a kis próbacsaládban. A szerveren maradó gyermek régi alvását, a visszaálló helyi profilt, a megszűnő pending sort és az elutasítás érthető jelzését ellenőrizzük. Nem kell végtelenül gyors kattintásokat ismételni; kontrollált offline/online sorrenddel determinisztikus a vesztes törlés.
+- [x] **M3 / A14:** a bc7b298 kliensjavítás gépi bizonyítékait 2026-10-01-én ae3dbac stagingen két readi-eszközös elfogadás egészíti ki: kontrollált offline/online törlés, 409 elutasítás, régi profil és 1 alvás helyreállítása, érthető magyarázat, újratöltés utáni megőrzés és friss szinkron. A képek nem mutatják a nyers outboxot; annak atomi feloldását a korábbi regressziók igazolják. Részletek a dokumentum végén.
 
 ### 2. Fiókok és megőrzött változások ugyanebben a környezetben
 
@@ -42,8 +42,8 @@ Előkészítés: meglevő, ellenőrzött 1799-es export megőrzése; ha a most k
 
 ### 3. A próbacsalád lezárása és az A15 visszaút
 
-- [ ] **M5 / A04 javítás retest:** a még meglevő kis próbacsalád megszüntetése. Konkrét ismétlési ok: a `028d25e` javítás után először kell stagingen igazolni, hogy a sikeres véglegesítés nem ad téves „adatok megváltoztak” hibát. Helyi napló és account megmarad, mindkét próbaeszköz családi kapcsolata lezárul. A már sikeres teljes családi naplóürítés/import/restore kör nem része ennek.
-- [ ] **M6 / A15, A04 visszaút:** a Chrome megmaradt kis helyi próbanaplójával csatlakozás az Opóhoz: eltérő profilok áttekintése → elhalasztás/újranyitás → helyi mentés → családi napló választása. Ezzel egyetlen szükséges visszaút vizsgálja az új csatlakozási folyamatot is. A próbanaplót előtte nem töröljük ki, és nem importáljuk az Opóba. Végül Edge admin / Chrome tag, mindkettő Boti / 1799. Az InPrivate ablakot a már lezárt próbakapcsolat ellenőrzése után bezárjuk.
+- [x] **M5 / A04 javítás retest:** 2026-10-01, ae3dbac: kis Solemi közös próba. megszüntetése; előnézet 1 gyermek / 1 alvás, a mentés letöltését a tulajdonos megerősítette. Utána mindkét próbaeszköz bejelentkezve maradt, a helyi profil és 1 alvás megmaradt, nincs család összekapcsolva. A végállapotban nincs téves megváltozott-adatok hiba. Ez a célzott funkcionális retest lezárása; a képernyőképek nem hálózati válasznaplók és nem pontos Worker-verzióigazolások.
+- [x] **M6 / A15, A04 visszaút:** 2026-10-01: Chrome ae3dbac helyi Próbababa / 1 alvás és Opo családi Boti / 1799 külön áttekintése, elhalasztás utáni helyi megőrzés és újranyitott összehasonlítás képpel igazolt. Családi napló választása után mindkét böngésző Opo / Boti / 1799, bejelentkezve és friss szinkronnal. A kis napló mentését M5 előtt a tulajdonos megerősítette; a második export tényleges letöltését és az F5 eseményt önmagukban a képek nem bizonyítják. A backup/tartósság meglévő A15 gépi bizonyítékaival együtt lezárt funkcionális forgatókönyv. Aktuális szerepköröket a végső kép nem mutatja; teljes A15 kapu továbbra is nyitott.
 
 ## Mi marad külön, és mi nem jelent újabb teljes kézi kört?
 
@@ -51,7 +51,7 @@ Előkészítés: meglevő, ellenőrzött 1799-es export megőrzése; ha a most k
 - A05 újratelepítés; A15 valódi telefon/hálózat és D1-terhelés; A24 telepített telefonos frissítés/történeti visszaállás külön környezeti bizonyíték. Ezeket egy későbbi telefonos blokkba rendezzük; desktop screenshot nem váltja ki őket.
 - A16 még fejlesztési munka, a store/native/éles konfiguráció és a statisztikai audit nem zárható le ezzel a hat ellenőrzéssel.
 - Ha egy blokk hibát talál: a javítás után az érintett lépés és közvetlen következménye ismétlendő, nem a teljes három blokk.
-- Minden eredményhez build, környezet, várt/tényleges viselkedés és bizonyíték kell. **3/6 összevont ellenőrzés kész (M1, M2, M4)**, kézi és célzott gépi bizonyítékok együtt. Nyitott: M3 (helyi javítás már kész, staging elfogadás kell), M5 (családmegszüntetés javításának staging retestje), M6 (eltérő helyi naplóval visszacsatlakozás). Ez nem a teljes kiadás százaléka, és nem három új beszélgetés előírása.
+- Minden eredményhez build, környezet, várt/tényleges viselkedés és bizonyíték kell. **6/6 összevont ellenőrzés kész (M1–M6)**, kézi és célzott gépi bizonyítékok együtt. Az összevont körben nincs nyitott forgatókönyv. Ez nem a teljes kiadás százaléka; a fennmaradó kiadási kapukat a RELEASE_CHECKLIST.md tartalmazza.
 
 ## Előkészítés eredménye
 
@@ -187,3 +187,49 @@ Ellenőrzések: `npx vitest run` → 31 fájl, **379/379 PASS**. A hét új A14 
 **Következő feladat: A14/M3 — tulajdonosi commit/push és az új staging build után célzott kétböngészős elfogadás. Feladatszint: GPT-6 Astra · erős.** Javasolt commitcím: `Recover rejected last-child deletions without losing local data`.
 
 A következő kézi kör terve (csak az új build után, kis Solemi közös próba. család): Chrome readi és külön Edge InPrivate readi, normál Edge/Opo/Boti/1799 érintetlen. Új InPrivate belépéskor esetleges eszközválasztásnál a normál Chrome Windows kapcsolat maradjon, majd a szükséges új Google-megerősítés. Más listánál előbb azonosítjuk a fiókot/eszközöket. A meglévő, 1 alvásos gyermek mellé egy üres próbagyermek. InPrivate Offline módban a meglévő, alvásos gyermek törlése; online Chrome-ban az üres második gyermek törlése. Ezután InPrivate No throttling: a szerver LAST_CHILD-dal védi az alvásos profilt; a kliens visszahozza azt és az 1 alvást. Kontroll mindkét oldalon, jelzés/Értem és F5. Külön alvást nem indítunk és a családi naplóürítés gombját nem használjuk. M5-höz/M6-hoz az egyalvásos napló megmarad. Ezt rövid lépésekben adjuk ki a tényleges új build és bejelentkezett fiókok alapján; még nem elvégzett próba.
+
+
+### 2026-10-01 — M3 kiindulás igazolva
+
+Bizonyíték: `codex-clipboard-a6c36c25-813a-4c47-af92-9441269e9979.png`. Edge InPrivate és normál Chrome: mindkettő `ae3dbac`, readi-fiók, Solemi közös próba. / Próbababa függő / 2026-01-01 / 1 alvás, Utolsó szinkron: most. A normál Edge/Opo nincs a képen; annak módosítását nem kértük. A DevTools aktuális hálózati beállításai nem látszanak.
+
+Kiadott következő részlépések: Chrome-ban M3 üres nevű második profil (0 alvás), megvárni a megjelenését mindkét oldalon; csak Edge InPrivate Network Offline, ott a Próbababa függő profil törlése a profilszerkesztőből. Az Edge egyelőre offline marad, a Chrome-on még nem kérünk törlést. Várt köztes állapot: Edge-en csak M3 üres / 0 alvás és várakozó módosítás; Chrome-on még mindkét profil, a régi 1 alvás megmarad. Ez terv, nem elvégzett eredmény.
+
+### 2026-10-01 — M3 offline köztes állapot igazolva
+
+Bizonyíték: `codex-clipboard-089368f7-a18d-4867-b874-93e0e9b15fb2.png`, mindkét ablak `ae3dbac`. Edge InPrivate readi: Network Offline, csak M3 üres / 0 alvás, családi kártya Offline és helyi mentést/későbbi küldést jelző szöveg. Normál Chrome readi: Próbababa függő / 2026-01-01 / 1 alvás és M3 üres / 0 alvás, friss szinkron. A Próbababa offline helyi törlése és a másik eszköz változatlan állapota igazolt. A képen nincs számszerű pending-jelzés; konkrét outbox-darabszámot nem állítunk.
+
+Következő kiadott lépések: Edge továbbra is Offline; online Chrome-ban kizárólag M3 üres profil törlése, majd várakozás arra, hogy csak Próbababa függő / 1 alvás és friss szinkron látszódjon. Csak ezután Edge No throttling, automatikus helyreállítás megvárása és a családi tájékoztatás megnyitása. Várt: mindkét oldalon a régi profil és 1 alvás; Edge-en az elutasított utolsóprofil-törlés érthető jelzése. Eredmény még nincs, M3 nincs lezárva.
+
+
+### 2026-10-01 — M3 elutasított törlés utáni helyreállítás igazolva
+
+`codex-clipboard-2cba93a6-2519-4db1-ab92-c00d04fb4024.png`: Edge továbbra is Offline / M3 üres / 0 alvás; online Chrome-ban már csak Próbababa függő / 2026-01-01 / 1 alvás, friss szinkron. Az üres második profil online törlése igazolt.
+
+`codex-clipboard-872b0a1b-5070-401e-968b-75ea2b65d771.png`: Edge No throttling, mindkét oldalon Próbababa függő / 2026-01-01 / 1 alvás; M3 üres eltűnt. Edge családi kártya: A gyermektörlést nem hajtottuk végre., állapot A családi adatok megosztva. Network gyermek DELETE 409, utána sync?after=0, sync?after=9 és sync?after=10 sikeres 200. A 409 válasz törzsét nem láttuk, konkrét hibakódot a képből nem állítunk. Az elutasítás és a régi profil/alvás helyreállítása, a szinkron folytatódása igazolt.
+
+Következő: Edge online F5, Beállítások profil/alvás kontroll, családi panel megnyitása és a tartós tájékoztatás megtekintése; Értem nyugtázás és friss szinkron kontroll. M3 csak ennek eredménye után jelölhető lezártnak.
+
+### 2026-10-01 — M3/A14 lezárás, magyarázat és újratöltés
+
+`codex-clipboard-d5d0fd58-f90c-4419-aaf8-23277fdc84c5.png`: Edge családi panelen a teljes magyarázat látható: az utolsó gyermek profilját és alvásait megvédtük, a családi változatot újra lekértük; Értem gomb. Chrome-on változatlan Próbababa függő / 1 alvás.
+
+`codex-clipboard-9a73acc3-f5ca-4c6f-a514-e4575416c605.png`: mindkét böngésző ae3dbac, readi-fiók, Solemi közös próba., Próbababa függő / 2026-01-01 / 1 alvás, Utolsó szinkron: most. Edge-en eltűnt az elutasítási jelzés; Network No throttling, friss dokumentum- és erőforrásbetöltés, sikeres me/access/plan/claim és sync?after=10. Az újratöltés utáni helyreállt állapot igazolt; az Értem kattintás és újratöltés pontos egymáshoz viszonyított sorrendjét nem állítjuk. A tájékoztatás tartósságát a korábbi gépi regresszió is vizsgálja.
+
+M3/A14 elfogadva a kézi és meglévő gépi bizonyítékok együttese alapján. Ez nem a szerver pontos SHA-jának vagy a valódi mobilos működésnek igazolása. Következő: M5, csak a kis próbacsalád megszüntetése Chrome-ban, a helyi napló megtartásával az M6 visszacsatlakozáshoz. Feladatszint: GPT-6 Astra · erős.
+### 2026-10-01 — M5 előnézet és sikeres megszüntetés
+
+`codex-clipboard-0f01d868-dd0b-4efd-94c7-9c3983eace0c.png`: Chrome megszüntetési előnézet, pontos családnév Solemi közös próba., 1 gyermekprofil / 1 alvásbejegyzés, beírt megerősítő név. A tulajdonos megerősítette a mentés letöltését; a fájl tartalmát nem vizsgáltuk.
+
+`codex-clipboard-651ba055-c0ab-4597-949d-c2728e3e2e2c.png`: véglegesítés után mindkét böngésző ae3dbac, readi-fiók bejelentkezve, Próbababa függő / 2026-01-01 / 1 alvás. Mindkét családi kártyán Nincs család összekapcsolva és a megszűnt kapcsolat/helyi megőrzés tájékoztatása. Helyi importfelirat látszik. A végállapotban nem jelenik meg a korábbi téves adatok-megváltoztak hiba; köztes HTTP-válaszokat a kép nem igazol. M5 célzott funkcionális elfogadás kész, az A04 fennmaradó bizonyítékai külön nyitottak.
+
+Következő M6, GPT-6 Astra · erős: az InPrivate próbaablak bezárható; normál Edge eredeti Opo admin és normál Chrome readi helyi próbanapló. Opo friss meghívója után Chrome Csatlakozás kóddal, a helyi és családi napló összehasonlítása, majd elhalasztás/újranyitás és családi napló elfogadása. Az utóbbi lépések még terv, nem elvégzett eredmény. A próbanaplót nem töröljük és nem importáljuk az Opóba.
+### 2026-10-01 — M6 áttekintés, elhalasztás és visszacsatlakozás lezárva
+
+`codex-clipboard-c51459c0-5c75-464e-94ff-6a863a564adc.png`: normál Edge 3acac04, eredeti fiók, Opo / Boti / 1799 és friss szinkron. Chrome csatlakozási áttekintés: helyi Próbababa függő / 2026-01-01 / 1 alvás, családi Opo / Boti / 2025-08-23 / 1799 alvás. A két napló külön szerepel, nincs automatikus összekeverés.
+
+`codex-clipboard-e7919909-b861-4b23-bd0f-ab1395531f39.png`: Chrome ae3dbac readi-fiókkal, továbbra is Próbababa függő / 1 alvás; családi kapcsolat előkészítve, szinkron a naplóválasztás után indul. `codex-clipboard-2488b8c5-dc63-4165-96ee-cda2d6fb4bc7.png`: újranyitott összehasonlításban ugyanaz a külön helyi és családi napló. A kért lépések közt F5 volt, de a képek önmagukban a frissítés eseményét nem igazolják; a megőrzött és újranyitható állapotot igen.
+
+`codex-clipboard-9ba728f6-49ec-4dc1-b730-d0fcd46c502f.png`: családi napló elfogadása és kért F5 utáni visszaküldött végállapot. Normál Edge 3acac04 az eredeti fiókkal és normál Chrome ae3dbac a readi-fiókkal: mindkettő Opo / Boti / 2025-08-23 / 1799 alvás és Utolsó szinkron: most. A felületen a próbagyermek nincs a családi gyermeklistában, a bejegyzésszám változatlan. Ez nem teljes rekordtartalom-összehasonlítás. A szerepkörök nem látszanak ezen a képen; új adminátadást nem kértünk.
+
+M6 funkcionális elfogadás kész a képi és meglévő A15 gépi bizonyítékok együttese alapján. A második, M6 közbeni export letöltése nem külön igazolt; az azonos kis napló M5 előtti mentését a tulajdonos megerősítette. Nem ismételtetjük a teljes folyamatot. M1–M6: 6/6 kész. Nincs új kódfuttatás vagy tesztfuttatás ebben a dokumentálási körben. Következő feladat: A27/S02 — megszakított éjszaka és valódi reggeli ébredés elkülönítése, gépi próbákkal. Feladatszint: GPT-6 Astra · erős.
