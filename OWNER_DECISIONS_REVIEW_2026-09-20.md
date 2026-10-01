@@ -5,6 +5,8 @@ Ez a dokumentum az öt tulajdonosi forrást a meglévő audithoz és az A03 jav�
 
 ## Elsődleges források
 
+- [Trial-szabály pontosítása, 2026-10-01](SOLEMI_V1_TRIAL_RULES_2026-10-01.md): 7 nap Family vagy Family+, egyszer accountonként és legfeljebb négy külön felhasználói trial Familynként; a korábbi eltérő trial-leírások helyett ez az irányadó. Az A11 része, a feladatsorrend változtatása nélkül.
+
 - [Tulajdonosi termékdöntések](1-SOLEMI_V1_TULAJDONOSI_TERMEEKDONTESEK_2026-09-20.txt): a korábbi, eltérő termékterveket felülíró döntések.
 - [Adatmegőrzési szabályzat](SOLEMI_V1_DATA_RETENTION_POLICY_2026-09-20.txt): fejlesztési célállapot; a nyitott megőrzési időket nem tekintjük lezártnak.
 - [Fióktörlés és export folyamata](SOLEMI_ACCOUNT_DELETION_FLOW_2026-09-20.txt): implementációs specifikáció és elfogadási esetek.
