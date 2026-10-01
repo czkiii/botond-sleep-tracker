@@ -1,5 +1,6 @@
 import type { SleepSession } from './types'
-import { DEFAULT_DAY_START_MINUTES, DEFAULT_NIGHT_START_MINUTES, EXTREME_SLEEP_DURATION_MS, FUTURE_TOLERANCE_MS, MIN_ANALYTICS_SLEEP_MS } from './utils'
+import { EXTREME_SLEEP_DURATION_MS, FUTURE_TOLERANCE_MS, MIN_ANALYTICS_SLEEP_MS } from './utils'
+import { splitSleepTime } from './sleepTime'
 
 const MILESTONE_DURATION_MS = 45 * 60 * 1000
 
@@ -60,13 +61,6 @@ function monthKey(year: number, month: number) {
   return `${year}-${String(month + 1).padStart(2, '0')}`
 }
 
-function nextLocalBoundary(time: number, minutes: number) {
-  const date = new Date(time)
-  const candidate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), Math.floor(minutes / 60), minutes % 60).getTime()
-  if (candidate > time) return candidate
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1, Math.floor(minutes / 60), minutes % 60).getTime()
-}
-
 function mergeIntervals(intervals: Array<{ start: number; end: number }>) {
   const sorted = intervals.slice().sort((a, b) => a.start - b.start || a.end - b.end)
   const merged: Array<{ start: number; end: number }> = []
@@ -79,25 +73,9 @@ function mergeIntervals(intervals: Array<{ start: number; end: number }>) {
 }
 
 function splitClassified(session: SleepSession, start: number, end: number) {
-  const result: ClassifiedInterval[] = []
-  let cursor = start
-  while (cursor < end) {
-    const nextMidnight = nextLocalBoundary(cursor, 0)
-    const nextDayStart = nextLocalBoundary(cursor, DEFAULT_DAY_START_MINUTES)
-    const nextNightStart = nextLocalBoundary(cursor, DEFAULT_NIGHT_START_MINUTES)
-    const segmentEnd = Math.min(end, nextMidnight, nextDayStart, nextNightStart)
-    const date = new Date(cursor)
-    const minutes = date.getHours() * 60 + date.getMinutes()
-    const automaticKind: SleepKind = minutes >= DEFAULT_DAY_START_MINUTES && minutes < DEFAULT_NIGHT_START_MINUTES ? 'day' : 'night'
-    result.push({
-      start: cursor,
-      end: segmentEnd,
-      kind: session.dayNightOverride ?? automaticKind,
-      priority: session.dayNightOverride ? 2 : 1
-    })
-    cursor = segmentEnd
-  }
-  return result
+  return splitSleepTime(start, end, session.dayNightOverride).map((segment): ClassifiedInterval => ({
+    ...segment, priority: session.dayNightOverride ? 2 : 1
+  }))
 }
 
 function classifyUnion(pieces: ClassifiedInterval[]) {

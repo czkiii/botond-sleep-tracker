@@ -58,9 +58,9 @@ kockázattól. A történeti pipák nem jelentik az auditpontok lezárását.
 Részletes bemenet, jelenlegi eredmény és elfogadási feltétel:
 [FAMILY_PLUS_STATISTICS_AUDIT_2026-09-20.md](FAMILY_PLUS_STATISTICS_AUDIT_2026-09-20.md).
 Vizsgált HEAD `3a0a687`, az alkalmazás forrása változatlan. A 72 sikeres helyi
-próba az audit bizonyítéka, nem a hibák lezárása. Minden alábbi tétel nyitott.
+próba az audit bizonyítéka, nem a hibák lezárása. Azóta az S01 helyi számítási javítása lezárult; az aktuális bizonyítékot az alábbi sor rögzíti. A teljes A27 elfogadás továbbra is nyitott.
 
-- [ ] **[GPT-6 Astra · high]** S01 — Másodpercpontos nappal/éjjel bontás, közös időhatár-kezelés.
+- [x] **[GPT-6 Astra · erős]** S01 — Közös, másodperc-/ezredmásodpercpontos nappal/éjjel bontás helyben javítva (2026-10-01). 23 új regresszió, több időzónás DST, közös napló minden elemzőn; 405/405 teszt, typecheck, build és böngészőpróba PASS. Az A27 közös telefonos elfogadását nem helyettesíti. [S01 checkpoint](DAY_NIGHT_BOUNDARIES_CHECKPOINT_2026-10-01.md).
 - [ ] **[GPT-6 Astra · high]** S02 — Megszakított éjszaka és valódi reggeli ébredés megkülönböztetése.
 - [ ] **[GPT-6 Astra · high]** S03 — Éjfél körüli óraidők körkörös statisztikája.
 - [ ] **[GPT-6 Sol · high]** S04 — Minimum mintaszám és kiemelt tipikus érték egyezése.

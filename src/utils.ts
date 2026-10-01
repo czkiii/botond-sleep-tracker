@@ -1,9 +1,9 @@
 import type { Locale } from './i18n'
 import { localeTag } from './i18n'
 import type { SleepSession } from './types'
+import { splitSleepTime } from './sleepTime'
+export { DEFAULT_DAY_START_MINUTES, DEFAULT_NIGHT_START_MINUTES } from './sleepTime'
 
-export const DEFAULT_DAY_START_MINUTES = 6 * 60
-export const DEFAULT_NIGHT_START_MINUTES = 19 * 60
 export const LONG_SLEEP_GUARDRAIL_MS = 12 * 60 * 60 * 1000
 export const EXTREME_SLEEP_DURATION_MS = 18 * 60 * 60 * 1000
 export const MIN_ANALYTICS_SLEEP_MS = 2 * 60 * 1000
@@ -97,16 +97,14 @@ export function awakeSince(sessions: SleepSession[], now = Date.now()) {
 export function splitDayNight(session: SleepSession, now = Date.now()) {
   const start = new Date(session.startTime).getTime()
   const end = session.endTime ? new Date(session.endTime).getTime() : now
-  const duration = Math.max(0, end - start)
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return { day: 0, night: 0 }
+  const duration = end - start
   if (session.dayNightOverride === 'day') return { day: duration, night: 0 }
   if (session.dayNightOverride === 'night') return { day: 0, night: duration }
   let day = 0, night = 0
-  for (let t = start; t < end; t += 60000) {
-    const d = new Date(t)
-    const mins = d.getHours() * 60 + d.getMinutes()
-    const bucket = Math.min(60000, end - t)
-    if (mins >= DEFAULT_DAY_START_MINUTES && mins < DEFAULT_NIGHT_START_MINUTES) day += bucket
-    else night += bucket
+  for (const segment of splitSleepTime(start, end)) {
+    if (segment.kind === 'day') day += segment.end - segment.start
+    else night += segment.end - segment.start
   }
   return { day, night }
 }

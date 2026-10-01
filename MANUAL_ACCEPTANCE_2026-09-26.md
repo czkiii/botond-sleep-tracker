@@ -2,7 +2,7 @@
 
 Feladatszint: GPT-6 Astra · erős. Staging: `a83b39a`.
 
-**Legfrissebb megálló — 2026-09-30:** a tulajdonos most nem tud kézzel tesztelni, M3/M5/M6 megálló megőrizve. M1/M2/M4 kész, 3/6. A14 javítás már `bc7b298` commitban; staging elfogadást ma nem állítunk. Közben önálló A20 beállítás- és profilszerkesztő-javítás készült, gépi ellenőrzésekkel: [mai checkpoint](SETTINGS_UX_CHECKPOINT_2026-09-30.md). Az új helyi felületen a családi megosztás közvetlenül a gyermeklista alatt van, a nyelv legalul. Az A22 helyi statisztikai frissítés és gépi mérés is elkészült: [A22 summary](STATISTICS_PERFORMANCE_CHECKPOINT_2026-09-30.md), 382/382 teszt és böngészőregresszió PASS. Következő önálló munka A27/S01; a kézi lépések csak akkor folytatódnak, amikor a tulajdonos ráér.
+**Legfrissebb megálló — 2026-10-01:** a tulajdonos most nem tud kézzel tesztelni, M3/M5/M6 megálló megőrizve. M1/M2/M4 kész, 3/6. A14 javítás már `bc7b298` commitban; staging elfogadást ma nem állítunk. Közben önálló A20 beállítás- és profilszerkesztő-javítás készült, gépi ellenőrzésekkel: [mai checkpoint](SETTINGS_UX_CHECKPOINT_2026-09-30.md). Az új helyi felületen a családi megosztás közvetlenül a gyermeklista alatt van, a nyelv legalul. Az A22 helyi statisztikai frissítés és gépi mérés is elkészült: [A22 summary](STATISTICS_PERFORMANCE_CHECKPOINT_2026-09-30.md), 382/382 teszt és böngészőregresszió PASS. Az A20/A22 csomag már `3acac04` commitban van. S01 pontos időbontása is helyben elkészült, 405/405 teszttel és gépi méréssel: [S01 checkpoint](DAY_NIGHT_BOUNDARIES_CHECKPOINT_2026-10-01.md). Következő önálló munka A27/S02; a kézi lépések csak akkor folytatódnak, amikor a tulajdonos ráér.
 
 ## Aktuális megálló és elsőbbség
 
