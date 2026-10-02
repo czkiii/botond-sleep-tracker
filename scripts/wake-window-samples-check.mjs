@@ -148,10 +148,40 @@ export async function checkWakeWindowSamples(browser, origin) {
         await checkLayout(prediction)
         await prediction.screenshot({ path: `.private-backups/s05-${locale}-${width}-${name}-prediction.png` })
       }
+
+      // S06: old one-nap days must not override the recent two-nap pattern.
+      // Include three night gaps too, so both learned types have a ready
+      // prediction and their displayed time/basis can be checked.
+      const recent = [...[27, 28, 29].flatMap(day => [[day, 8, 9], [day, 11, 12], [day, 20, 21]]), [30, 8, 9]]
+      await card.locator('.insights-range button').first().click()
+      await apply(recent)
+      const baseline = await prediction.innerText()
+      const wakeBaseline = await card.locator('.wake-window-hero').innerText()
+      assert.equal(await prediction.locator('.prediction-window').innerText(), '11:00–11:00')
+      const imported = [...Array.from({ length: 20 }, (_, i) => [i + 1, 8, 9]), ...recent]
+      await apply(imported)
+      assert.equal(await prediction.innerText(), baseline, 'Out-of-range import must not change the 7-day prediction')
+      assert.equal(await card.locator('.wake-window-hero').innerText(), wakeBaseline)
+      const nightLabels = { hu: 'éjszakai alvás', en: 'night sleep', de: 'Nachtschlaf' }
+      for (const buttonIndex of [1, 2]) {
+        await card.locator('.insights-range button').nth(buttonIndex).click()
+        await page.waitForFunction(() => document.querySelector('.prediction-window')?.textContent === '17:00–17:00')
+        assert.ok((await prediction.innerText()).includes(nightLabels[locale]))
+        assert.equal(await prediction.locator('.insights-card-head b').innerText(), `3 ${rangeLabels[4]}`)
+      }
+      await checkLayout(prediction)
+      await prediction.screenshot({ path: `.private-backups/s06-${locale}-${width}-30-days.png` })
+      await card.locator('.insights-range button').first().click()
+      await page.waitForFunction(() => document.querySelector('.prediction-window')?.textContent === '11:00–11:00')
+      assert.equal(await prediction.innerText(), baseline, 'Returning to 7 days restores its own evidence')
+      assert.equal(await card.locator('.wake-window-hero').innerText(), wakeBaseline)
+      await checkLayout(prediction)
+      await prediction.screenshot({ path: `.private-backups/s06-${locale}-${width}-7-days.png` })
       assert.deepEqual(errors, [])
       assert.deepEqual(unexpected, [])
       console.log(`PASS: wake minimum ${locale}/${width}, 0/1/2/3, active sleep, removal, subgroup count, range change, layout`)
       console.log(`PASS: factual evidence ${locale}/${width}, 9 total/3 selected, 7 same-day, identical/spread quartiles, prediction explanation, layout`)
+      console.log(`PASS: prediction lookback ${locale}/${width}, old import invariant at 7 days, 14/30-day type/window, return to 7 days`)
     } finally { await context.close() }
   }
 }

@@ -49,7 +49,7 @@ function quantile(values: number[], position: number) {
   return sorted[lower + 1] === undefined ? sorted[lower] : sorted[lower] + fraction * (sorted[lower + 1] - sorted[lower])
 }
 
-function nextBucket(sessions: SleepSession[], now: number): PredictionBucket {
+function nextBucket(sessions: SleepSession[], now: number, cutoff: number): PredictionBucket {
   const date = new Date(now)
   const minutes = date.getHours() * 60 + date.getMinutes()
   if (minutes < DEFAULT_DAY_START_MINUTES || minutes >= DEFAULT_NIGHT_START_MINUTES) return 'night'
@@ -58,6 +58,10 @@ function nextBucket(sessions: SleepSession[], now: number): PredictionBucket {
   sessions.forEach((session) => {
     if (Date.parse(session.startTime) > now) return
     const key = localDateKey(session.startTime)
+    // Learn nap counts only from past calendar days fully inside the
+    // selected rolling range. The cut-off day's fragment is not a whole
+    // day. Today's count is current context, never a historical sample.
+    if (key !== today && startOfLocalDay(new Date(session.startTime)) < cutoff) return
     const parts = splitDayNight(session, now)
     if (parts.day <= parts.night) return
     daytimeByDate.set(key, (daytimeByDate.get(key) ?? 0) + 1)
@@ -87,7 +91,8 @@ export function buildPredictionLite(sessions: SleepSession[], now = Date.now(), 
   const lastCompleted = allCompleted.slice().sort((a, b) => Date.parse(b.endTime!) - Date.parse(a.endTime!))[0]
   if (!lastCompleted || excluded.has(lastCompleted.id)) return empty('unavailable', null)
   const currentWakeMs = Math.max(0, now - Date.parse(lastCompleted.endTime!))
-  const bucket = nextBucket(cleanCompleted, now)
+  const cutoff = now - lookbackDays * DAY_MS
+  const bucket = nextBucket(cleanCompleted, now, cutoff)
 
   const dayOrder = new Map<string, Exclude<PredictionBucket, 'night'>>()
   const dayGroups = new Map<string, SleepSession[]>()
@@ -101,7 +106,8 @@ export function buildPredictionLite(sessions: SleepSession[], now = Date.now(), 
     dayOrder.set(session.id, index === 0 ? 'day-1' : index === 1 ? 'day-2' : 'day-3-plus')
   }))
 
-  const cutoff = now - lookbackDays * DAY_MS
+  // Keep original adjacency and each day's actual sleep order: filtering
+  // sessions first would invent gaps or relabel a boundary day's later nap.
   const samples: Array<{ durationMs: number; sessionIds: [string, string] }> = []
   for (let index = 0; index < allCompleted.length - 1; index += 1) {
     const previous = allCompleted[index]

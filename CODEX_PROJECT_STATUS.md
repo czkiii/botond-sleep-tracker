@@ -1,13 +1,13 @@
 # Solemi Sleep — Codex projektállapot
 
 **Utolsó frissítés:** 2026-10-02
-**Legfrissebb megálló:** A27/S05 helyben kész: bizonyossági címkék helyett a kiemelt történeti érték/becslés tényleges mintaszáma, pontos HU/EN/DE középső 50% és becslési sáv magyarázat, puszta darabszámból származó confidence eltávolítva. [S05 checkpoint](WAKE_EVIDENCE_CHECKPOINT_2026-10-02.md): 3 új próba; 458/458 teljes teszt, typecheck, build és HU/EN/DE × 320/393 px UI-próba PASS. S01–S05 helyi kapui kész; M1–M6 kézi kör továbbra is 6/6. A teljes kiadás és a közös telefonos elfogadás nyitott.
+**Legfrissebb megálló:** A27/S06 helyben kész: becsléstípus tanulása a kiválasztott 7/14/30 napba teljesen beleférő korábbi naptári napokból; régi import változatlansága, kezdőhatár töredéknapja kizárva a napi darabszámból, eredeti időtartam-párok megőrizve. [S06 checkpoint](PREDICTION_LOOKBACK_CHECKPOINT_2026-10-02.md): 9 új próba; 467/467 teljes teszt, typecheck, build és HU/EN/DE × 320/393 px UI-próba PASS. S01–S06 helyi kapui kész; M1–M6 kézi kör továbbra is 6/6. A teljes kiadás és a közös telefonos elfogadás nyitott.
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
 **Teljes audit alapja:** `e9374f4` (`Add verified store billing foundation`); az akkori helyi origin-refhez képest 0 ahead / 0 behind.
-**Aktuális HEAD:** `e344b12` — `Align wake-window minimum samples and highlighted evidence`, `feat/child-profile-v4`. S04 commitban. S05 javítás, gépi próbák és dokumentáció helyi módosítások; ebben a körben commit/push/deploy nem történt.
+**Aktuális HEAD:** `4b39202` — `Replace confidence labels with sample counts and explain historical ranges`, `feat/child-profile-v4`. S05 commitban. S06 javítás, gépi próbák és dokumentáció helyi módosítások; ebben a körben commit/push/deploy nem történt.
 
-**Következő feladat — GPT-6 Astra · erős:** A27/S06 — a becsléstípus és a kiválasztott mintavételi időszak egyeztetése, gépi próbákkal. Ehhez most nem kell tulajdonosi kézi teszt. M1–M6 összevont kör lezárva; a fennmaradó kiadási kapuk a RELEASE_CHECKLIST.md-ben követhetők.
+**Következő feladat — GPT-6 Astra · erős:** A27/S07 — elavult ébredés és hiányos aktuális kontextus kezelése a becslésben, gépi próbákkal. Ehhez most nem kell tulajdonosi kézi teszt. M1–M6 összevont kör lezárva; a fennmaradó kiadási kapuk a RELEASE_CHECKLIST.md-ben követhetők.
 
 **2026-09-24-es staging eredmény — [GPT-6 Astra · high] javítás, [GPT-6 Sol · medium] kézi folytatás:** a `Solemi törlési próba` családban a tényleges családi naplótörlés mindkét eszközt 0 alvásra vitte, a kis export visszaimportja mindkettőt 1-re állította. Az üres visszaállítási pont szinkronja először `INVALID_REQUEST` hibával elakadt, mert a szerver az érvényes üres gyermeknevet elutasította. A `fb64e1b` javítás után mindkét eszköz névtelen profilt, 0 alvást és friss szinkront mutat; az elakadt szinkron kétböngészős próbája sikeres. Teljes helyi ellenőrzés: 27 fájl, 296/296 teszt; frontend és Worker typecheck sikeres. Az eredeti Opo családot nem módosítottuk.
 
