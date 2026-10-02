@@ -40,7 +40,7 @@ describe('buildPredictionLite', () => {
     expect(result.windowStart).toBe(Date.parse('2026-08-25T08:30:00.000Z'))
     expect(result.windowEnd).toBe(Date.parse('2026-08-25T09:30:00.000Z'))
     expect(result.windowState).toBe('likely-now')
-    expect(result.confidence).toBe('low')
+    expect(result).not.toHaveProperty('confidence')
   })
 
   it('marks a learned window as passed instead of moving it forward', () => {

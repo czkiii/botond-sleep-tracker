@@ -23,7 +23,7 @@ describe('wake-window minimum evidence', () => {
     expect(wake.sampleCount).toBe(count)
     expect(wake.typicalMs).toBe(count >= 3 ? 2 * HOUR : null)
     expect(wake.typicalRange).toEqual(count >= 3 ? { lowMs: 2 * HOUR, highMs: 2 * HOUR } : null)
-    expect(wake.confidence).toBe(count >= 3 ? 'low' : null)
+    expect(wake).not.toHaveProperty('confidence')
     expect(wake.breakdown.map(item => item.key)).toEqual(count >= 3 ? ['day-2'] : [])
   })
 
@@ -41,7 +41,7 @@ describe('wake-window minimum evidence', () => {
     expect(buildInsightsFoundation(full, now).wakeWindow.typicalMs).toBe(2 * HOUR)
     const last = full[full.length - 1]
     for (const reduced of [full.slice(0, -1), [...full.slice(0, -1), { ...last, endTime: last.startTime }]]) {
-      expect(buildInsightsFoundation(reduced, now).wakeWindow).toMatchObject({ sampleCount: 2, typicalMs: null, typicalRange: null, confidence: null, breakdown: [] })
+      expect(buildInsightsFoundation(reduced, now).wakeWindow).toMatchObject({ sampleCount: 2, typicalMs: null, typicalRange: null, breakdown: [] })
     }
   })
 

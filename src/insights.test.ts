@@ -22,7 +22,7 @@ function session(id: string, start: string, end: string | null): SleepSession {
 describe('buildInsightsFoundation', () => {
   it('returns an unavailable insight without sleep data', () => {
     const result = buildInsightsFoundation([], NOW)
-    expect(result.wakeWindow).toMatchObject({ status: 'unavailable', currentMs: null, typicalMs: null, typicalRange: null, sampleCount: 0, confidence: null, lookbackDays: 14 })
+    expect(result.wakeWindow).toMatchObject({ status: 'unavailable', currentMs: null, typicalMs: null, typicalRange: null, sampleCount: 0, lookbackDays: 14 })
   })
 
   it('keeps collecting until three clean wake windows exist', () => {
@@ -46,7 +46,7 @@ describe('buildInsightsFoundation', () => {
     expect(result.wakeWindow.status).toBe('ready')
     expect(result.wakeWindow.typicalMs).toBe(3 * HOUR)
     expect(result.wakeWindow.sampleCount).toBe(3)
-    expect(result.wakeWindow.confidence).toBe('low')
+    expect(result.wakeWindow).not.toHaveProperty('confidence')
   })
 
   it('averages the two middle values for an even-sized median', () => {

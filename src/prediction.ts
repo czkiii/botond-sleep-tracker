@@ -12,7 +12,6 @@ export type PredictionLite = {
   lookbackDays: 7 | 14 | 30
   bucket: PredictionBucket | null
   sampleCount: number
-  confidence: 'low' | 'medium' | null
   currentWakeMs: number | null
   typicalTime: number | null
   windowStart: number | null
@@ -72,7 +71,7 @@ function nextBucket(sessions: SleepSession[], now: number): PredictionBucket {
 
 export function buildPredictionLite(sessions: SleepSession[], now = Date.now(), lookbackDays: 7 | 14 | 30 = 14): PredictionLite {
   const empty = (status: 'collecting' | 'unavailable', bucket: PredictionBucket | null, sampleCount = 0, currentWakeMs: number | null = null): PredictionLite => ({
-    status, lookbackDays, bucket, sampleCount, confidence: null, currentWakeMs, typicalTime: null, windowStart: null, windowEnd: null, windowState: null, sourceSessionIds: []
+    status, lookbackDays, bucket, sampleCount, currentWakeMs, typicalTime: null, windowStart: null, windowEnd: null, windowState: null, sourceSessionIds: []
   })
   const report = getDataQualityReport(sessions, now)
   const excluded = new Set(report.excludedSessionIds)
@@ -126,7 +125,7 @@ export function buildPredictionLite(sessions: SleepSession[], now = Date.now(), 
   const windowEnd = lastWake + quantile(durations, 0.75)
   const windowState = now < windowStart ? 'upcoming' : now <= windowEnd ? 'likely-now' : 'passed'
   return {
-    status: 'ready', lookbackDays, bucket, sampleCount: samples.length, confidence: samples.length >= 7 ? 'medium' : 'low', currentWakeMs,
+    status: 'ready', lookbackDays, bucket, sampleCount: samples.length, currentWakeMs,
     typicalTime, windowStart, windowEnd, windowState, sourceSessionIds: Array.from(new Set(samples.flatMap((sample) => sample.sessionIds)))
   }
 }

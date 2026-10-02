@@ -6,17 +6,12 @@ const MIN_WAKE_WINDOW_MS = 5 * 60 * 1000
 const MAX_WAKE_WINDOW_MS = 12 * 60 * 60 * 1000
 const MIN_WAKE_WINDOW_SAMPLES = 3
 
-export function wakeWindowConfidence(sampleCount: number): 'low' | 'medium' | null {
-  return sampleCount >= 7 ? 'medium' : sampleCount >= MIN_WAKE_WINDOW_SAMPLES ? 'low' : null
-}
-
 export type WakeWindowInsight = {
   status: 'ready' | 'collecting' | 'unavailable'
   currentMs: number | null
   typicalMs: number | null
   typicalRange: { lowMs: number; highMs: number } | null
   sampleCount: number
-  confidence: 'low' | 'medium' | null
   lookbackDays: 7 | 14 | 30
   sourceSessionIds: string[]
   breakdown: Array<{
@@ -285,7 +280,6 @@ export function buildInsightsFoundation(sessions: SleepSession[], now = Date.now
       typicalMs,
       typicalRange: lowMs !== null && highMs !== null ? { lowMs, highMs } : null,
       sampleCount,
-      confidence: wakeWindowConfidence(sampleCount),
       lookbackDays,
       sourceSessionIds: Array.from(new Set(samples.flatMap((sample) => sample.sessionIds))),
       breakdown
