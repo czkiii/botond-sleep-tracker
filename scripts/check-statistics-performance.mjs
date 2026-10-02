@@ -5,6 +5,7 @@ import { createRequire } from 'node:module'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { createServer } from 'vite'
 import { checkStatisticsFreshness } from './statistics-freshness.mjs'
+import { checkRoutineClock } from './routine-clock-check.mjs'
 
 const require = createRequire(import.meta.url)
 const { chromium } = require(process.env.SOLEMI_PLAYWRIGHT_MODULE || 'playwright')
@@ -86,6 +87,7 @@ try {
     await context.close()
   }
   const freshness = baseline ? 'not run for baseline' : await checkStatisticsFreshness(browser, origin)
+  if (!baseline) await checkRoutineClock(browser, origin)
   await mkdir('.private-backups', { recursive: true })
   if (results.length) await writeFile(`.private-backups/a22-${baseline ? 'baseline' : 'after'}.json`, JSON.stringify({ browser: browser.version(), mode: 'Vite development, real clock, synthetic 4 sleeps/day of 2 hours', results, freshness }, null, 2))
 } finally { await browser?.close(); await server.close() }

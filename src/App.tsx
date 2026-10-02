@@ -11,6 +11,7 @@ import type { AvatarCrop } from './photoStore'
 import { mergeChildDraft, removeChildProfile } from './childProfiles'
 import { familyBootstrapCopy } from './familyBootstrapCopy'
 import { buildInsightsFoundation } from './insights'
+import type { ClockPattern } from './insights'
 import { buildSimilarDaysInsight } from './similarDays'
 import { buildPredictionLite } from './prediction'
 import { buildSleepDaySource, buildSleepDevelopment } from './sleepDevelopment'
@@ -481,11 +482,13 @@ const StatsPage = memo(function StatsPage({ sessions, locale, childName, product
       {insights.quality.excludedSessionCount > 0 && <small className="insights-quality-note">{t(locale, 'insightsExcluded', { count: insights.quality.excludedSessionCount })}</small>}
     </div>
     <div className="insights-card routine-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'routinePatterns')}</h2></div>{routine.status === 'ready' && <b>{t(locale, 'observedDays', { count: routine.observedDayCount })}</b>}</div>
-      {routine.status === 'collecting' && <p className="routine-empty">{t(locale, 'routineCollecting')}</p>}
-      {routine.bedtime && <RoutineRow label={t(locale, 'typicalBedtime')} value={formatClockMinutes(routine.bedtime.typicalMinutes, locale)} detail={t(locale, 'routineConsistency', { consistent: routine.bedtime.consistentCount, count: routine.bedtime.sampleCount })} />}
-      {routine.wakeTime && <RoutineRow label={t(locale, 'typicalWakeTime')} value={formatClockMinutes(routine.wakeTime.typicalMinutes, locale)} detail={t(locale, 'routineConsistency', { consistent: routine.wakeTime.consistentCount, count: routine.wakeTime.sampleCount })} />}
+      {routine.status === 'collecting' && !routine.bedtimeVariable && !routine.wakeTimeVariable && <p className="routine-empty">{t(locale, 'routineCollecting')}</p>}
+      {routine.bedtime && <RoutineRow label={t(locale, 'typicalBedtime')} value={formatClockMinutes(routine.bedtime.typicalMinutes, locale)} detail={clockPatternDetail(routine.bedtime, locale)} />}
+      {routine.wakeTime && <RoutineRow label={t(locale, 'typicalWakeTime')} value={formatClockMinutes(routine.wakeTime.typicalMinutes, locale)} detail={clockPatternDetail(routine.wakeTime, locale)} />}
+      {routine.bedtimeVariable && <RoutineRow variable label={t(locale, 'typicalBedtime')} value={t(locale, 'routineClockVariable')} detail={t(locale, 'routineClockVariableHelp')} />}
+      {routine.wakeTimeVariable && <RoutineRow variable label={t(locale, 'typicalWakeTime')} value={t(locale, 'routineClockVariable')} detail={t(locale, 'routineClockVariableHelp')} />}
       {routine.daytimeSleepCount && <RoutineRow label={t(locale, 'typicalNapCount')} value={formatCount(routine.daytimeSleepCount.typicalCount, locale)} detail={t(locale, 'napCountRange', { low: formatCount(routine.daytimeSleepCount.lowCount, locale), high: formatCount(routine.daytimeSleepCount.highCount, locale) })} />}
-      {routine.status === 'ready' && <small>{t(locale, 'routineOwnData')}</small>}
+      {(routine.status === 'ready' || routine.bedtimeVariable || routine.wakeTimeVariable) && <small>{t(locale, 'routineOwnData')}</small>}
     </div>
     <div className="insights-card development-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'sleepDevelopment')}</h2></div><b>{t(locale, 'familyPlus')}</b></div>
       <div className="insights-range four-options" aria-label={t(locale, 'developmentRange')}>{([3, 6, 12] as const).map((value) => <button key={value} className={developmentRange === value ? 'active' : ''} onClick={() => setDevelopmentRange(value)}>{value} {t(locale, 'monthsShort')}</button>)}<button className={developmentRange === 'custom' ? 'active' : ''} onClick={openDevelopmentPicker}>{t(locale, 'customRange')}</button></div>
@@ -570,8 +573,8 @@ function wakeBucketLabel(locale: Locale, key: 'day-1' | 'day-2' | 'day-3-plus' |
   return t(locale, key === 'day-1' ? 'firstNapWindow' : key === 'day-2' ? 'secondNapWindow' : key === 'day-3-plus' ? 'laterNapWindow' : 'nightSleepWindow')
 }
 
-function RoutineRow({ label, value, detail }: { label: string; value: string; detail: string }) {
-  return <div className="routine-row"><span>{label}</span><strong>{value}</strong><small>{detail}</small></div>
+function RoutineRow({ label, value, detail, variable = false }: { label: string; value: string; detail: string; variable?: boolean }) {
+  return <div className={`routine-row${variable ? ' routine-row-variable' : ''}`}><span>{label}</span><strong>{value}</strong><small>{detail}</small></div>
 }
 
 function DevelopmentPoint({ label, month, locale }: { label: string; month: import('./sleepDevelopment').SleepDevelopmentMonth; locale: Locale }) {
@@ -624,6 +627,12 @@ function monthlyMilestoneLabel(locale: Locale, milestone: MonthlyReportMilestone
 function formatClockMinutes(minutes: number, locale: Locale) {
   const date = new Date(2020, 0, 1, Math.floor(minutes / 60), minutes % 60)
   return new Intl.DateTimeFormat(localeTag(locale), { hour: '2-digit', minute: '2-digit' }).format(date)
+}
+
+function clockPatternDetail(pattern: ClockPattern, locale: Locale) {
+  const range = t(locale, 'routineClockRange', { low: formatClockMinutes(pattern.lowMinutes, locale), high: formatClockMinutes(pattern.highMinutes, locale) })
+  const midnight = pattern.rangeCrossesMidnight ? ` (${t(locale, 'routineAcrossMidnight')})` : ''
+  return `${range}${midnight} · ${t(locale, 'routineConsistency', { consistent: pattern.consistentCount, count: pattern.sampleCount })}`
 }
 
 function formatCount(value: number, locale: Locale) {

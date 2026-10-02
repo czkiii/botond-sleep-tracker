@@ -39,6 +39,8 @@ export type RoutineInsight = {
   observedDayCount: number
   bedtime: ClockPattern | null
   wakeTime: ClockPattern | null
+  bedtimeVariable: boolean
+  wakeTimeVariable: boolean
   daytimeSleepCount: CountPattern | null
 }
 
@@ -46,6 +48,7 @@ export type ClockPattern = {
   typicalMinutes: number
   lowMinutes: number
   highMinutes: number
+  rangeCrossesMidnight: boolean
   sampleCount: number
   consistentCount: number
 }
@@ -86,6 +89,41 @@ function clockMinutes(iso: string) {
 function circularDistance(a: number, b: number) {
   const difference = Math.abs(a - b) % 1440
   return Math.min(difference, 1440 - difference)
+}
+
+// Cut the clock at its largest empty gap, then calculate the median and
+// Q1–Q3 along the occupied arc. A span of half a day or more has no unique
+// short direction. Also require a strict majority within the existing
+// ±30-minute consistency band: separated modes must not invent a midpoint.
+export function buildClockPattern(values: number[]): ClockPattern | null {
+  if (values.length < 3 || values.some(value => !Number.isFinite(value))) return null
+  const normalize = (value: number) => ((value % 1440) + 1440) % 1440
+  const sorted = values.map(normalize).sort((a, b) => a - b)
+  let largestGap = -1
+  let startIndex = 0
+  sorted.forEach((value, index) => {
+    const next = index + 1 < sorted.length ? sorted[index + 1] : sorted[0] + 1440
+    if (next - value > largestGap) {
+      largestGap = next - value
+      startIndex = (index + 1) % sorted.length
+    }
+  })
+  if (1440 - largestGap >= 720) return null
+  const origin = sorted[startIndex]
+  const unwrapped = sorted.map(value => value < origin ? value + 1440 : value)
+  const middle = median(unwrapped)!
+  const consistentCount = sorted.filter(value => circularDistance(value, normalize(middle)) <= 30).length
+  if (consistentCount <= values.length / 2) return null
+  const lowMinutes = normalize(Math.round(quantile(unwrapped, 0.25)!))
+  const highMinutes = normalize(Math.round(quantile(unwrapped, 0.75)!))
+  return {
+    typicalMinutes: normalize(Math.round(middle)),
+    lowMinutes,
+    highMinutes,
+    rangeCrossesMidnight: lowMinutes > highMinutes,
+    sampleCount: values.length,
+    consistentCount,
+  }
 }
 
 // The existing bedtime clock uses noon as its wrap point. Use that same
@@ -202,10 +240,7 @@ export function buildInsightsFoundation(sessions: SleepSession[], now = Date.now
     }
   })
 
-  const bedtimeValues = routineNights.map((night) => {
-    const minutes = clockMinutes(night.first.startTime)
-    return minutes < 12 * 60 ? minutes + 1440 : minutes
-  })
+  const bedtimeValues = routineNights.map((night) => clockMinutes(night.first.startTime))
   const wakeValues = routineNights.map((night) => clockMinutes(night.last.endTime!))
   const observedDays = new Set<string>([
     ...routineNights.map((night) => localDateKey(night.last.endTime!)),
@@ -213,20 +248,6 @@ export function buildInsightsFoundation(sessions: SleepSession[], now = Date.now
   ])
   const napCountValues = Array.from(observedDays).map((key) => daytimeByDay.get(key)?.length ?? 0)
 
-  const clockPattern = (values: number[]): ClockPattern | null => {
-    const middle = median(values)
-    const low = quantile(values, 0.25)
-    const high = quantile(values, 0.75)
-    if (values.length < 3 || middle === null || low === null || high === null) return null
-    const typicalMinutes = Math.round(middle) % 1440
-    return {
-      typicalMinutes,
-      lowMinutes: Math.round(low) % 1440,
-      highMinutes: Math.round(high) % 1440,
-      sampleCount: values.length,
-      consistentCount: values.filter((value) => circularDistance(value % 1440, typicalMinutes) <= 30).length
-    }
-  }
   const countMiddle = median(napCountValues)
   const countLow = quantile(napCountValues, 0.25)
   const countHigh = quantile(napCountValues, 0.75)
@@ -236,14 +257,16 @@ export function buildInsightsFoundation(sessions: SleepSession[], now = Date.now
     highCount: countHigh,
     sampleCount: napCountValues.length
   } : null
-  const bedtime = clockPattern(bedtimeValues)
-  const wakeTime = clockPattern(wakeValues)
+  const bedtime = buildClockPattern(bedtimeValues)
+  const wakeTime = buildClockPattern(wakeValues)
   const routine: RoutineInsight = {
     status: bedtime || wakeTime || daytimeSleepCount ? 'ready' : 'collecting',
     lookbackDays,
     observedDayCount: observedDays.size,
     bedtime,
     wakeTime,
+    bedtimeVariable: bedtimeValues.length >= 3 && bedtime === null,
+    wakeTimeVariable: wakeValues.length >= 3 && wakeTime === null,
     daytimeSleepCount
   }
 
