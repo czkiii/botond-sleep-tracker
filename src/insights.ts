@@ -4,6 +4,11 @@ import { EXTREME_SLEEP_DURATION_MS, durationOf, getDataQualityReport, splitDayNi
 const DAY_MS = 24 * 60 * 60 * 1000
 const MIN_WAKE_WINDOW_MS = 5 * 60 * 1000
 const MAX_WAKE_WINDOW_MS = 12 * 60 * 60 * 1000
+const MIN_WAKE_WINDOW_SAMPLES = 3
+
+export function wakeWindowConfidence(sampleCount: number): 'low' | 'medium' | null {
+  return sampleCount >= 7 ? 'medium' : sampleCount >= MIN_WAKE_WINDOW_SAMPLES ? 'low' : null
+}
 
 export type WakeWindowInsight = {
   status: 'ready' | 'collecting' | 'unavailable'
@@ -215,17 +220,20 @@ export function buildInsightsFoundation(sessions: SleepSession[], now = Date.now
   const active = sessions.find((session) => !session.endTime)
   const currentMs = !active && lastCompleted && !excludedIds.has(lastCompleted.id) ? Math.max(0, now - Date.parse(lastCompleted.endTime!)) : null
   const windows = samples.map((sample) => sample.durationMs)
-  const typicalMs = median(windows)
-  const lowMs = quantile(windows, 0.25)
-  const highMs = quantile(windows, 0.75)
   const sampleCount = windows.length
-  const status = currentMs === null ? 'unavailable' : sampleCount >= 3 ? 'ready' : 'collecting'
+  // Historical evidence has its own minimum, independent of whether the
+  // child is currently asleep. Consumers must not promote partial samples.
+  const hasPattern = sampleCount >= MIN_WAKE_WINDOW_SAMPLES
+  const typicalMs = hasPattern ? median(windows) : null
+  const lowMs = hasPattern ? quantile(windows, 0.25) : null
+  const highMs = hasPattern ? quantile(windows, 0.75) : null
+  const status = currentMs === null ? 'unavailable' : hasPattern ? 'ready' : 'collecting'
   const breakdown = (['day-1', 'day-2', 'day-3-plus', 'night'] as const).flatMap((key) => {
     const values = samples.filter((sample) => sample.bucket === key).map((sample) => sample.durationMs)
     const middle = median(values)
     const low = quantile(values, 0.25)
     const high = quantile(values, 0.75)
-    return values.length >= 3 && middle !== null && low !== null && high !== null ? [{ key, typicalMs: middle, lowMs: low, highMs: high, sampleCount: values.length }] : []
+    return values.length >= MIN_WAKE_WINDOW_SAMPLES && middle !== null && low !== null && high !== null ? [{ key, typicalMs: middle, lowMs: low, highMs: high, sampleCount: values.length }] : []
   })
 
   const routineCutoff = now - lookbackDays * DAY_MS
@@ -277,7 +285,7 @@ export function buildInsightsFoundation(sessions: SleepSession[], now = Date.now
       typicalMs,
       typicalRange: lowMs !== null && highMs !== null ? { lowMs, highMs } : null,
       sampleCount,
-      confidence: sampleCount >= 7 ? 'medium' : sampleCount >= 3 ? 'low' : null,
+      confidence: wakeWindowConfidence(sampleCount),
       lookbackDays,
       sourceSessionIds: Array.from(new Set(samples.flatMap((sample) => sample.sessionIds))),
       breakdown

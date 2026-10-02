@@ -31,7 +31,8 @@ describe('buildInsightsFoundation', () => {
       session('b', '2026-08-24T11:00:00.000Z', '2026-08-24T12:00:00.000Z')
     ], NOW)
     expect(result.wakeWindow.status).toBe('collecting')
-    expect(result.wakeWindow.typicalMs).toBe(2 * HOUR)
+    expect(result.wakeWindow.typicalMs).toBeNull()
+    expect(result.wakeWindow.typicalRange).toBeNull()
     expect(result.wakeWindow.sampleCount).toBe(1)
   })
 

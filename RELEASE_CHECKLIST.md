@@ -58,12 +58,12 @@ kockázattól. A történeti pipák nem jelentik az auditpontok lezárását.
 Részletes bemenet, jelenlegi eredmény és elfogadási feltétel:
 [FAMILY_PLUS_STATISTICS_AUDIT_2026-09-20.md](FAMILY_PLUS_STATISTICS_AUDIT_2026-09-20.md).
 Vizsgált HEAD `3a0a687`, az alkalmazás forrása változatlan. A 72 sikeres helyi
-próba az audit bizonyítéka, nem a hibák lezárása. Azóta az S01–S03 helyi számítási javítása lezárult; az aktuális bizonyítékot az alábbi sor rögzíti. A teljes A27 elfogadás továbbra is nyitott.
+próba az audit bizonyítéka, nem a hibák lezárása. Azóta az S01–S04 helyi számítási javítása lezárult; az aktuális bizonyítékot az alábbi sorok rögzítik. A teljes A27 elfogadás továbbra is nyitott.
 
 - [x] **[GPT-6 Astra · erős]** S01 — Közös, másodperc-/ezredmásodpercpontos nappal/éjjel bontás helyben javítva (2026-10-01). 23 új regresszió, több időzónás DST, közös napló minden elemzőn; 405/405 teszt, typecheck, build és böngészőpróba PASS. Az A27 közös telefonos elfogadását nem helyettesíti. [S01 checkpoint](DAY_NIGHT_BOUNDARIES_CHECKPOINT_2026-10-01.md).
 - [x] **[GPT-6 Astra · erős]** S02 — Megszakított éjszaka rutinja helyben javítva (2026-10-02): egy minta helyi déltől délig, első éjszakai elalvás/utolsó rögzített ébredés, aktív vagy hibás csoport kizárva. Ébrenléti szünet nem alvásidő. 18 új próba, 423/423 teljes teszt, typecheck, build és déli automatikus frissülést igazoló Edge-próba PASS. A27 közös telefonos elfogadása nyitott. [S02 checkpoint](NIGHT_ROUTINE_CHECKPOINT_2026-10-02.md).
 - [x] **[GPT-6 Astra · erős]** S03 — Körkörös rutin-óraidők helyben javítva (2026-10-02): 23:55/00:05 mediánja 00:00, középső 50% tartománya éjfélen át; szórt és két távoli csoportos mintánál konzervatív visszajelzés. 24 új próba, 447/447 teljes teszt, typecheck, build és HU/EN/DE × 320/393 px böngészőpróba PASS. A27 közös telefonos elfogadása nyitott. [S03 checkpoint](CIRCULAR_CLOCK_CHECKPOINT_2026-10-02.md).
-- [ ] **[GPT-6 Sol · high]** S04 — Minimum mintaszám és kiemelt tipikus érték egyezése.
+- [x] **[GPT-6 Astra · erős]** S04 — Minimum mintaszám és kiemelt tipikus érték egyezése helyben javítva (2026-10-02). 0–2 mintánál gyűjtési állapot, háromtól tipikus érték; kiemelt alcsoporthoz tartozó mintaszám és magyarázat, aktív alvástól független történeti minta. 8 új próba; 455/455 teljes teszt, typecheck, build és HU/EN/DE × 320/393 px böngészőpróba PASS. A27 közös telefonos elfogadása nyitott. [S04 checkpoint](WAKE_WINDOW_SAMPLES_CHECKPOINT_2026-10-02.md).
 - [ ] **[GPT-6 Sol · medium]** S05 — Adatokhoz igazodó bizonyossági címke és pontos Q1–Q3 magyarázat.
 - [ ] **[GPT-6 Sol · medium]** S06 — Becsléstípus és kiválasztott mintavételi időszak egyezése.
 - [ ] **[GPT-6 Sol · high]** S07 — Elavult ébredés/hiányos aktuális kontextus becslésének kezelése.
