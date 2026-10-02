@@ -104,6 +104,25 @@ export async function checkStatisticsFreshness(browser, origin) {
     await page.locator('.internal-plan-options').getByRole('button', { name: 'Family+', exact: true }).click()
     assert.ok((await calls()).buildInsightsFoundation > locked.buildInsightsFoundation, 'Unlock builds fresh insights')
 
+    // A partial night must not appear as a finished routine. At local noon
+    // the ordinary statistics clock admits one sample for the whole night.
+    await page.clock.setSystemTime(new Date('2026-09-30T09:59:59Z'))
+    await page.evaluate(() => {
+      const data = JSON.parse(localStorage.getItem('solemiSleep:v4'))
+      const iso = (day, hour, minute = 0) => new Date(2026, 8, day, hour, minute).toISOString()
+      data.sessions = [28, 29, 30].flatMap(day => [[iso(day - 1, 20), iso(day, 1)], [iso(day, 1, 30), iso(day, 6)]].map(([startTime, endTime], i) => ({
+        id: `night-${day}-${i}`, childId: 'a', startTime, endTime, note: '', dayNightOverride: null, createdAt: startTime, updatedAt: endTime,
+      })))
+      localStorage.setItem('solemiSleep:v4', JSON.stringify(data))
+      window.dispatchEvent(new Event('solemi-remote-data-applied'))
+      window.dispatchEvent(new Event('focus'))
+    })
+    const morningRow = page.locator('.routine-row').filter({ hasText: 'Typical morning wake-up' })
+    assert.equal(await morningRow.count(), 0, 'Two closed nights are not three samples')
+    await page.clock.runFor(1000)
+    assert.match(await morningRow.innerText(), /06:00/, 'Resettling must end at 06:00, not 01:00')
+    assert.match(await morningRow.innerText(), /3\/3/, 'Three nights, not four start dates')
+
     // Unmounting removes the analysis timer and listeners.
     await page.locator('.bottom-nav button').first().click()
     before = await calls()
@@ -112,7 +131,7 @@ export async function checkStatisticsFreshness(browser, origin) {
     assert.deepEqual(await calls(), before, 'Unmount cleanup')
     assert.deepEqual(errors, [])
     assert.deepEqual(unexpected, [])
-    console.log('PASS: stopwatch, stable seconds, minute boundary, range selection, immediate data/deletion/child refresh, hidden/resume, focus/midnight, entitlement switch, unmount cleanup')
+    console.log('PASS: stopwatch, stable seconds, minute boundary, range selection, immediate data/deletion/child refresh, hidden/resume, focus/midnight, entitlement switch, fragmented-night/noon routine, unmount cleanup')
     return 'PASS'
   } finally { await context.close() }
 }

@@ -1,8 +1,8 @@
 # Solemi Sleep — belső verziótól a kiadásig
 
-Utolsó frissítés: 2026-09-30
+Utolsó frissítés: 2026-10-02
 
-**Kézi elfogadás aktuális sorrendje:** [összevont tesztmenet](MANUAL_ACCEPTANCE_2026-09-26.md). Egy kis tesztcsalád, három blokk, hat célzott ellenőrzés; a már igazolt próbák újrafelhasználásával. A régi checkpointok eltérő folytatási utasításai történetiek. A menetrend önmagában nem zár le auditpontot. Az `a83b39a` Worker/Pages-verzió igazolt; az új viselkedések elfogadása még folyamatban.
+**Kézi elfogadás aktuális sorrendje:** [összevont tesztmenet](MANUAL_ACCEPTANCE_2026-09-26.md). Egy kis tesztcsalád, három blokk, hat célzott ellenőrzés; a már igazolt próbák újrafelhasználásával. A régi checkpointok eltérő folytatási utasításai történetiek. A menetrend önmagában nem zár le auditpontot. Az M1–M6 összevont kör 2026-10-01-én 6/6 lezárult; a pontos bizonyítékok és buildenkénti határok a tesztnaplóban szerepelnek. A többi kiadási kapu ettől még nyitott.
 
 Ez az operatív lista a `SOLEMI_EXECUTION_PLAN.md` és a `SOLEMI_MASTER_ROADMAP.md` kiadási pontjait rendezi végrehajtási sorrendbe.
 
@@ -58,10 +58,10 @@ kockázattól. A történeti pipák nem jelentik az auditpontok lezárását.
 Részletes bemenet, jelenlegi eredmény és elfogadási feltétel:
 [FAMILY_PLUS_STATISTICS_AUDIT_2026-09-20.md](FAMILY_PLUS_STATISTICS_AUDIT_2026-09-20.md).
 Vizsgált HEAD `3a0a687`, az alkalmazás forrása változatlan. A 72 sikeres helyi
-próba az audit bizonyítéka, nem a hibák lezárása. Azóta az S01 helyi számítási javítása lezárult; az aktuális bizonyítékot az alábbi sor rögzíti. A teljes A27 elfogadás továbbra is nyitott.
+próba az audit bizonyítéka, nem a hibák lezárása. Azóta az S01 és S02 helyi számítási javítása lezárult; az aktuális bizonyítékot az alábbi sor rögzíti. A teljes A27 elfogadás továbbra is nyitott.
 
 - [x] **[GPT-6 Astra · erős]** S01 — Közös, másodperc-/ezredmásodpercpontos nappal/éjjel bontás helyben javítva (2026-10-01). 23 új regresszió, több időzónás DST, közös napló minden elemzőn; 405/405 teszt, typecheck, build és böngészőpróba PASS. Az A27 közös telefonos elfogadását nem helyettesíti. [S01 checkpoint](DAY_NIGHT_BOUNDARIES_CHECKPOINT_2026-10-01.md).
-- [ ] **[GPT-6 Astra · high]** S02 — Megszakított éjszaka és valódi reggeli ébredés megkülönböztetése.
+- [x] **[GPT-6 Astra · erős]** S02 — Megszakított éjszaka rutinja helyben javítva (2026-10-02): egy minta helyi déltől délig, első éjszakai elalvás/utolsó rögzített ébredés, aktív vagy hibás csoport kizárva. Ébrenléti szünet nem alvásidő. 18 új próba, 423/423 teljes teszt, typecheck, build és déli automatikus frissülést igazoló Edge-próba PASS. A27 közös telefonos elfogadása nyitott. [S02 checkpoint](NIGHT_ROUTINE_CHECKPOINT_2026-10-02.md).
 - [ ] **[GPT-6 Astra · high]** S03 — Éjfél körüli óraidők körkörös statisztikája.
 - [ ] **[GPT-6 Sol · high]** S04 — Minimum mintaszám és kiemelt tipikus érték egyezése.
 - [ ] **[GPT-6 Sol · medium]** S05 — Adatokhoz igazodó bizonyossági címke és pontos Q1–Q3 magyarázat.

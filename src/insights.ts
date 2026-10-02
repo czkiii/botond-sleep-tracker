@@ -88,6 +88,55 @@ function circularDistance(a: number, b: number) {
   return Math.min(difference, 1440 - difference)
 }
 
+// The existing bedtime clock uses noon as its wrap point. Use that same
+// calendar boundary for night samples, so post-midnight resettling belongs
+// to the previous evening, including on 23/25-hour DST days.
+function routineNightBounds(iso: string) {
+  const start = new Date(iso)
+  if (!Number.isFinite(start.getTime())) return null
+  if (start.getHours() < 12) start.setDate(start.getDate() - 1)
+  start.setHours(12, 0, 0, 0)
+  const end = new Date(start)
+  end.setDate(end.getDate() + 1)
+  return { key: start.getTime(), end: end.getTime() }
+}
+
+function completedRoutineNights(sessions: SleepSession[], excludedIds: Set<string>, now: number, cutoff: number) {
+  const nights = new Map<number, { first: SleepSession; last: SleepSession; closesAt: number }>()
+  const incomplete = new Set<number>()
+  for (const session of sessions) {
+    const bounds = routineNightBounds(session.startTime)
+    if (!bounds) continue
+    // A rejected or unfinished fragment must not leave an earlier fragment
+    // masquerading as the final waking. Keep the entire sample out.
+    if (!session.endTime || excludedIds.has(session.id)) {
+      incomplete.add(bounds.key)
+      if (session.endTime) {
+        const endBounds = routineNightBounds(session.endTime)
+        if (endBounds) incomplete.add(endBounds.key)
+      }
+      continue
+    }
+    const parts = splitDayNight(session, now)
+    if (parts.night <= parts.day) continue
+    if (Date.parse(session.endTime) > bounds.end) {
+      incomplete.add(bounds.key)
+      continue
+    }
+    const existing = nights.get(bounds.key)
+    if (!existing) nights.set(bounds.key, { first: session, last: session, closesAt: bounds.end })
+    else {
+      if (Date.parse(session.startTime) < Date.parse(existing.first.startTime)) existing.first = session
+      if (Date.parse(session.endTime) > Date.parse(existing.last.endTime!)) existing.last = session
+    }
+  }
+  // Wait until the noon boundary: before then a recorded waking can still
+  // be a pause in the current night. Filter whole groups, not fragments.
+  return Array.from(nights.entries())
+    .filter(([key, night]) => !incomplete.has(key) && night.closesAt <= now && Date.parse(night.last.endTime!) >= cutoff)
+    .map(([, night]) => night)
+}
+
 export function buildInsightsFoundation(sessions: SleepSession[], now = Date.now(), options: { lookbackDays?: 7 | 14 | 30 } = {}): InsightsFoundation {
   const lookbackDays = options.lookbackDays ?? 14
   const report = getDataQualityReport(sessions, now)
@@ -143,27 +192,23 @@ export function buildInsightsFoundation(sessions: SleepSession[], now = Date.now
 
   const routineCutoff = now - lookbackDays * DAY_MS
   const recentCompleted = completed.filter((session) => Date.parse(session.endTime!) >= routineCutoff)
-  const nighttimeByStartDay = new Map<string, SleepSession>()
+  const routineNights = completedRoutineNights(sessions, excludedIds, now, routineCutoff)
   const daytimeByDay = new Map<string, SleepSession[]>()
   recentCompleted.forEach((session) => {
     const parts = splitDayNight(session, now)
-    if (parts.night > parts.day) {
-      const key = localDateKey(session.startTime)
-      const existing = nighttimeByStartDay.get(key)
-      if (!existing || durationOf(session, now) > durationOf(existing, now)) nighttimeByStartDay.set(key, session)
-    } else {
+    if (parts.night <= parts.day) {
       const key = localDateKey(session.startTime)
       daytimeByDay.set(key, [...(daytimeByDay.get(key) ?? []), session])
     }
   })
 
-  const bedtimeValues = Array.from(nighttimeByStartDay.values()).map((session) => {
-    const minutes = clockMinutes(session.startTime)
+  const bedtimeValues = routineNights.map((night) => {
+    const minutes = clockMinutes(night.first.startTime)
     return minutes < 12 * 60 ? minutes + 1440 : minutes
   })
-  const wakeValues = Array.from(nighttimeByStartDay.values()).map((session) => clockMinutes(session.endTime!))
+  const wakeValues = routineNights.map((night) => clockMinutes(night.last.endTime!))
   const observedDays = new Set<string>([
-    ...Array.from(nighttimeByStartDay.values()).map((session) => localDateKey(session.endTime!)),
+    ...routineNights.map((night) => localDateKey(night.last.endTime!)),
     ...Array.from(daytimeByDay.keys())
   ])
   const napCountValues = Array.from(observedDays).map((key) => daytimeByDay.get(key)?.length ?? 0)
