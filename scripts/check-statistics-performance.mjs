@@ -14,9 +14,11 @@ import { checkMonthlyPeriods } from './monthly-period-check.mjs'
 import { checkSleepOverlap } from './sleep-overlap-check.mjs'
 import { checkStatisticsTimeZone } from './statistics-timezone-check.mjs'
 import { checkNightResettling } from './night-resettling-check.mjs'
+import { checkStatisticsAcceptance } from './statistics-acceptance-check.mjs'
 
 const require = createRequire(import.meta.url)
 const { chromium } = require(process.env.SOLEMI_PLAYWRIGHT_MODULE || 'playwright')
+const acceptanceOnly = process.argv.includes('--acceptance-only')
 const baseline = process.argv.includes('--baseline')
 const wakeSamplesOnly = process.argv.includes('--wake-samples-only')
 const longestBlockOnly = process.argv.includes('--longest-block-only')
@@ -56,7 +58,7 @@ try {
   browser = await chromium.launch({ headless: true,
     ...(process.env.SOLEMI_BROWSER_CHANNEL ? { channel: process.env.SOLEMI_BROWSER_CHANNEL } : {}) })
   const results = []
-  for (const count of process.argv.includes('--freshness-only') || wakeSamplesOnly || longestBlockOnly || coverageOnly || monthlyPeriodOnly || overlapOnly || timezoneOnly || nightResettlingOnly ? [] : [1800, 5000]) for (const plan of ['free', 'familyPlus']) {
+  for (const count of acceptanceOnly || process.argv.includes('--freshness-only') || wakeSamplesOnly || longestBlockOnly || coverageOnly || monthlyPeriodOnly || overlapOnly || timezoneOnly || nightResettlingOnly ? [] : [1800, 5000]) for (const plan of ['free', 'familyPlus']) {
     const context = await browser.newContext({ viewport: { width: 393, height: 852 }, timezoneId: 'Europe/Budapest', serviceWorkers: 'block' })
     const at = Date.UTC(2026, 8, 30, 10, 0, 10)
     const sessions = Array.from({ length: count }, (_, i) => {
@@ -102,16 +104,17 @@ try {
     console.log(JSON.stringify(results.at(-1)))
     await context.close()
   }
-  const freshness = performanceOnly || baseline || wakeSamplesOnly || longestBlockOnly || coverageOnly || monthlyPeriodOnly || overlapOnly || timezoneOnly || nightResettlingOnly ? 'not run in this mode' : await checkStatisticsFreshness(browser, origin)
-  if (!baseline && !nightResettlingOnly && !timezoneOnly && !overlapOnly && !performanceOnly && !monthlyPeriodOnly && !wakeSamplesOnly && !longestBlockOnly && !coverageOnly) await checkRoutineClock(browser, origin)
-  if (!baseline && !nightResettlingOnly && !timezoneOnly && !overlapOnly && !performanceOnly && !monthlyPeriodOnly && !longestBlockOnly && !coverageOnly) await checkWakeWindowSamples(browser, origin)
-  if (!baseline && !nightResettlingOnly && !timezoneOnly && !overlapOnly && !performanceOnly && !monthlyPeriodOnly && !longestBlockOnly && !coverageOnly) await checkPredictionContext(browser, origin)
-  if (!baseline && !nightResettlingOnly && !timezoneOnly && !overlapOnly && !performanceOnly && !monthlyPeriodOnly && !wakeSamplesOnly && !coverageOnly) await checkLongestBlock(browser, origin)
-  if (!baseline && !nightResettlingOnly && !timezoneOnly && !overlapOnly && !performanceOnly && !monthlyPeriodOnly && !wakeSamplesOnly && !longestBlockOnly) await checkLogCoverage(browser, origin)
-  if (!baseline && !nightResettlingOnly && !timezoneOnly && !overlapOnly && !performanceOnly && !wakeSamplesOnly && !longestBlockOnly && !coverageOnly) await checkMonthlyPeriods(browser, origin)
-  if (!baseline && !nightResettlingOnly && !timezoneOnly && !performanceOnly && !monthlyPeriodOnly && !wakeSamplesOnly && !longestBlockOnly && !coverageOnly) await checkSleepOverlap(browser, origin)
-  if (!baseline && !nightResettlingOnly && !performanceOnly && !overlapOnly && !monthlyPeriodOnly && !wakeSamplesOnly && !longestBlockOnly && !coverageOnly) await checkStatisticsTimeZone(browser, origin)
-  if (!baseline && !performanceOnly && !timezoneOnly && !overlapOnly && !monthlyPeriodOnly && !wakeSamplesOnly && !longestBlockOnly && !coverageOnly) await checkNightResettling(browser, origin)
+  const freshness = acceptanceOnly || performanceOnly || baseline || wakeSamplesOnly || longestBlockOnly || coverageOnly || monthlyPeriodOnly || overlapOnly || timezoneOnly || nightResettlingOnly ? 'not run in this mode' : await checkStatisticsFreshness(browser, origin)
+  if (!acceptanceOnly && !baseline && !nightResettlingOnly && !timezoneOnly && !overlapOnly && !performanceOnly && !monthlyPeriodOnly && !wakeSamplesOnly && !longestBlockOnly && !coverageOnly) await checkRoutineClock(browser, origin)
+  if (!acceptanceOnly && !baseline && !nightResettlingOnly && !timezoneOnly && !overlapOnly && !performanceOnly && !monthlyPeriodOnly && !longestBlockOnly && !coverageOnly) await checkWakeWindowSamples(browser, origin)
+  if (!acceptanceOnly && !baseline && !nightResettlingOnly && !timezoneOnly && !overlapOnly && !performanceOnly && !monthlyPeriodOnly && !longestBlockOnly && !coverageOnly) await checkPredictionContext(browser, origin)
+  if (!acceptanceOnly && !baseline && !nightResettlingOnly && !timezoneOnly && !overlapOnly && !performanceOnly && !monthlyPeriodOnly && !wakeSamplesOnly && !coverageOnly) await checkLongestBlock(browser, origin)
+  if (!acceptanceOnly && !baseline && !nightResettlingOnly && !timezoneOnly && !overlapOnly && !performanceOnly && !monthlyPeriodOnly && !wakeSamplesOnly && !longestBlockOnly) await checkLogCoverage(browser, origin)
+  if (!acceptanceOnly && !baseline && !nightResettlingOnly && !timezoneOnly && !overlapOnly && !performanceOnly && !wakeSamplesOnly && !longestBlockOnly && !coverageOnly) await checkMonthlyPeriods(browser, origin)
+  if (!acceptanceOnly && !baseline && !nightResettlingOnly && !timezoneOnly && !performanceOnly && !monthlyPeriodOnly && !wakeSamplesOnly && !longestBlockOnly && !coverageOnly) await checkSleepOverlap(browser, origin)
+  if (!acceptanceOnly && !baseline && !nightResettlingOnly && !performanceOnly && !overlapOnly && !monthlyPeriodOnly && !wakeSamplesOnly && !longestBlockOnly && !coverageOnly) await checkStatisticsTimeZone(browser, origin)
+  if (!acceptanceOnly && !baseline && !performanceOnly && !timezoneOnly && !overlapOnly && !monthlyPeriodOnly && !wakeSamplesOnly && !longestBlockOnly && !coverageOnly) await checkNightResettling(browser, origin)
+  if (acceptanceOnly || (!baseline && !performanceOnly && !wakeSamplesOnly && !longestBlockOnly && !coverageOnly && !monthlyPeriodOnly && !overlapOnly && !timezoneOnly && !nightResettlingOnly)) await checkStatisticsAcceptance(browser, origin)
   await mkdir('.private-backups', { recursive: true })
   if (results.length) await writeFile(`.private-backups/a22-${baseline ? 'baseline' : 'after'}.json`, JSON.stringify({ browser: browser.version(), mode: 'Vite development, real clock, synthetic 4 sleeps/day of 2 hours', results, freshness }, null, 2))
 } finally { await browser?.close(); await server.close() }

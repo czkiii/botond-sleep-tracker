@@ -46,7 +46,7 @@ vagy kifejezett, indokolt termékdöntés kell; a puszta priorizálás nem lezá
 - [ ] **[GPT-6 Astra · high]** A24 — Lockfile, CI-hez kötött release, pontos SHA és PWA upgrade. A frontend és a Worker lockfile-ja elkészült; a CI, a belső preview és a Pages build rögzített `npm ci` telepítésre váltott. Mindkét lockfile külön, tiszta könyvtárban sikeres `npm ci --dry-run` ellenőrzést kapott. A Pages deploy workflow már csak kézzel, `main` ágon indul, és a saját commitján typechecket, tesztet és production buildet futtat. A jelenlegi A07 konfigurációs kapu még blokkolja az éles buildet. Az internal artifact build fiókos staging kapcsolói és ikonlinkjei helyben ellenőrizve. A Worker commitazonosítója a staging csomag része; a smoke a várt GitHub SHA-ra vár és minden válasznál ellenőrzi. Régi, hiányzó vagy közben változó verzió nem adhat sikeres eredményt. A 242770e staging Worker pontos SHA-ja és az arra futtatott helyi smoke sikeres. A PWA már megvárja az appablakok bezárását; offline fiókindítási hiba nem vált vendégnaplóra. 30 fájl / 338 teszt, mindkét typecheck, internal build és két útvonalas Edge upgrade/kompatibilis rollback próba sikeres. Aktív alvás és függő sor megmaradt. A történeti kiadásokkal végzett és telepített telefonos PWA-próba, a GitHub saját futásának igazolása és a külső kötelező merge-check még nyitott. Részletek: [PWA checkpoint](PWA_UPDATE_CHECKPOINT_2026-09-26.md).
 - [ ] **[GPT-6 Astra · high]** A25 — Teljes sémaleltár, migrációs terv, staging restore és rollback főpróba. A Wrangler-belépés 2026-09-23-án megújult. A staging D1 teljes SQL-exportja a Gitből kizárt helyi mappában megvan; memóriabeli SQLite-visszatöltés, integritás- és idegenkulcs-ellenőrzés sikeres ([checkpoint](STAGING_D1_RECOVERY_2026-09-23.md)). Távoli D1 restore/rollback főpróba még hiányzik; a Time Travel az összes staging családot érintené.
 - [ ] **[GPT-6 Sol · medium]** A26 — Support/monitoring, staging adatkezelés és két store beadási bizonyíték.
-- [ ] **[GPT-6 Astra · high]** A27 — Family+ számítási audit S01–S15 lezárása az alábbi bontásban.
+- [ ] **[GPT-6 Astra · high]** A27 — S01–S15 helyi javításai és az összevont gépi előkészítés kész: 569/569 teszt, teljes statisztikai böngészőcsomag PASS. Közös 162 alvásos napló és háromblokkos telefonos terv elkészült. A célzott valódi telefonos elfogadás még nyitott; [közös elfogadás](A27_COMMON_ACCEPTANCE_2026-10-03.md), [gépi checkpoint](A27_ACCEPTANCE_PREPARATION_CHECKPOINT_2026-10-03.md).
 
 **Jelenlegi döntés: nyilvános fizetős kiadás még nem engedhető tovább.**
 Az audit 185 meglévő tesztje és buildjei sikeresek, de a fenti feladatok nyitottak.
@@ -76,9 +76,10 @@ próba az audit bizonyítéka, nem a hibák lezárása. Azóta az S01–S15 hely
 - [x] **[GPT-6 Astra · erős]** S14 — Megjelenítői időzóna dokumentálva és HU/EN/DE jelzéssel; utazás után focus/visibility/percforduló újraszámol, naptári dátumok és gördülő 24 órás ablakok megkülönböztetve (2026-10-03). 14 új próba, UTC/Budapest/Tokió, két régió DST-je, év/hónaphatár és dátumvonal; 547/547 teljes teszt, typecheck, build, 6/6 böngészőpróba és 4/4 teljesítménykontroll PASS. A27 közös telefonos elfogadása nyitott. [S14 checkpoint](STATISTICS_TIMEZONE_CHECKPOINT_2026-10-03.md).
 - [x] **[GPT-6 Astra · erős]** S15 — Esti első elalvás és éjszakai visszaalvás külön mintacsoportja, közös déltől délig csoportosítással (2026-10-03). Visszaalvás kizárva az általános tipikus értékből; kevés éjszakai mintánál nincs idegen helyettesítés. 14 új próba; 561/561 teljes teszt, typecheck, build, 6/6 HU/EN/DE böngészőpróba, korábbi becslési regresszió és 4/4 teljesítménykontroll PASS. A27 közös elfogadása nyitott. [S15 checkpoint](NIGHT_RESETTLING_CHECKPOINT_2026-10-03.md).
 
-Javítás után közös tesztnapló minden kártyán, HU/EN/DE szövegek és célzott
-kéttelefonos elfogadás szükséges. Nincs automatikus kiadás utáni halasztás;
-az A03 staging elfogadása elkészült, az A04–A06 elfogadása folytatódik.
+A közös tesztnapló hét kártyás HU/EN/DE gépi ellenőrzése elkészült (2026-10-03).
+A célzott kéttelefonos elfogadás még szükséges; az előkészített három blokk az
+[A27 közös elfogadás](A27_COMMON_ACCEPTANCE_2026-10-03.md) dokumentumban található.
+M1–M6 már 6/6 lezárt, nem ismétlendő. Nincs automatikus kiadás utáni halasztás.
 
 ## Célállapotok
 
