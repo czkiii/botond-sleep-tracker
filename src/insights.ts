@@ -249,7 +249,12 @@ export function buildInsightsFoundation(sessions: SleepSession[], now = Date.now
     ...routineNights.map((night) => localDateKey(night.last.endTime!)),
     ...Array.from(daytimeByDay.keys())
   ])
-  const napCountValues = Array.from(observedDays).map((key) => daytimeByDay.get(key)?.length ?? 0)
+  // Missing daytime entries cannot establish a true zero nap count.
+  // Use recorded counts on past calendar dates with daytime entries only.
+  const todayKey = localDateKey(new Date(now).toISOString())
+  const napCountValues = Array.from(daytimeByDay.entries())
+    .filter(([key]) => key < todayKey)
+    .map(([, entries]) => entries.length)
 
   const countMiddle = median(napCountValues)
   const countLow = quantile(napCountValues, 0.25)

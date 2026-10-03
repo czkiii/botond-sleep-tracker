@@ -9,12 +9,14 @@ import { checkRoutineClock } from './routine-clock-check.mjs'
 import { checkWakeWindowSamples } from './wake-window-samples-check.mjs'
 import { checkPredictionContext } from './prediction-context-check.mjs'
 import { checkLongestBlock } from './longest-block-check.mjs'
+import { checkLogCoverage } from './log-coverage-check.mjs'
 
 const require = createRequire(import.meta.url)
 const { chromium } = require(process.env.SOLEMI_PLAYWRIGHT_MODULE || 'playwright')
 const baseline = process.argv.includes('--baseline')
 const wakeSamplesOnly = process.argv.includes('--wake-samples-only')
 const longestBlockOnly = process.argv.includes('--longest-block-only')
+const coverageOnly = process.argv.includes('--coverage-only')
 const functions = ['buildSleepDaySummaries', 'buildInsightsFoundation', 'buildSimilarDaysInsight',
   'buildPredictionLite', 'buildSleepDevelopment', 'buildSleepChangeInsight', 'buildMonthlyFamilyReport', 'buildSleepDaySource']
 const server = await createServer({ base: '/', server: { host: '127.0.0.1', port: 0 }, define: {
@@ -45,7 +47,7 @@ try {
   browser = await chromium.launch({ headless: true,
     ...(process.env.SOLEMI_BROWSER_CHANNEL ? { channel: process.env.SOLEMI_BROWSER_CHANNEL } : {}) })
   const results = []
-  for (const count of process.argv.includes('--freshness-only') || wakeSamplesOnly || longestBlockOnly ? [] : [1800, 5000]) for (const plan of ['free', 'familyPlus']) {
+  for (const count of process.argv.includes('--freshness-only') || wakeSamplesOnly || longestBlockOnly || coverageOnly ? [] : [1800, 5000]) for (const plan of ['free', 'familyPlus']) {
     const context = await browser.newContext({ viewport: { width: 393, height: 852 }, timezoneId: 'Europe/Budapest', serviceWorkers: 'block' })
     const at = Date.UTC(2026, 8, 30, 10, 0, 10)
     const sessions = Array.from({ length: count }, (_, i) => {
@@ -91,11 +93,12 @@ try {
     console.log(JSON.stringify(results.at(-1)))
     await context.close()
   }
-  const freshness = baseline || wakeSamplesOnly || longestBlockOnly ? 'not run in this mode' : await checkStatisticsFreshness(browser, origin)
-  if (!baseline && !wakeSamplesOnly && !longestBlockOnly) await checkRoutineClock(browser, origin)
-  if (!baseline && !longestBlockOnly) await checkWakeWindowSamples(browser, origin)
-  if (!baseline && !longestBlockOnly) await checkPredictionContext(browser, origin)
-  if (!baseline && !wakeSamplesOnly) await checkLongestBlock(browser, origin)
+  const freshness = baseline || wakeSamplesOnly || longestBlockOnly || coverageOnly ? 'not run in this mode' : await checkStatisticsFreshness(browser, origin)
+  if (!baseline && !wakeSamplesOnly && !longestBlockOnly && !coverageOnly) await checkRoutineClock(browser, origin)
+  if (!baseline && !longestBlockOnly && !coverageOnly) await checkWakeWindowSamples(browser, origin)
+  if (!baseline && !longestBlockOnly && !coverageOnly) await checkPredictionContext(browser, origin)
+  if (!baseline && !wakeSamplesOnly && !coverageOnly) await checkLongestBlock(browser, origin)
+  if (!baseline && !wakeSamplesOnly && !longestBlockOnly) await checkLogCoverage(browser, origin)
   await mkdir('.private-backups', { recursive: true })
   if (results.length) await writeFile(`.private-backups/a22-${baseline ? 'baseline' : 'after'}.json`, JSON.stringify({ browser: browser.version(), mode: 'Vite development, real clock, synthetic 4 sleeps/day of 2 hours', results, freshness }, null, 2))
 } finally { await browser?.close(); await server.close() }

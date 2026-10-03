@@ -3,13 +3,16 @@ import type { SleepDaySummary } from './sleepDevelopment'
 import type { SleepSession } from './types'
 
 const HOUR_MS = 60 * 60 * 1000
+export const CHANGE_MIN_RECENT_DAYS = 4
+export const CHANGE_MIN_BASELINE_DAYS = 14
 
 export type SleepChangeMetric = 'total' | 'day' | 'night' | 'longest' | 'episodes'
 
 export type SleepChangeSignal = {
   metric: SleepChangeMetric
   direction: 'higher' | 'lower'
-  severity: 'notice' | 'strong'
+  recentSampleCount: number
+  baselineSampleCount: number
   baselineValue: number
   recentValue: number
   delta: number
@@ -18,7 +21,9 @@ export type SleepChangeSignal = {
 }
 
 export type SleepChangeInsight = {
+  // Status describes the recorded values, never verified child behaviour.
   status: 'collecting' | 'stable' | 'changed'
+  coverage: 'unverified'
   recentWindowDays: 5
   baselineWindowDays: 28
   recentSampleCount: number
@@ -61,15 +66,15 @@ export function buildSleepChangeInsight(sessions: SleepSession[], now = Date.now
   const recentDays = days.filter((day) => dayTime(day) >= recentStart && dayTime(day) < todayStart)
   const baselineDays = days.filter((day) => dayTime(day) >= baselineStart && dayTime(day) < recentStart)
 
-  if (recentDays.length < 4 || baselineDays.length < 14) {
-    return { status: 'collecting', recentWindowDays: 5, baselineWindowDays: 28, recentSampleCount: recentDays.length, baselineSampleCount: baselineDays.length, signals: [] }
+  if (recentDays.length < CHANGE_MIN_RECENT_DAYS || baselineDays.length < CHANGE_MIN_BASELINE_DAYS) {
+    return { status: 'collecting', coverage: 'unverified', recentWindowDays: 5, baselineWindowDays: 28, recentSampleCount: recentDays.length, baselineSampleCount: baselineDays.length, signals: [] }
   }
 
   const metrics: SleepChangeMetric[] = ['total', 'night', 'day', 'longest', 'episodes']
   const rawSignals = metrics.flatMap((metric): SleepChangeSignal[] => {
     const baselineValues = baselineDays.map(day => metricValue(day, metric)).filter((value): value is number => value !== null)
     const recentValues = recentDays.map(day => metricValue(day, metric)).filter((value): value is number => value !== null)
-    if (baselineValues.length < 14 || recentValues.length < 4) return []
+    if (baselineValues.length < CHANGE_MIN_BASELINE_DAYS || recentValues.length < CHANGE_MIN_RECENT_DAYS) return []
     const baselineValue = median(baselineValues)
     const recentValue = median(recentValues)
     const delta = recentValue - baselineValue
@@ -87,7 +92,8 @@ export function buildSleepChangeInsight(sessions: SleepSession[], now = Date.now
     return [{
       metric,
       direction,
-      severity: Math.abs(delta) >= threshold * 1.5 && matchingRecentDays >= 4 ? 'strong' : 'notice',
+      recentSampleCount: recentValues.length,
+      baselineSampleCount: baselineValues.length,
       baselineValue,
       recentValue,
       delta,
@@ -110,6 +116,7 @@ export function buildSleepChangeInsight(sessions: SleepSession[], now = Date.now
 
   return {
     status: signals.length ? 'changed' : 'stable',
+    coverage: 'unverified',
     recentWindowDays: 5,
     baselineWindowDays: 28,
     recentSampleCount: recentDays.length,

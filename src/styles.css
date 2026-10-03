@@ -352,6 +352,8 @@ svg { display: block; }
 .development-milestones { display: grid; gap: 6px; }
 .development-milestones span { padding: 8px 10px; border-radius: 11px; color: #a8d6bd; background: rgba(54, 170, 116, .1); font-size: 10px; line-height: 1.35; }
 .change-card { display: grid; gap: 12px; }
+.change-card > .insights-card-head { flex-wrap: wrap; }
+.change-coverage { margin: 0; color: #a9bfd3; font-size: 11px; line-height: 1.5; }
 .change-stable { display: grid; gap: 5px; padding: 13px; border: 1px solid rgba(77, 174, 125, .13); border-radius: 15px; background: rgba(54, 170, 116, .08); }
 .change-stable strong { color: #a8d6bd; font-size: 13px; }
 .change-stable span { color: #789b8a; font-size: 10px; line-height: 1.45; }
@@ -362,8 +364,6 @@ svg { display: block; }
 .change-signal > div b { padding: 4px 7px; border-radius: 999px; color: #d6ae7b; background: rgba(190, 126, 49, .11); font-size: 9px; }
 .change-signal > p { margin: 2px 0 !important; color: #a9bfd3; font-size: 11px; line-height: 1.45; }
 .change-signal > small { color: #718ba4; font-size: 9px; line-height: 1.35; }
-.change-signal.strong { border-color: rgba(226, 137, 91, .18); background: rgba(172, 76, 40, .09); }
-.change-signal.strong > div b { color: #e7a27e; background: rgba(190, 82, 49, .13); }
 .monthly-report-card { display: grid; gap: 12px; }
 .monthly-report-hero { display: grid; gap: 5px; padding: 15px; border: 1px solid rgba(117, 159, 238, .18); border-radius: 16px; background: linear-gradient(145deg, rgba(69, 99, 181, .18), rgba(30, 69, 116, .08)); }
 .monthly-report-hero span { color: #9fc7ee; font-size: 12px; font-weight: 730; text-transform: capitalize; }

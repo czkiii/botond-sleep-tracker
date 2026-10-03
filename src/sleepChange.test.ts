@@ -33,11 +33,11 @@ describe('buildSleepChangeInsight', () => {
     expect(result.signals).toEqual([])
   })
 
-  it('detects a persistent reduction in recent night sleep', () => {
+  it('describes a repeated reduction in recorded night sleep', () => {
     const result = buildSleepChangeInsight(history(() => 6.5), NOW)
     expect(result.status).toBe('changed')
     const night = result.signals.find((signal) => signal.metric === 'night')
-    expect(night).toMatchObject({ direction: 'lower', matchingRecentDays: 5, severity: 'strong' })
+    expect(night).toMatchObject({ direction: 'lower', matchingRecentDays: 5, recentSampleCount: 5, baselineSampleCount: 28 })
   })
 
   it('does not turn one unusual day into a change signal', () => {

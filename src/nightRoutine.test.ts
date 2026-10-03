@@ -102,7 +102,9 @@ describe('night-level routine samples', () => {
     }
     const routine = buildInsightsFoundation(sessions, now()).routine
     expect(routine.wakeTime).toMatchObject({ typicalMinutes: 360, sampleCount: 3 })
-    expect(routine.daytimeSleepCount?.typicalCount).toBe(2)
+    // The current date is not a finished calendar day for nap-count sampling.
+    expect(routine.daytimeSleepCount).toBeNull()
+    expect(buildInsightsFoundation(sessions, Date.parse(time(24, 0))).routine.daytimeSleepCount?.typicalCount).toBe(2)
   })
 
   it('never adds gaps to sleep totals or merges fragments into continuous sleep', () => {

@@ -17,7 +17,7 @@ import { buildPredictionLite } from './prediction'
 import { formatPredictionWindow, predictionUnavailableText } from './predictionDisplay'
 import { buildSleepDaySource, buildSleepDevelopment } from './sleepDevelopment'
 import type { SleepDevelopmentMilestone } from './sleepDevelopment'
-import { buildSleepChangeInsight } from './sleepChange'
+import { buildSleepChangeInsight, CHANGE_MIN_RECENT_DAYS, CHANGE_MIN_BASELINE_DAYS } from './sleepChange'
 import type { SleepChangeMetric, SleepChangeSignal } from './sleepChange'
 import { buildMonthlyFamilyReport } from './monthlyReport'
 import type { MonthlyReportMetric, MonthlyReportMilestone, MonthlyReportTrend } from './monthlyReport'
@@ -492,6 +492,7 @@ const StatsPage = memo(function StatsPage({ sessions, locale, childName, product
       {routine.wakeTimeVariable && <RoutineRow variable label={t(locale, 'typicalWakeTime')} value={t(locale, 'routineClockVariable')} detail={t(locale, 'routineClockVariableHelp')} />}
       {routine.daytimeSleepCount && <RoutineRow label={t(locale, 'typicalNapCount')} value={formatCount(routine.daytimeSleepCount.typicalCount, locale)} detail={t(locale, 'napCountRange', { low: formatCount(routine.daytimeSleepCount.lowCount, locale), high: formatCount(routine.daytimeSleepCount.highCount, locale) })} />}
       {(routine.status === 'ready' || routine.bedtimeVariable || routine.wakeTimeVariable) && <small>{t(locale, 'routineOwnData')}</small>}
+      <small className="nap-coverage">{t(locale, 'napCoverage')}</small>
     </div>
     <div className="insights-card development-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'sleepDevelopment')}</h2></div><b>{t(locale, 'familyPlus')}</b></div>
       <div className="insights-range four-options" aria-label={t(locale, 'developmentRange')}>{([3, 6, 12] as const).map((value) => <button key={value} className={developmentRange === value ? 'active' : ''} onClick={() => setDevelopmentRange(value)}>{value} {t(locale, 'monthsShort')}</button>)}<button className={developmentRange === 'custom' ? 'active' : ''} onClick={openDevelopmentPicker}>{t(locale, 'customRange')}</button></div>
@@ -509,10 +510,11 @@ const StatsPage = memo(function StatsPage({ sessions, locale, childName, product
         {development.first && development.latest && <div className="then-now"><strong>{t(locale, 'thenNow')}</strong><div className="then-now-grid"><DevelopmentPoint label={t(locale, 'then')} month={development.first} locale={locale} /><DevelopmentPoint label={t(locale, 'nowPeriod')} month={development.latest} locale={locale} /></div></div>}
         {development.milestones.length > 0 && <div className="development-milestones">{development.milestones.slice(0, 3).map((milestone) => <span key={milestone.kind}>{developmentMilestoneLabel(locale, milestone)}</span>)}</div>}
       </>}
-      <small>{t(locale, 'developmentOwnData')}</small><small className="longest-block-explanation">{t(locale, 'longestBlockExplanation')}</small>
+      <small>{t(locale, 'developmentOwnData')}</small><small className="recorded-coverage">{t(locale, 'recordedCoverage')}</small><small className="longest-block-explanation">{t(locale, 'longestBlockExplanation')}</small>
     </div>
     <div className="insights-card change-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'sleepChangePlain')}</h2></div><b>{t(locale, sleepChange.status === 'changed' ? 'changeDetectedPlain' : sleepChange.status === 'stable' ? 'stablePatternPlain' : 'familyPlus')}</b></div>
-      {sleepChange.status === 'collecting' && <p className="routine-empty">{t(locale, 'changeCollectingPlain', { recent: sleepChange.recentSampleCount, baseline: sleepChange.baselineSampleCount })}</p>}
+      <p className="change-coverage">{t(locale, 'changeCoverage', { recent: sleepChange.recentSampleCount, baseline: sleepChange.baselineSampleCount })}</p>
+      {sleepChange.status === 'collecting' && <p className="routine-empty">{t(locale, 'changeCollectingPlain', { recent: sleepChange.recentSampleCount, baseline: sleepChange.baselineSampleCount, minRecent: CHANGE_MIN_RECENT_DAYS, minBaseline: CHANGE_MIN_BASELINE_DAYS })}</p>}
       {sleepChange.status === 'stable' && <div className="change-stable"><strong>{t(locale, 'stablePatternPlain')}</strong><span>{t(locale, 'changeStablePlain', { name: childName })}</span></div>}
       {sleepChange.status === 'changed' && <><p className="change-intro">{t(locale, 'changeIntro', { name: childName })}</p><div className="change-signals">{sleepChange.signals.slice(0, 3).map((signal) => <ChangeSignal key={signal.metric} signal={signal} locale={locale} />)}</div></>}
       <small>{t(locale, 'changeOwnDataPlain')}</small>
@@ -525,7 +527,7 @@ const StatsPage = memo(function StatsPage({ sessions, locale, childName, product
         {monthlyReport.trends.length === 0 ? <div className="monthly-stable"><strong>{t(locale, 'monthlyStableTitle')}</strong><span>{t(locale, 'monthlyStable')}</span></div> : <div className="monthly-trends"><strong>{t(locale, 'monthlyTrends')}</strong>{monthlyReport.trends.slice(0, 3).map((trend) => <MonthlyTrend key={trend.metric} trend={trend} locale={locale} />)}</div>}
         {monthlyReport.milestones.length > 0 && <div className="monthly-milestones"><strong>{t(locale, 'monthlyMilestones')}</strong>{monthlyReport.milestones.map((milestone) => <span key={milestone.kind}>{monthlyMilestoneLabel(locale, milestone)}</span>)}</div>}
       </>}
-      <small>{t(locale, 'monthlyOwnData')}</small><small className="longest-block-explanation">{t(locale, 'longestBlockExplanation')}</small>
+      <small>{t(locale, 'monthlyOwnData')}</small><small className="recorded-coverage">{t(locale, 'recordedCoverage')}</small><small className="longest-block-explanation">{t(locale, 'longestBlockExplanation')}</small>
     </div>
     <div className="insights-card similar-days-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'similarDays')}</h2></div>{similarDays.status === 'ready' && <b>{t(locale, 'closestDays')}</b>}</div>
       {similarDays.status === 'unavailable' && <p className="routine-empty">{t(locale, 'similarDaysUnavailablePlain', { name: childName })}</p>}
@@ -599,9 +601,9 @@ function ChangeSignal({ signal, locale }: { signal: SleepChangeSignal; locale: L
     ? t(locale, signal.direction === 'higher' ? 'changeEpisodesMore' : 'changeEpisodesLess')
     : t(locale, signal.direction === 'higher' ? 'changeMetricMorePlain' : 'changeMetricLessPlain', { metric: changeMetricLabel(locale, signal.metric).toLocaleLowerCase(localeTag(locale)) })
   const explanation = signal.metric === 'episodes'
-    ? t(locale, 'changeEpisodesExplanation', { count: signal.matchingRecentDays, baseline, recent })
-    : t(locale, 'changeDurationExplanation', { count: signal.matchingRecentDays, baseline, recent, difference: value })
-  return <div className={`change-signal ${signal.severity}`}><div><span>{title}</span><b>{t(locale, 'changeDaysBadge', { count: signal.matchingRecentDays })}</b></div><p>{explanation}</p><small>{t(locale, 'changeNotWarning')}</small></div>
+    ? t(locale, 'changeEpisodesExplanation', { count: signal.matchingRecentDays, samples: signal.recentSampleCount, baseline, recent })
+    : t(locale, 'changeDurationExplanation', { count: signal.matchingRecentDays, samples: signal.recentSampleCount, baseline, recent, difference: value })
+  return <div className="change-signal"><div><span>{title}</span><b>{t(locale, 'changeDaysBadge', { count: signal.matchingRecentDays, samples: signal.recentSampleCount })}</b></div><p>{explanation}</p><small>{t(locale, 'changeNotWarning')}</small></div>
 }
 
 function changeMetricLabel(locale: Locale, metric: SleepChangeMetric) {
