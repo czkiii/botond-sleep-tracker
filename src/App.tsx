@@ -12,7 +12,7 @@ import { mergeChildDraft, removeChildProfile } from './childProfiles'
 import { familyBootstrapCopy } from './familyBootstrapCopy'
 import { buildInsightsFoundation } from './insights'
 import type { ClockPattern } from './insights'
-import { buildSimilarDaysInsight } from './similarDays'
+import { buildSimilarDaysInsight, SIMILAR_DAYS_HISTORY_DAYS } from './similarDays'
 import { buildPredictionLite } from './prediction'
 import { formatPredictionWindow, predictionUnavailableText } from './predictionDisplay'
 import { buildSleepDaySource, buildSleepDevelopment } from './sleepDevelopment'
@@ -530,8 +530,8 @@ const StatsPage = memo(function StatsPage({ sessions, locale, childName, product
     <div className="insights-card similar-days-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'similarDays')}</h2></div>{similarDays.status === 'ready' && <b>{t(locale, 'closestDays')}</b>}</div>
       {similarDays.status === 'unavailable' && <p className="routine-empty">{t(locale, 'similarDaysUnavailablePlain', { name: childName })}</p>}
       {similarDays.status === 'collecting' && <p className="routine-empty">{t(locale, 'similarDaysCollectingPlain', { count: similarDays.candidateCount })}</p>}
-      {similarDays.matches.map((match) => <div className="similar-day-row" key={match.dateKey}><div><strong>{formatDateKey(match.dateKey, locale)}</strong><small>{t(locale, 'similarDayEvidence', { naps: match.snapshot.daytimeSleepCount, sleep: formatDuration(match.snapshot.totalSleepMs, locale), awake: formatDuration(match.snapshot.awakeMs ?? 0, locale) })}</small></div>{match.nextSleep ? <span>{t(locale, 'thenSleptAt')} <b>{formatTime(match.nextSleep.startTime, locale)}</b></span> : <span>{t(locale, 'noLaterSleep')}</span>}</div>)}
-      {similarDays.status === 'ready' && <small>{t(locale, 'similarDaysExplanationPlain', { name: childName })}</small>}
+      {similarDays.matches.map((match) => <div className="similar-day-row" key={match.dateKey}><div><strong>{formatDateKey(match.dateKey, locale)}</strong><small>{t(locale, 'similarDayEvidence', { naps: match.snapshot.daytimeSleepCount, sleep: formatDuration(match.snapshot.totalSleepMs, locale), awake: formatDuration(match.snapshot.awakeMs ?? 0, locale) })}</small><small className="similar-day-differences">{t(locale, 'similarDayDifferences', { naps: match.differences.daytimeSleepCount, sleep: formatDuration(match.differences.totalSleepMs, locale), awake: formatDuration(match.differences.awakeMs, locale) })}</small></div>{match.nextSleep ? <span>{t(locale, 'thenSleptAt')} <b>{formatTime(match.nextSleep.startTime, locale)}</b></span> : <span>{t(locale, 'noLaterSleep')}</span>}</div>)}
+      {similarDays.status === 'ready' && <><small>{t(locale, 'similarDaysExplanationPlain', { days: SIMILAR_DAYS_HISTORY_DAYS })}</small><small>{t(locale, 'similarDaysLimitations')}</small></>}
     </div>
     <div className="insights-card prediction-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'nextSleepEstimate')}</h2></div>{prediction.status === 'ready' && <b>{t(locale, 'sampleCountShort', { count: prediction.sampleCount })}</b>}</div>
       {prediction.status === 'unavailable' && <p className="routine-empty">{predictionUnavailableText(prediction, locale)}</p>}
@@ -569,7 +569,7 @@ function LockedInsightsOverview({ locale }: { locale: Locale }) {
 
 function formatDateKey(value: string, locale: Locale) {
   const [year, month, day] = value.split('-').map(Number)
-  return new Intl.DateTimeFormat(localeTag(locale), { month: 'short', day: 'numeric', weekday: 'short' }).format(new Date(year, month - 1, day))
+  return new Intl.DateTimeFormat(localeTag(locale), { year: 'numeric', month: 'short', day: 'numeric', weekday: 'short' }).format(new Date(year, month - 1, day))
 }
 
 function wakeBucketLabel(locale: Locale, key: 'day-1' | 'day-2' | 'day-3-plus' | 'night') {

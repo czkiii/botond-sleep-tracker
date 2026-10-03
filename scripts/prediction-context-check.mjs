@@ -112,13 +112,13 @@ export async function checkPredictionContext(browser, origin) {
         await similar.locator('.routine-empty').filter({ hasText: similarEmpty[locale] }).waitFor()
         assert.equal(await similar.locator('.similar-day-row, .insights-card-head b').count(), 0)
       }
-      const captureSimilar = async name => {
+      const captureSimilar = async (name, step = 's08') => {
         await similar.evaluate(node => node.scrollIntoView({ block: 'center' }))
         assert.equal(await similar.evaluate(node => {
           const box = node.getBoundingClientRect()
           return [...node.querySelectorAll('*')].some(child => child.scrollWidth > child.clientWidth + 1 || child.getBoundingClientRect().right > box.right + 1)
         }), false, 'Similar days must fit a narrow phone')
-        await similar.screenshot({ path: `.private-backups/s08-${locale}-${width}-${name}.png` })
+        await similar.screenshot({ path: `.private-backups/${step}-${locale}-${width}-${name}.png` })
       }
       await page.clock.setSystemTime(new Date('2026-09-30T10:00:00Z'))
       await page.evaluate(() => window.dispatchEvent(new Event('focus')))
@@ -135,6 +135,42 @@ export async function checkPredictionContext(browser, origin) {
       assert.equal(await similar.locator('.similar-day-row').count(), 3)
       assert.equal(await similar.locator('.insights-card-head b').count(), 1)
       await captureSimilar('awake')
+
+      // S09: ranking is not a similarity guarantee. Large and zero differences,
+      // old calendar dates and the scope/limitations must be visible to readers.
+      const closestCopy = {
+        hu: ['Legközelebbi elérhető napok', '10 ó', '2 ó', '0 p', 'Eltérés nagysága', 'életkor', 'nem mai előrejelzés', 'nem jelent hasonlóságot'],
+        en: ['Closest available days', '10 hr', '2 hr', '0 min', 'Size of difference', 'age', 'not a forecast for today', 'does not mean they are similar'],
+        de: ['Nächstliegende verfügbare Tage', '10 Std.', '2 Std.', '0 Min.', 'Größe der Abweichung', 'Altersveränderungen', 'keine Vorhersage für heute', 'bedeutet keine Ähnlichkeit'],
+      }[locale]
+      assert.equal(await similar.locator('h2').innerText(), closestCopy[0])
+      const distantDays = [23, 24, 25].map(day => [day, 0, day, 11])
+      const distant = [...distantDays, [30, 8, 30, 9, 'day']]
+      await apply(distant)
+      assert.equal(await similar.locator('.similar-day-row').count(), 3)
+      for (const row of await similar.locator('.similar-day-differences').all()) {
+        const text = await row.innerText()
+        for (const expected of [closestCopy[1], closestCopy[2], closestCopy[4]]) assert.ok(text.includes(expected), text)
+      }
+      const copy = await similar.innerText()
+      for (const expected of ['730', '7/14/30', closestCopy[5], closestCopy[6]]) assert.ok(copy.includes(expected), copy)
+      await captureSimilar('distant', 's09')
+      // Day -335 in September 2026 is 2025-09-30. Exact old data may outrank
+      // recent distant data, so its year must be apparent; no age normalization.
+      await apply([...distant, [-335, 8, -335, 9, 'day'], [-335, 13, -335, 14, 'day']])
+      for (const index of [0, 2, 1]) {
+        await wake.locator('.insights-range button').nth(index).click()
+        const first = similar.locator('.similar-day-row').first()
+        assert.match(await first.locator('strong').innerText(), /2025/)
+        const differences = await first.locator('.similar-day-differences').innerText()
+        assert.equal(differences.split(closestCopy[3]).length - 1, 2, 'Exact match has zero sleep and wake differences')
+        assert.match(await first.locator(':scope > span').innerText(), /13:00/)
+      }
+      await captureSimilar('old-exact', 's09')
+      await apply([distantDays[0], distantDays[1], [30, 8, 30, 9, 'day']])
+      await similar.locator('.routine-empty').filter({ hasText: closestCopy[7] }).waitFor()
+      assert.equal(await similar.locator('.similar-day-row, .insights-card-head b').count(), 0)
+      await captureSimilar('collecting', 's09')
       await apply([...awakeToday, [30, 11, null, null, 'day']])
       await noSimilar()
       await apply([...awakeToday, [31, 11, null, null, 'day']])
@@ -149,6 +185,7 @@ export async function checkPredictionContext(browser, origin) {
       assert.deepEqual(unexpected, [])
       console.log(`PASS: prediction context ${locale}/${width}, missing/stale/active/invalid, recovery/removal, range changes, dated night, midnight/06:00`)
       console.log(`PASS: similar days active sleep ${locale}/${width}, start/finish/reopen/future, midnight, no stale matches`)
+      console.log(`PASS: closest days ${locale}/${width}, distant differences, old exact match/year, 7/14/30 invariance, collecting, scope/limitations`)
     } finally { await context.close() }
   }
 }

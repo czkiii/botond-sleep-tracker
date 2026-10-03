@@ -1,13 +1,13 @@
 # Solemi Sleep — Codex projektállapot
 
 **Utolsó frissítés:** 2026-10-03
-**Legfrissebb megálló:** A27/S08 helyben kész: futó alvás alatt nincs korábbi ébredésből számolt nap-összehasonlítás; lezárás után az új ébredésből azonnal frissül. Hibás/jövőbeli/éjféli aktív rekord is védve. [S08 checkpoint](SIMILAR_DAYS_ACTIVE_CHECKPOINT_2026-10-03.md): 10 új próba; 490/490 teljes teszt, typecheck, build és HU/EN/DE × 320/393 px UI-próba PASS. S01–S08 helyi kapui kész; M1–M6 kézi kör továbbra is 6/6. A teljes kiadás és a közös telefonos elfogadás nyitott.
+**Legfrissebb megálló:** A27/S09 helyben kész: Legközelebbi elérhető napok következetes HU/EN/DE megnevezés, találatonként látható eltérések, évvel jelölt dátum, pontos 730 napos keresési határ és életkor/naplóhiány korlátai. Nincs önkényes hasonlósági küszöb. [S09 checkpoint](CLOSEST_DAYS_CHECKPOINT_2026-10-03.md): 3 új számítási próba; 493/493 teljes teszt, typecheck, build és HU/EN/DE × 320/393 px UI-próba PASS. S01–S09 helyi kapui kész; M1–M6 kézi kör továbbra is 6/6. A teljes kiadás és a közös telefonos elfogadás nyitott.
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
 **Teljes audit alapja:** `e9374f4` (`Add verified store billing foundation`); az akkori helyi origin-refhez képest 0 ahead / 0 behind.
-**Aktuális HEAD:** `ea3a907` — `Handle stale prediction context and explain unavailable estimates`, `feat/child-profile-v4`. S07 commitban. S08 javítás, gépi próbák és dokumentáció helyi módosítások; ebben a körben commit/push/deploy nem történt.
+**Aktuális HEAD:** `a32e651` — `Hide similar-day comparisons during active sleep`, `feat/child-profile-v4`. S08 commitban. S09 felület, gépi próbák és dokumentáció helyi módosítások; ebben a körben commit/push/deploy nem történt.
 
-**Következő feladat — GPT-6 Astra · erős:** A27/S09 — a hasonlóság és a legközelebbi elérhető napok következetes jelentése, gépi próbákkal. Ehhez most nem kell tulajdonosi kézi teszt. M1–M6 összevont kör lezárva; a fennmaradó kiadási kapuk a RELEASE_CHECKLIST.md-ben követhetők.
+**Következő feladat — GPT-6 Astra · erős:** A27/S10 — a leghosszabb alvásszakasz közös nevezője, naphoz/hónaphoz rendelése és felirata, gépi próbákkal. Ehhez most nem kell tulajdonosi kézi teszt. M1–M6 összevont kör lezárva; a fennmaradó kiadási kapuk a RELEASE_CHECKLIST.md-ben követhetők.
 
 **2026-09-24-es staging eredmény — [GPT-6 Astra · high] javítás, [GPT-6 Sol · medium] kézi folytatás:** a `Solemi törlési próba` családban a tényleges családi naplótörlés mindkét eszközt 0 alvásra vitte, a kis export visszaimportja mindkettőt 1-re állította. Az üres visszaállítási pont szinkronja először `INVALID_REQUEST` hibával elakadt, mert a szerver az érvényes üres gyermeknevet elutasította. A `fb64e1b` javítás után mindkét eszköz névtelen profilt, 0 alvást és friss szinkront mutat; az elakadt szinkron kétböngészős próbája sikeres. Teljes helyi ellenőrzés: 27 fájl, 296/296 teszt; frontend és Worker typecheck sikeres. Az eredeti Opo családot nem módosítottuk.
 
