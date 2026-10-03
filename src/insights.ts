@@ -1,3 +1,5 @@
+import { buildNightGroups, buildSleepBuckets } from './nightGroups'
+import type { WakeBucket } from './nightGroups'
 import type { SleepSession } from './types'
 import { EXTREME_SLEEP_DURATION_MS, durationOf, getDataQualityReport, splitDayNight } from './utils'
 
@@ -15,7 +17,7 @@ export type WakeWindowInsight = {
   lookbackDays: 7 | 14 | 30
   sourceSessionIds: string[]
   breakdown: Array<{
-    key: 'day-1' | 'day-2' | 'day-3-plus' | 'night'
+    key: WakeBucket
     typicalMs: number
     lowMs: number
     highMs: number
@@ -126,55 +128,6 @@ export function buildClockPattern(values: number[]): ClockPattern | null {
   }
 }
 
-// The existing bedtime clock uses noon as its wrap point. Use that same
-// calendar boundary for night samples, so post-midnight resettling belongs
-// to the previous evening, including on 23/25-hour DST days.
-function routineNightBounds(iso: string) {
-  const start = new Date(iso)
-  if (!Number.isFinite(start.getTime())) return null
-  if (start.getHours() < 12) start.setDate(start.getDate() - 1)
-  start.setHours(12, 0, 0, 0)
-  const end = new Date(start)
-  end.setDate(end.getDate() + 1)
-  return { key: start.getTime(), end: end.getTime() }
-}
-
-function completedRoutineNights(sessions: SleepSession[], excludedIds: Set<string>, now: number, cutoff: number) {
-  const nights = new Map<number, { first: SleepSession; last: SleepSession; closesAt: number }>()
-  const incomplete = new Set<number>()
-  for (const session of sessions) {
-    const bounds = routineNightBounds(session.startTime)
-    if (!bounds) continue
-    // A rejected or unfinished fragment must not leave an earlier fragment
-    // masquerading as the final waking. Keep the entire sample out.
-    if (!session.endTime || excludedIds.has(session.id)) {
-      incomplete.add(bounds.key)
-      if (session.endTime) {
-        const endBounds = routineNightBounds(session.endTime)
-        if (endBounds) incomplete.add(endBounds.key)
-      }
-      continue
-    }
-    const parts = splitDayNight(session, now)
-    if (parts.night <= parts.day) continue
-    if (Date.parse(session.endTime) > bounds.end) {
-      incomplete.add(bounds.key)
-      continue
-    }
-    const existing = nights.get(bounds.key)
-    if (!existing) nights.set(bounds.key, { first: session, last: session, closesAt: bounds.end })
-    else {
-      if (Date.parse(session.startTime) < Date.parse(existing.first.startTime)) existing.first = session
-      if (Date.parse(session.endTime) > Date.parse(existing.last.endTime!)) existing.last = session
-    }
-  }
-  // Wait until the noon boundary: before then a recorded waking can still
-  // be a pause in the current night. Filter whole groups, not fragments.
-  return Array.from(nights.entries())
-    .filter(([key, night]) => !incomplete.has(key) && night.closesAt <= now && Date.parse(night.last.endTime!) >= cutoff)
-    .map(([, night]) => night)
-}
-
 export function buildInsightsFoundation(sessions: SleepSession[], now = Date.now(), options: { lookbackDays?: 7 | 14 | 30 } = {}): InsightsFoundation {
   const lookbackDays = options.lookbackDays ?? 14
   const report = getDataQualityReport(sessions, now)
@@ -185,20 +138,11 @@ export function buildInsightsFoundation(sessions: SleepSession[], now = Date.now
     .sort((a, b) => Date.parse(a.startTime) - Date.parse(b.startTime))
   const completed = allCompleted.filter((session) => !excludedIds.has(session.id) && durationOf(session, now) < EXTREME_SLEEP_DURATION_MS)
 
-  const dayOrder = new Map<string, 'day-1' | 'day-2' | 'day-3-plus'>()
-  const dayGroups = new Map<string, SleepSession[]>()
-  completed.forEach((session) => {
-    const parts = splitDayNight(session, now)
-    if (parts.day <= parts.night) return
-    const key = localDateKey(session.startTime)
-    dayGroups.set(key, [...(dayGroups.get(key) ?? []), session])
-  })
-  dayGroups.forEach((items) => items.sort((a, b) => Date.parse(a.startTime) - Date.parse(b.startTime)).forEach((session, index) => {
-    dayOrder.set(session.id, index === 0 ? 'day-1' : index === 1 ? 'day-2' : 'day-3-plus')
-  }))
+  const nightGroups = buildNightGroups(sessions, excludedIds, now)
+  const sleepBuckets = buildSleepBuckets(sessions, excludedIds, now, nightGroups)
 
   const recentCutoff = statisticsLookbackStart(now, lookbackDays)
-  const samples: Array<{ durationMs: number; sessionIds: [string, string]; bucket: 'day-1' | 'day-2' | 'day-3-plus' | 'night' }> = []
+  const samples: Array<{ durationMs: number; sessionIds: [string, string]; bucket: WakeBucket }> = []
   for (let index = 0; index < allCompleted.length - 1; index += 1) {
     const previous = allCompleted[index]
     const next = allCompleted[index + 1]
@@ -206,15 +150,17 @@ export function buildInsightsFoundation(sessions: SleepSession[], now = Date.now
     const wakeTime = Date.parse(previous.endTime!)
     const nextSleep = Date.parse(next.startTime)
     const window = nextSleep - wakeTime
-    if (wakeTime >= recentCutoff && window >= MIN_WAKE_WINDOW_MS && window <= MAX_WAKE_WINDOW_MS) {
-      samples.push({ durationMs: window, sessionIds: [previous.id, next.id], bucket: dayOrder.get(next.id) ?? 'night' })
+    const bucket = sleepBuckets.get(next.id)
+    if (bucket && wakeTime >= recentCutoff && window >= MIN_WAKE_WINDOW_MS && window <= MAX_WAKE_WINDOW_MS) {
+      samples.push({ durationMs: window, sessionIds: [previous.id, next.id], bucket })
     }
   }
 
   const lastCompleted = allCompleted[allCompleted.length - 1]
   const active = sessions.find((session) => !session.endTime)
   const currentMs = !active && lastCompleted && !excludedIds.has(lastCompleted.id) ? Math.max(0, now - Date.parse(lastCompleted.endTime!)) : null
-  const windows = samples.map((sample) => sample.durationMs)
+  const generalSamples = samples.filter(sample => sample.bucket !== 'night-resettling')
+  const windows = generalSamples.map((sample) => sample.durationMs)
   const sampleCount = windows.length
   // Historical evidence has its own minimum, independent of whether the
   // child is currently asleep. Consumers must not promote partial samples.
@@ -223,7 +169,7 @@ export function buildInsightsFoundation(sessions: SleepSession[], now = Date.now
   const lowMs = hasPattern ? quantile(windows, 0.25) : null
   const highMs = hasPattern ? quantile(windows, 0.75) : null
   const status = currentMs === null ? 'unavailable' : hasPattern ? 'ready' : 'collecting'
-  const breakdown = (['day-1', 'day-2', 'day-3-plus', 'night'] as const).flatMap((key) => {
+  const breakdown = (['day-1', 'day-2', 'day-3-plus', 'night', 'night-resettling'] as const).flatMap((key) => {
     const values = samples.filter((sample) => sample.bucket === key).map((sample) => sample.durationMs)
     const middle = median(values)
     const low = quantile(values, 0.25)
@@ -233,7 +179,9 @@ export function buildInsightsFoundation(sessions: SleepSession[], now = Date.now
 
   const routineCutoff = statisticsLookbackStart(now, lookbackDays)
   const recentCompleted = completed.filter((session) => Date.parse(session.endTime!) >= routineCutoff)
-  const routineNights = completedRoutineNights(sessions, excludedIds, now, routineCutoff)
+  const routineNights = Array.from(nightGroups.nights.entries())
+    .filter(([key, night]) => !nightGroups.incomplete.has(key) && night.closesAt <= now && Date.parse(night.last.endTime!) >= routineCutoff)
+    .map(([, night]) => night)
   const daytimeByDay = new Map<string, SleepSession[]>()
   recentCompleted.forEach((session) => {
     const parts = splitDayNight(session, now)
@@ -286,7 +234,7 @@ export function buildInsightsFoundation(sessions: SleepSession[], now = Date.now
       typicalRange: lowMs !== null && highMs !== null ? { lowMs, highMs } : null,
       sampleCount,
       lookbackDays,
-      sourceSessionIds: Array.from(new Set(samples.flatMap((sample) => sample.sessionIds))),
+      sourceSessionIds: Array.from(new Set(generalSamples.flatMap((sample) => sample.sessionIds))),
       breakdown
     },
     routine,

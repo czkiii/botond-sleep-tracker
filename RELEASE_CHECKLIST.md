@@ -1,6 +1,6 @@
 # Solemi Sleep — belső verziótól a kiadásig
 
-Utolsó frissítés: 2026-10-02
+Utolsó frissítés: 2026-10-03
 
 **Kézi elfogadás aktuális sorrendje:** [összevont tesztmenet](MANUAL_ACCEPTANCE_2026-09-26.md). Egy kis tesztcsalád, három blokk, hat célzott ellenőrzés; a már igazolt próbák újrafelhasználásával. A régi checkpointok eltérő folytatási utasításai történetiek. A menetrend önmagában nem zár le auditpontot. Az M1–M6 összevont kör 2026-10-01-én 6/6 lezárult; a pontos bizonyítékok és buildenkénti határok a tesztnaplóban szerepelnek. A többi kiadási kapu ettől még nyitott.
 
@@ -58,7 +58,7 @@ kockázattól. A történeti pipák nem jelentik az auditpontok lezárását.
 Részletes bemenet, jelenlegi eredmény és elfogadási feltétel:
 [FAMILY_PLUS_STATISTICS_AUDIT_2026-09-20.md](FAMILY_PLUS_STATISTICS_AUDIT_2026-09-20.md).
 Vizsgált HEAD `3a0a687`, az alkalmazás forrása változatlan. A 72 sikeres helyi
-próba az audit bizonyítéka, nem a hibák lezárása. Azóta az S01–S14 helyi javítása lezárult; az aktuális bizonyítékot az alábbi sorok rögzítik. A teljes A27 elfogadás továbbra is nyitott.
+próba az audit bizonyítéka, nem a hibák lezárása. Azóta az S01–S15 helyi javítása lezárult; az aktuális bizonyítékot az alábbi sorok rögzítik. A teljes A27 elfogadás továbbra is nyitott.
 
 - [x] **[GPT-6 Astra · erős]** S01 — Közös, másodperc-/ezredmásodpercpontos nappal/éjjel bontás helyben javítva (2026-10-01). 23 új regresszió, több időzónás DST, közös napló minden elemzőn; 405/405 teszt, typecheck, build és böngészőpróba PASS. Az A27 közös telefonos elfogadását nem helyettesíti. [S01 checkpoint](DAY_NIGHT_BOUNDARIES_CHECKPOINT_2026-10-01.md).
 - [x] **[GPT-6 Astra · erős]** S02 — Megszakított éjszaka rutinja helyben javítva (2026-10-02): egy minta helyi déltől délig, első éjszakai elalvás/utolsó rögzített ébredés, aktív vagy hibás csoport kizárva. Ébrenléti szünet nem alvásidő. 18 új próba, 423/423 teljes teszt, typecheck, build és déli automatikus frissülést igazoló Edge-próba PASS. A27 közös telefonos elfogadása nyitott. [S02 checkpoint](NIGHT_ROUTINE_CHECKPOINT_2026-10-02.md).
@@ -74,7 +74,7 @@ próba az audit bizonyítéka, nem a hibák lezárása. Azóta az S01–S14 hely
 - [x] **[GPT-6 Astra · erős]** S12 — Tényleges riport- és összehasonlítási hónapok, külön csúcstörténet, üres/elégtelen hónapok indoklása, aktuális hónap elkülönítése (2026-10-03). 7 új próba; 521/521 teljes teszt, typecheck, build és HU/EN/DE × 320/393 px böngészőpróba PASS, automatikus hónapváltással. A27 közös telefonos elfogadása nyitott. [S12 checkpoint](MONTHLY_PERIOD_CHECKPOINT_2026-10-03.md).
 - [x] **[GPT-6 Astra · erős]** S13 — Közös kézi típuskonfliktus-kizárás teljes átfedő csoportra; megőrzött nyers adatok, nem ütköző duplikátumok egyszeri összesítése és megnevezett sorrendalapú kizárás (2026-10-03). 12 új próba; 533/533 teljes teszt, typecheck, build, HU/EN/DE × 320/393 px böngészőpróba és 1800/5000 × Free/Family+ nyugalmi teljesítménykontroll PASS. A27 közös telefonos elfogadása nyitott. [S13 checkpoint](SLEEP_OVERLAP_CHECKPOINT_2026-10-03.md).
 - [x] **[GPT-6 Astra · erős]** S14 — Megjelenítői időzóna dokumentálva és HU/EN/DE jelzéssel; utazás után focus/visibility/percforduló újraszámol, naptári dátumok és gördülő 24 órás ablakok megkülönböztetve (2026-10-03). 14 új próba, UTC/Budapest/Tokió, két régió DST-je, év/hónaphatár és dátumvonal; 547/547 teljes teszt, typecheck, build, 6/6 böngészőpróba és 4/4 teljesítménykontroll PASS. A27 közös telefonos elfogadása nyitott. [S14 checkpoint](STATISTICS_TIMEZONE_CHECKPOINT_2026-10-03.md).
-- [ ] **[GPT-6 Astra · high]** S15 — Esti lefekvés és éjszakai visszaalvás külön mintacsoportja.
+- [x] **[GPT-6 Astra · erős]** S15 — Esti első elalvás és éjszakai visszaalvás külön mintacsoportja, közös déltől délig csoportosítással (2026-10-03). Visszaalvás kizárva az általános tipikus értékből; kevés éjszakai mintánál nincs idegen helyettesítés. 14 új próba; 561/561 teljes teszt, typecheck, build, 6/6 HU/EN/DE böngészőpróba, korábbi becslési regresszió és 4/4 teljesítménykontroll PASS. A27 közös elfogadása nyitott. [S15 checkpoint](NIGHT_RESETTLING_CHECKPOINT_2026-10-03.md).
 
 Javítás után közös tesztnapló minden kártyán, HU/EN/DE szövegek és célzott
 kéttelefonos elfogadás szükséges. Nincs automatikus kiadás utáni halasztás;

@@ -1,3 +1,5 @@
+import { buildNightGroups, buildSleepBuckets, routineNightBounds } from './nightGroups'
+import type { WakeBucket } from './nightGroups'
 import type { SleepSession } from './types'
 import { DEFAULT_DAY_START_MINUTES, DEFAULT_NIGHT_START_MINUTES, getDataQualityReport, splitDayNight } from './utils'
 
@@ -5,7 +7,7 @@ import { statisticsLookbackStart } from './statisticsCalendar'
 const MIN_WAKE_WINDOW_MS = 5 * 60 * 1000
 const MAX_WAKE_WINDOW_MS = 12 * 60 * 60 * 1000
 
-export type PredictionBucket = 'day-1' | 'day-2' | 'day-3-plus' | 'night'
+export type PredictionBucket = WakeBucket
 
 export type PredictionLite = {
   status: 'ready' | 'collecting' | 'unavailable'
@@ -111,19 +113,16 @@ export function buildPredictionLite(sessions: SleepSession[], now = Date.now(), 
   if (lastWake < contextStart.getTime()) return empty('unavailable', { unavailableReason: 'stale-wake', lastWakeTime: lastWake })
   const currentWakeMs = now - lastWake
   const cutoff = statisticsLookbackStart(now, lookbackDays)
-  const bucket = nextBucket(cleanCompleted, now, cutoff)
+  let bucket = nextBucket(cleanCompleted, now, cutoff)
+  const nightGroups = buildNightGroups(sessions, excluded, now)
+  const currentNight = routineNightBounds(reference.toISOString())!
+  const minutes = reference.getHours() * 60 + reference.getMinutes()
+  if (bucket === 'night' && (minutes < DEFAULT_DAY_START_MINUTES || minutes >= DEFAULT_NIGHT_START_MINUTES)) {
+    if (nightGroups.incomplete.has(currentNight.key)) return empty('unavailable', { unavailableReason: 'invalid-data' })
+    if (nightGroups.nights.has(currentNight.key)) bucket = 'night-resettling'
+  }
 
-  const dayOrder = new Map<string, Exclude<PredictionBucket, 'night'>>()
-  const dayGroups = new Map<string, SleepSession[]>()
-  cleanCompleted.forEach((session) => {
-    const parts = splitDayNight(session, now)
-    if (parts.day <= parts.night) return
-    const key = localDateKey(session.startTime)
-    dayGroups.set(key, [...(dayGroups.get(key) ?? []), session])
-  })
-  dayGroups.forEach((items) => items.sort((a, b) => Date.parse(a.startTime) - Date.parse(b.startTime)).forEach((session, index) => {
-    dayOrder.set(session.id, index === 0 ? 'day-1' : index === 1 ? 'day-2' : 'day-3-plus')
-  }))
+  const sleepBuckets = buildSleepBuckets(sessions, excluded, now, nightGroups)
 
   // Keep original adjacency and each day's actual sleep order: filtering
   // sessions first would invent gaps or relabel a boundary day's later nap.
@@ -135,8 +134,7 @@ export function buildPredictionLite(sessions: SleepSession[], now = Date.now(), 
     const wake = Date.parse(previous.endTime!)
     const sleep = Date.parse(next.startTime)
     const durationMs = sleep - wake
-    const nextParts = splitDayNight(next, now)
-    const sampleBucket: PredictionBucket = nextParts.day > nextParts.night ? dayOrder.get(next.id) ?? 'day-3-plus' : 'night'
+    const sampleBucket = sleepBuckets.get(next.id)
     if (wake >= cutoff && durationMs >= MIN_WAKE_WINDOW_MS && durationMs <= MAX_WAKE_WINDOW_MS && sampleBucket === bucket) {
       samples.push({ durationMs, sessionIds: [previous.id, next.id] })
     }

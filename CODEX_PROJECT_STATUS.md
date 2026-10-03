@@ -1,13 +1,13 @@
 # Solemi Sleep — Codex projektállapot
 
 **Utolsó frissítés:** 2026-10-03
-**Legfrissebb megálló:** A27/S14 helyben kész: megjelenítői időzóna jelzése, utazás utáni újraszámolás, naptári és gördülő időablakok egyértelmű szabálya. [S14 checkpoint](STATISTICS_TIMEZONE_CHECKPOINT_2026-10-03.md): 14 új próba; 547/547 teljes teszt, typecheck, build, 6/6 időzónaváltási böngészőpróba és 4/4 nyugalmi teljesítménykontroll PASS. S01–S14 helyi kapui kész; M1–M6 kézi kör továbbra is 6/6. A teljes kiadás és a közös telefonos elfogadás nyitott.
+**Legfrissebb megálló:** A27/S15 helyben kész: esti első elalvás és éjszakai visszaalvás külön mintacsoport, közös rutinbesorolással; rövid visszaalvás nem torzítja az általános tipikus ébrenlétet, kevés éjszakai minta nem kap idegen helyettesítést. [S15 checkpoint](NIGHT_RESETTLING_CHECKPOINT_2026-10-03.md): 14 új próba; 561/561 teljes teszt, typecheck, build, 6/6 új böngészőpróba, korábbi ébrenléti/becslési regresszió és 4/4 nyugalmi teljesítménykontroll PASS. S01–S15 helyi javításai készek; M1–M6 kézi kör továbbra is 6/6. A teljes A27 és a közös telefonos elfogadás nyitott.
 **Aktív fejlesztési ág:** `feat/child-profile-v4`
 **Éles ág:** `main` (`a529a64`)
 **Teljes audit alapja:** `e9374f4` (`Add verified store billing foundation`); az akkori helyi origin-refhez képest 0 ahead / 0 behind.
-**Aktuális HEAD:** `378ad9e` — `Exclude conflicting sleep types and clarify overlap handling`, `feat/child-profile-v4`. S13 commitban. S14 időzóna-kezelés, felület, gépi próbák és dokumentáció helyi módosítások; ebben a körben commit/push/deploy nem történt.
+**Aktuális HEAD:** `7382115` — `Clarify statistics time zones and refresh calendar grouping after travel`, `feat/child-profile-v4`. S14 commitban. S15 csoportosítás, felület, gépi próbák és dokumentáció helyi módosítások; ebben a körben commit/push/deploy nem történt.
 
-**Következő feladat — GPT-6 Astra · erős:** A27/S15 — esti lefekvés és éjszakai visszaalvás elkülönítése az ébrenléti ablakokban és a becslésben, gépi próbákkal. Ehhez most nem kell tulajdonosi kézi teszt. M1–M6 összevont kör lezárva; a fennmaradó kiadási kapuk a RELEASE_CHECKLIST.md-ben követhetők.
+**Következő feladat — GPT-6 Astra · erős:** A27 közös elfogadásának előkészítése — a javított kártyák összevont gépi ellenőrzése közös tesztnaplóval, bizonyítékokkal és a fennmaradó célzott telefonos próba rövid listájával. Az előkészítéshez nem kell tulajdonosi kézi teszt. S01–S15 helyben kész; nincs új S16 funkció. M1–M6 összevont kör lezárva; a fennmaradó kiadási kapuk a RELEASE_CHECKLIST.md-ben követhetők.
 
 **2026-09-24-es staging eredmény — [GPT-6 Astra · high] javítás, [GPT-6 Sol · medium] kézi folytatás:** a `Solemi törlési próba` családban a tényleges családi naplótörlés mindkét eszközt 0 alvásra vitte, a kis export visszaimportja mindkettőt 1-re állította. Az üres visszaállítási pont szinkronja először `INVALID_REQUEST` hibával elakadt, mert a szerver az érvényes üres gyermeknevet elutasította. A `fb64e1b` javítás után mindkét eszköz névtelen profilt, 0 alvást és friss szinkront mutat; az elakadt szinkron kétböngészős próbája sikeres. Teljes helyi ellenőrzés: 27 fájl, 296/296 teszt; frontend és Worker typecheck sikeres. Az eredeti Opo családot nem módosítottuk.
 

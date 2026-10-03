@@ -162,7 +162,7 @@ export async function checkWakeWindowSamples(browser, origin) {
       await apply(imported)
       assert.equal(await prediction.innerText(), baseline, 'Out-of-range import must not change the 7-day prediction')
       assert.equal(await card.locator('.wake-window-hero').innerText(), wakeBaseline)
-      const nightLabels = { hu: 'éjszakai alvás', en: 'night sleep', de: 'Nachtschlaf' }
+      const nightLabels = { hu: 'az éjszaka első elalvása', en: 'the first sleep of the night', de: 'erster Schlaf der Nacht' }
       for (const buttonIndex of [1, 2]) {
         await card.locator('.insights-range button').nth(buttonIndex).click()
         await page.waitForFunction(() => document.querySelector('.prediction-window')?.textContent === '17:00–17:00')

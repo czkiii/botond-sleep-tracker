@@ -13,6 +13,7 @@ import { checkLogCoverage } from './log-coverage-check.mjs'
 import { checkMonthlyPeriods } from './monthly-period-check.mjs'
 import { checkSleepOverlap } from './sleep-overlap-check.mjs'
 import { checkStatisticsTimeZone } from './statistics-timezone-check.mjs'
+import { checkNightResettling } from './night-resettling-check.mjs'
 
 const require = createRequire(import.meta.url)
 const { chromium } = require(process.env.SOLEMI_PLAYWRIGHT_MODULE || 'playwright')
@@ -23,6 +24,7 @@ const coverageOnly = process.argv.includes('--coverage-only')
 const monthlyPeriodOnly = process.argv.includes('--monthly-period-only')
 const overlapOnly = process.argv.includes('--overlap-only')
 const timezoneOnly = process.argv.includes('--timezone-only')
+const nightResettlingOnly = process.argv.includes('--night-resettling-only')
 const performanceOnly = process.argv.includes('--performance-only')
 const functions = ['buildSleepDaySummaries', 'buildInsightsFoundation', 'buildSimilarDaysInsight',
   'buildPredictionLite', 'buildSleepDevelopment', 'buildSleepChangeInsight', 'buildMonthlyFamilyReport', 'buildSleepDaySource']
@@ -54,7 +56,7 @@ try {
   browser = await chromium.launch({ headless: true,
     ...(process.env.SOLEMI_BROWSER_CHANNEL ? { channel: process.env.SOLEMI_BROWSER_CHANNEL } : {}) })
   const results = []
-  for (const count of process.argv.includes('--freshness-only') || wakeSamplesOnly || longestBlockOnly || coverageOnly || monthlyPeriodOnly || overlapOnly || timezoneOnly ? [] : [1800, 5000]) for (const plan of ['free', 'familyPlus']) {
+  for (const count of process.argv.includes('--freshness-only') || wakeSamplesOnly || longestBlockOnly || coverageOnly || monthlyPeriodOnly || overlapOnly || timezoneOnly || nightResettlingOnly ? [] : [1800, 5000]) for (const plan of ['free', 'familyPlus']) {
     const context = await browser.newContext({ viewport: { width: 393, height: 852 }, timezoneId: 'Europe/Budapest', serviceWorkers: 'block' })
     const at = Date.UTC(2026, 8, 30, 10, 0, 10)
     const sessions = Array.from({ length: count }, (_, i) => {
@@ -100,15 +102,16 @@ try {
     console.log(JSON.stringify(results.at(-1)))
     await context.close()
   }
-  const freshness = performanceOnly || baseline || wakeSamplesOnly || longestBlockOnly || coverageOnly || monthlyPeriodOnly || overlapOnly || timezoneOnly ? 'not run in this mode' : await checkStatisticsFreshness(browser, origin)
-  if (!baseline && !timezoneOnly && !overlapOnly && !performanceOnly && !monthlyPeriodOnly && !wakeSamplesOnly && !longestBlockOnly && !coverageOnly) await checkRoutineClock(browser, origin)
-  if (!baseline && !timezoneOnly && !overlapOnly && !performanceOnly && !monthlyPeriodOnly && !longestBlockOnly && !coverageOnly) await checkWakeWindowSamples(browser, origin)
-  if (!baseline && !timezoneOnly && !overlapOnly && !performanceOnly && !monthlyPeriodOnly && !longestBlockOnly && !coverageOnly) await checkPredictionContext(browser, origin)
-  if (!baseline && !timezoneOnly && !overlapOnly && !performanceOnly && !monthlyPeriodOnly && !wakeSamplesOnly && !coverageOnly) await checkLongestBlock(browser, origin)
-  if (!baseline && !timezoneOnly && !overlapOnly && !performanceOnly && !monthlyPeriodOnly && !wakeSamplesOnly && !longestBlockOnly) await checkLogCoverage(browser, origin)
-  if (!baseline && !timezoneOnly && !overlapOnly && !performanceOnly && !wakeSamplesOnly && !longestBlockOnly && !coverageOnly) await checkMonthlyPeriods(browser, origin)
-  if (!baseline && !timezoneOnly && !performanceOnly && !monthlyPeriodOnly && !wakeSamplesOnly && !longestBlockOnly && !coverageOnly) await checkSleepOverlap(browser, origin)
-  if (!baseline && !performanceOnly && !overlapOnly && !monthlyPeriodOnly && !wakeSamplesOnly && !longestBlockOnly && !coverageOnly) await checkStatisticsTimeZone(browser, origin)
+  const freshness = performanceOnly || baseline || wakeSamplesOnly || longestBlockOnly || coverageOnly || monthlyPeriodOnly || overlapOnly || timezoneOnly || nightResettlingOnly ? 'not run in this mode' : await checkStatisticsFreshness(browser, origin)
+  if (!baseline && !nightResettlingOnly && !timezoneOnly && !overlapOnly && !performanceOnly && !monthlyPeriodOnly && !wakeSamplesOnly && !longestBlockOnly && !coverageOnly) await checkRoutineClock(browser, origin)
+  if (!baseline && !nightResettlingOnly && !timezoneOnly && !overlapOnly && !performanceOnly && !monthlyPeriodOnly && !longestBlockOnly && !coverageOnly) await checkWakeWindowSamples(browser, origin)
+  if (!baseline && !nightResettlingOnly && !timezoneOnly && !overlapOnly && !performanceOnly && !monthlyPeriodOnly && !longestBlockOnly && !coverageOnly) await checkPredictionContext(browser, origin)
+  if (!baseline && !nightResettlingOnly && !timezoneOnly && !overlapOnly && !performanceOnly && !monthlyPeriodOnly && !wakeSamplesOnly && !coverageOnly) await checkLongestBlock(browser, origin)
+  if (!baseline && !nightResettlingOnly && !timezoneOnly && !overlapOnly && !performanceOnly && !monthlyPeriodOnly && !wakeSamplesOnly && !longestBlockOnly) await checkLogCoverage(browser, origin)
+  if (!baseline && !nightResettlingOnly && !timezoneOnly && !overlapOnly && !performanceOnly && !wakeSamplesOnly && !longestBlockOnly && !coverageOnly) await checkMonthlyPeriods(browser, origin)
+  if (!baseline && !nightResettlingOnly && !timezoneOnly && !performanceOnly && !monthlyPeriodOnly && !wakeSamplesOnly && !longestBlockOnly && !coverageOnly) await checkSleepOverlap(browser, origin)
+  if (!baseline && !nightResettlingOnly && !performanceOnly && !overlapOnly && !monthlyPeriodOnly && !wakeSamplesOnly && !longestBlockOnly && !coverageOnly) await checkStatisticsTimeZone(browser, origin)
+  if (!baseline && !performanceOnly && !timezoneOnly && !overlapOnly && !monthlyPeriodOnly && !wakeSamplesOnly && !longestBlockOnly && !coverageOnly) await checkNightResettling(browser, origin)
   await mkdir('.private-backups', { recursive: true })
   if (results.length) await writeFile(`.private-backups/a22-${baseline ? 'baseline' : 'after'}.json`, JSON.stringify({ browser: browser.version(), mode: 'Vite development, real clock, synthetic 4 sleeps/day of 2 hours', results, freshness }, null, 2))
 } finally { await browser?.close(); await server.close() }

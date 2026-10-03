@@ -315,11 +315,12 @@ svg { display: block; }
 .insights-quality-note { margin-top: 5px; color: #c79f91 !important; }
 .wake-breakdown { display: grid; gap: 7px; margin: 14px 0; padding-top: 13px; border-top: 1px solid rgba(118, 181, 245, .1); }
 .wake-breakdown > strong { margin-bottom: 2px; color: #b8d0e6; font-size: 12px; }
-.wake-breakdown > div { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; }
+.wake-breakdown > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; align-items: center; }
+.wake-breakdown span { overflow-wrap: anywhere; }
 .wake-breakdown span { color: #8099b2; font-size: 11px; }
 .wake-breakdown b { color: #afd7fc; font-size: 12px; }
 .wake-breakdown small { grid-column: 1 / -1; color: #617a93; font-size: 9px; }
-.wake-breakdown > div.relevant { margin: 0 -8px; padding: 7px 8px; border-radius: 10px; background: rgba(67, 137, 204, .11); }
+.wake-breakdown > div.relevant { padding: 7px 8px; border-radius: 10px; background: rgba(67, 137, 204, .11); }
 .routine-card { display: grid; gap: 10px; }
 .routine-empty { margin: 12px 0 0 !important; }
 .routine-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; padding: 12px; border-radius: 14px; background: rgba(68, 128, 185, .09); }
