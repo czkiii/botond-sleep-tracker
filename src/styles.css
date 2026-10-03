@@ -369,7 +369,8 @@ svg { display: block; }
 .monthly-report-hero span { color: #9fc7ee; font-size: 12px; font-weight: 730; text-transform: capitalize; }
 .monthly-report-hero strong { color: #e1efff; font-size: 30px; letter-spacing: -.035em; }
 .monthly-report-hero small, .monthly-baseline { color: #718ba4 !important; font-size: 10px !important; line-height: 1.4; }
-.monthly-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.monthly-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.monthly-kpis > div:last-child { grid-column: 1 / -1; }
 .monthly-kpis > div { min-width: 0; display: grid; gap: 5px; padding: 10px; border-radius: 13px; background: rgba(68, 128, 185, .08); }
 .monthly-kpis span { color: #7892aa; font-size: 9px; }
 .monthly-kpis strong { color: #c9e3fb; font-size: 13px; }

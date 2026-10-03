@@ -67,15 +67,20 @@ export function buildSleepChangeInsight(sessions: SleepSession[], now = Date.now
 
   const metrics: SleepChangeMetric[] = ['total', 'night', 'day', 'longest', 'episodes']
   const rawSignals = metrics.flatMap((metric): SleepChangeSignal[] => {
-    const baselineValue = median(baselineDays.map((day) => metricValue(day, metric)))
-    const recentValue = median(recentDays.map((day) => metricValue(day, metric)))
+    const baselineValues = baselineDays.map(day => metricValue(day, metric)).filter((value): value is number => value !== null)
+    const recentValues = recentDays.map(day => metricValue(day, metric)).filter((value): value is number => value !== null)
+    if (baselineValues.length < 14 || recentValues.length < 4) return []
+    const baselineValue = median(baselineValues)
+    const recentValue = median(recentValues)
     const delta = recentValue - baselineValue
     const threshold = thresholdFor(metric, baselineValue)
     if (Math.abs(delta) < threshold) return []
     const direction = delta > 0 ? 'higher' : 'lower'
     const persistenceThreshold = threshold * 0.6
     const matchingRecentDays = recentDays.filter((day) => {
-      const deviation = metricValue(day, metric) - baselineValue
+      const value = metricValue(day, metric)
+      if (value === null) return false
+      const deviation = value - baselineValue
       return direction === 'higher' ? deviation >= persistenceThreshold : deviation <= -persistenceThreshold
     }).length
     if (matchingRecentDays < 3) return []

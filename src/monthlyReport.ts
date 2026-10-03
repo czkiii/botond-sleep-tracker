@@ -1,22 +1,12 @@
-import { buildSleepDaySummaries } from './sleepDevelopment'
-import type { SleepDaySummary } from './sleepDevelopment'
+import { buildSleepDaySummaries, summarizeSleepMonths } from './sleepDevelopment'
+import type { SleepDaySummary, SleepDevelopmentMonth } from './sleepDevelopment'
 import type { SleepSession } from './types'
 
 const MIN_RECORDED_DAYS = 14
 
 export type MonthlyReportMetric = 'total' | 'day' | 'night' | 'longest' | 'episodes'
 
-export type MonthlyReportMonth = {
-  key: string
-  year: number
-  month: number
-  recordedDays: number
-  averageTotalMs: number
-  averageDayMs: number
-  averageNightMs: number
-  averageLongestBlockMs: number
-  averageEpisodeCount: number
-}
+export type MonthlyReportMonth = SleepDevelopmentMonth
 
 export type MonthlyReportTrend = {
   metric: MonthlyReportMetric
@@ -62,29 +52,10 @@ function metricValue(month: MonthlyReportMonth, metric: MonthlyReportMetric) {
   return month.averageEpisodeCount
 }
 
-function summarizeMonths(days: SleepDaySummary[]) {
-  const grouped = new Map<string, SleepDaySummary[]>()
-  days.forEach((day) => {
-    const key = `${day.year}-${String(day.month + 1).padStart(2, '0')}`
-    grouped.set(key, [...(grouped.get(key) ?? []), day])
-  })
-  return Array.from(grouped.entries()).map(([key, entries]): MonthlyReportMonth => ({
-    key,
-    year: entries[0].year,
-    month: entries[0].month,
-    recordedDays: entries.length,
-    averageTotalMs: entries.reduce((sum, day) => sum + day.totalMs, 0) / entries.length,
-    averageDayMs: entries.reduce((sum, day) => sum + day.dayMs, 0) / entries.length,
-    averageNightMs: entries.reduce((sum, day) => sum + day.nightMs, 0) / entries.length,
-    averageLongestBlockMs: entries.reduce((sum, day) => sum + day.longestBlockMs, 0) / entries.length,
-    averageEpisodeCount: entries.reduce((sum, day) => sum + day.episodeCount, 0) / entries.length
-  })).sort((left, right) => left.key.localeCompare(right.key))
-}
-
 export function buildMonthlyFamilyReport(sessions: SleepSession[], now = Date.now(), days = buildSleepDaySummaries(sessions, now)): MonthlyFamilyReport {
   const current = new Date(now)
   const currentMonthKey = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`
-  const eligible = summarizeMonths(days)
+  const eligible = summarizeSleepMonths(days)
     .filter((month) => month.key < currentMonthKey && month.recordedDays >= MIN_RECORDED_DAYS)
   const month = eligible[eligible.length - 1] ?? null
   const earlier = month ? eligible.filter((candidate) => candidate.key < month.key) : []
@@ -94,7 +65,9 @@ export function buildMonthlyFamilyReport(sessions: SleepSession[], now = Date.no
   const metrics: MonthlyReportMetric[] = ['total', 'night', 'day', 'longest', 'episodes']
   const trends = metrics.flatMap((metric): MonthlyReportTrend[] => {
     const currentValue = metricValue(month, metric)
-    const baselineValue = median(baseline.map((item) => metricValue(item, metric)))
+    const baselineValues = baseline.map((item) => metricValue(item, metric))
+    if (currentValue === null || baselineValues.some(value => value === null)) return []
+    const baselineValue = median(baselineValues as number[])
     const delta = currentValue - baselineValue
     return Math.abs(delta) >= trendThresholds[metric]
       ? [{ metric, direction: delta > 0 ? 'higher' : 'lower', currentValue, baselineValue, delta }]
@@ -104,10 +77,11 @@ export function buildMonthlyFamilyReport(sessions: SleepSession[], now = Date.no
   const milestones: MonthlyReportMilestone[] = []
   if (earlier.length >= 2) {
     const previousNightHigh = Math.max(...earlier.map((item) => item.averageNightMs))
-    const previousLongestHigh = Math.max(...earlier.map((item) => item.averageLongestBlockMs))
+    const earlierLongest = earlier.map(item => item.averageLongestBlockMs).filter((value): value is number => value !== null)
+    const previousLongestHigh = Math.max(...earlierLongest)
     const previousEpisodesLow = Math.min(...earlier.map((item) => item.averageEpisodeCount))
     if (month.averageNightMs >= previousNightHigh + 30 * 60 * 1000) milestones.push({ kind: 'night-high', value: month.averageNightMs, previousBest: previousNightHigh })
-    if (month.averageLongestBlockMs >= previousLongestHigh + 30 * 60 * 1000) milestones.push({ kind: 'longest-high', value: month.averageLongestBlockMs, previousBest: previousLongestHigh })
+    if (earlierLongest.length >= 2 && month.averageLongestBlockMs !== null && month.averageLongestBlockMs >= previousLongestHigh + 30 * 60 * 1000) milestones.push({ kind: 'longest-high', value: month.averageLongestBlockMs, previousBest: previousLongestHigh })
     if (month.averageEpisodeCount <= previousEpisodesLow - 0.5) milestones.push({ kind: 'episodes-low', value: month.averageEpisodeCount, previousBest: previousEpisodesLow })
   }
 

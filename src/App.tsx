@@ -509,7 +509,7 @@ const StatsPage = memo(function StatsPage({ sessions, locale, childName, product
         {development.first && development.latest && <div className="then-now"><strong>{t(locale, 'thenNow')}</strong><div className="then-now-grid"><DevelopmentPoint label={t(locale, 'then')} month={development.first} locale={locale} /><DevelopmentPoint label={t(locale, 'nowPeriod')} month={development.latest} locale={locale} /></div></div>}
         {development.milestones.length > 0 && <div className="development-milestones">{development.milestones.slice(0, 3).map((milestone) => <span key={milestone.kind}>{developmentMilestoneLabel(locale, milestone)}</span>)}</div>}
       </>}
-      <small>{t(locale, 'developmentOwnData')}</small>
+      <small>{t(locale, 'developmentOwnData')}</small><small className="longest-block-explanation">{t(locale, 'longestBlockExplanation')}</small>
     </div>
     <div className="insights-card change-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'sleepChangePlain')}</h2></div><b>{t(locale, sleepChange.status === 'changed' ? 'changeDetectedPlain' : sleepChange.status === 'stable' ? 'stablePatternPlain' : 'familyPlus')}</b></div>
       {sleepChange.status === 'collecting' && <p className="routine-empty">{t(locale, 'changeCollectingPlain', { recent: sleepChange.recentSampleCount, baseline: sleepChange.baselineSampleCount })}</p>}
@@ -520,12 +520,12 @@ const StatsPage = memo(function StatsPage({ sessions, locale, childName, product
     <div className="insights-card monthly-report-card"><div className="insights-card-head"><div><span>{t(locale, 'monthlyReportEyebrow')}</span><h2>{t(locale, 'monthlyReport')}</h2></div><b>{t(locale, 'familyPlus')}</b></div>
       {monthlyReport.status === 'collecting' || !monthlyReport.month ? <p className="routine-empty">{t(locale, 'monthlyReportCollecting')}</p> : <>
         <div className="monthly-report-hero"><span>{formatReportMonth(monthlyReport.month, locale)}</span><strong>{formatDuration(monthlyReport.month.averageTotalMs, locale)}</strong><small>{t(locale, 'monthlyDailyAverage')} · {t(locale, 'recordedDays', { count: monthlyReport.month.recordedDays })}</small></div>
-        <div className="monthly-kpis"><div><span>{t(locale, 'daytime')}</span><strong>{formatDuration(monthlyReport.month.averageDayMs, locale)}</strong></div><div><span>{t(locale, 'nighttime')}</span><strong>{formatDuration(monthlyReport.month.averageNightMs, locale)}</strong></div><div><span>{t(locale, 'longestBlock')}</span><strong>{formatDuration(monthlyReport.month.averageLongestBlockMs, locale)}</strong></div></div>
+        <div className="monthly-kpis"><div><span>{t(locale, 'daytime')}</span><strong>{formatDuration(monthlyReport.month.averageDayMs, locale)}</strong></div><div><span>{t(locale, 'nighttime')}</span><strong>{formatDuration(monthlyReport.month.averageNightMs, locale)}</strong></div><div><span>{t(locale, 'averageLongestBlock')}</span><strong>{monthlyReport.month.averageLongestBlockMs === null ? t(locale, 'longestBlockMissing') : formatDuration(monthlyReport.month.averageLongestBlockMs, locale)}</strong><small className="longest-block-basis">{t(locale, 'longestBlockSampleDays', { count: monthlyReport.month.longestBlockSampleDays })}</small></div></div>
         <small className="monthly-baseline">{t(locale, 'monthlyComparedTo', { count: monthlyReport.baselineMonthCount })}</small>
         {monthlyReport.trends.length === 0 ? <div className="monthly-stable"><strong>{t(locale, 'monthlyStableTitle')}</strong><span>{t(locale, 'monthlyStable')}</span></div> : <div className="monthly-trends"><strong>{t(locale, 'monthlyTrends')}</strong>{monthlyReport.trends.slice(0, 3).map((trend) => <MonthlyTrend key={trend.metric} trend={trend} locale={locale} />)}</div>}
         {monthlyReport.milestones.length > 0 && <div className="monthly-milestones"><strong>{t(locale, 'monthlyMilestones')}</strong>{monthlyReport.milestones.map((milestone) => <span key={milestone.kind}>{monthlyMilestoneLabel(locale, milestone)}</span>)}</div>}
       </>}
-      <small>{t(locale, 'monthlyOwnData')}</small>
+      <small>{t(locale, 'monthlyOwnData')}</small><small className="longest-block-explanation">{t(locale, 'longestBlockExplanation')}</small>
     </div>
     <div className="insights-card similar-days-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'similarDays')}</h2></div>{similarDays.status === 'ready' && <b>{t(locale, 'closestDays')}</b>}</div>
       {similarDays.status === 'unavailable' && <p className="routine-empty">{t(locale, 'similarDaysUnavailablePlain', { name: childName })}</p>}
@@ -582,7 +582,7 @@ function RoutineRow({ label, value, detail, variable = false }: { label: string;
 
 function DevelopmentPoint({ label, month, locale }: { label: string; month: import('./sleepDevelopment').SleepDevelopmentMonth; locale: Locale }) {
   const monthLabel = new Intl.DateTimeFormat(localeTag(locale), { year: 'numeric', month: 'short' }).format(new Date(month.year, month.month, 1))
-  return <div><span>{label} · {monthLabel}</span><strong>{formatDuration(month.averageTotalMs, locale)}</strong><small>{t(locale, 'longestBlock')}: {formatDuration(month.averageLongestBlockMs, locale)} · {t(locale, 'recordedDays', { count: month.recordedDays })}</small></div>
+  return <div><span>{label} · {monthLabel}</span><strong>{formatDuration(month.averageTotalMs, locale)}</strong><small>{t(locale, 'averageLongestBlock')}: {month.averageLongestBlockMs === null ? t(locale, 'longestBlockMissing') : formatDuration(month.averageLongestBlockMs, locale)}</small><small className="longest-block-basis">{t(locale, 'longestBlockSampleDays', { count: month.longestBlockSampleDays })}</small><small>{t(locale, 'recordedDays', { count: month.recordedDays })}</small></div>
 }
 
 function developmentMilestoneLabel(locale: Locale, milestone: SleepDevelopmentMilestone) {
@@ -613,6 +613,7 @@ function formatReportMonth(month: import('./monthlyReport').MonthlyReportMonth, 
 }
 
 function monthlyMetricLabel(locale: Locale, metric: MonthlyReportMetric) {
+  if (metric === 'longest') return t(locale, 'averageLongestBlock')
   return changeMetricLabel(locale, metric)
 }
 

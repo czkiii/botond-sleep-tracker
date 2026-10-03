@@ -21,7 +21,8 @@ export type SleepDevelopmentMonth = {
   averageTotalMs: number
   averageDayMs: number
   averageNightMs: number
-  averageLongestBlockMs: number
+  averageLongestBlockMs: number | null
+  longestBlockSampleDays: number
   averageEpisodeCount: number
 }
 
@@ -48,7 +49,8 @@ export type SleepDaySummary = {
   totalMs: number
   dayMs: number
   nightMs: number
-  longestBlockMs: number
+  // Full duration of the longest episode starting on this date; null if none starts.
+  longestBlockMs: number | null
   episodeCount: number
 }
 
@@ -136,7 +138,7 @@ export function buildSleepDaySource(sessions: SleepSession[], now: number) {
       totalMs: classified.day + classified.night,
       dayMs: classified.day,
       nightMs: classified.night,
-      longestBlockMs: episodes.length ? Math.max(...episodes) : 0,
+      longestBlockMs: episodes.length ? Math.max(...episodes) : null,
       episodeCount: episodes.length
     }
   }).sort((left, right) => left.key.localeCompare(right.key))
@@ -148,7 +150,9 @@ export function buildSleepDaySummaries(sessions: SleepSession[], now = Date.now(
   return buildSleepDaySource(sessions, now).days
 }
 
-export function buildSleepDevelopment(sessions: SleepSession[], now = Date.now(), rangeMonths: 3 | 6 | 12 = 12, customRange?: { startMonth: string; endMonth: string }, source = buildSleepDaySource(sessions, now)): SleepDevelopment {
+// Totals use every recorded date; daily maxima use only dates with episode starts.
+// Full episode duration belongs to its local start date, even across months.
+export function summarizeSleepMonths(days: SleepDaySummary[]): SleepDevelopmentMonth[] {
   const monthTotals = new Map<string, {
     year: number
     month: number
@@ -161,7 +165,7 @@ export function buildSleepDevelopment(sessions: SleepSession[], now = Date.now()
     episodes: number
   }>()
 
-  source.days.forEach((day) => {
+  days.forEach((day) => {
     const keyMonth = monthKey(day.year, day.month)
     const previous = monthTotals.get(keyMonth) ?? { year: day.year, month: day.month, recordedDays: 0, total: 0, day: 0, night: 0, longest: 0, longestDays: 0, episodes: 0 }
     previous.recordedDays += 1
@@ -169,20 +173,14 @@ export function buildSleepDevelopment(sessions: SleepSession[], now = Date.now()
     previous.day += day.dayMs
     previous.night += day.nightMs
     previous.episodes += day.episodeCount
-    if (day.episodeCount) {
+    if (day.longestBlockMs !== null) {
       previous.longest += day.longestBlockMs
       previous.longestDays += 1
     }
     monthTotals.set(keyMonth, previous)
   })
 
-  const current = new Date(now)
-  const firstIncludedMonth = new Date(current.getFullYear(), current.getMonth() - rangeMonths + 1, 1)
-  const months = Array.from(monthTotals.entries())
-    .filter(([key, value]) => {
-      const inRange = customRange ? key >= customRange.startMonth && key <= customRange.endMonth : new Date(value.year, value.month, 1) >= firstIncludedMonth
-      return inRange && value.recordedDays >= 3
-    })
+  return Array.from(monthTotals.entries())
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([, value]): SleepDevelopmentMonth => ({
       key: monthKey(value.year, value.month),
@@ -192,20 +190,31 @@ export function buildSleepDevelopment(sessions: SleepSession[], now = Date.now()
       averageTotalMs: value.total / value.recordedDays,
       averageDayMs: value.day / value.recordedDays,
       averageNightMs: value.night / value.recordedDays,
-      averageLongestBlockMs: value.longestDays ? value.longest / value.longestDays : 0,
+      averageLongestBlockMs: value.longestDays ? value.longest / value.longestDays : null,
+      longestBlockSampleDays: value.longestDays,
       averageEpisodeCount: value.episodes / value.recordedDays
     }))
+}
+
+export function buildSleepDevelopment(sessions: SleepSession[], now = Date.now(), rangeMonths: 3 | 6 | 12 = 12, customRange?: { startMonth: string; endMonth: string }, source = buildSleepDaySource(sessions, now)): SleepDevelopment {
+  const current = new Date(now)
+  const firstIncludedMonth = new Date(current.getFullYear(), current.getMonth() - rangeMonths + 1, 1)
+  const months = summarizeSleepMonths(source.days).filter(value => {
+    const inRange = customRange ? value.key >= customRange.startMonth && value.key <= customRange.endMonth : new Date(value.year, value.month, 1) >= firstIncludedMonth
+    return inRange && value.recordedDays >= 3
+  })
 
   const first = months[0] ?? null
   const latest = months[months.length - 1] ?? null
   const milestones: SleepDevelopmentMilestone[] = []
   if (first && latest && first !== latest) {
     const nightDelta = latest.averageNightMs - first.averageNightMs
-    const longestDelta = latest.averageLongestBlockMs - first.averageLongestBlockMs
+    const longestDelta = latest.averageLongestBlockMs !== null && first.averageLongestBlockMs !== null
+      ? latest.averageLongestBlockMs - first.averageLongestBlockMs : null
     const episodeDelta = latest.averageEpisodeCount - first.averageEpisodeCount
     const dayDelta = latest.averageDayMs - first.averageDayMs
     if (nightDelta >= MILESTONE_DURATION_MS) milestones.push({ kind: 'night-longer', delta: nightDelta })
-    if (longestDelta >= MILESTONE_DURATION_MS) milestones.push({ kind: 'longest-longer', delta: longestDelta })
+    if (longestDelta !== null && longestDelta >= MILESTONE_DURATION_MS) milestones.push({ kind: 'longest-longer', delta: longestDelta })
     if (episodeDelta <= -0.75) milestones.push({ kind: 'episodes-fewer', delta: episodeDelta })
     if (dayDelta <= -MILESTONE_DURATION_MS) milestones.push({ kind: 'day-shorter', delta: dayDelta })
   }

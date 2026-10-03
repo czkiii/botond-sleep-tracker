@@ -112,7 +112,7 @@ describe('night-level routine samples', () => {
     expect(JSON.stringify(sessions)).toBe(original)
     const days = buildSleepDaySummaries(sessions, now())
     expect(days.reduce((sum, day) => sum + day.totalMs, 0)).toBe(3 * 9.5 * HOUR)
-    expect(Math.max(...days.map(day => day.longestBlockMs))).toBe(5 * HOUR)
+    expect(Math.max(...days.flatMap(day => day.longestBlockMs === null ? [] : [day.longestBlockMs]))).toBe(5 * HOUR)
     expect(days.reduce((sum, day) => sum + day.episodeCount, 0)).toBe(6)
   })
 
