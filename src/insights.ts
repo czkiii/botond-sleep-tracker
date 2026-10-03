@@ -1,7 +1,7 @@
 import type { SleepSession } from './types'
 import { EXTREME_SLEEP_DURATION_MS, durationOf, getDataQualityReport, splitDayNight } from './utils'
 
-const DAY_MS = 24 * 60 * 60 * 1000
+import { statisticsLookbackStart } from './statisticsCalendar'
 const MIN_WAKE_WINDOW_MS = 5 * 60 * 1000
 const MAX_WAKE_WINDOW_MS = 12 * 60 * 60 * 1000
 const MIN_WAKE_WINDOW_SAMPLES = 3
@@ -197,7 +197,7 @@ export function buildInsightsFoundation(sessions: SleepSession[], now = Date.now
     dayOrder.set(session.id, index === 0 ? 'day-1' : index === 1 ? 'day-2' : 'day-3-plus')
   }))
 
-  const recentCutoff = now - lookbackDays * DAY_MS
+  const recentCutoff = statisticsLookbackStart(now, lookbackDays)
   const samples: Array<{ durationMs: number; sessionIds: [string, string]; bucket: 'day-1' | 'day-2' | 'day-3-plus' | 'night' }> = []
   for (let index = 0; index < allCompleted.length - 1; index += 1) {
     const previous = allCompleted[index]
@@ -231,7 +231,7 @@ export function buildInsightsFoundation(sessions: SleepSession[], now = Date.now
     return values.length >= MIN_WAKE_WINDOW_SAMPLES && middle !== null && low !== null && high !== null ? [{ key, typicalMs: middle, lowMs: low, highMs: high, sampleCount: values.length }] : []
   })
 
-  const routineCutoff = now - lookbackDays * DAY_MS
+  const routineCutoff = statisticsLookbackStart(now, lookbackDays)
   const recentCompleted = completed.filter((session) => Date.parse(session.endTime!) >= routineCutoff)
   const routineNights = completedRoutineNights(sessions, excludedIds, now, routineCutoff)
   const daytimeByDay = new Map<string, SleepSession[]>()

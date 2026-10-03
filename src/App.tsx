@@ -26,6 +26,7 @@ import type { PremiumInsightFeature, ProductPlan } from './entitlements'
 import { DEFAULT_DAY_START_MINUTES, DEFAULT_NIGHT_START_MINUTES, LONG_SLEEP_GUARDRAIL_MS, awakeSince, durationOf, formatDateHeader, formatDuration, formatTime, formatTimer, getDataQualityWarnings, todaySessions, totalToday } from './utils'
 import SleepTimeline from './SleepTimeline'
 import { useStatisticsTime } from './useStatisticsTime'
+import { localCalendarDayDistance } from './statisticsCalendar'
 import { clearFamilyDiary, clearLocalDiary, getFamilyReplacementReadiness, getSessionSyncRevision, getSyncStore, saveLocalData } from './familySync'
 import { prepareFamilyReplacement, summarizeReplacement } from './dataReplacement'
 import type { ReplacementSummary } from './dataReplacement'
@@ -359,7 +360,7 @@ function dateKeyTime(value: string) {
 }
 
 const StatsPage = memo(function StatsPage({ sessions, locale, childName, productPlan, premiumInsightsAvailable, onPreviewPlanChange }: { sessions: SleepSession[]; locale: Locale; childName: string; productPlan: ProductPlan; premiumInsightsAvailable: boolean; onPreviewPlanChange?: (plan: ProductPlan) => void }) {
-  const now = useStatisticsTime(sessions)
+  const { now, timeZone } = useStatisticsTime(sessions)
   const availableStart = sessions.length > 0 ? dateKeyAt(Math.min(...sessions.map((session) => new Date(session.startTime).getTime()))) : dateKeyAt(now)
   const availableEnd = dateKeyAt(now)
   const [range, setRange] = useState<'day' | 'week' | 'month' | 'custom'>('week')
@@ -376,7 +377,7 @@ const StatsPage = memo(function StatsPage({ sessions, locale, childName, product
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const customStartTime = dateKeyTime(customStart)
   const customEndTime = dateKeyTime(customEnd)
-  const customDays = Math.max(1, Math.round((customEndTime - customStartTime) / 86400000) + 1)
+  const customDays = Math.max(1, localCalendarDayDistance(customStartTime, customEndTime) + 1)
   const days = range === 'day' ? 1 : range === 'week' ? 7 : range === 'month' ? 30 : customDays
   const developmentMonthOptions = useMemo(() => {
     const [startYear, startMonth] = availableStart.slice(0, 7).split('-').map(Number)
@@ -389,7 +390,7 @@ const StatsPage = memo(function StatsPage({ sessions, locale, childName, product
       cursor.setMonth(cursor.getMonth() + 1)
     }
     return result
-  }, [availableStart, availableEnd, locale])
+  }, [availableStart, availableEnd, locale, timeZone])
 
   useEffect(() => {
     if (!developmentMonthOptions.length) return
@@ -397,7 +398,7 @@ const StatsPage = memo(function StatsPage({ sessions, locale, childName, product
     const last = developmentMonthOptions[developmentMonthOptions.length - 1].value
     setDevelopmentStart((current) => developmentMonthOptions.some((month) => month.value === current) ? current : first)
     setDevelopmentEnd((current) => developmentMonthOptions.some((month) => month.value === current) ? current : last)
-  }, [developmentMonthOptions])
+  }, [developmentMonthOptions, timeZone])
 
   const moveDevelopmentMonth = (target: 'start' | 'end', delta: -1 | 1) => {
     const currentValue = target === 'start' ? developmentDraftStart : developmentDraftEnd
@@ -421,17 +422,24 @@ const StatsPage = memo(function StatsPage({ sessions, locale, childName, product
     setDevelopmentRange('custom')
     setDevelopmentPickerOpen(false)
   }
-  const sleepDaySource = useMemo(() => buildSleepDaySource(sessions, now), [sessions, now])
+  const sleepDaySource = useMemo(() => buildSleepDaySource(sessions, now), [sessions, now, timeZone])
   const sleepDaysByDate = useMemo(() => new Map(sleepDaySource.days.map((day) => [day.key, { total: day.totalMs, day: day.dayMs, night: day.nightMs }])), [sleepDaySource])
 
-  const chart = useMemo(() => Array.from({ length: days }, (_, index) => {
-    const date = range === 'custom' ? new Date(customStartTime) : new Date(now)
-    date.setHours(0, 0, 0, 0)
-    date.setDate(date.getDate() + (range === 'custom' ? index : -(days - 1 - index)))
-    const dateKey = dateKeyAt(date.getTime())
-    const stats = sleepDaysByDate.get(dateKey) ?? { total: 0, day: 0, night: 0 }
-    return { dateKey, label: new Intl.DateTimeFormat(localeTag(locale), days > 31 ? { month: 'short', day: 'numeric' } : { day: 'numeric' }).format(date), hours: +(stats.total / 3600000).toFixed(2), ...stats }
-  }), [sleepDaysByDate, now, days, range, customStartTime, locale])
+  const chart = useMemo(() => {
+    const seenDates = new Set<string>()
+    return Array.from({ length: days }, (_, index) => {
+      const date = range === 'custom' ? new Date(customStartTime) : new Date(now)
+      date.setHours(0, 0, 0, 0)
+      date.setDate(date.getDate() + (range === 'custom' ? index : -(days - 1 - index)))
+      const dateKey = dateKeyAt(date.getTime())
+      const stats = sleepDaysByDate.get(dateKey) ?? { total: 0, day: 0, night: 0 }
+      return { dateKey, label: new Intl.DateTimeFormat(localeTag(locale), days > 31 ? { month: 'short', day: 'numeric' } : { day: 'numeric' }).format(date), hours: +(stats.total / 3600000).toFixed(2), ...stats }
+    }).filter(item => {
+      if (seenDates.has(item.dateKey)) return false
+      seenDates.add(item.dateKey)
+      return true
+    })
+  }, [sleepDaysByDate, now, days, range, customStartTime, locale])
 
   const sums = chart.reduce((acc, item) => ({ total: acc.total + item.total, day: acc.day + item.day, night: acc.night + item.night }), { total: 0, day: 0, night: 0 })
   const divisor = Math.max(1, chart.length)
@@ -442,18 +450,18 @@ const StatsPage = memo(function StatsPage({ sessions, locale, childName, product
     const values = sleepDaysByDate.get(selectedDate) ?? { total: 0, day: 0, night: 0 }
     const date = new Date(year, month - 1, day)
     return { ...values, label: new Intl.DateTimeFormat(localeTag(locale), { month: 'short', day: 'numeric' }).format(date) }
-  }, [sleepDaysByDate, selectedDate, locale])
+  }, [sleepDaysByDate, selectedDate, locale, timeZone])
 
   const changeRange = (next: 'day' | 'week' | 'month' | 'custom') => { setRange(next); setSelectedDate(null) }
   const display = selectedStats ?? { total: sums.total / divisor, day: sums.day / divisor, night: sums.night / divisor, label: t(locale, 'average') }
   const timelineDate = selectedDate ?? (range === 'custom' ? customEnd : undefined)
   const chartUnit = locale === 'hu' ? 'ó' : locale === 'de' ? 'Std.' : 'hr'
-  const insights = useMemo(() => premiumInsightsAvailable ? buildInsightsFoundation(sessions, now, { lookbackDays: insightsRange }) : null, [premiumInsightsAvailable, sessions, now, insightsRange])
-  const similarDays = useMemo(() => premiumInsightsAvailable ? buildSimilarDaysInsight(sessions, now, insightsRange) : null, [premiumInsightsAvailable, sessions, now, insightsRange])
-  const prediction = useMemo(() => premiumInsightsAvailable ? buildPredictionLite(sessions, now, insightsRange) : null, [premiumInsightsAvailable, sessions, now, insightsRange])
-  const development = useMemo(() => premiumInsightsAvailable ? buildSleepDevelopment(sessions, now, developmentRange === 'custom' ? 12 : developmentRange, developmentRange === 'custom' ? { startMonth: developmentStart, endMonth: developmentEnd } : undefined, sleepDaySource) : null, [premiumInsightsAvailable, sessions, now, developmentRange, developmentStart, developmentEnd, sleepDaySource])
-  const sleepChange = useMemo(() => premiumInsightsAvailable ? buildSleepChangeInsight(sessions, now, sleepDaySource.days) : null, [premiumInsightsAvailable, sessions, now, sleepDaySource])
-  const monthlyReport = useMemo(() => premiumInsightsAvailable ? buildMonthlyFamilyReport(sessions, now, sleepDaySource.days) : null, [premiumInsightsAvailable, sessions, now, sleepDaySource])
+  const insights = useMemo(() => premiumInsightsAvailable ? buildInsightsFoundation(sessions, now, { lookbackDays: insightsRange }) : null, [premiumInsightsAvailable, sessions, now, insightsRange, timeZone])
+  const similarDays = useMemo(() => premiumInsightsAvailable ? buildSimilarDaysInsight(sessions, now, insightsRange) : null, [premiumInsightsAvailable, sessions, now, insightsRange, timeZone])
+  const prediction = useMemo(() => premiumInsightsAvailable ? buildPredictionLite(sessions, now, insightsRange) : null, [premiumInsightsAvailable, sessions, now, insightsRange, timeZone])
+  const development = useMemo(() => premiumInsightsAvailable ? buildSleepDevelopment(sessions, now, developmentRange === 'custom' ? 12 : developmentRange, developmentRange === 'custom' ? { startMonth: developmentStart, endMonth: developmentEnd } : undefined, sleepDaySource) : null, [premiumInsightsAvailable, sessions, now, developmentRange, developmentStart, developmentEnd, sleepDaySource, timeZone])
+  const sleepChange = useMemo(() => premiumInsightsAvailable ? buildSleepChangeInsight(sessions, now, sleepDaySource.days) : null, [premiumInsightsAvailable, sessions, now, sleepDaySource, timeZone])
+  const monthlyReport = useMemo(() => premiumInsightsAvailable ? buildMonthlyFamilyReport(sessions, now, sleepDaySource.days) : null, [premiumInsightsAvailable, sessions, now, sleepDaySource, timeZone])
   const developmentChart = useMemo(() => (development?.months ?? []).map((item) => ({
     key: item.key,
     label: new Intl.DateTimeFormat(localeTag(locale), { month: 'short' }).format(new Date(item.year, item.month, 1)).replace('.', '').slice(0, 3),
@@ -474,6 +482,7 @@ const StatsPage = memo(function StatsPage({ sessions, locale, childName, product
     {onPreviewPlanChange && <InternalPlanPreview locale={locale} plan={productPlan} onChange={onPreviewPlanChange} />}
     <div className="segmented four-options"><button className={range === 'day' ? 'active' : ''} onClick={() => changeRange('day')}>{t(locale, 'day')}</button><button className={range === 'week' ? 'active' : ''} onClick={() => changeRange('week')}>{t(locale, 'week')}</button><button className={range === 'month' ? 'active' : ''} onClick={() => changeRange('month')}>{t(locale, 'month')}</button><button className={range === 'custom' ? 'active' : ''} onClick={() => changeRange('custom')}>{t(locale, 'customRange')}</button></div>
     {range === 'custom' && <div className="custom-range-picker"><label>{t(locale, 'fromDate')}<input type="date" min={availableStart} max={customEnd} value={customStart} onChange={(event) => setCustomStart(event.target.value)} /></label><label>{t(locale, 'toDate')}<input type="date" min={customStart} max={availableEnd} value={customEnd} onChange={(event) => setCustomEnd(event.target.value)} /></label></div>}
+    <details className="statistics-timezone"><summary>{t(locale, 'statisticsTimeZone', { zone: timeZone })}</summary><p>{t(locale, 'statisticsTimeZonePolicy')}</p><p>{t(locale, 'statisticsWindowPolicy')}</p></details>
     <div className="statistics-overlap-policy">
       {sleepDaySource.conflictSessionIds.length > 0 && <p role="status">{t(locale, 'statisticsTypeConflict', { count: sleepDaySource.conflictSessionIds.length })}</p>}
       <details><summary>{t(locale, 'statisticsOverlapTitle')}</summary><p>{t(locale, 'statisticsOverlapPolicy')}</p></details>

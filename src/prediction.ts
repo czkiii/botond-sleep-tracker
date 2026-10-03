@@ -1,7 +1,7 @@
 import type { SleepSession } from './types'
 import { DEFAULT_DAY_START_MINUTES, DEFAULT_NIGHT_START_MINUTES, getDataQualityReport, splitDayNight } from './utils'
 
-const DAY_MS = 24 * 60 * 60 * 1000
+import { statisticsLookbackStart } from './statisticsCalendar'
 const MIN_WAKE_WINDOW_MS = 5 * 60 * 1000
 const MAX_WAKE_WINDOW_MS = 12 * 60 * 60 * 1000
 
@@ -110,7 +110,7 @@ export function buildPredictionLite(sessions: SleepSession[], now = Date.now(), 
   }
   if (lastWake < contextStart.getTime()) return empty('unavailable', { unavailableReason: 'stale-wake', lastWakeTime: lastWake })
   const currentWakeMs = now - lastWake
-  const cutoff = now - lookbackDays * DAY_MS
+  const cutoff = statisticsLookbackStart(now, lookbackDays)
   const bucket = nextBucket(cleanCompleted, now, cutoff)
 
   const dayOrder = new Map<string, Exclude<PredictionBucket, 'night'>>()

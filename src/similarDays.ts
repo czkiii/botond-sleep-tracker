@@ -1,8 +1,9 @@
 import type { SleepSession } from './types'
 import { getDataQualityReport, splitDayNight } from './utils'
 
+import { localCalendarDayDistance } from './statisticsCalendar'
+
 const HOUR_MS = 60 * 60 * 1000
-const DAY_MS = 24 * HOUR_MS
 export const SIMILAR_DAYS_HISTORY_DAYS = 730
 
 export type DaySnapshot = {
@@ -109,11 +110,14 @@ export function buildSimilarDaysInsight(sessions: SleepSession[], now = Date.now
 
   const candidates: Array<{ snapshot: DaySnapshot; distance: number; nextSleep: SimilarDayMatch['nextSleep'] }> = []
   const earliestStart = clean.reduce((earliest, session) => Math.min(earliest, Date.parse(session.startTime)), now)
-  const availableHistoryDays = Math.max(1, Math.ceil((currentDayStart - startOfLocalDay(new Date(earliestStart))) / DAY_MS))
+  const availableHistoryDays = Math.max(1, localCalendarDayDistance(earliestStart, currentDayStart))
   const searchDays = Math.min(SIMILAR_DAYS_HISTORY_DAYS, availableHistoryDays)
+  const seenDates = new Set<number>()
   for (let offset = 1; offset <= searchDays; offset += 1) {
     const date = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate() - offset)
     const dayStart = startOfLocalDay(date)
+    if (dayStart >= currentDayStart || seenDates.has(dayStart)) continue
+    seenDates.add(dayStart)
     const dayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime()
     if (sessions.some((session) => excluded.has(session.id) && overlapsDay(session, dayStart, dayEnd, now))) continue
     const snapshot = snapshotForDay(clean, date, reference, now)

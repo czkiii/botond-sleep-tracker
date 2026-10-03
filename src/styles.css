@@ -369,6 +369,8 @@ svg { display: block; }
 .statistics-overlap-policy summary { cursor: pointer; padding: 8px 0; }
 .statistics-overlap-policy p { margin: 8px 0; }
 .statistics-overlap-policy [role="status"] { color: #ffc6a3; }
+.statistics-timezone { order: 1; color: #a5bad0; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.statistics-timezone summary { cursor: pointer; padding: 8px 0; }
 .monthly-skipped { color: #a5bad0; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
 .monthly-skipped summary { cursor: pointer; padding: 8px 0; }
 .monthly-skipped ul { padding-left: 20px; margin: 8px 0 0; }
