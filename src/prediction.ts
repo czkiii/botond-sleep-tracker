@@ -9,6 +9,8 @@ export type PredictionBucket = 'day-1' | 'day-2' | 'day-3-plus' | 'night'
 
 export type PredictionLite = {
   status: 'ready' | 'collecting' | 'unavailable'
+  unavailableReason: 'missing-wake' | 'sleeping' | 'invalid-data' | 'stale-wake' | null
+  lastWakeTime: number | null
   lookbackDays: 7 | 14 | 30
   bucket: PredictionBucket | null
   sampleCount: number
@@ -74,8 +76,9 @@ function nextBucket(sessions: SleepSession[], now: number, cutoff: number): Pred
 }
 
 export function buildPredictionLite(sessions: SleepSession[], now = Date.now(), lookbackDays: 7 | 14 | 30 = 14): PredictionLite {
-  const empty = (status: 'collecting' | 'unavailable', bucket: PredictionBucket | null, sampleCount = 0, currentWakeMs: number | null = null): PredictionLite => ({
-    status, lookbackDays, bucket, sampleCount, currentWakeMs, typicalTime: null, windowStart: null, windowEnd: null, windowState: null, sourceSessionIds: []
+  const empty = (status: 'collecting' | 'unavailable', details: Partial<Pick<PredictionLite, 'bucket' | 'sampleCount' | 'currentWakeMs' | 'lastWakeTime' | 'unavailableReason'>> = {}): PredictionLite => ({
+    status, lookbackDays, bucket: null, sampleCount: 0, currentWakeMs: null, lastWakeTime: null, unavailableReason: null,
+    typicalTime: null, windowStart: null, windowEnd: null, windowState: null, sourceSessionIds: [], ...details
   })
   const report = getDataQualityReport(sessions, now)
   const excluded = new Set(report.excludedSessionIds)
@@ -84,13 +87,29 @@ export function buildPredictionLite(sessions: SleepSession[], now = Date.now(), 
   const tomorrowStart = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate() + 1).getTime()
   const currentHasIssue = sessions.some((session) => excluded.has(session.id) && overlaps(session, todayStart, tomorrowStart, now))
   const active = sessions.some((session) => !session.endTime)
-  if (active || currentHasIssue) return empty('unavailable', null)
+  // Unknown or future timestamps cannot establish the latest real waking.
+  const unknownTiming = sessions.some(session => !Number.isFinite(Date.parse(session.startTime)) ||
+    Date.parse(session.startTime) > now || (session.endTime !== null &&
+      (!Number.isFinite(Date.parse(session.endTime)) || Date.parse(session.endTime) > now)))
+  if (unknownTiming) return empty('unavailable', { unavailableReason: 'invalid-data' })
+  if (active) return empty('unavailable', { unavailableReason: 'sleeping' })
+  if (currentHasIssue) return empty('unavailable', { unavailableReason: 'invalid-data' })
 
   const allCompleted = sessions.filter((session) => session.endTime).slice().sort((a, b) => Date.parse(a.startTime) - Date.parse(b.startTime))
   const cleanCompleted = allCompleted.filter((session) => !excluded.has(session.id))
   const lastCompleted = allCompleted.slice().sort((a, b) => Date.parse(b.endTime!) - Date.parse(a.endTime!))[0]
-  if (!lastCompleted || excluded.has(lastCompleted.id)) return empty('unavailable', null)
-  const currentWakeMs = Math.max(0, now - Date.parse(lastCompleted.endTime!))
+  if (!lastCompleted) return empty('unavailable', { unavailableReason: 'missing-wake' })
+  if (excluded.has(lastCompleted.id)) return empty('unavailable', { unavailableReason: 'invalid-data' })
+  const lastWake = Date.parse(lastCompleted.endTime!)
+  // Calendar-based display eligibility, not a physiological wake-duration
+  // limit. After midnight retain the preceding evening until day starts.
+  const contextStart = new Date(todayStart)
+  if (reference.getHours() * 60 + reference.getMinutes() < DEFAULT_DAY_START_MINUTES) {
+    contextStart.setDate(contextStart.getDate() - 1)
+    contextStart.setMinutes(DEFAULT_NIGHT_START_MINUTES)
+  }
+  if (lastWake < contextStart.getTime()) return empty('unavailable', { unavailableReason: 'stale-wake', lastWakeTime: lastWake })
+  const currentWakeMs = now - lastWake
   const cutoff = now - lookbackDays * DAY_MS
   const bucket = nextBucket(cleanCompleted, now, cutoff)
 
@@ -122,16 +141,15 @@ export function buildPredictionLite(sessions: SleepSession[], now = Date.now(), 
       samples.push({ durationMs, sessionIds: [previous.id, next.id] })
     }
   }
-  if (samples.length < 3) return empty('collecting', bucket, samples.length, currentWakeMs)
+  if (samples.length < 3) return empty('collecting', { bucket, sampleCount: samples.length, currentWakeMs, lastWakeTime: lastWake })
 
   const durations = samples.map((sample) => sample.durationMs)
-  const lastWake = Date.parse(lastCompleted.endTime!)
   const typicalTime = lastWake + median(durations)
   const windowStart = lastWake + quantile(durations, 0.25)
   const windowEnd = lastWake + quantile(durations, 0.75)
   const windowState = now < windowStart ? 'upcoming' : now <= windowEnd ? 'likely-now' : 'passed'
   return {
-    status: 'ready', lookbackDays, bucket, sampleCount: samples.length, currentWakeMs,
+    status: 'ready', unavailableReason: null, lastWakeTime: lastWake, lookbackDays, bucket, sampleCount: samples.length, currentWakeMs,
     typicalTime, windowStart, windowEnd, windowState, sourceSessionIds: Array.from(new Set(samples.flatMap((sample) => sample.sessionIds)))
   }
 }
