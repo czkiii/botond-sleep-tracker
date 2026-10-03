@@ -101,9 +101,54 @@ export async function checkPredictionContext(browser, origin) {
       assert.equal(await card.locator('.prediction-window').count(), 1)
       await page.clock.runFor(1000)
       await unavailable(labels[locale][2])
+
+      // S08: an open sleep must hide awake comparisons, including immediately
+      // after starting, after reopening, and across the local midnight boundary.
+      const similar = page.locator('.similar-days-card')
+      const similarEmpty = {
+        hu: 'most legyen ébren', en: 'must currently be awake', de: 'muss gerade wach sein',
+      }
+      const noSimilar = async () => {
+        await similar.locator('.routine-empty').filter({ hasText: similarEmpty[locale] }).waitFor()
+        assert.equal(await similar.locator('.similar-day-row, .insights-card-head b').count(), 0)
+      }
+      const captureSimilar = async name => {
+        await similar.evaluate(node => node.scrollIntoView({ block: 'center' }))
+        assert.equal(await similar.evaluate(node => {
+          const box = node.getBoundingClientRect()
+          return [...node.querySelectorAll('*')].some(child => child.scrollWidth > child.clientWidth + 1 || child.getBoundingClientRect().right > box.right + 1)
+        }), false, 'Similar days must fit a narrow phone')
+        await similar.screenshot({ path: `.private-backups/s08-${locale}-${width}-${name}.png` })
+      }
+      await page.clock.setSystemTime(new Date('2026-09-30T10:00:00Z'))
+      await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+      const similarHistory = [23, 24, 25].flatMap(day => [[day, 8, day, 9, 'day'], [day, 11, day, 12, 'day']])
+      const awakeToday = [...similarHistory, [30, 8, 30, 9, 'day']]
+      await apply(awakeToday)
+      assert.equal(await similar.locator('.similar-day-row').count(), 3)
+      for (const startHour of [11, 12]) {
+        await apply([...awakeToday, [30, startHour, null, null, 'day']])
+        await noSimilar()
+      }
+      await captureSimilar('active')
+      await apply([...awakeToday, [30, 11, 30, 12, 'day']])
+      assert.equal(await similar.locator('.similar-day-row').count(), 3)
+      assert.equal(await similar.locator('.insights-card-head b').count(), 1)
+      await captureSimilar('awake')
+      await apply([...awakeToday, [30, 11, null, null, 'day']])
+      await noSimilar()
+      await apply([...awakeToday, [31, 11, null, null, 'day']])
+      await noSimilar()
+      await page.clock.setSystemTime(new Date('2026-09-30T21:59:00Z'))
+      await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+      await apply([...awakeToday, [30, 23, null, null]])
+      await noSimilar()
+      await page.clock.runFor(60000)
+      await noSimilar()
       assert.deepEqual(errors, [])
       assert.deepEqual(unexpected, [])
       console.log(`PASS: prediction context ${locale}/${width}, missing/stale/active/invalid, recovery/removal, range changes, dated night, midnight/06:00`)
+      console.log(`PASS: similar days active sleep ${locale}/${width}, start/finish/reopen/future, midnight, no stale matches`)
     } finally { await context.close() }
   }
 }

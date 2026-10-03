@@ -92,6 +92,11 @@ function snapshotForDay(sessions: SleepSession[], date: Date, reference: Date, n
 }
 
 export function buildSimilarDaysInsight(sessions: SleepSession[], now = Date.now(), lookbackDays: 7 | 14 | 30 = 14): SimilarDaysInsight {
+  // An unfinished sleep cannot provide a reliable awake context. Check before
+  // quality filtering so even an invalid open record cannot expose an old waking.
+  if (sessions.some((session) => !session.endTime)) {
+    return { status: 'unavailable', lookbackDays, current: null, candidateCount: 0, matches: [] }
+  }
   const reference = new Date(now)
   const report = getDataQualityReport(sessions, now)
   const excluded = new Set(report.excludedSessionIds)
