@@ -365,6 +365,10 @@ svg { display: block; }
 .change-signal > p { margin: 2px 0 !important; color: #a9bfd3; font-size: 11px; line-height: 1.45; }
 .change-signal > small { color: #718ba4; font-size: 9px; line-height: 1.35; }
 .monthly-report-card { display: grid; gap: 12px; }
+.monthly-skipped { color: #a5bad0; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.monthly-skipped summary { cursor: pointer; padding: 8px 0; }
+.monthly-skipped ul { padding-left: 20px; margin: 8px 0 0; }
+.monthly-skipped li + li { margin-top: 6px; }
 .monthly-report-hero { display: grid; gap: 5px; padding: 15px; border: 1px solid rgba(117, 159, 238, .18); border-radius: 16px; background: linear-gradient(145deg, rgba(69, 99, 181, .18), rgba(30, 69, 116, .08)); }
 .monthly-report-hero span { color: #9fc7ee; font-size: 12px; font-weight: 730; text-transform: capitalize; }
 .monthly-report-hero strong { color: #e1efff; font-size: 30px; letter-spacing: -.035em; }

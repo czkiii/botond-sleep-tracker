@@ -523,10 +523,13 @@ const StatsPage = memo(function StatsPage({ sessions, locale, childName, product
       {monthlyReport.status === 'collecting' || !monthlyReport.month ? <p className="routine-empty">{t(locale, 'monthlyReportCollecting')}</p> : <>
         <div className="monthly-report-hero"><span>{formatReportMonth(monthlyReport.month, locale)}</span><strong>{formatDuration(monthlyReport.month.averageTotalMs, locale)}</strong><small>{t(locale, 'monthlyDailyAverage')} · {t(locale, 'recordedDays', { count: monthlyReport.month.recordedDays })}</small></div>
         <div className="monthly-kpis"><div><span>{t(locale, 'daytime')}</span><strong>{formatDuration(monthlyReport.month.averageDayMs, locale)}</strong></div><div><span>{t(locale, 'nighttime')}</span><strong>{formatDuration(monthlyReport.month.averageNightMs, locale)}</strong></div><div><span>{t(locale, 'averageLongestBlock')}</span><strong>{monthlyReport.month.averageLongestBlockMs === null ? t(locale, 'longestBlockMissing') : formatDuration(monthlyReport.month.averageLongestBlockMs, locale)}</strong><small className="longest-block-basis">{t(locale, 'longestBlockSampleDays', { count: monthlyReport.month.longestBlockSampleDays })}</small></div></div>
-        <small className="monthly-baseline">{t(locale, 'monthlyComparedTo', { count: monthlyReport.baselineMonthCount })}</small>
+        <small className="monthly-baseline">{t(locale, 'monthlyComparedTo', { count: monthlyReport.baselineMonthCount })} {t(locale, 'monthlyBaselinePeriods', { months: monthlyReport.baselineMonths.map(month => formatReportMonth(month, locale)).join('; ') })}</small>
         {monthlyReport.trends.length === 0 ? <div className="monthly-stable"><strong>{t(locale, 'monthlyStableTitle')}</strong><span>{t(locale, 'monthlyStable')}</span></div> : <div className="monthly-trends"><strong>{t(locale, 'monthlyTrends')}</strong>{monthlyReport.trends.slice(0, 3).map((trend) => <MonthlyTrend key={trend.metric} trend={trend} locale={locale} />)}</div>}
-        {monthlyReport.milestones.length > 0 && <div className="monthly-milestones"><strong>{t(locale, 'monthlyMilestones')}</strong>{monthlyReport.milestones.map((milestone) => <span key={milestone.kind}>{monthlyMilestoneLabel(locale, milestone)}</span>)}</div>}
+        {monthlyReport.milestones.length > 0 && <div className="monthly-milestones"><strong>{t(locale, 'monthlyMilestones')}</strong><small className="monthly-milestone-periods">{t(locale, 'monthlyMilestonePeriods', { months: monthlyReport.milestoneMonths.map(month => formatReportMonth(month, locale)).join('; ') })}</small>{monthlyReport.milestones.map((milestone) => <span key={milestone.kind}>{monthlyMilestoneLabel(locale, milestone)}</span>)}</div>}
       </>}
+      {monthlyReport.status === 'collecting' && monthlyReport.month && <small className="monthly-candidate">{t(locale, 'monthlyCandidate', { month: formatReportMonth(monthlyReport.month, locale) })}</small>}
+      <small className="monthly-current-period">{t(locale, 'monthlyCurrentPeriod', { month: formatReportMonth(monthlyReport.currentMonth, locale) })}</small>
+      {monthlyReport.skippedMonths.length > 0 && <details className="monthly-skipped"><summary>{t(locale, 'monthlySkippedPeriods', { count: monthlyReport.skippedMonths.reduce((sum, period) => sum + period.count, 0) })}</summary><small>{t(locale, 'monthlySkippedScope')}</small><ul>{monthlyReport.skippedMonths.map(period => <li key={period.start.key}>{formatReportMonth(period.start, locale)}{period.count > 1 && <> – {formatReportMonth(period.end, locale)}</>}: {t(locale, period.recordedDays === 0 ? 'monthlyNoData' : 'monthlyTooFewDates', { count: period.recordedDays })}</li>)}</ul></details>}
       <small>{t(locale, 'monthlyOwnData')}</small><small className="recorded-coverage">{t(locale, 'recordedCoverage')}</small><small className="longest-block-explanation">{t(locale, 'longestBlockExplanation')}</small>
     </div>
     <div className="insights-card similar-days-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'similarDays')}</h2></div>{similarDays.status === 'ready' && <b>{t(locale, 'closestDays')}</b>}</div>
@@ -610,7 +613,7 @@ function changeMetricLabel(locale: Locale, metric: SleepChangeMetric) {
   return t(locale, metric === 'total' ? 'changeMetricTotal' : metric === 'day' ? 'changeMetricDay' : metric === 'night' ? 'changeMetricNight' : metric === 'longest' ? 'changeMetricLongest' : 'changeMetricEpisodes')
 }
 
-function formatReportMonth(month: import('./monthlyReport').MonthlyReportMonth, locale: Locale) {
+function formatReportMonth(month: import('./monthlyReport').ReportMonthRef, locale: Locale) {
   return new Intl.DateTimeFormat(localeTag(locale), { year: 'numeric', month: 'long' }).format(new Date(month.year, month.month, 1))
 }
 

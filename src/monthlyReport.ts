@@ -7,6 +7,13 @@ const MIN_RECORDED_DAYS = 14
 export type MonthlyReportMetric = 'total' | 'day' | 'night' | 'longest' | 'episodes'
 
 export type MonthlyReportMonth = SleepDevelopmentMonth
+export type ReportMonthRef = Pick<MonthlyReportMonth, 'key' | 'year' | 'month'>
+export type SkippedReportMonths = {
+  start: ReportMonthRef
+  end: ReportMonthRef
+  count: number
+  recordedDays: number
+}
 
 export type MonthlyReportTrend = {
   metric: MonthlyReportMetric
@@ -26,6 +33,10 @@ export type MonthlyFamilyReport = {
   status: 'collecting' | 'ready'
   month: MonthlyReportMonth | null
   baselineMonthCount: number
+  baselineMonths: MonthlyReportMonth[]
+  milestoneMonths: MonthlyReportMonth[]
+  currentMonth: ReportMonthRef
+  skippedMonths: SkippedReportMonths[]
   trends: MonthlyReportTrend[]
   milestones: MonthlyReportMilestone[]
 }
@@ -52,15 +63,38 @@ function metricValue(month: MonthlyReportMonth, metric: MonthlyReportMetric) {
   return month.averageEpisodeCount
 }
 
+function monthRef(index: number): ReportMonthRef {
+  const year = Math.floor(index / 12), month = index % 12
+  return { key: `${year}-${String(month + 1).padStart(2, '0')}`, year, month }
+}
+
+// Enumerate recorded months only; a long empty gap is one range, not hundreds of rows.
+function skippedPeriods(months: MonthlyReportMonth[], start: ReportMonthRef | undefined, current: ReportMonthRef): SkippedReportMonths[] {
+  if (!start) return []
+  let cursor = start.year * 12 + start.month
+  const end = current.year * 12 + current.month
+  const skipped: SkippedReportMonths[] = []
+  for (const month of months.filter(item => item.key >= start.key && item.key < current.key)) {
+    const index = month.year * 12 + month.month
+    if (index > cursor) skipped.push({ start: monthRef(cursor), end: monthRef(index - 1), count: index - cursor, recordedDays: 0 })
+    if (month.recordedDays < MIN_RECORDED_DAYS) skipped.push({ start: month, end: month, count: 1, recordedDays: month.recordedDays })
+    cursor = index + 1
+  }
+  if (cursor < end) skipped.push({ start: monthRef(cursor), end: monthRef(end - 1), count: end - cursor, recordedDays: 0 })
+  return skipped
+}
+
 export function buildMonthlyFamilyReport(sessions: SleepSession[], now = Date.now(), days = buildSleepDaySummaries(sessions, now)): MonthlyFamilyReport {
   const current = new Date(now)
-  const currentMonthKey = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`
-  const eligible = summarizeSleepMonths(days)
-    .filter((month) => month.key < currentMonthKey && month.recordedDays >= MIN_RECORDED_DAYS)
+  const currentMonth = monthRef(current.getFullYear() * 12 + current.getMonth())
+  const months = summarizeSleepMonths(days)
+  const eligible = months.filter((month) => month.key < currentMonth.key && month.recordedDays >= MIN_RECORDED_DAYS)
   const month = eligible[eligible.length - 1] ?? null
   const earlier = month ? eligible.filter((candidate) => candidate.key < month.key) : []
   const baseline = earlier.slice(-3)
-  if (!month || baseline.length === 0) return { status: 'collecting', month, baselineMonthCount: baseline.length, trends: [], milestones: [] }
+  const period = { currentMonth, baselineMonths: baseline, milestoneMonths: earlier, baselineMonthCount: baseline.length,
+    skippedMonths: skippedPeriods(months, baseline[0] ?? months[0], currentMonth) }
+  if (!month || baseline.length === 0) return { status: 'collecting', month, ...period, trends: [], milestones: [] }
 
   const metrics: MonthlyReportMetric[] = ['total', 'night', 'day', 'longest', 'episodes']
   const trends = metrics.flatMap((metric): MonthlyReportTrend[] => {
@@ -85,7 +119,7 @@ export function buildMonthlyFamilyReport(sessions: SleepSession[], now = Date.no
     if (month.averageEpisodeCount <= previousEpisodesLow - 0.5) milestones.push({ kind: 'episodes-low', value: month.averageEpisodeCount, previousBest: previousEpisodesLow })
   }
 
-  return { status: 'ready', month, baselineMonthCount: baseline.length, trends, milestones }
+  return { status: 'ready', month, ...period, trends, milestones }
 }
 
 export const MONTHLY_REPORT_MIN_RECORDED_DAYS = MIN_RECORDED_DAYS
