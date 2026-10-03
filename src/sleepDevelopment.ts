@@ -1,6 +1,7 @@
 import type { SleepSession } from './types'
 import { EXTREME_SLEEP_DURATION_MS, FUTURE_TOLERANCE_MS, MIN_ANALYTICS_SLEEP_MS } from './utils'
 import { splitSleepTime } from './sleepTime'
+import { getDataQualityReport } from './utils'
 
 const MILESTONE_DURATION_MS = 45 * 60 * 1000
 
@@ -91,7 +92,9 @@ function classifyUnion(pieces: ClassifiedInterval[]) {
     if (!covering.length) continue
     const highestPriority = Math.max(...covering.map((piece) => piece.priority))
     const candidates = covering.filter((piece) => piece.priority === highestPriority)
-    const kind: SleepKind = candidates.some((piece) => piece.kind === 'night') ? 'night' : 'day'
+    // Conflicting manual groups have already been excluded. Automatic pieces
+    // agree at a given instant; all highest-priority candidates share a kind.
+    const kind = candidates[0].kind
     if (kind === 'day') day += end - start
     else night += end - start
   }
@@ -101,8 +104,11 @@ function classifyUnion(pieces: ClassifiedInterval[]) {
 // One render snapshot can share this preparation across the chart and reports.
 // Consumers must use the same sessions/now and must not mutate the result.
 export function buildSleepDaySource(sessions: SleepSession[], now: number) {
+  const conflictSessionIds = [...new Set(getDataQualityReport(sessions, now).issues
+    .filter(issue => issue.kind === 'classification-conflict').flatMap(issue => issue.sessionIds))]
+  const conflicts = new Set(conflictSessionIds)
   const intervals = sessions.flatMap((session) => {
-    if (!session.endTime) return []
+    if (!session.endTime || conflicts.has(session.id)) return []
     const start = Date.parse(session.startTime)
     const end = Date.parse(session.endTime)
     const duration = end - start
@@ -143,7 +149,7 @@ export function buildSleepDaySource(sessions: SleepSession[], now: number) {
     }
   }).sort((left, right) => left.key.localeCompare(right.key))
 
-  return { days, usableSessionCount: intervals.length }
+  return { days, usableSessionCount: intervals.length, conflictSessionIds }
 }
 
 export function buildSleepDaySummaries(sessions: SleepSession[], now = Date.now()) {
@@ -196,7 +202,7 @@ export function summarizeSleepMonths(days: SleepDaySummary[]): SleepDevelopmentM
     }))
 }
 
-export function buildSleepDevelopment(sessions: SleepSession[], now = Date.now(), rangeMonths: 3 | 6 | 12 = 12, customRange?: { startMonth: string; endMonth: string }, source = buildSleepDaySource(sessions, now)): SleepDevelopment {
+export function buildSleepDevelopment(sessions: SleepSession[], now = Date.now(), rangeMonths: 3 | 6 | 12 = 12, customRange?: { startMonth: string; endMonth: string }, source: Pick<ReturnType<typeof buildSleepDaySource>, 'days' | 'usableSessionCount'> = buildSleepDaySource(sessions, now)): SleepDevelopment {
   const current = new Date(now)
   const firstIncludedMonth = new Date(current.getFullYear(), current.getMonth() - rangeMonths + 1, 1)
   const months = summarizeSleepMonths(source.days).filter(value => {

@@ -2,6 +2,7 @@ import type { Locale } from './i18n'
 import { localeTag } from './i18n'
 import type { SleepSession } from './types'
 import { splitSleepTime } from './sleepTime'
+import { conflictingSleepGroups } from './sleepOverlap'
 export { DEFAULT_DAY_START_MINUTES, DEFAULT_NIGHT_START_MINUTES } from './sleepTime'
 
 export const LONG_SLEEP_GUARDRAIL_MS = 12 * 60 * 60 * 1000
@@ -10,7 +11,7 @@ export const MIN_ANALYTICS_SLEEP_MS = 2 * 60 * 1000
 export const DUPLICATE_TOLERANCE_MS = 2 * 60 * 1000
 export const FUTURE_TOLERANCE_MS = 60 * 1000
 
-export type DataQualityIssueKind = 'invalid-time' | 'future-time' | 'suspiciously-short' | 'stale-active' | 'extreme-duration' | 'possible-duplicate' | 'overlap'
+export type DataQualityIssueKind = 'invalid-time' | 'future-time' | 'suspiciously-short' | 'stale-active' | 'extreme-duration' | 'possible-duplicate' | 'overlap' | 'classification-conflict'
 
 export type DataQualityIssue = {
   kind: DataQualityIssueKind
@@ -142,6 +143,7 @@ export function getDataQualityReport(sessions: SleepSession[], now = Date.now())
       const current = sorted[index]
       const next = sorted[nextIndex]
       if (next.start >= current.end) break
+      if (current.session.childId !== next.session.childId) continue
       const sameEndState = Boolean(current.session.endTime) === Boolean(next.session.endTime)
       const nearSameTimes = Math.abs(current.start - next.start) <= DUPLICATE_TOLERANCE_MS && Math.abs(current.end - next.end) <= DUPLICATE_TOLERANCE_MS
       issues.push({
@@ -153,6 +155,9 @@ export function getDataQualityReport(sessions: SleepSession[], now = Date.now())
     }
   }
 
+  for (const sessionIds of conflictingSleepGroups(validIntervals)) {
+    issues.push({ kind: 'classification-conflict', severity: 'error', sessionIds, excludesFromInsights: true })
+  }
   const excluded = new Set(issues.filter((issue) => issue.excludesFromInsights).flatMap((issue) => issue.sessionIds))
   return {
     issues,

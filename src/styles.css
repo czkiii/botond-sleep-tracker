@@ -365,6 +365,10 @@ svg { display: block; }
 .change-signal > p { margin: 2px 0 !important; color: #a9bfd3; font-size: 11px; line-height: 1.45; }
 .change-signal > small { color: #718ba4; font-size: 9px; line-height: 1.35; }
 .monthly-report-card { display: grid; gap: 12px; }
+.statistics-overlap-policy { order: 1; color: #a5bad0; font-size: 12px; line-height: 1.5; margin: 10px 0; }
+.statistics-overlap-policy summary { cursor: pointer; padding: 8px 0; }
+.statistics-overlap-policy p { margin: 8px 0; }
+.statistics-overlap-policy [role="status"] { color: #ffc6a3; }
 .monthly-skipped { color: #a5bad0; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
 .monthly-skipped summary { cursor: pointer; padding: 8px 0; }
 .monthly-skipped ul { padding-left: 20px; margin: 8px 0 0; }

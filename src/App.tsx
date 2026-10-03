@@ -301,7 +301,7 @@ function TodayPage({ data, child, sessions, now, locale, current, onSelectChild,
   const elapsed = current ? durationOf(current, now) : awakeSince(sessions, now)
   const qualityWarnings = getDataQualityWarnings(sessions, now)
   const showLongSleepReminder = Boolean(current && data.settings.longSleepReminderEnabled && elapsed >= LONG_SLEEP_GUARDRAIL_MS)
-  const visibleQualityWarning = qualityWarnings.find((issue) => issue.kind !== 'stale-active')
+  const visibleQualityWarning = qualityWarnings.find(issue => issue.kind === 'classification-conflict') ?? qualityWarnings.find((issue) => issue.kind !== 'stale-active')
 
   return <section className="screen today-screen">
     <header className="compact-header"><div className="header-copy"><div className="child-header-line"><ChildAvatar child={child} className="child-avatar" />{data.children.length > 1 ? <select aria-label={t(locale, 'chooseChild')} className="child-switcher" value={child.id} onChange={(event) => onSelectChild(event.target.value)}>{data.children.map((item) => <option key={item.id} value={item.id}>{item.name || t(locale, 'unnamedChild')}</option>)}</select> : <strong className="single-child-name">{child.name || t(locale, 'unnamedChild')}</strong>}</div><div className="date-label">{formatDateHeader(new Date(now), locale)}</div><div className="daily-summary">{t(locale, 'todaySoFar')} <strong>{formatDuration(total, locale)}</strong> {t(locale, 'sleepNoun')}</div></div><button className="icon-button" aria-label={t(locale, 'settings')} onClick={onSettings}><Icon name="settings" size={18} /></button></header>
@@ -326,7 +326,8 @@ function qualityIssueTranslationKey(kind: DataQualityIssueKind) {
     'stale-active': 'staleActiveWarning',
     'extreme-duration': 'extremeDurationWarning',
     'possible-duplicate': 'duplicateWarning',
-    overlap: 'overlapWarning'
+    overlap: 'overlapWarning',
+    'classification-conflict': 'classificationConflictWarning'
   } as const
   return keys[kind]
 }
@@ -473,6 +474,10 @@ const StatsPage = memo(function StatsPage({ sessions, locale, childName, product
     {onPreviewPlanChange && <InternalPlanPreview locale={locale} plan={productPlan} onChange={onPreviewPlanChange} />}
     <div className="segmented four-options"><button className={range === 'day' ? 'active' : ''} onClick={() => changeRange('day')}>{t(locale, 'day')}</button><button className={range === 'week' ? 'active' : ''} onClick={() => changeRange('week')}>{t(locale, 'week')}</button><button className={range === 'month' ? 'active' : ''} onClick={() => changeRange('month')}>{t(locale, 'month')}</button><button className={range === 'custom' ? 'active' : ''} onClick={() => changeRange('custom')}>{t(locale, 'customRange')}</button></div>
     {range === 'custom' && <div className="custom-range-picker"><label>{t(locale, 'fromDate')}<input type="date" min={availableStart} max={customEnd} value={customStart} onChange={(event) => setCustomStart(event.target.value)} /></label><label>{t(locale, 'toDate')}<input type="date" min={customStart} max={availableEnd} value={customEnd} onChange={(event) => setCustomEnd(event.target.value)} /></label></div>}
+    <div className="statistics-overlap-policy">
+      {sleepDaySource.conflictSessionIds.length > 0 && <p role="status">{t(locale, 'statisticsTypeConflict', { count: sleepDaySource.conflictSessionIds.length })}</p>}
+      <details><summary>{t(locale, 'statisticsOverlapTitle')}</summary><p>{t(locale, 'statisticsOverlapPolicy')}</p></details>
+    </div>
     <div className="chart-card compact-chart-card"><h2>{t(locale, 'sleepDuration')}</h2><div className="bar-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={chart} margin={{ top: 8, right: 2, bottom: 0, left: -26 }}><XAxis dataKey="label" tickLine={false} axisLine={false} /><YAxis domain={[0, 14]} tickLine={false} axisLine={false} /><Tooltip contentStyle={{ background: '#0d1a2b', border: '1px solid #1c3352', borderRadius: 10 }} formatter={(value) => [`${value} ${chartUnit}`, t(locale, 'sleep')]} /><Bar dataKey="hours" fill="#579dff" radius={[4, 4, 1, 1]} maxBarSize={17} onClick={(entry: any) => setSelectedDate(entry?.payload?.dateKey ?? null)} /></BarChart></ResponsiveContainer></div></div>
     <h2 className="overview-title">{t(locale, 'overview24h')}</h2>
     <div className="overview-compact"><SleepTimeline sessions={sessions} now={now} day={timelineDate} locale={locale} /><div className="stats-row"><StatCard label={display.label} value={formatDuration(display.total, locale)} suffix={selectedStats ? undefined : t(locale, 'perDay')} /><StatCard label={t(locale, 'daytime')} value={formatDuration(display.day, locale)} icon="sun" /><StatCard label={t(locale, 'nighttime')} value={formatDuration(display.night, locale)} icon="moon" /></div></div>
