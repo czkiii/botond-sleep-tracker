@@ -2,6 +2,7 @@ import { AuthError, AuthService, SESSION_MS } from './authService'
 import { EntitlementService } from './entitlementService'
 import type { TestPlan } from './entitlementService'
 import { buildSha } from './buildIdentity'
+import { offlineEntitlement } from './offlineEntitlement'
 
 interface Env {
   DB: D1Database
@@ -10,6 +11,7 @@ interface Env {
   SOLEMI_ENVIRONMENT?: string
   GOOGLE_CLIENT_ID?: string
   AUTH_SECRET?: string
+  OFFLINE_ENTITLEMENT_PRIVATE_JWK?: string
   ACCOUNT_FAMILY_BRIDGE?: string
   ENTITLEMENT_ENFORCEMENT?: string
   ENTITLEMENT_TEST_MODE?: string
@@ -1569,7 +1571,8 @@ async function accountAuthRoute(request: Request, env: Env, path: string) {
     }
     if (request.method === 'GET' && path === '/v1/auth/access') {
       const access = await service.authenticate(accountBearer(request))
-      return ok(request, env, await entitlementService(env).accessState(access.account.id))
+      return ok(request, env, { ...await entitlementService(env).accessState(access.account.id),
+        offlineGrant: await offlineEntitlement(env.DB, env.OFFLINE_ENTITLEMENT_PRIVATE_JWK, access) })
     }
     if (request.method === 'POST' && path === '/v1/auth/test/plan') {
       requireAllowedAuthOrigin(request, env)

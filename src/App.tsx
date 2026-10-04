@@ -157,10 +157,17 @@ export default function App({ writeAccess = 'writer' }: { writeAccess?: WriteAcc
     window.addEventListener(ACCOUNT_ACCESS_EVENT, onAccess)
     window.addEventListener(ACCOUNT_STATE_EVENT, onAccount)
     void restoreAccount()
+    const onResume = () => { void restoreAccount().then(refreshAccess).catch(() => {}) }
+    const interval = window.setInterval(refreshAccess, 30_000)
+    window.addEventListener('online', onResume)
+    window.addEventListener('focus', refreshAccess)
     return () => {
       stopped = true
       window.removeEventListener(ACCOUNT_ACCESS_EVENT, onAccess)
       window.removeEventListener(ACCOUNT_STATE_EVENT, onAccount)
+      window.clearInterval(interval)
+      window.removeEventListener('online', onResume)
+      window.removeEventListener('focus', refreshAccess)
     }
   }, [storageError, writeAccess])
   useEffect(() => { document.documentElement.lang = locale }, [locale])
@@ -210,7 +217,7 @@ export default function App({ writeAccess = 'writer' }: { writeAccess?: WriteAcc
     <main className="app-main">
       {page === 'today' && <TodayPage data={data} child={activeChild} sessions={activeSessions} now={now} locale={locale} current={current} onSelectChild={(childId) => setData((previous) => ({ ...previous, settings: { ...previous.settings, activeChildId: childId } }))} onStart={startNow} onEnd={endNow} onAdjustStart={adjustCurrentStart} onOpenEditor={openEditor} onHistory={() => setPage('history')} onSettings={() => setPage('settings')} />}
       {page === 'history' && <HistoryPage now={now} sessions={activeSessions} locale={locale} onEdit={openEditor} onDelete={deleteSession} onNew={() => openEditor('new')} />}
-      {page === 'stats' && <StatsPage sessions={activeSessions} locale={locale} childName={activeChild.name} productPlan={previewPlan} premiumInsightsAvailable={accountAuthEnabled ? Boolean(accountAccess?.features.includes('FAMILY_PLUS_INSIGHTS')) : internalPreview && canUsePremiumInsights(previewPlan)} onPreviewPlanChange={internalPreview ? setPreviewPlan : undefined} />}
+      {page === 'stats' && <StatsPage sessions={activeSessions} locale={locale} childName={activeChild.name} productPlan={previewPlan} premiumInsightsAvailable={accountAuthEnabled ? Boolean(accountAccess?.features.includes('FAMILY_PLUS_INSIGHTS') && (!accountAccess.offlineUntil || now < accountAccess.offlineUntil)) : internalPreview && canUsePremiumInsights(previewPlan)} onPreviewPlanChange={internalPreview ? setPreviewPlan : undefined} />}
       {page === 'settings' && <SettingsPage data={data} setData={setData} onBack={() => setPage('today')}
         familySyncAvailable={accountAuthEnabled ? Boolean(accountAccess?.features.includes('FAMILY_SYNC')) : internalPreview && canUseFamilySync(previewPlan)}
         familyRole={accountAccess?.membership?.role ?? null} />}

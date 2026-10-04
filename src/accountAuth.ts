@@ -1,5 +1,6 @@
 import { fetchJson } from './apiTransport'
-import { activateRestoredAccountWorkspace, activateSignedOutWorkspace } from './accountWorkspace'
+import { activateRestoredAccountWorkspace, activateSignedOutWorkspace, getActiveAccountWorkspaceId } from './accountWorkspace'
+import { bindOfflineDevice, clearOfflineEntitlement, readOfflineEntitlement, saveOfflineEntitlement } from './offlineEntitlement'
 
 const internalAccountProxy = import.meta.env.VITE_INTERNAL_PREVIEW === 'true'
   && import.meta.env.VITE_ACCOUNT_AUTH === 'true' ? '/api' : ''
@@ -8,12 +9,15 @@ const API_BASE = (import.meta.env.VITE_ACCOUNT_API_BASE || internalAccountProxy
   || 'https://solemi-sleep-sync.czki-adam.workers.dev').replace(/\/$/, '')
 const ACCESS_KEY = 'solemiSleep:accountAccess'
 const INSTALLATION_KEY = 'solemiSleep:installationSecret'
+const EPOCH_KEY = 'solemiSleep:authEpoch:v1'
 export const ACCOUNT_STATE_EVENT = 'solemi-account-state'
 export const ACCOUNT_ACCESS_EVENT = 'solemi-account-access'
 
 export type SignedInAccount = { id: string; email: string | null; name: string | null }
 export type AccountDevice = { id: string; name: string | null; platform: 'WEB' | 'IOS' | 'ANDROID' | 'OTHER' | null; last_seen_at: number }
 export type AccountAccessState = {
+  offlineGrant?: string
+  offlineUntil?: number
   features: Array<'FAMILY_SYNC' | 'PDF_EXPORT' | 'FAMILY_PLUS_INSIGHTS'>
   accountFeatures: Array<'FAMILY_SYNC' | 'PDF_EXPORT' | 'FAMILY_PLUS_INSIGHTS'>
   familyFeatures: Array<'FAMILY_SYNC' | 'PDF_EXPORT' | 'FAMILY_PLUS_INSIGHTS'>
@@ -48,6 +52,7 @@ function announceAccess(access: AccountAccessState | null) {
 }
 
 function saveAccess(data: AccessResponse) {
+  bindOfflineDevice(data.account.id, data.deviceId)
   sessionStorage.setItem(ACCESS_KEY, JSON.stringify(data))
   return data.account
 }
@@ -81,6 +86,7 @@ export function restoreAccount() {
 }
 
 async function restoreAccountOnce() {
+  const epoch = authEpoch()
   if (!navigator.onLine) return deferAccountRestore()
   const saved = readAccess()
   if (saved && saved.accessExpiresAt > Date.now() + 5_000) {
@@ -90,10 +96,12 @@ async function restoreAccountOnce() {
         headers: { Authorization: `Bearer ${saved.accessToken}` }
       })
     } catch (error) {
+      assertEpoch(epoch)
       if (!isRejectedSession(error)) return deferAccountRestore()
       sessionStorage.removeItem(ACCESS_KEY)
     }
     if (current) {
+      assertEpoch(epoch)
       activateRestoredAccountWorkspace(current.account.id)
       restoredAccount = current.account
       restoreCompleted = true
@@ -103,23 +111,14 @@ async function restoreAccountOnce() {
   }
   let refreshed: AccessResponse
   try {
-    refreshed = await request<AccessResponse>('/v1/auth/refresh', { method: 'POST' })
+    refreshed = await refreshAccess()
   } catch (error) {
+    assertEpoch(epoch)
     if (!isRejectedSession(error)) return deferAccountRestore()
-    sessionStorage.removeItem(ACCESS_KEY)
-    activateSignedOutWorkspace()
-    restoredAccount = null
-    restoreCompleted = true
-    announceAccess(null)
-    announceAccount(null)
+    rejectSession()
     return null
   }
-  const account = saveAccess(refreshed)
-  activateRestoredAccountWorkspace(account.id)
-  restoredAccount = account
-  restoreCompleted = true
-  announceAccount(account)
-  return account
+  return refreshed.account
 }
 
 function isRejectedSession(error: unknown) {
@@ -127,14 +126,14 @@ function isRejectedSession(error: unknown) {
     && (error.code === 'SESSION_INVALID' || error.code === 'REFRESH_REUSED')
 }
 
-function deferAccountRestore() {
+async function deferAccountRestore() {
   // A failed network check is not a logout. Keep the active account's diary
-  // and outbox visible, without granting authenticated access or paid features.
+  // and outbox visible. Only a valid signed receipt can restore local paid features.
   // A later online attempt must be able to retry instead of caching a logout.
   restoredAccount = null
   restoreCompleted = false
-  announceAccess(null)
   announceAccount(null)
+  announceAccess(await readOfflineEntitlement())
   return null
 }
 
@@ -150,14 +149,17 @@ export async function beginGoogleSignIn(
     nonce,
     callback: async ({ credential }) => {
       try {
-        const data = await request<AccessResponse>('/v1/auth/google', {
+        const epoch = beginAuthChange()
+        const data = await sessionLock(() => request<AccessResponse>('/v1/auth/google', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ credential, nonce, installationSecret: installationSecret(),
             deviceName: browserDeviceName(),
             ...(replaceDeviceId ? { replaceDeviceId } : {}) })
-        })
+        }))
+        assertEpoch(epoch)
         const account = saveAccess(data)
         await onSuccess(account)
+        assertEpoch(epoch)
         restoredAccount = account
         restoreCompleted = true
         announceAccount(account)
@@ -186,7 +188,9 @@ function browserDeviceName() {
 }
 
 export async function signOutAccount(deleteLocalData = false) {
-  await request('/v1/auth/logout', { method: 'POST' })
+  const epoch = beginAuthChange()
+  await sessionLock(() => request('/v1/auth/logout', { method: 'POST' }))
+  assertEpoch(epoch)
   sessionStorage.removeItem(ACCESS_KEY)
   restoredAccount = null
   restoreCompleted = true
@@ -205,41 +209,114 @@ export async function signOutAccount(deleteLocalData = false) {
   return workspace
 }
 
-let refreshPromise: Promise<AccessResponse | null> | null = null
+function authEpoch() { return localStorage.getItem(EPOCH_KEY) || '' }
+function assertEpoch(epoch: string) {
+  if (authEpoch() !== epoch) throw new AccountAuthError('ACCOUNT_CONTEXT_CHANGED')
+}
+function beginAuthChange() {
+  const epoch = crypto.randomUUID()
+  localStorage.setItem(EPOCH_KEY, epoch)
+  clearOfflineEntitlement()
+  announceAccess(null)
+  return epoch
+}
+function rejectSession() {
+  sessionStorage.removeItem(ACCESS_KEY)
+  clearOfflineEntitlement()
+  activateSignedOutWorkspace()
+  restoredAccount = null
+  restoreCompleted = true
+  announceAccess(null)
+  announceAccount(null)
+}
 
-async function usableAccess() {
-  const saved = readAccess()
-  if (saved && saved.accessExpiresAt > Date.now() + 5_000) return saved
+async function sessionLock<T>(action: () => Promise<T>): Promise<T> {
+  // The refresh cookie is shared by tabs. The browser applies Set-Cookie before
+  // this lock is released, so the next tab rotates the new token, not its parent.
+  if (navigator.locks) return navigator.locks.request('solemi-account-session', action)
+  return action()
+}
+
+let refreshPromise: Promise<AccessResponse> | null = null
+function refreshAccess() {
   if (!refreshPromise) {
-    refreshPromise = request<AccessResponse>('/v1/auth/refresh', { method: 'POST' })
-      .then((data) => {
-        saveAccess(data)
-        activateRestoredAccountWorkspace(data.account.id)
-        restoredAccount = data.account
-        restoreCompleted = true
-        announceAccount(data.account)
-        return data
-      })
-      .catch(() => { sessionStorage.removeItem(ACCESS_KEY); announceAccount(null); return null })
-      .finally(() => { refreshPromise = null })
+    const epoch = authEpoch()
+    refreshPromise = sessionLock(async () => {
+      assertEpoch(epoch)
+      const data = await request<AccessResponse>('/v1/auth/refresh', { method: 'POST' })
+      assertEpoch(epoch)
+      saveAccess(data)
+      activateRestoredAccountWorkspace(data.account.id)
+      restoredAccount = data.account
+      restoreCompleted = true
+      announceAccount(data.account)
+      return data
+    }).finally(() => { refreshPromise = null })
   }
   return refreshPromise
 }
 
+async function usableAccess() {
+  if (!navigator.onLine) throw new AccountAuthError('ACCOUNT_OFFLINE')
+  const saved = readAccess()
+  if (saved && saved.accessExpiresAt > Date.now() + 5_000) return saved
+  const epoch = authEpoch()
+  try { return await refreshAccess() }
+  catch (error) {
+    assertEpoch(epoch)
+    if (isRejectedSession(error)) rejectSession()
+    // Transport failures are retryable and must not erase credentials or diary.
+    throw error
+  }
+}
+
 export async function accountRequest<T>(path: string, options: RequestInit = {}) {
+  const originalWorkspace = getActiveAccountWorkspaceId()
   const access = await usableAccess()
-  if (!access) throw new AccountAuthError('SESSION_INVALID')
+  const epoch = authEpoch()
+  const workspace = getActiveAccountWorkspaceId()
+  if (workspace !== access.account.id || (originalWorkspace && workspace !== originalWorkspace)) throw new AccountAuthError('ACCOUNT_CONTEXT_CHANGED')
   const headers = new Headers(options.headers)
   headers.set('Authorization', `Bearer ${access.accessToken}`)
   if (options.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
-  return request<T>(path, { ...options, headers })
+  const checkContext = () => {
+    assertEpoch(epoch)
+    if (getActiveAccountWorkspaceId() !== workspace) throw new AccountAuthError('ACCOUNT_CONTEXT_CHANGED')
+  }
+  try {
+    const result = await request<T>(path, { ...options, headers })
+    checkContext()
+    if (options.method === 'POST' && path.startsWith('/v1/auth/')) clearOfflineEntitlement()
+    return result
+  } catch (error) {
+    checkContext()
+    if (isRejectedSession(error) && readAccess()?.accessToken === access.accessToken) rejectSession()
+    throw error
+  }
 }
 
-export function getAccountAccess() {
-  return accountRequest<AccountAccessState>('/v1/auth/access').then((access) => {
+export async function getAccountAccess(): Promise<AccountAccessState> {
+  try {
+    const access = await accountRequest<AccountAccessState>('/v1/auth/access')
+    const epoch = authEpoch()
+    const workspace = getActiveAccountWorkspaceId()
+    const saved = readAccess()
+    if (saved) {
+      try { await saveOfflineEntitlement(access.offlineGrant, saved.account.id, saved.deviceId) }
+      catch { /* Cache persistence must not hide a successful online entitlement check. */ }
+    }
+    assertEpoch(epoch)
+    if (getActiveAccountWorkspaceId() !== workspace) throw new AccountAuthError('ACCOUNT_CONTEXT_CHANGED')
     announceAccess(access)
     return access
-  })
+  } catch (error) {
+    const transient = !(error instanceof AccountAuthError) || error.code === 'ACCOUNT_OFFLINE' || (error.status ?? 0) >= 500
+    if (transient) {
+      const offline = await readOfflineEntitlement()
+      if (offline) { announceAccess(offline); return offline }
+    }
+    throw error
+  }
 }
 
 export function setInternalTestPlan(plan: 'free' | 'family' | 'familyPlus') {

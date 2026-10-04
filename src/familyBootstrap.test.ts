@@ -167,6 +167,7 @@ describe('existing local diary joining a family', () => {
 
   it('also stages automatic authenticated account bootstrap without merging its nonempty diary', async () => {
     vi.stubEnv('VITE_ACCOUNT_AUTH', 'true')
+    storage.setItem('solemiSleep:activeWorkspace:v1', JSON.stringify({ kind: 'account', accountId: 'account' }))
     sessionStorage.setItem('solemiSleep:accountAccess', JSON.stringify({ account: { id: 'account' }, deviceId: 'auth-device',
       accessToken: 'account-token', accessExpiresAt: Date.now() + 60_000, expiresAt: Date.now() + 120_000 }))
     expect(await reconcileAccountFamily()).toMatchObject({ connected: false, needsReview: true })
@@ -177,6 +178,7 @@ describe('existing local diary joining a family', () => {
 
   it('uses the authenticated join route and family token when reviewing an account family', async () => {
     vi.stubEnv('VITE_ACCOUNT_AUTH', 'true')
+    storage.setItem('solemiSleep:activeWorkspace:v1', JSON.stringify({ kind: 'account', accountId: 'account' }))
     sessionStorage.setItem('solemiSleep:accountAccess', JSON.stringify({ account: { id: 'account' }, deviceId: 'auth-device',
       accessToken: 'account-token', accessExpiresAt: Date.now() + 60_000, expiresAt: Date.now() + 120_000 }))
     fetchMock.mockImplementationOnce(async () => ok({ connection }))

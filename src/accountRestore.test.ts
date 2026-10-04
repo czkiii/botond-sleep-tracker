@@ -60,6 +60,111 @@ function expectAccountDiaryUnchanged() {
 }
 
 describe('account restoration after closing/reopening the PWA', () => {
+  it('shares one refresh between cold restore and simultaneous authenticated requests', async () => {
+    const auth = await import('./accountAuth')
+    let release!: (value: Response) => void
+    fetchMock.mockImplementation((url: string) => url.endsWith('/refresh')
+      ? new Promise(resolve => { release = resolve }) : Promise.resolve(Response.json({ ok: true, data: { value: 1 } })))
+    const restoring = auth.restoreAccount()
+    const reads = [auth.accountRequest('/v1/auth/access'), auth.accountRequest('/v1/auth/access')]
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    release(Response.json({ ok: true, data: validAccess() }))
+    expect(await restoring).toMatchObject({ id: 'account-a' })
+    expect(await Promise.all(reads)).toEqual([{ value: 1 }, { value: 1 }])
+    expect(fetchMock.mock.calls.filter(([url]) => url.endsWith('/refresh'))).toHaveLength(1)
+    expectAccountDiaryUnchanged()
+  })
+
+  it('does not turn a transient refresh failure into logout and can retry', async () => {
+    const auth = await import('./accountAuth')
+    const old = { ...validAccess(), accessExpiresAt: Date.now() - 1 }
+    session.setItem(accessKey, JSON.stringify(old))
+    const events: unknown[] = []
+    window.addEventListener(auth.ACCOUNT_STATE_EVENT, e => events.push((e as CustomEvent).detail.account))
+    fetchMock.mockRejectedValueOnce(new TypeError('Lost refresh response'))
+    await expect(auth.accountRequest('/v1/auth/access')).rejects.toThrow('Lost refresh response')
+    expect(session.getItem(accessKey)).toBe(JSON.stringify(old))
+    expect(events).toEqual([])
+    expectAccountDiaryUnchanged()
+    fetchMock.mockResolvedValueOnce(Response.json({ ok: true, data: validAccess() }))
+      .mockResolvedValueOnce(Response.json({ ok: true, data: { recovered: true } }))
+    expect(await auth.accountRequest('/v1/auth/access')).toEqual({ recovered: true })
+  })
+
+  it('does not issue an authenticated mutation while offline', async () => {
+    const auth = await import('./accountAuth')
+    session.setItem(accessKey, JSON.stringify(validAccess()))
+    vi.stubGlobal('navigator', { onLine: false })
+    await expect(auth.accountRequest('/v1/children', { method: 'POST', body: '{}' })).rejects.toMatchObject({ code: 'ACCOUNT_OFFLINE' })
+    expect(fetchMock).not.toHaveBeenCalled()
+    expectAccountDiaryUnchanged()
+  })
+
+  it('discards a refresh response arriving after logout begins', async () => {
+    const auth = await import('./accountAuth')
+    let release!: (value: Response) => void
+    fetchMock.mockImplementation((url: string) => url.endsWith('/refresh')
+      ? new Promise(resolve => { release = resolve }) : Promise.resolve(Response.json({ ok: true, data: {} })))
+    const refreshing = auth.accountRequest('/v1/auth/access')
+    const rejected = expect(refreshing).rejects.toMatchObject({ code: 'ACCOUNT_CONTEXT_CHANGED' })
+    await auth.signOutAccount()
+    release(Response.json({ ok: true, data: validAccess() }))
+    await rejected
+    expect(session.getItem(accessKey)).toBeNull()
+    expect(JSON.parse(storage.getItem(workspaceKey)!)).toEqual({ kind: 'guest' })
+  })
+
+  it('does not send account A mutations using a refresh that restores account B', async () => {
+    const auth = await import('./accountAuth')
+    const other = validAccess(); other.account.id = 'account-b'
+    fetchMock.mockResolvedValueOnce(Response.json({ ok: true, data: other }))
+    await expect(auth.accountRequest('/v1/children', { method: 'POST', body: '{}' })).rejects.toMatchObject({ code: 'ACCOUNT_CONTEXT_CHANGED' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(JSON.parse(storage.getItem(accountSnapshotKey)!).diary).toBe(raw)
+  })
+
+  it('discards an access response when the active workspace changes during the request', async () => {
+    const auth = await import('./accountAuth')
+    session.setItem(accessKey, JSON.stringify(validAccess()))
+    let release!: (value: Response) => void
+    fetchMock.mockImplementation(() => new Promise(resolve => { release = resolve }))
+    const reading = auth.getAccountAccess()
+    const rejected = expect(reading).rejects.toMatchObject({ code: 'ACCOUNT_CONTEXT_CHANGED' })
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce())
+    storage.setItem(workspaceKey, JSON.stringify({ kind: 'account', accountId: 'account-b' }))
+    release(Response.json({ ok: true, data: { features: ['FAMILY_PLUS_INSIGHTS'] } }))
+    await rejected
+  })
+
+  it('serializes refreshes from separate tabs using the shared browser lock', async () => {
+    let tail = Promise.resolve()
+    const locks = { request: vi.fn((_name: string, action: () => Promise<unknown>) => {
+      const result = tail.then(action)
+      tail = result.then(() => {}, () => {})
+      return result
+    }) }
+    vi.stubGlobal('navigator', { onLine: true, locks })
+    const first = await import('./accountAuth')
+    vi.resetModules()
+    const second = await import('./accountAuth')
+    let inFlight = 0, peak = 0, cookieVersion = 0
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.endsWith('/refresh')) {
+        const observed = cookieVersion
+        peak = Math.max(peak, ++inFlight)
+        await new Promise(resolve => setTimeout(resolve, 5))
+        expect(observed).toBe(cookieVersion)
+        cookieVersion++; inFlight--
+        return Response.json({ ok: true, data: validAccess() })
+      }
+      return Response.json({ ok: true, data: {} })
+    })
+    await Promise.all([first.restoreAccount(), second.restoreAccount()])
+    expect(peak).toBe(1)
+    expect(cookieVersion).toBe(2)
+    expect(locks.request.mock.calls.map(([name]) => name)).toEqual(['solemi-account-session', 'solemi-account-session'])
+  })
+
   it('opens the existing account diary offline with no tab session and retries when online', async () => {
     const { restoreAccount } = await import('./accountAuth')
     vi.stubGlobal('navigator', { onLine: false })

@@ -59,6 +59,7 @@ describe('family departure on the client', () => {
     Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { onLine: true, language: 'hu-HU' } })
     Object.defineProperty(globalThis, 'window', { configurable: true, value: { dispatchEvent: vi.fn() } })
     storage.setItem(STORAGE_KEY, JSON.stringify(previous))
+    storage.setItem('solemiSleep:activeWorkspace:v1', JSON.stringify({ kind: 'account', accountId: 'account-1' }))
     const store = { connection: { familyId: 'family-1', familyName: 'Teszt', deviceId: 'device-1', deviceToken: 'token-1', revision: 4 },
       pending: [] as Array<{ id: string; method: string; path: string; body: Record<string, unknown> }>, conflicts: [], missingSessions: [] }
     storage.setItem('solemiSleep:sync:v1', JSON.stringify(store))
@@ -128,7 +129,7 @@ describe('family departure on the client', () => {
     const edited = { ...previous, sessions: previous.sessions.map(s => ({ ...s, note: 'new edit' })) }
     storage.setItem(STORAGE_KEY, JSON.stringify(edited))
     complete(new Response(JSON.stringify({ ok: true, data: { left: true } }), { status: 200 }))
-    await expect(leaving).rejects.toThrow('FAMILY_MEMBERSHIP_CHANGED')
+    await expect(leaving).rejects.toThrow(change === 'workspace' ? 'ACCOUNT_CONTEXT_CHANGED' : 'FAMILY_MEMBERSHIP_CHANGED')
     expect(getSyncStore()).toMatchObject(newerStore)
     expect(storage.getItem('solemiSleep:detachedFamily')).toBe('keep-marker')
     expect(loadData()).toEqual(edited)
@@ -229,6 +230,7 @@ describe('account-owned family creation', () => {
     Object.defineProperty(globalThis, 'window', { configurable: true, value: { dispatchEvent: vi.fn() } })
     const local = { ...previous, children: [previous.children[1]], sessions: [] }
     storage.setItem(STORAGE_KEY, JSON.stringify(local))
+    storage.setItem('solemiSleep:activeWorkspace:v1', JSON.stringify({ kind: 'account', accountId: 'account-1' }))
     session.setItem('solemiSleep:accountAccess', JSON.stringify({
       account: { id: 'account-1', email: null, name: null }, deviceId: 'account-device-1',
       accessToken: 'account-token', accessExpiresAt: Date.now() + 60_000, expiresAt: Date.now() + 120_000
@@ -343,6 +345,7 @@ describe('local-only diary deletion', () => {
 
   it('does not reconnect a deliberately detached device after reload', async () => {
     const storage = new MemoryStorage()
+    storage.setItem('solemiSleep:activeWorkspace:v1', JSON.stringify({ kind: 'account', accountId: 'account-1' }))
     const session = new MemoryStorage()
     Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage })
     Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, value: session })

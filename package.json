@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:pwa": "node scripts/check-pwa-lifecycle.mjs",
+    "test:account-access": "node scripts/check-account-access.mjs",
     "test:family-join": "node scripts/check-family-bootstrap.mjs",
     "test:child-deletion": "node scripts/check-child-deletion.mjs",
     "test:settings": "node scripts/check-settings-accessibility.mjs",

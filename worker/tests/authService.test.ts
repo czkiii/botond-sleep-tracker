@@ -103,6 +103,36 @@ describe('account authentication service', () => {
     await expect(service.authenticate(rotated.accessToken, now + 3)).rejects.toMatchObject({ code: 'SESSION_INVALID' })
   })
 
+  it('keeps successive tab refreshes valid when each uses the cookie set by the preceding response', async () => {
+    const initial = await login()
+    const tabA = await service.refresh(initial.refresh, now + 1)
+    const tabB = await service.refresh(tabA.refresh, now + 2)
+    await expect(service.authenticate(tabA.accessToken, now + 3)).resolves.toMatchObject({ deviceId: initial.deviceId })
+    await expect(service.authenticate(tabB.accessToken, now + 3)).resolves.toMatchObject({ deviceId: initial.deviceId })
+    expect(sqlite.prepare('SELECT rotation_counter FROM account_sessions WHERE revoked_at IS NULL').get()).toEqual({ rotation_counter: 2 })
+  })
+
+  it('requires fresh login after a lost response leaves the old refresh cookie, without revoking another device', async () => {
+    const first = await login('a'.repeat(64))
+    const other = await login('b'.repeat(64))
+    const lost = await service.refresh(first.refresh, now + 1)
+    await expect(service.refresh(first.refresh, now + 2)).rejects.toMatchObject({ code: 'REFRESH_REUSED' })
+    await expect(service.authenticate(lost.accessToken, now + 3)).rejects.toMatchObject({ code: 'SESSION_INVALID' })
+    await expect(service.authenticate(other.accessToken, now + 3)).resolves.toMatchObject({ deviceId: other.deviceId })
+    const recovered = await login('a'.repeat(64))
+    await expect(service.authenticate(recovered.accessToken, now + 3)).resolves.toMatchObject({ deviceId: first.deviceId })
+  })
+
+  it('rejects both access and refresh on the replaced third-device session while keeping the chosen device', async () => {
+    const first = await login('a'.repeat(64))
+    const kept = await login('b'.repeat(64))
+    const third = await login('c'.repeat(64), { replaceDeviceId: first.deviceId })
+    await expect(service.authenticate(first.accessToken, now + 1)).rejects.toMatchObject({ code: 'SESSION_INVALID' })
+    await expect(service.refresh(first.refresh, now + 1)).rejects.toMatchObject({ code: 'SESSION_INVALID' })
+    await expect(service.authenticate(kept.accessToken, now + 1)).resolves.toMatchObject({ deviceId: kept.deviceId })
+    await expect(service.authenticate(third.accessToken, now + 1)).resolves.toMatchObject({ deviceId: third.deviceId })
+  })
+
   it('rejects expired access tokens, unknown refresh tokens and signed-out sessions', async () => {
     const loggedIn = await login()
     await expect(service.authenticate(loggedIn.accessToken, now + ACCESS_SECONDS * 1000)).rejects.toMatchObject({ code: 'SESSION_INVALID' })

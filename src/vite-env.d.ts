@@ -8,6 +8,7 @@ interface ImportMetaEnv {
   readonly VITE_SYNC_API_BASE?: string
   readonly VITE_ACCOUNT_AUTH?: string
   readonly VITE_ACCOUNT_API_BASE?: string
+  readonly VITE_OFFLINE_ENTITLEMENT_PUBLIC_JWK?: string
 }
 
 interface Window {
