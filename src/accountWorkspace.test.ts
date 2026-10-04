@@ -14,9 +14,14 @@ class MemoryStorage implements Storage {
 
 class FailingStorage extends MemoryStorage {
   failOn = ''
+  failOnRemoval = ''
   override setItem(key: string, value: string) {
     if (this.failOn && key.includes(this.failOn)) throw new Error('quota')
     super.setItem(key, value)
+  }
+  override removeItem(key: string) {
+    if (this.failOnRemoval && key.includes(this.failOnRemoval)) throw new Error('interrupted removal')
+    super.removeItem(key)
   }
 }
 
@@ -155,5 +160,115 @@ describe('account-bound local workspaces', () => {
     expect(getActiveAccountWorkspaceId()).toBe('account-a')
     expect(loadData().children[0].name).toBe('Recovered account diary')
     expect(storage.getItem('solemiSleep:workspaceSwitch:v1')).toBeNull()
+  })
+
+  it('keeps a recoverable copy if deleting the current account is interrupted before changing the visible diary', () => {
+    const storage = new FailingStorage()
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage })
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { language: 'hu-HU' } })
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { dispatchEvent: () => true } })
+    const original = diary('Account A', [{ id: 'pending-a' }])
+    storage.setItem(STORAGE_KEY, JSON.stringify(original))
+    activateRestoredAccountWorkspace('account-a')
+    storage.failOn = 'activeWorkspace:v1'
+
+    expect(() => activateSignedOutWorkspace(true)).toThrow('quota')
+    expect(getActiveAccountWorkspaceId()).toBe('account-a')
+    expect(JSON.parse(storage.getItem('solemiSleep:workspaceData:v1:account:account-a')!).diary).toBe(JSON.stringify(original))
+    storage.failOn = ''
+    expect(recoverAccountWorkspaceSwitch()).toBe(true)
+    expect(getActiveAccountWorkspaceId()).toBeNull()
+    expect(storage.getItem('solemiSleep:workspaceData:v1:account:account-a')).toBeNull()
+    expect(loadData().children[0].name).toBe('')
+  })
+
+  it('keeps the account visible if the guest snapshot cannot be saved before a local deletion', () => {
+    const storage = new FailingStorage()
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage })
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { language: 'hu-HU' } })
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { dispatchEvent: () => true } })
+    storage.setItem(STORAGE_KEY, JSON.stringify(diary('Account A')))
+    activateRestoredAccountWorkspace('account-a')
+    storage.failOn = 'workspaceData:v1:guest'
+
+    expect(() => activateSignedOutWorkspace(true)).toThrow('quota')
+    expect(getActiveAccountWorkspaceId()).toBe('account-a')
+    expect(loadData().children[0].name).toBe('Account A')
+    expect(storage.getItem('solemiSleep:workspaceData:v1:account:account-a')).not.toBeNull()
+    expect(storage.getItem('solemiSleep:workspaceSwitch:v1')).toBeNull()
+  })
+
+  it('rejects a damaged recovery journal that would delete an unrelated account', () => {
+    const storage = setup()
+    storage.setItem(STORAGE_KEY, JSON.stringify(diary('Account A')))
+    activateRestoredAccountWorkspace('account-a')
+    const accountSnapshot = JSON.stringify({ diary: JSON.stringify(diary('Account B')),
+      legacyDiary: null, legacySync: null, detachedFamily: null, lastSyncAt: null })
+    storage.setItem('solemiSleep:workspaceData:v1:account:account-b', accountSnapshot)
+    storage.setItem('solemiSleep:workspaceSwitch:v1', JSON.stringify({
+      target: { kind: 'account', accountId: 'account-b' },
+      removeAfter: { kind: 'account', accountId: 'account-a' }
+    }))
+
+    expect(recoverAccountWorkspaceSwitch()).toBe(false)
+    expect(getActiveAccountWorkspaceId()).toBe('account-a')
+    expect(loadData().children[0].name).toBe('Account A')
+    expect(storage.getItem('solemiSleep:workspaceData:v1:account:account-b')).toBe(accountSnapshot)
+  })
+
+  it('keeps a photo that another account diary still references when deleting the first account locally', () => {
+    const storage = setup()
+    const first = diary('Account A')
+    first.children[0].photoRef = 'shared-local-photo'
+    storage.setItem(STORAGE_KEY, JSON.stringify(first))
+    activateRestoredAccountWorkspace('account-a')
+    activateSignedOutWorkspace()
+    activateInteractiveAccountWorkspace('account-b', false)
+    const second = diary('Account B')
+    second.children[0].photoRef = 'shared-local-photo'
+    storage.setItem(STORAGE_KEY, JSON.stringify(second))
+    activateSignedOutWorkspace()
+    activateInteractiveAccountWorkspace('account-a', false)
+
+    expect(activateSignedOutWorkspace(true).deletedPhotoRefs).toEqual([])
+    activateInteractiveAccountWorkspace('account-b', false)
+    expect(loadData().children[0].photoRef).toBe('shared-local-photo')
+  })
+
+  it('finishes local account deletion after a crash between switching and removing the account snapshot', () => {
+    const storage = new FailingStorage()
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage })
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { language: 'hu-HU' } })
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { dispatchEvent: () => true } })
+    storage.setItem(STORAGE_KEY, JSON.stringify(diary('Account A')))
+    activateRestoredAccountWorkspace('account-a')
+    storage.failOnRemoval = 'workspaceData:v1:account:account-a'
+
+    expect(() => activateSignedOutWorkspace(true)).toThrow('interrupted removal')
+    expect(getActiveAccountWorkspaceId()).toBeNull()
+    expect(storage.getItem('solemiSleep:workspaceData:v1:account:account-a')).not.toBeNull()
+    storage.failOnRemoval = ''
+    expect(recoverAccountWorkspaceSwitch()).toBe(true)
+    expect(storage.getItem('solemiSleep:workspaceData:v1:account:account-a')).toBeNull()
+    expect(storage.getItem('solemiSleep:workspaceSwitch:v1')).toBeNull()
+    expect(loadData().children[0].name).toBe('')
+  })
+
+  it('does not show a guest diary again after adopting it across an interrupted switch', () => {
+    const storage = new FailingStorage()
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage })
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { language: 'hu-HU' } })
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { dispatchEvent: () => true } })
+    storage.setItem(STORAGE_KEY, JSON.stringify(diary('Guest child')))
+    activateSignedOutWorkspace()
+    storage.failOnRemoval = 'workspaceData:v1:guest'
+
+    expect(() => activateInteractiveAccountWorkspace('account-a', true)).toThrow('interrupted removal')
+    expect(loadData().children[0].name).toBe('Guest child')
+    storage.failOnRemoval = ''
+    expect(recoverAccountWorkspaceSwitch()).toBe(true)
+    expect(storage.getItem('solemiSleep:workspaceData:v1:guest')).toBeNull()
+    activateSignedOutWorkspace()
+    expect(loadData().children[0].name).toBe('')
   })
 })

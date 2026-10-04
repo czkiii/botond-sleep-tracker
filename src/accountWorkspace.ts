@@ -17,7 +17,7 @@ type WorkspaceSnapshot = {
   detachedFamily: string | null
   lastSyncAt: string | null
 }
-type SwitchJournal = { target: Workspace }
+type SwitchJournal = { target: Workspace; removeAfter?: Workspace }
 
 const guestWorkspace: Workspace = { kind: 'guest' }
 
@@ -99,6 +99,30 @@ function savedSnapshot(workspace: Workspace) {
   return parseSnapshot(localStorage.getItem(workspaceStorageKey(workspace)))
 }
 
+function photoRefsInRetainedDiaries(): Set<string> | null {
+  try {
+    const diaries = [localStorage.getItem(STORAGE_KEY)]
+    for (let index = 0; index < localStorage.length; index++) {
+      const key = localStorage.key(index)
+      if (!key?.startsWith(WORKSPACE_PREFIX)) continue
+      const snapshot = parseSnapshot(localStorage.getItem(key))
+      if (!snapshot) return null
+      diaries.push(snapshot.diary)
+    }
+    const refs = new Set<string>()
+    for (const diary of diaries) {
+      if (!diary) continue
+      const data = JSON.parse(diary) as { children?: Array<{ photoRef?: unknown }>;
+        __solemiLocal?: { safetyBackupV1?: { data?: { children?: Array<{ photoRef?: unknown }> } } } }
+      if (!Array.isArray(data.children)) return null
+      for (const child of [...data.children, ...(data.__solemiLocal?.safetyBackupV1?.data?.children ?? [])]) {
+        if (typeof child.photoRef === 'string') refs.add(child.photoRef)
+      }
+    }
+    return refs
+  } catch { return null }
+}
+
 function saveSnapshot(workspace: Workspace, snapshot: WorkspaceSnapshot) {
   localStorage.setItem(workspaceStorageKey(workspace), JSON.stringify(snapshot))
 }
@@ -108,16 +132,17 @@ function sameWorkspace(left: Workspace | null, right: Workspace) {
     || (left?.kind === 'account' && left.accountId === right.accountId))
 }
 
-function switchWorkspace(target: Workspace, snapshot: WorkspaceSnapshot, saveCurrent = true) {
+function switchWorkspace(target: Workspace, snapshot: WorkspaceSnapshot, removeAfter?: Workspace) {
   const current = activeWorkspace()
   if (sameWorkspace(current, target)) return false
-  if (current && saveCurrent) saveSnapshot(current, currentSnapshot())
+  if (current) saveSnapshot(current, currentSnapshot())
   saveSnapshot(target, snapshot)
-  const journal: SwitchJournal = { target }
+  const journal: SwitchJournal = { target, removeAfter }
   localStorage.setItem(SWITCH_JOURNAL_KEY, JSON.stringify(journal))
   applySnapshot(snapshot)
   clearTransientFamilyState()
   localStorage.setItem(ACTIVE_WORKSPACE_KEY, JSON.stringify(target))
+  if (removeAfter) localStorage.removeItem(workspaceStorageKey(removeAfter))
   localStorage.removeItem(SWITCH_JOURNAL_KEY)
   announceWorkspaceChange()
   return true
@@ -130,11 +155,18 @@ export function recoverAccountWorkspaceSwitch() {
   try {
     const journal = JSON.parse(raw) as Partial<SwitchJournal>
     const target = parseWorkspace(JSON.stringify(journal.target))
+    const removeAfter = journal.removeAfter === undefined ? null : parseWorkspace(JSON.stringify(journal.removeAfter))
     const snapshot = target ? savedSnapshot(target) : null
-    if (!target || !snapshot) throw new Error('invalid workspace journal')
+    const validRemoval = removeAfter && target
+      && ((removeAfter.kind === 'account' && target.kind === 'guest')
+        || (removeAfter.kind === 'guest' && target.kind === 'account'))
+    if (!target || !snapshot || (journal.removeAfter !== undefined && !validRemoval)) {
+      throw new Error('invalid workspace journal')
+    }
     applySnapshot(snapshot)
     clearTransientFamilyState()
     localStorage.setItem(ACTIVE_WORKSPACE_KEY, JSON.stringify(target))
+    if (removeAfter) localStorage.removeItem(workspaceStorageKey(removeAfter))
     localStorage.removeItem(SWITCH_JOURNAL_KEY)
     return true
   } catch {
@@ -163,9 +195,7 @@ export function activateInteractiveAccountWorkspace(accountId: string, adoptGues
   if (!current) saveSnapshot(guestWorkspace, outgoing)
   const movingGuestDiary = !existing && adoptGuestDiary && current?.kind !== 'account'
   const targetSnapshot = existing ?? (movingGuestDiary ? outgoing : emptySnapshot())
-  const changed = switchWorkspace(target, targetSnapshot)
-  if (changed && movingGuestDiary) localStorage.removeItem(workspaceStorageKey(guestWorkspace))
-  return changed
+  return switchWorkspace(target, targetSnapshot, movingGuestDiary ? guestWorkspace : undefined)
 }
 
 export function activateRestoredAccountWorkspace(accountId: string) {
@@ -195,9 +225,10 @@ export function activateSignedOutWorkspace(deleteAccountData = false) {
   const photoRefs = deleteAccountData
     ? loadData().children.flatMap((child) => child.photoRef ? [child.photoRef] : []) : []
   const guest = savedSnapshot(guestWorkspace) ?? emptySnapshot()
-  if (deleteAccountData) localStorage.removeItem(workspaceStorageKey(current))
-  const changed = switchWorkspace(guestWorkspace, guest, !deleteAccountData)
-  return { changed, deletedPhotoRefs: photoRefs }
+  const changed = switchWorkspace(guestWorkspace, guest, deleteAccountData ? current : undefined)
+  const retainedRefs = deleteAccountData ? photoRefsInRetainedDiaries() : null
+  return { changed, deletedPhotoRefs: retainedRefs
+    ? photoRefs.filter((ref) => !retainedRefs.has(ref)) : [] }
 }
 
 export function getActiveAccountWorkspaceId() {
