@@ -525,12 +525,27 @@ export async function createInvite() {
   return request<{ code: string; expiresAt: string }>('/v1/invites', { method: 'POST', body: '{}' }, store.connection.deviceToken)
 }
 
+function requireUnchangedDepartureContext(workspace: string | null, store: SyncStore) {
+  const latest = readStore()
+  const unchanged = (before: SyncConnection | null, after: SyncConnection | null) =>
+    (!before && !after) || sameConnection(before, after)
+  // A delayed success belongs to the original account/family only. In particular,
+  // do not clear another workspace's connection, bootstrap or pending operations.
+  if (getActiveAccountWorkspaceId() !== workspace
+    || !unchanged(store.connection, latest.connection)
+    || !unchanged(store.bootstrapConnection ?? null, latest.bootstrapConnection ?? null)) {
+    throw new Error('FAMILY_MEMBERSHIP_CHANGED')
+  }
+}
+
 export async function leaveFamily() {
+  const workspace = getActiveAccountWorkspaceId()
   const store = readStore()
   const readiness = getFamilyReplacementReadiness()
   if (!readiness.ready) throw new Error(`FAMILY_DETACH_${readiness.reason?.toUpperCase() || 'BLOCKED'}`)
   if (store.connection) {
     await request('/v1/device/leave', { method: 'POST', body: '{}' }, store.connection.deviceToken)
+    requireUnchangedDepartureContext(workspace, store)
     localStorage.setItem(DETACHED_FAMILY_KEY, store.connection.familyId)
   }
   writeStore(defaultStore())
@@ -550,11 +565,14 @@ export async function getAccountFamilyMembers() {
 }
 
 export async function leaveAccountFamily(successorAccountId?: string) {
+  const workspace = getActiveAccountWorkspaceId()
+  const store = readStore()
   const readiness = getFamilyReplacementReadiness()
   if (!readiness.ready) throw new Error(`FAMILY_LEAVE_${readiness.reason?.toUpperCase() || 'BLOCKED'}`)
   await accountRequest('/v1/auth/family/leave', {
     method: 'POST', body: JSON.stringify(successorAccountId ? { successorAccountId } : {})
   })
+  requireUnchangedDepartureContext(workspace, store)
   localStorage.removeItem(DETACHED_FAMILY_KEY)
   writeStore(defaultStore())
   announceDiaryReplacement()

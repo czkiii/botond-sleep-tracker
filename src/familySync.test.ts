@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { clearLocalDiary, createFamily, dissolveFamily, prepareFamilyDissolution, flushPending, getFamilyReplacementReadiness, getSyncStore, isEmptyStarterData, leaveFamily, makeOperations, mergeRemote, pullRemote, reconcileAccountFamily, resolveSyncConflict, saveLocalData } from './familySync'
+import { clearLocalDiary, createFamily, dissolveFamily, prepareFamilyDissolution, flushPending, getFamilyReplacementReadiness, getSyncStore, isEmptyStarterData, leaveAccountFamily, leaveFamily, makeOperations, mergeRemote, pullRemote, reconcileAccountFamily, resolveSyncConflict, saveLocalData } from './familySync'
 import { DataStorageError, STORAGE_KEY, createDefaultData, inspectBackup, loadData, loadSafetyBackup, saveSafetyBackup } from './storage'
 import { API_TIMEOUT_MS } from './apiTransport'
 import type { AppData, ChildProfile, SleepSession } from './types'
@@ -49,7 +49,7 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-describe('family dissolution on the client', () => {
+describe('family departure on the client', () => {
   function setup() {
     vi.stubEnv('VITE_ACCOUNT_AUTH', 'true')
     const storage = new MemoryStorage()
@@ -75,6 +75,64 @@ describe('family dissolution on the client', () => {
     Object.defineProperty(globalThis, 'fetch', { configurable: true, value: fetchMock })
     return { storage, store, fetchMock }
   }
+
+  it.each(['offline', 'pending', 'attention'] as const)('blocks account leave with %s without sending or discarding anything', async (reason) => {
+    const { storage, store, fetchMock } = setup()
+    if (reason === 'offline') Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { onLine: false } })
+    if (reason === 'pending') store.pending.push({ id: 'op', method: 'PATCH', path: '/v1/sessions/sleep-a', body: { patch: { note: 'pending' } } })
+    storage.setItem('solemiSleep:sync:v1', reason === 'attention' ? '{invalid' : JSON.stringify(store))
+    const before = storage.getItem('solemiSleep:sync:v1')
+    await expect(leaveAccountFamily()).rejects.toThrow(`FAMILY_LEAVE_${reason.toUpperCase()}`)
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(storage.getItem('solemiSleep:sync:v1')).toBe(before)
+    expect(loadData()).toEqual(previous)
+  })
+
+  it('keeps the diary and connection after a lost account-leave response, then retries without losing the backup', async () => {
+    const { storage, fetchMock } = setup()
+    const local = { ...previous, children: previous.children.map(c => ({ ...c, photoRef: 'local-photo' })),
+      sessions: previous.sessions.map(s => ({ ...s, endTime: null })) }
+    storage.setItem(STORAGE_KEY, JSON.stringify(local))
+    saveSafetyBackup(local, 'before-import')
+    const backup = loadSafetyBackup()
+    expect(backup?.data).toEqual(local)
+    fetchMock.mockRejectedValueOnce(new TypeError('response lost'))
+    await expect(leaveAccountFamily('successor')).rejects.toThrow()
+    expect(getSyncStore().connection?.familyId).toBe('family-1')
+    expect(loadData()).toEqual(local)
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, data: { left: true } }), { status: 200 }))
+    await leaveAccountFamily('successor')
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ successorAccountId: 'successor' })
+    expect(getSyncStore().connection).toBeNull()
+    expect(loadData()).toEqual(local)
+    expect(loadSafetyBackup()).toEqual(backup)
+  })
+
+  it.each([
+    ['account', 'workspace'], ['account', 'connection'], ['account', 'bootstrap'],
+    ['device', 'workspace'], ['device', 'connection'], ['device', 'bootstrap']
+  ] as const)('ignores a late %s leave response after the %s changes', async (kind, change) => {
+    const { storage, store, fetchMock } = setup()
+    storage.setItem('solemiSleep:activeWorkspace:v1', JSON.stringify({ kind: 'account', accountId: 'account-1' }))
+    let complete!: (response: Response) => void
+    fetchMock.mockImplementationOnce(() => new Promise<Response>(resolve => { complete = resolve }))
+    const leaving = kind === 'account' ? leaveAccountFamily() : leaveFamily()
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce())
+    if (change === 'workspace') storage.setItem('solemiSleep:activeWorkspace:v1', JSON.stringify({ kind: 'account', accountId: 'account-2' }))
+    if (change === 'connection') store.connection = { ...store.connection, familyId: 'family-2', deviceToken: 'new-token' }
+    store.pending.push({ id: 'new-op', method: 'PATCH', path: '/v1/sessions/sleep-a', body: { patch: { note: 'new edit' } } })
+    const newerStore = { ...store, ...(change === 'bootstrap'
+      ? { connection: null, pending: [], bootstrapConnection: { ...store.connection, familyId: 'family-2', deviceToken: 'new-token' } } : {}) }
+    storage.setItem('solemiSleep:sync:v1', JSON.stringify(newerStore))
+    storage.setItem('solemiSleep:detachedFamily', 'keep-marker')
+    const edited = { ...previous, sessions: previous.sessions.map(s => ({ ...s, note: 'new edit' })) }
+    storage.setItem(STORAGE_KEY, JSON.stringify(edited))
+    complete(new Response(JSON.stringify({ ok: true, data: { left: true } }), { status: 200 }))
+    await expect(leaving).rejects.toThrow('FAMILY_MEMBERSHIP_CHANGED')
+    expect(getSyncStore()).toMatchObject(newerStore)
+    expect(storage.getItem('solemiSleep:detachedFamily')).toBe('keep-marker')
+    expect(loadData()).toEqual(edited)
+  })
 
   it('exports the authoritative family snapshot without replacing the local diary, then detaches after success', async () => {
     const { fetchMock } = setup()

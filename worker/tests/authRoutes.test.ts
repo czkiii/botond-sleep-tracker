@@ -82,6 +82,124 @@ function setTestPlan(access: string, plan: 'free' | 'family' | 'familyPlus') {
   })
 }
 
+describe('A04 remaining account leave cases', () => {
+  async function setup() {
+    await seedLegacyFamily('owner-family-token')
+    const tokens: Record<string, string> = {}
+    for (const name of ['owner', 'b', 'c']) tokens[name] = await accountAccess(`acc_${name}`, `adev_${name}`, `leave_${name}`)
+    expect((await fetch('/v1/auth/family/claim', { method: 'POST',
+      headers: { Origin: origin, Authorization: `Bearer ${tokens.owner}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyDeviceToken: 'owner-family-token' }) })).status).toBe(200)
+    for (const [name, joined] of [['b', 100], ['c', 200]] as const) {
+      sqlite.prepare(`INSERT INTO legacy_family_memberships VALUES (?, 'fam_test', ?, 'MEMBER', 'ACTIVE', ?, NULL)`)
+        .run(`mem_${name}`, `acc_${name}`, joined)
+      sqlite.prepare(`INSERT INTO devices VALUES (?, 'fam_test', ?, ?, '2026-10-04', '2026-10-04', NULL)`)
+        .run(`dev_${name}`, await sha256(`${env.TOKEN_PEPPER}:${name}-family-token`), name)
+      sqlite.prepare(`INSERT INTO account_family_devices VALUES (?, ?, 'fam_test', ?, 100, 100)`)
+        .run(`adev_${name}`, `acc_${name}`, `dev_${name}`)
+    }
+    sqlite.prepare(`INSERT INTO children (id, family_id, name, created_at, updated_at, revision)
+      VALUES ('child_leave', 'fam_test', 'Keep me', '2026-10-04', '2026-10-04', 1)`).run()
+    sqlite.prepare(`INSERT INTO sleep_sessions (id, family_id, child_id, start_time, end_time, note, created_at, updated_at, revision)
+      VALUES ('sleep_leave', 'fam_test', 'child_leave', '2026-10-03T12:00:00Z', NULL, 'Still sleeping', '2026-10-03', '2026-10-03', 2)`).run()
+    sqlite.prepare(`UPDATE families SET revision = 2 WHERE id = 'fam_test'`).run()
+    return tokens
+  }
+  const headers = (token: string) => ({ Origin: origin, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' })
+  const leave = (token: string, successorAccountId?: string) => fetch('/v1/auth/family/leave', {
+    method: 'POST', headers: headers(token), body: JSON.stringify(successorAccountId ? { successorAccountId } : {})
+  })
+  const members = () => sqlite.prepare('SELECT account_id, role, status FROM legacy_family_memberships ORDER BY account_id').all()
+  const diary = () => ['families', 'children', 'sleep_sessions'].map(table => sqlite.prepare(`SELECT * FROM ${table} ORDER BY id`).all())
+
+  it('uses stable membership-id order for equal join dates and ignores ended members', async () => {
+    const tokens = await setup(), before = diary()
+    sqlite.prepare(`UPDATE legacy_family_memberships SET joined_at = 100 WHERE account_id = 'acc_c'`).run()
+    const ended = await accountAccess('acc_ended', 'adev_ended', 'ended')
+    expect(ended).toBeTruthy()
+    sqlite.prepare(`INSERT INTO legacy_family_memberships VALUES ('mem_0', 'fam_test', 'acc_ended', 'MEMBER', 'LEFT', 0, 1)`).run()
+    expect((await leave(tokens.owner)).status).toBe(200)
+    expect(sqlite.prepare(`SELECT account_id FROM legacy_family_memberships WHERE role = 'ADMIN' AND status = 'ACTIVE'`).all()).toEqual([{ account_id: 'acc_b' }])
+    expect(diary()).toEqual(before)
+  })
+
+  it('rejects a stale member leave after that member has become admin, then transfers on retry', async () => {
+    const tokens = await setup(), before = diary(), batch = env.DB.batch.bind(env.DB)
+    // B has already read MEMBER when the owner's complete leave commits.
+    env.DB.batch = (async (statements: D1PreparedStatement[]) => {
+      env.DB.batch = batch
+      expect((await leave(tokens.owner)).status).toBe(200)
+      return batch(statements)
+    }) as D1Database['batch']
+    const stale = await leave(tokens.b)
+    expect(stale.status).toBe(409)
+    expect(await stale.json()).toMatchObject({ error: { code: 'FAMILY_MEMBERSHIP_CHANGED' } })
+    expect(sqlite.prepare(`SELECT role, status FROM legacy_family_memberships WHERE account_id = 'acc_b'`).get()).toEqual({ role: 'ADMIN', status: 'ACTIVE' })
+    expect(sqlite.prepare(`SELECT revoked_at FROM devices WHERE id = 'dev_b'`).get()).toEqual({ revoked_at: null })
+    expect((await leave(tokens.b)).status).toBe(200)
+    expect(sqlite.prepare(`SELECT role, status FROM legacy_family_memberships WHERE account_id = 'acc_c'`).get()).toEqual({ role: 'ADMIN', status: 'ACTIVE' })
+    expect(diary()).toEqual(before)
+  })
+
+  it('does not leave or revoke devices if the chosen successor leaves before the transaction', async () => {
+    const tokens = await setup(), before = diary(), batch = env.DB.batch.bind(env.DB)
+    env.DB.batch = (async (statements: D1PreparedStatement[]) => {
+      env.DB.batch = batch
+      expect((await leave(tokens.b)).status).toBe(200)
+      return batch(statements)
+    }) as D1Database['batch']
+    expect((await leave(tokens.owner, 'acc_b')).status).toBe(409)
+    expect(sqlite.prepare(`SELECT role, status FROM legacy_family_memberships WHERE account_id = 'acc_owner'`).get()).toEqual({ role: 'ADMIN', status: 'ACTIVE' })
+    expect(sqlite.prepare(`SELECT revoked_at FROM devices WHERE id = 'dev_legacy'`).get()).toEqual({ revoked_at: null })
+    expect((await leave(tokens.owner)).status).toBe(200)
+    expect(diary()).toEqual(before)
+  })
+
+  it('rolls back membership and promotion together if device revocation fails', async () => {
+    const tokens = await setup(), before = members(), data = diary()
+    sqlite.exec(`CREATE TRIGGER fail_leave BEFORE UPDATE OF revoked_at ON devices
+      BEGIN SELECT RAISE(ABORT, 'injected revocation failure'); END`)
+    expect((await leave(tokens.owner)).status).toBe(500)
+    expect(members()).toEqual(before)
+    expect(diary()).toEqual(data)
+    expect(sqlite.prepare(`SELECT COUNT(*) AS n FROM account_family_devices`).get()).toEqual({ n: 3 })
+  })
+
+  it.each([
+    ['owner', false], ['b', false], ['owner', true], ['b', true]
+  ] as const)('payer %s leaving, another payer %s: preserves diary and enforces the remaining entitlement', async (payer, anotherPayer) => {
+    const tokens = await setup(), before = diary()
+    env.ENTITLEMENT_ENFORCEMENT = 'true'
+    env.ENTITLEMENT_TEST_MODE = 'true'
+    expect((await setTestPlan(tokens[payer], 'familyPlus')).status).toBe(200)
+    if (anotherPayer) expect((await setTestPlan(tokens.c, 'family')).status).toBe(200)
+    const syncHeaders = { ...headers(tokens.c), 'X-Solemi-Family-Token': 'c-family-token' }
+    expect((await fetch('/v1/sync?after=0', { headers: syncHeaders })).status).toBe(200)
+    expect((await leave(tokens[payer])).status).toBe(200)
+    const access = await fetch('/v1/auth/access', { headers: headers(tokens.c) })
+    expect(await access.json()).toMatchObject({ data: { familySync: { status: anotherPayer ? 'ACTIVE' : 'PAUSED', canSync: anotherPayer },
+      familyFeatures: anotherPayer ? ['FAMILY_SYNC', 'PDF_EXPORT'] : [] } })
+    const sync = await fetch('/v1/sync?after=0', { headers: syncHeaders })
+    expect(sync.status).toBe(anotherPayer ? 200 : 403)
+    if (!anotherPayer) {
+      expect(await sync.json()).toMatchObject({ error: { code: 'FAMILY_SYNC_PAUSED' } })
+      const write = await fetch('/v1/sessions/sleep_leave', { method: 'PATCH', headers: syncHeaders,
+        body: JSON.stringify({ operationId: 'blocked-leave-write', baseRevision: 2, patch: { note: 'Must not apply' } }) })
+      expect(write.status).toBe(403)
+      expect(await write.json()).toMatchObject({ error: { code: 'FAMILY_SYNC_PAUSED' } })
+    }
+    expect(diary()).toEqual(before)
+    expect((await fetch('/v1/auth/me', { headers: headers(tokens[payer]) })).status).toBe(200)
+    const payerAccess = await fetch('/v1/auth/access', { headers: headers(tokens[payer]) })
+    expect(await payerAccess.json()).toMatchObject({ data: { membership: null, accountFeatures: ['FAMILY_PLUS_INSIGHTS', 'FAMILY_SYNC', 'PDF_EXPORT'] } })
+    // Retrying a successful leave is harmless; a remaining payer can resume without restoring data.
+    expect((await leave(tokens[payer])).status).toBe(200)
+    expect((await setTestPlan(tokens.c, 'family')).status).toBe(200)
+    expect((await fetch('/v1/sync?after=0', { headers: syncHeaders })).status).toBe(200)
+    expect(diary()).toEqual(before)
+  })
+})
+
 describe('last-member family dissolution', () => {
   async function setup() {
     await seedLegacyFamily('dissolve-token')

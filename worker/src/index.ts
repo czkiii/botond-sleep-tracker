@@ -1323,10 +1323,12 @@ async function leaveAccountFamily(request: Request, env: Env, access: AccountAcc
   const now = Date.now()
   const endedAt = now
   const revokedAt = nowIso()
+  // A concurrent admin departure may promote this member after the read above.
+  // Retry with the new role instead of leaving without transferring admin rights.
   const statements: D1PreparedStatement[] = [
     env.DB.prepare(`UPDATE legacy_family_memberships
       SET status = 'LEFT', ended_at = ?
-      WHERE id = ? AND account_id = ? AND family_id = ? AND status = 'ACTIVE'
+      WHERE id = ? AND account_id = ? AND family_id = ? AND status = 'ACTIVE' AND role = ?
         AND EXISTS (
           SELECT 1 FROM legacy_family_memberships other
           WHERE other.family_id = ? AND other.account_id <> ? AND other.status = 'ACTIVE'
@@ -1337,7 +1339,7 @@ async function leaveAccountFamily(request: Request, env: Env, access: AccountAcc
             AND successor.status = 'ACTIVE'
             AND (? = '' OR successor.account_id = ?)
         ))`)
-      .bind(endedAt, membership.id, access.account.id, membership.family_id,
+      .bind(endedAt, membership.id, access.account.id, membership.family_id, membership.role,
         membership.family_id, access.account.id, membership.role,
         membership.family_id, access.account.id, requestedSuccessor, requestedSuccessor)
   ]
