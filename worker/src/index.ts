@@ -1052,11 +1052,16 @@ function entitlementService(env: Env) {
   return new EntitlementService(env.DB)
 }
 
-async function requireFamilySyncEntitlement(request: Request, env: Env, auth: DeviceAuth) {
+async function requireAccountFamilyMembership(request: Request, env: Env, auth: DeviceAuth) {
   if (env.ENTITLEMENT_ENFORCEMENT !== 'true') return
-  const service = entitlementService(env)
   if (!request.headers.get('X-Solemi-Family-Token')) throw new ApiError(401, 'SESSION_INVALID')
-  const access = await accountAuth(env).authenticate(accountBearer(request))
+  let access: AccountAccess
+  try {
+    access = await accountAuth(env).authenticate(accountBearer(request))
+  } catch (error) {
+    if (error instanceof AuthError) throw new ApiError(error.status, error.code, error.code, error.data)
+    throw error
+  }
   const mapping = await env.DB.prepare(`SELECT 1 AS linked
     FROM account_family_devices afd
     JOIN legacy_family_memberships m
@@ -1065,7 +1070,12 @@ async function requireFamilySyncEntitlement(request: Request, env: Env, auth: De
     .bind(access.deviceId, access.account.id, auth.familyId, auth.deviceId)
     .first<{ linked: number }>()
   if (!mapping) throw new ApiError(403, 'FAMILY_MEMBERSHIP_REQUIRED')
-  if (!await service.familyCanSync(auth.familyId)) {
+}
+
+async function requireFamilySyncEntitlement(request: Request, env: Env, auth: DeviceAuth) {
+  if (env.ENTITLEMENT_ENFORCEMENT !== 'true') return
+  await requireAccountFamilyMembership(request, env, auth)
+  if (!await entitlementService(env).familyCanSync(auth.familyId)) {
     throw new ApiError(403, 'FAMILY_SYNC_PAUSED', 'Family Sync is paused.')
   }
 }
@@ -1676,8 +1686,15 @@ async function route(request: Request, env: Env) {
   }
 
   if (request.method === 'GET' && path === '/v1/sync') return sync(request, env, auth)
-  if (request.method === 'GET' && path === '/v1/device') return getDevice(request, env, auth)
-  if (request.method === 'POST' && path === '/v1/device/leave') return leaveDevice(request, env, auth)
+  if (request.method === 'GET' && path === '/v1/device') {
+    await requireAccountFamilyMembership(request, env, auth)
+    return getDevice(request, env, auth)
+  }
+  if (request.method === 'POST' && path === '/v1/device/leave') {
+    // Detaching an authenticated device must remain possible after a plan expires.
+    await requireAccountFamilyMembership(request, env, auth)
+    return leaveDevice(request, env, auth)
+  }
   if (request.method === 'POST' && path === '/v1/children') return createChildProfile(request, env, auth)
   if (request.method === 'POST' && path === '/v1/sessions/start') return startSleep(request, env, auth)
   if (request.method === 'POST' && path === '/v1/sessions') return createCompletedSleep(request, env, auth)

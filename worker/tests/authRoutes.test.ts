@@ -82,6 +82,102 @@ function setTestPlan(access: string, plan: 'free' | 'family' | 'familyPlus') {
   })
 }
 
+describe('A06 enforced family access boundaries', () => {
+  afterEach(() => vi.restoreAllMocks())
+  const diaryRoutes = [
+    ['GET', '/v1/sync?after=0'], ['POST', '/v1/invites'],
+    ['POST', '/v1/children'], ['PATCH', '/v1/children/child_access'], ['DELETE', '/v1/children/child_access'],
+    ['POST', '/v1/sessions'], ['POST', '/v1/sessions/start'], ['POST', '/v1/sessions/sleep_access/end'],
+    ['PATCH', '/v1/sessions/sleep_access'], ['DELETE', '/v1/sessions/sleep_access']
+  ] as const
+  const deviceRoutes = [['GET', '/v1/device'], ['POST', '/v1/device/leave']] as const
+  const data = () => ['families', 'children', 'sleep_sessions', 'operations', 'invite_codes']
+    .map(table => sqlite.prepare(`SELECT * FROM ${table}`).all())
+  async function setup() {
+    env.ENTITLEMENT_ENFORCEMENT = 'true'
+    env.ENTITLEMENT_TEST_MODE = 'true'
+    await seedLegacyFamily('family-access-token')
+    const owner = await accountAccess('acc_owner', 'adev_owner', 'access_owner')
+    const headers = { Origin: origin, Authorization: `Bearer ${owner}`, 'Content-Type': 'application/json',
+      'X-Solemi-Family-Token': 'family-access-token' }
+    expect((await fetch('/v1/auth/family/claim', { method: 'POST', headers,
+      body: JSON.stringify({ familyDeviceToken: 'family-access-token' }) })).status).toBe(200)
+    expect((await setTestPlan(owner, 'family')).status).toBe(200)
+    sqlite.prepare(`INSERT INTO children (id, family_id, name, created_at, updated_at, revision)
+      VALUES ('child_access', 'fam_test', 'Private diary', '2026-10-04', '2026-10-04', 1)`).run()
+    sqlite.prepare(`INSERT INTO sleep_sessions (id, family_id, child_id, start_time, note, created_at, updated_at, revision)
+      VALUES ('sleep_access', 'fam_test', 'child_access', '2026-10-04T08:00:00Z', 'Private note', '2026-10-04', '2026-10-04', 2)`).run()
+    sqlite.prepare(`UPDATE families SET revision = 2`).run()
+    return { owner, headers }
+  }
+  it.each(['legacy-only', 'missing-account', 'invalid-token', 'expired-session', 'revoked-session',
+    'revoked-account-device', 'revoked-family-device', 'other-account', 'other-device', 'left-member'] as const)(
+    'rejects %s on every diary and device endpoint without changing family data', async (state) => {
+      const { headers } = await setup()
+      // Auth rejection must be a controlled API response, never INTERNAL_ERROR.
+      const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+      let status = 401, code = 'SESSION_INVALID'
+      if (state === 'legacy-only') { headers.Authorization = 'Bearer family-access-token'; delete (headers as Record<string, string>)['X-Solemi-Family-Token'] }
+      if (state === 'missing-account') delete (headers as Record<string, string>).Authorization
+      if (state === 'invalid-token') headers.Authorization = 'Bearer invalid-account-token'
+      if (state === 'expired-session') vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 61_000)
+      if (state === 'revoked-session') sqlite.prepare(`UPDATE account_sessions SET revoked_at = 1`).run()
+      if (state === 'revoked-account-device') sqlite.prepare(`UPDATE account_devices SET revoked_at = 1, revoke_reason = 'USER_REVOKED'`).run()
+      if (state === 'revoked-family-device') {
+        sqlite.prepare(`UPDATE devices SET revoked_at = '2026-10-04T00:00:00Z'`).run()
+        status = 403; code = 'DEVICE_REVOKED'
+      }
+      if (state === 'other-account' || state === 'other-device') {
+        headers.Authorization = `Bearer ${await accountAccess(state === 'other-account' ? 'acc_other' : 'acc_owner', 'adev_other', 'access_other')}`
+        status = 403; code = 'FAMILY_MEMBERSHIP_REQUIRED'
+      }
+      if (state === 'left-member') {
+        sqlite.prepare(`UPDATE legacy_family_memberships SET status = 'LEFT', ended_at = 1`).run()
+        status = 403; code = 'FAMILY_MEMBERSHIP_REQUIRED'
+      }
+      const before = data()
+      const deviceBefore = sqlite.prepare(`SELECT revoked_at FROM devices WHERE id = 'dev_legacy'`).get()
+      for (const [method, path] of [...diaryRoutes, ...deviceRoutes]) {
+        const response = await fetch(path, { method, headers, ...(method === 'GET' ? {} : { body: '{}' }) })
+        expect(response.status, `${method} ${path}`).toBe(status)
+        expect(await response.json()).toMatchObject({ ok: false, error: { code } })
+      }
+      expect(logged).not.toHaveBeenCalled()
+      expect(data()).toEqual(before)
+      expect(sqlite.prepare(`SELECT revoked_at FROM devices WHERE id = 'dev_legacy'`).get()).toEqual(deviceBefore)
+    })
+
+  it('blocks every paid diary endpoint for Free but allows its own device inspection and detachment', async () => {
+    const { owner, headers } = await setup()
+    expect((await setTestPlan(owner, 'free')).status).toBe(200)
+    const before = data()
+    for (const [method, path] of diaryRoutes) {
+      const response = await fetch(path, { method, headers, ...(method === 'GET' ? {} : { body: '{}' }) })
+      expect(response.status, `${method} ${path}`).toBe(403)
+      expect(await response.json()).toMatchObject({ error: { code: 'FAMILY_SYNC_PAUSED' } })
+    }
+    expect((await fetch('/v1/device', { headers })).status).toBe(200)
+    expect((await fetch('/v1/device/leave', { method: 'POST', headers, body: '{}' })).status).toBe(200)
+    expect(data()).toEqual(before)
+  })
+
+  it.each(['not-started', 'start-boundary', 'end-boundary', 'revoked', 'unrelated-feature'] as const)(
+    'uses actual family sync entitlement for %s', async (state) => {
+      const { headers } = await setup()
+      const now = Date.now()
+      vi.spyOn(Date, 'now').mockReturnValue(now)
+      sqlite.prepare(`UPDATE account_entitlements SET valid_from = ?, valid_until = ?`).run(now, now + 1000)
+      if (state === 'not-started') sqlite.prepare(`UPDATE account_entitlements SET valid_from = ?`).run(now + 1)
+      if (state === 'end-boundary') sqlite.prepare(`UPDATE account_entitlements SET valid_from = ?, valid_until = ?`).run(now - 1000, now)
+      if (state === 'revoked') sqlite.prepare(`UPDATE account_entitlements SET revoked_at = ?`).run(now)
+      if (state === 'unrelated-feature') sqlite.prepare(`DELETE FROM account_entitlements WHERE feature_key = 'FAMILY_SYNC'`).run()
+      const response = await fetch('/v1/sync?after=0', { headers })
+      expect(response.status).toBe(state === 'start-boundary' ? 200 : 403)
+      if (state === 'start-boundary') expect(await response.json()).toMatchObject({ data: { sessions: [{ note: 'Private note' }] } })
+      else expect(await response.json()).toMatchObject({ error: { code: 'FAMILY_SYNC_PAUSED' } })
+    })
+})
+
 describe('A04 remaining account leave cases', () => {
   async function setup() {
     await seedLegacyFamily('owner-family-token')
@@ -516,6 +612,13 @@ describe('account auth routes', () => {
     env.ENTITLEMENT_TEST_MODE = 'true'
     const legacyToken = 'ss_dv_compatible-claim'
     await seedLegacyFamily(legacyToken)
+    sqlite.prepare(`INSERT INTO children (id, family_id, name, created_at, updated_at, revision)
+      VALUES ('child_legacy', 'fam_test', 'Existing child', '2026-10-04', '2026-10-04', 1)`).run()
+    sqlite.prepare(`INSERT INTO sleep_sessions (id, family_id, child_id, start_time, note, created_at, updated_at, revision)
+      VALUES ('sleep_legacy', 'fam_test', 'child_legacy', '2026-10-04T08:00:00Z', 'Existing note', '2026-10-04', '2026-10-04', 2)`).run()
+    sqlite.prepare(`UPDATE families SET revision = 2`).run()
+    const diary = () => ['families', 'children', 'sleep_sessions'].map(table => sqlite.prepare(`SELECT * FROM ${table}`).all())
+    const before = diary()
 
     const blocked = await fetch('/v1/sync?after=0', {
       headers: { Authorization: `Bearer ${legacyToken}` }
@@ -529,12 +632,21 @@ describe('account auth routes', () => {
       body: JSON.stringify({ familyDeviceToken: legacyToken })
     })
     expect(claim.status).toBe(200)
+    const headers = { Authorization: `Bearer ${access}`, 'X-Solemi-Family-Token': legacyToken }
+    const paused = await fetch('/v1/sync?after=0', { headers })
+    expect(paused.status).toBe(403)
+    expect(await paused.json()).toMatchObject({ error: { code: 'FAMILY_SYNC_PAUSED' } })
+    expect((await fetch('/v1/device', { headers })).status).toBe(200)
+    expect(diary()).toEqual(before)
     expect((await setTestPlan(access, 'family')).status).toBe(200)
     const migrated = await fetch('/v1/sync?after=0', { headers: {
       Authorization: `Bearer ${access}`, 'X-Solemi-Family-Token': legacyToken
     } })
     expect(migrated.status).toBe(200)
-    expect(await migrated.json()).toMatchObject({ data: { familyName: 'Teszt család' } })
+    expect(await migrated.json()).toMatchObject({ data: { familyName: 'Teszt család',
+      children: [{ id: 'child_legacy', name: 'Existing child' }],
+      sessions: [{ id: 'sleep_legacy', note: 'Existing note', endTime: null }] } })
+    expect(diary()).toEqual(before)
   })
 
   it('does not create server rows when a free account calls the authenticated family route', async () => {
