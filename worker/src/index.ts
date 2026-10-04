@@ -1025,11 +1025,12 @@ function requireAllowedAuthOrigin(request: Request, env: Env) {
 
 function cookieValue(request: Request, name: string) {
   const prefix = `${name}=`
-  for (const part of (request.headers.get('Cookie') ?? '').split(';')) {
-    const value = part.trim()
-    if (value.startsWith(prefix)) return decodeURIComponent(value.slice(prefix.length))
-  }
-  return null
+  const matches = (request.headers.get('Cookie') ?? '').split(';').map(value => value.trim())
+    .filter(value => value.startsWith(prefix))
+  if (!matches.length) return null
+  if (matches.length !== 1) throw new AuthError('SESSION_INVALID')
+  try { return decodeURIComponent(matches[0].slice(prefix.length)) }
+  catch { throw new AuthError('SESSION_INVALID') }
 }
 
 function refreshCookie(token: string, maxAgeSeconds: number) {

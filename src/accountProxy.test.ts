@@ -4,6 +4,40 @@ import { onRequest } from '../functions/api/[[path]]'
 afterEach(() => vi.unstubAllGlobals())
 
 describe('internal account proxy', () => {
+  it.each(['/api/v1/auth/unknown', '/api/v1/auth/refresh/extra', '/api/v1/auth/%72efresh'])(
+    'does not forward credentials to unlisted path %s', async (path) => {
+      const forwarded = vi.fn(async () => new Response('{}'))
+      vi.stubGlobal('fetch', forwarded)
+      const response = await onRequest({ request: new Request(`https://solemi-sleep-internal.pages.dev${path}`, {
+        method: 'POST', headers: { Origin: 'https://solemi-sleep-internal.pages.dev', Cookie: 'solemi_refresh=private' }
+      }) })
+      expect(response.status).toBe(404)
+      expect(forwarded).not.toHaveBeenCalled()
+    })
+
+  it.each([['GET', '/auth/refresh'], ['POST', '/auth/me'], ['DELETE', '/auth/logout'],
+    ['PATCH', '/sync'], ['POST', '/device'], ['GET', '/invites']])('rejects unsupported %s %s at the proxy', async (method, path) => {
+    const forwarded = vi.fn(async () => new Response('{}'))
+    vi.stubGlobal('fetch', forwarded)
+    const response = await onRequest({ request: new Request(`https://solemi-sleep-internal.pages.dev/api/v1${path}`, {
+      method, headers: { Origin: 'https://solemi-sleep-internal.pages.dev', Cookie: 'solemi_refresh=private' }
+    }) })
+    expect(response.status).toBe(405)
+    expect(forwarded).not.toHaveBeenCalled()
+  })
+
+  it.each(['/auth/refresh', '/auth/logout', '/auth/google', '/sync'])('minimizes cookie forwarding for %s', async (path) => {
+    const forwarded = vi.fn(async (_url, options) => {
+      expect(options.headers.get('Cookie')).toBe(['/auth/refresh', '/auth/logout'].includes(path) ? 'solemi_refresh=needed' : null)
+      return new Response('{}')
+    })
+    vi.stubGlobal('fetch', forwarded)
+    const response = await onRequest({ request: new Request(`https://solemi-sleep-internal.pages.dev/api/v1${path}`, {
+      method: path === '/sync' ? 'GET' : 'POST', headers: { Origin: 'https://solemi-sleep-internal.pages.dev',
+        Cookie: 'unrelated=private; solemi_refresh=needed; analytics=other' }
+    }) })
+    expect(response.status).toBe(200)
+  })
   it('forwards auth requests to staging and converts the refresh cookie to first-party scope', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const request = new Request(input, init)
