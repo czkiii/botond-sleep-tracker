@@ -492,7 +492,7 @@ describe('two device client + Worker reconciliation', () => {
     }
     vi.stubGlobal('fetch', async (url: string, options: RequestInit) => {
       if (options.method === 'DELETE') deletes++
-      if (failure === 'network' && failOnce && url.endsWith('/v1/sync?after=0')) {
+      if (failure === 'network' && failOnce && url.includes('/v1/sync?after=0&')) {
         failOnce = false
         throw new TypeError('offline')
       }
@@ -517,7 +517,7 @@ describe('two device client + Worker reconciliation', () => {
     const otherRaw = devices[1].storage.getItem(STORAGE_KEY)
     vi.stubGlobal('fetch', async (url: string, options: RequestInit) => {
       const response = await worker.fetch(new Request(url, options), env)
-      if (url.endsWith('/v1/sync?after=0')) useDevice(1, true)
+      if (url.includes('/v1/sync?after=0&')) useDevice(1, true)
       return response
     })
     await pullRemote()
@@ -535,7 +535,7 @@ describe('two device client + Worker reconciliation', () => {
     let editOnce = true
     vi.stubGlobal('fetch', async (url: string, options: RequestInit) => {
       const response = await worker.fetch(new Request(url, options), env)
-      if (editOnce && url.endsWith('/v1/sync?after=0')) {
+      if (editOnce && url.includes('/v1/sync?after=0&')) {
         editOnce = false
         const current = loadData()
         saveLocalData(current, { ...current, settings: { ...current.settings, longSleepReminderEnabled: true } })
@@ -866,5 +866,91 @@ describe('two device client + Worker reconciliation', () => {
     saveLocalData(loadData(), devices[0].displayed)
     expect(getSyncStore().pending).toEqual([])
     expect(loadData().sessions).toHaveLength(1)
+  })
+})
+
+
+describe('bounded snapshot downloads', () => {
+  function seedSleeps(count: number) {
+    sqlite.exec('BEGIN');
+    const insert = sqlite.prepare(`INSERT INTO sleep_sessions
+      (id, family_id, child_id, start_time, end_time, note, created_at, updated_at, revision)
+      VALUES (?, 'family-a', 'child-a', ?, ?, '', ?, ?, 2)`)
+    for (let i = 0; i < count; i++) insert.run('bulk-' + String(i).padStart(5, '0'), at, '2026-08-26T11:00:00.000Z', at, at)
+    sqlite.exec('COMMIT')
+  }
+  it('downloads 5001 same-revision sleeps without omissions and commits once', async () => {
+    seedSleeps(5000); useDevice(0, true)
+    let pages = 0
+    vi.stubGlobal('fetch', async (url: string, options: RequestInit) => {
+      if (url.includes('/v1/sync?')) {
+        pages++
+        expect(loadData().sessions).toHaveLength(1)
+        const response = await worker.fetch(new Request(url, options), env)
+        const body = await response.clone().json() as { data: { sessions: unknown[] } }
+        expect(body.data.sessions.length).toBeLessThanOrEqual(500)
+        return response
+      }
+      return worker.fetch(new Request(url, options), env)
+    })
+    await pullRemote(true)
+    expect(pages).toBe(11)
+    expect(loadData().sessions).toHaveLength(5001)
+    expect(new Set(loadData().sessions.map(s => s.id)).size).toBe(5001)
+    expect(devices[0].updates).toBe(1)
+  })
+  it('never sends a truncated successful response to an old unpaged client', async () => {
+    seedSleeps(5000)
+    const response = await worker.fetch(new Request('https://worker/v1/sync?after=0', {
+      headers: { Authorization: 'Bearer test-device-token-0' }
+    }), env)
+    expect(response.status).toBe(413)
+    expect(await response.json()).toMatchObject({ error: { code: 'SYNC_SNAPSHOT_TOO_LARGE' } })
+  })
+  it('retains diary and cursor after the second page fails, then retries completely', async () => {
+    seedSleeps(500); useDevice(0, true)
+    const before = loadData(); const store = getSyncStore()
+    vi.stubGlobal('fetch', async (url: string, options: RequestInit) => {
+      if (url.includes('offset=500')) throw new Error('offline')
+      return worker.fetch(new Request(url, options), env)
+    })
+    await expect(pullRemote(true)).rejects.toThrow('offline')
+    expect(loadData()).toEqual(before)
+    expect(getSyncStore().connection).toEqual(store.connection)
+    vi.stubGlobal('fetch', (url: string, options: RequestInit) => worker.fetch(new Request(url, options), env))
+    await pullRemote(true)
+    expect(loadData().sessions).toHaveLength(501)
+  })
+  it('restarts after a concurrent write and uses the new child and complete session snapshot', async () => {
+    seedSleeps(500); useDevice(0, true); let changed = false
+    vi.stubGlobal('fetch', async (url: string, options: RequestInit) => {
+      if (url.includes('offset=500') && !changed) {
+        changed = true
+        sqlite.exec(`UPDATE families SET revision = 3 WHERE id = 'family-a';
+          UPDATE children SET name = 'Changed while downloading', revision = 3 WHERE id = 'child-a';
+          UPDATE sleep_sessions SET note = 'updated', revision = 3 WHERE id = 'bulk-00000'`)
+      }
+      return worker.fetch(new Request(url, options), env)
+    })
+    await pullRemote(true)
+    expect(loadData().sessions).toHaveLength(501)
+    expect(loadData().children[0].name).toBe('Changed while downloading')
+    expect(loadData().sessions.find(s => s.id === 'bulk-00000')?.note).toBe('updated')
+    expect(getSyncStore().connection?.revision).toBe(3)
+  })
+  it.each(['offset=-1', 'offset=500', 'offset=10001&snapshot=2', 'snapshot=NaN', 'after=9007199254740992'])('rejects invalid page parameters: %s', async query => {
+    const response = await worker.fetch(new Request('https://worker/v1/sync?paged=1&' + query, {
+      headers: { Authorization: 'Bearer test-device-token-0' }
+    }), env)
+    expect(response.status).toBe(400)
+  })
+  it('limits real invite writes after membership checks', async () => {
+    const limiter = { limit: vi.fn(async () => ({ success: false })) }
+    const response = await worker.fetch(new Request('https://worker/v1/invites', {
+      method: 'POST', headers: { Authorization: 'Bearer test-device-token-0' }
+    }), { ...env, INVITE_LIMITER: limiter })
+    expect(response.status).toBe(429)
+    expect(limiter.limit).toHaveBeenCalledWith({ key: 'invite:family-a' })
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM invite_codes').get()!.n).toBe(0)
   })
 })

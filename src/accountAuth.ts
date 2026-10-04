@@ -310,7 +310,8 @@ export async function getAccountAccess(): Promise<AccountAccessState> {
     announceAccess(access)
     return access
   } catch (error) {
-    const transient = !(error instanceof AccountAuthError) || error.code === 'ACCOUNT_OFFLINE' || (error.status ?? 0) >= 500
+    const transient = !(error instanceof AccountAuthError) || error.code === 'ACCOUNT_OFFLINE'
+      || error.status === 429 || (error.status ?? 0) >= 500
     if (transient) {
       const offline = await readOfflineEntitlement()
       if (offline) { announceAccess(offline); return offline }

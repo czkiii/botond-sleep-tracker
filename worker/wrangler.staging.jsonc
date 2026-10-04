@@ -14,6 +14,33 @@
     "ENTITLEMENT_TEST_MODE": "true",
     "RECONCILIATION_CONFLICTS": "true"
   },
+  "ratelimits": [
+    {
+      "name": "API_LIMITER",
+      "namespace_id": "19200",
+      "simple": {
+        "limit": 6000,
+        "period": 60
+      }
+    },
+    {
+      "name": "AUTH_LIMITER",
+      "namespace_id": "19201",
+      "simple": {
+        "limit": 120,
+        "period": 60
+      }
+    },
+    {
+      "name": "INVITE_LIMITER",
+      "namespace_id": "19202",
+      "simple": {
+        "limit": 30,
+        "period": 60
+      }
+    }
+  ],
+  "limits": { "cpu_ms": 50 },
   "d1_databases": [
     {
       "binding": "DB",

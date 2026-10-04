@@ -32,3 +32,18 @@ it('reports an invalid upstream body and clears its timeout', async () => {
   await expect(fetchJson('/local-test')).rejects.toMatchObject({ code: 'API_RESPONSE_INVALID' })
   expect(vi.getTimerCount()).toBe(0)
 })
+
+it('honors rate-limit cooldown across endpoints without sending or retrying a write', async () => {
+  vi.useFakeTimers()
+  const fetch = vi.fn(async () => new Response(JSON.stringify({ ok: false }), {
+    status: 429, headers: { 'Retry-After': '60' }
+  }))
+  vi.stubGlobal('fetch', fetch)
+  expect((await fetchJson('https://budget.test/sync')).response.status).toBe(429)
+  await expect(fetchJson('https://budget.test/session', { method: 'POST', body: '{}' })).rejects.toMatchObject({ code: 'RATE_LIMITED' })
+  expect(fetch).toHaveBeenCalledTimes(1)
+  await vi.advanceTimersByTimeAsync(60_000)
+  fetch.mockImplementation(async () => new Response('{}'))
+  expect((await fetchJson('https://budget.test/sync')).response.status).toBe(200)
+  expect(fetch).toHaveBeenCalledTimes(2)
+})

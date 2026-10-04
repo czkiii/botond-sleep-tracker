@@ -2,6 +2,7 @@ import type { AppData, ChildProfile, SleepSession } from './types'
 import { createDefaultData, getLocalMetadata, inspectBackup, loadData, saveDataAfterDeletion, saveDataWithMetadata, saveLocalMetadata, saveRemoteData, saveSafetyBackup } from './storage'
 import { accountDeviceName, accountRequest } from './accountAuth'
 import { fetchJson } from './apiTransport'
+import { downloadSyncSnapshot } from './syncSnapshot'
 import { getActiveAccountWorkspaceId } from './accountWorkspace'
 import { deleteChildPhoto } from './photoStore'
 
@@ -389,8 +390,8 @@ export async function prepareFamilyBootstrap(): Promise<FamilyBootstrapPreview> 
   if (!navigator.onLine) throw new Error('FAMILY_BOOTSTRAP_OFFLINE')
   const local = loadData()
   const workspace = getActiveAccountWorkspaceId()
-  const result = await request<{ revision: number; familyName?: string; children: RemoteChild[]; sessions: RemoteSession[] }>(
-    '/v1/sync?after=0', {}, connection.deviceToken)
+  const result = await downloadSyncSnapshot(0, path => request<{ revision: number; familyName?: string; children: RemoteChild[]; sessions: RemoteSession[]; nextOffset?: number | null }>(
+    path, {}, connection.deviceToken))
   if (!sameConnection(connection, readStore().bootstrapConnection ?? null)
     || getActiveAccountWorkspaceId() !== workspace || JSON.stringify(local) !== JSON.stringify(loadData())) {
     throw new Error('FAMILY_BOOTSTRAP_CHANGED')
@@ -836,8 +837,8 @@ export function restoreMissingSession(sessionId: string) {
 // share one durable write; a failed download/save leaves recovery retryable.
 async function recoverRejectedChildDeletion(store: SyncStore, operation: PendingOperation) {
   const current = loadData()
-  const result = await request<{ children: RemoteChild[]; sessions: RemoteSession[] }>(
-    '/v1/sync?after=0', {}, store.connection!.deviceToken)
+  const result = await downloadSyncSnapshot(0, path => request<{ revision: number; children: RemoteChild[]; sessions: RemoteSession[]; nextOffset?: number | null }>(
+    path, {}, store.connection!.deviceToken))
   const latest = readStore()
   if (!sameConnection(store.connection, latest.connection)
     || JSON.stringify(store.pending) !== JSON.stringify(latest.pending)
@@ -1048,7 +1049,7 @@ async function pullRemoteNow(forceFromZero = false) {
   if (!sameConnection(store.connection, fresh.connection) || !fresh.connection
     || fresh.conflicts.length || fresh.pending.some((op) => !blockedByMissingSession(fresh, op)) || !navigator.onLine) return changedLocal
   const after = forceFromZero ? 0 : fresh.connection.revision
-  const result = await request<{ revision: number; familyName?: string; children?: RemoteChild[]; sessions: RemoteSession[] }>(`/v1/sync?after=${after}`, {}, fresh.connection.deviceToken)
+  const result = await downloadSyncSnapshot(after, path => request<{ revision: number; familyName?: string; children?: RemoteChild[]; sessions: RemoteSession[]; nextOffset?: number | null }>(path, {}, fresh.connection!.deviceToken))
   const latest = readStore()
   // Edits made while this snapshot was in flight must be uploaded/conflicted
   // against the old cursor before any downloaded values replace them.

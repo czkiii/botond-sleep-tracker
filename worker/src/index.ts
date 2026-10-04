@@ -3,8 +3,10 @@ import { EntitlementService } from './entitlementService'
 import type { TestPlan } from './entitlementService'
 import { buildSha } from './buildIdentity'
 import { offlineEntitlement } from './offlineEntitlement'
+import { consumeLimit, limitRequest, RequestLimitError } from './requestLimits'
+import type { LimitEnv } from './requestLimits'
 
-interface Env {
+interface Env extends LimitEnv {
   DB: D1Database
   TOKEN_PEPPER: string
   ALLOWED_ORIGINS: string
@@ -93,6 +95,9 @@ function corsHeaders(request: Request, env: Env) {
   const headers = new Headers({
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer',
+    'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
     'X-Solemi-Build-Sha': buildSha(),
     'Vary': 'Origin'
   })
@@ -500,29 +505,47 @@ async function sync(request: Request, env: Env, auth: DeviceAuth) {
   const url = new URL(request.url)
   const afterRaw = url.searchParams.get('after') ?? '0'
   const after = Number(afterRaw)
-  if (!Number.isInteger(after) || after < 0) throw new ApiError(400, 'INVALID_REQUEST', 'Invalid revision.')
+  if (!Number.isSafeInteger(after) || after < 0) throw new ApiError(400, 'INVALID_REQUEST', 'Invalid revision.')
 
+  const paged = url.searchParams.get('paged') === '1'
+  const offset = Number(url.searchParams.get('offset') ?? '0')
+  const snapshotRaw = url.searchParams.get('snapshot')
+  const snapshot = snapshotRaw === null ? null : Number(snapshotRaw)
+  if (!Number.isSafeInteger(offset) || offset < 0 || offset > 10000
+    || (offset > 0 && (!paged || snapshot === null))
+    || (snapshot !== null && (!Number.isSafeInteger(snapshot) || snapshot < 0))) {
+    throw new ApiError(400, 'INVALID_REQUEST', 'Invalid page.')
+  }
+  const pageSize = paged ? 500 : 5000
+  // Reject any cross-page change; the client commits only a complete snapshot.
   // D1 batch is one transaction: rows and the cursor describe the same snapshot.
   const [families, children, sessions] = await env.DB.batch([
     env.DB.prepare('SELECT name, revision FROM families WHERE id = ?').bind(auth.familyId),
     env.DB.prepare(
       `SELECT id, family_id, name, birth_date, created_at, updated_at, deleted_at, revision
-       FROM children WHERE family_id = ? ORDER BY created_at ASC`
+       FROM children WHERE family_id = ? ORDER BY created_at ASC LIMIT 1001`
     ).bind(auth.familyId),
     env.DB.prepare(
       `SELECT id, family_id, child_id, start_time, end_time, note, day_night_override, created_at, updated_at, deleted_at, revision
        FROM sleep_sessions
        WHERE family_id = ? AND revision > ?
-       ORDER BY revision ASC`
-    ).bind(auth.familyId, after)
+       ORDER BY revision ASC, id ASC LIMIT ? OFFSET ?`
+    ).bind(auth.familyId, after, pageSize + 1, offset)
   ])
   const family = families.results[0] as { name: string; revision: number } | undefined
+  const revision = family?.revision ?? auth.familyRevision
+  if (snapshot !== null && snapshot !== revision) throw new ApiError(409, 'SYNC_SNAPSHOT_CHANGED')
+  if (children.results.length > 1000 || (!paged && sessions.results.length > pageSize)) {
+    throw new ApiError(413, 'SYNC_SNAPSHOT_TOO_LARGE')
+  }
+  const more = sessions.results.length > pageSize
 
   return ok(request, env, {
     familyName: family?.name ?? auth.familyName,
     revision: family?.revision ?? auth.familyRevision,
     children: (children.results as unknown as ChildRow[]).map(childDto),
-    sessions: (sessions.results as unknown as SessionRow[]).map(sessionDto)
+    sessions: (sessions.results.slice(0, pageSize) as unknown as SessionRow[]).map(sessionDto),
+    ...(paged ? { nextOffset: more ? offset + pageSize : null } : {})
   })
 }
 
@@ -1429,10 +1452,13 @@ async function soleFamilyAdmin(env: Env, accountId: string) {
 
 async function previewFamilyDissolution(request: Request, env: Env, access: AccountAccess) {
   const family = await soleFamilyAdmin(env, access.account.id)
-  const children = await env.DB.prepare(`SELECT * FROM children WHERE family_id = ? AND deleted_at IS NULL`)
+  const children = await env.DB.prepare(`SELECT * FROM children WHERE family_id = ? AND deleted_at IS NULL LIMIT 1001`)
     .bind(family.id).all<ChildRow>()
-  const sessions = await env.DB.prepare(`SELECT * FROM sleep_sessions WHERE family_id = ? AND deleted_at IS NULL`)
+  const sessions = await env.DB.prepare(`SELECT * FROM sleep_sessions WHERE family_id = ? AND deleted_at IS NULL LIMIT 5001`)
     .bind(family.id).all<SessionRow>()
+  if (children.results.length > 1000 || sessions.results.length > 5000) {
+    throw new ApiError(413, 'SYNC_SNAPSHOT_TOO_LARGE')
+  }
   // All diary mutations advance the revision. Reject a snapshot read across a write.
   const fresh = await soleFamilyAdmin(env, access.account.id)
   if (fresh.id !== family.id || fresh.revision !== family.revision || fresh.name !== family.name) {
@@ -1665,6 +1691,7 @@ async function route(request: Request, env: Env) {
     return ok(request, env, { service: 'solemi-sleep-sync', status: 'ok', buildSha: buildSha() })
   }
 
+  await limitRequest(request, env, path)
   if (path.startsWith('/v1/auth/')) return accountAuthRoute(request, env, path)
 
   if (request.method === 'POST' && path === '/v1/families') {
@@ -1686,6 +1713,7 @@ async function route(request: Request, env: Env) {
   if (isRawFamilyData) await requireFamilySyncEntitlement(request, env, auth)
   if (request.method === 'POST' && path === '/v1/invites') {
     await requireFamilySyncEntitlement(request, env, auth)
+    await consumeLimit(env.INVITE_LIMITER, `invite:${auth.familyId}`)
     return createInvite(request, env, auth)
   }
 
@@ -1722,8 +1750,14 @@ export default {
     try {
       return await route(request, env)
     } catch (error) {
+      if (error instanceof RequestLimitError) {
+        const response = fail(request, env, new ApiError(error.status, error.code))
+        response.headers.set('Retry-After', '60')
+        return response
+      }
       if (error instanceof ApiError) return fail(request, env, error)
-      console.error(error)
+      // Provider/DB errors can contain SQL values or credentials.
+      console.error('SOLEMI_INTERNAL_ERROR')
       return fail(request, env, new ApiError(500, 'INTERNAL_ERROR', 'Unexpected server error.'))
     }
   }

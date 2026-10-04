@@ -9,6 +9,33 @@
     "SOLEMI_ENVIRONMENT": "production",
     "ALLOWED_ORIGINS": "https://czkiii.github.io,http://localhost:5173"
   },
+  "ratelimits": [
+    {
+      "name": "API_LIMITER",
+      "namespace_id": "19100",
+      "simple": {
+        "limit": 6000,
+        "period": 60
+      }
+    },
+    {
+      "name": "AUTH_LIMITER",
+      "namespace_id": "19101",
+      "simple": {
+        "limit": 120,
+        "period": 60
+      }
+    },
+    {
+      "name": "INVITE_LIMITER",
+      "namespace_id": "19102",
+      "simple": {
+        "limit": 30,
+        "period": 60
+      }
+    }
+  ],
+  "limits": { "cpu_ms": 50 },
   "d1_databases": [
     {
       "binding": "DB",

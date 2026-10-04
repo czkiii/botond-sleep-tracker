@@ -30,7 +30,18 @@ function proxyTarget(appOrigin: string, env: PagesContext['env']) {
   return upstream.origin
 }
 
-export async function onRequest({ request, env }: PagesContext) {
+export async function onRequest(context: PagesContext) {
+  let response: Response
+  try { response = await proxyRequest(context) }
+  catch { response = new Response('Upstream unavailable', { status: 502 }) }
+  response.headers.set('Cache-Control', 'no-store')
+  response.headers.set('X-Content-Type-Options', 'nosniff')
+  response.headers.set('Referrer-Policy', 'no-referrer')
+  response.headers.set('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'")
+  return response
+}
+
+async function proxyRequest({ request, env }: PagesContext) {
   const incomingUrl = new URL(request.url)
   const methods = [...new Set(ROUTES.filter(([path]) => path.test(incomingUrl.pathname)).flatMap(([, methods]) => methods))]
   if (!methods.length) {
@@ -95,7 +106,8 @@ export async function onRequest({ request, env }: PagesContext) {
     method: request.method,
     headers,
     body,
-    redirect: 'manual'
+    redirect: 'manual',
+    signal: AbortSignal.timeout(12_000)
   })
 
   const responseHeaders = new Headers(upstream.headers)

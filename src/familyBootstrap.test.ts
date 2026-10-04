@@ -57,7 +57,7 @@ describe('existing local diary joining a family', () => {
     expect(loadSafetyBackup()?.data).toEqual(diary)
     expect(getSyncStore()).toMatchObject({ connection: { revision: 40 }, pending: [] })
     expect(getSyncStore().bootstrapConnection).toBeUndefined()
-    expect(fetchMock.mock.calls.map(call => String(call[0]).split('/v1/')[1])).toEqual(['join', 'sync?after=0'])
+    expect(fetchMock.mock.calls.map(call => String(call[0]).split('/v1/')[1])).toEqual(['join', 'sync?after=0&paged=1&offset=0'])
   })
 
   it('does not upload local edits while the family diary choice is postponed', async () => {

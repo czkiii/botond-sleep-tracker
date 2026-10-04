@@ -179,6 +179,20 @@ describe('server-signed offline entitlement and client validation', () => {
     expect(await client.readOfflineEntitlement()).toBeNull()
   })
 
+  it('preserves signed local rights during throttling without enabling cloud sync', async () => {
+    await save()
+    vi.stubGlobal('navigator', { onLine: true, language: 'hu-HU' })
+    sessionStorage.setItem('solemiSleep:accountAccess', JSON.stringify({ account: { id: 'owner' }, deviceId: 'device',
+      accessToken: 'access', accessExpiresAt: now + 300000 }))
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ ok: false, error: { code: 'RATE_LIMITED' } },
+      { status: 429, headers: { 'Retry-After': '60' } })))
+    const auth = await import('../../src/accountAuth')
+    const result = await auth.getAccountAccess()
+    expect(result.features).toEqual(['FAMILY_PLUS_INSIGHTS'])
+    expect(result.familySync.canSync).toBe(false)
+    expect(await client.readOfflineEntitlement()).not.toBeNull()
+  })
+
   it('preserves verified local rights on transport failure but clears them on a revoked session', async () => {
     await save()
     vi.stubGlobal('navigator', { onLine: true, language: 'hu-HU' })

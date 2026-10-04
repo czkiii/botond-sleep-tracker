@@ -60,6 +60,16 @@ function expectAccountDiaryUnchanged() {
 }
 
 describe('account restoration after closing/reopening the PWA', () => {
+  it('retains session, account diary and pending work when refresh is throttled', async () => {
+    const auth = await import('./accountAuth')
+    const old = { ...validAccess(), accessExpiresAt: Date.now() - 1 }
+    session.setItem(accessKey, JSON.stringify(old))
+    fetchMock.mockResolvedValue(Response.json({ ok: false, error: { code: 'RATE_LIMITED' } },
+      { status: 429, headers: { 'Retry-After': '60' } }))
+    await expect(auth.accountRequest('/v1/auth/access')).rejects.toMatchObject({ code: 'RATE_LIMITED' })
+    expect(session.getItem(accessKey)).toBe(JSON.stringify(old))
+    expectAccountDiaryUnchanged()
+  })
   it('shares one refresh between cold restore and simultaneous authenticated requests', async () => {
     const auth = await import('./accountAuth')
     let release!: (value: Response) => void

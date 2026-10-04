@@ -118,7 +118,10 @@ describe('staging smoke commit gate', () => {
       TOKEN_PEPPER: 'test', ALLOWED_ORIGINS: origin, GOOGLE_CLIENT_ID: 'test',
       AUTH_SECRET: 'test-secret-with-at-least-32-characters',
       ACCOUNT_FAMILY_BRIDGE: 'true', ENTITLEMENT_ENFORCEMENT: 'true',
-      SOLEMI_ENVIRONMENT: 'staging', ENTITLEMENT_TEST_MODE: 'true' }
+      SOLEMI_ENVIRONMENT: 'staging', ENTITLEMENT_TEST_MODE: 'true',
+      API_LIMITER: { limit: async () => ({ success: true }) },
+      AUTH_LIMITER: { limit: async () => ({ success: true }) },
+      INVITE_LIMITER: { limit: async () => ({ success: true }) } }
     const deps = harness()
     deps.fetchImpl.mockImplementation((url, init) => worker.fetch(new Request(url, init), env))
     await runStagingSmoke(config, deps)

@@ -33,6 +33,7 @@ function loadInternalPlanPreview(): ProductPlan {
 
 const copy = {
   hu: {
+    rateLimited: "Sok kérés érkezett. Várj egy percet, majd próbáld újra. A helyi módosításaid megmaradtak.", snapshotTooLarge: "A napló meghaladja a letöltési korlátot. Az adatok megmaradtak; kérj segítséget a támogatástól.",
     title: 'Családi megosztás', connected: 'A családi adatok megosztva', disconnected: 'Nincs család összekapcsolva',
     intro: 'Kapcsold össze a család telefonjait, hogy ugyanazokat az alvásadatokat lássátok.', create: 'Új család létrehozása', join: 'Csatlakozás kóddal',
     familyName: 'Család neve', familyNamePlaceholder: 'Pl. Kovács család', createButton: 'Család létrehozása',
@@ -53,6 +54,7 @@ const copy = {
     paused: 'A családi szinkron szünetel', pausedHint: 'A családban jelenleg nincs aktív Family vagy Family+ előfizetés. A helyi módosításaid megmaradnak.'
   },
   en: {
+    rateLimited: "Too many requests. Wait a minute, then try again. Your local changes have been kept.", snapshotTooLarge: "The diary exceeds the download limit. Your data has been kept; contact support for help.",
     title: 'Family sharing', connected: 'Family data is shared', disconnected: 'No family connected',
     intro: 'Connect the family’s phones so everyone sees the same sleep data.', create: 'Create a new family', join: 'Join with a code',
     familyName: 'Family name', familyNamePlaceholder: 'e.g. Smith family', createButton: 'Create family',
@@ -73,6 +75,7 @@ const copy = {
     paused: 'Family sync is paused', pausedHint: 'No family member currently has an active Family or Family+ subscription. Your local changes are kept.'
   },
   de: {
+    rateLimited: "Zu viele Anfragen. Warte eine Minute und versuche es erneut. Deine lokalen Änderungen bleiben erhalten.", snapshotTooLarge: "Das Tagebuch überschreitet das Download-Limit. Deine Daten bleiben erhalten; wende dich an den Support.",
     title: 'Familienfreigabe', connected: 'Familiendaten werden geteilt', disconnected: 'Keine Familie verbunden',
     intro: 'Verbinde die Telefone der Familie, damit alle dieselben Schlafdaten sehen.', create: 'Neue Familie erstellen', join: 'Mit Code beitreten',
     familyName: 'Familienname', familyNamePlaceholder: 'z. B. Familie Müller', createButton: 'Familie erstellen',
@@ -153,6 +156,8 @@ export default function FamilySyncLayer() {
     if (code === 'FAMILY_BOOTSTRAP_CHANGED') return bootstrapText.changed
     if (code === 'INVITE_NOT_FOUND') return text.inviteNotFound
     if (code === 'INVITE_ALREADY_USED') return text.inviteUsed
+    if (code === 'RATE_LIMITED' || code === 'RATE_LIMIT_UNAVAILABLE') return text.rateLimited
+    if (code === 'SYNC_SNAPSHOT_TOO_LARGE') return text.snapshotTooLarge
     if (code === 'INVITE_EXPIRED') return text.inviteExpired
     if (code === 'DEVICE_REVOKED') return text.deviceRevoked
     if (code === 'INVALID_DEVICE_TOKEN') return text.invalidToken
