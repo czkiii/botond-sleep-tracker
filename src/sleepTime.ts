@@ -5,6 +5,20 @@ export const DEFAULT_NIGHT_START_MINUTES = 19 * 60
 
 export type SleepTimeSegment = { start: number; end: number; kind: 'day' | 'night' }
 
+// Shared half-open union for diary totals and analytical daily totals.
+// Callers choose the eligible records; overlapping time is counted once.
+export function mergeSleepIntervals(intervals: Array<{ start: number; end: number }>) {
+  const sorted = intervals.filter(item => Number.isFinite(item.start) && Number.isFinite(item.end) && item.end > item.start)
+    .slice().sort((a, b) => a.start - b.start || a.end - b.end)
+  const merged: Array<{ start: number; end: number }> = []
+  for (const interval of sorted) {
+    const previous = merged[merged.length - 1]
+    if (previous && interval.start <= previous.end) previous.end = Math.max(previous.end, interval.end)
+    else merged.push({ ...interval })
+  }
+  return merged
+}
+
 function nextLocalBoundary(time: number, minutes: number) {
   const date = new Date(time)
   date.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0)

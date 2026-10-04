@@ -28,6 +28,8 @@ const overlapOnly = process.argv.includes('--overlap-only')
 const timezoneOnly = process.argv.includes('--timezone-only')
 const nightResettlingOnly = process.argv.includes('--night-resettling-only')
 const performanceOnly = process.argv.includes('--performance-only')
+const measurementLabel = process.argv.find(arg => arg.startsWith('--measurement-label='))?.split('=')[1]
+if (measurementLabel && !/^[a-z0-9-]+$/.test(measurementLabel)) throw new Error('Invalid measurement label')
 const functions = ['buildSleepDaySummaries', 'buildInsightsFoundation', 'buildSimilarDaysInsight',
   'buildPredictionLite', 'buildSleepDevelopment', 'buildSleepChangeInsight', 'buildMonthlyFamilyReport', 'buildSleepDaySource']
 const server = await createServer({ base: '/', server: { host: '127.0.0.1', port: 0 }, define: {
@@ -42,11 +44,12 @@ const server = await createServer({ base: '/', server: { host: '127.0.0.1', port
     changed = true
     code = code.replace(`export function ${name}(`, `function measured_${name}(`)
     code += `\nexport function ${name}(...args: Parameters<typeof measured_${name}>) {
-      const state = ((globalThis as any).__statisticsMeasure ??= { calls: {}, ms: 0, depth: 0 });
+      const state = ((globalThis as any).__statisticsMeasure ??= { calls: {}, functionMs: {}, ms: 0, depth: 0 });
       state.calls['${name}'] = (state.calls['${name}'] ?? 0) + 1;
       const start = performance.now(); const outer = state.depth++ === 0;
       try { return measured_${name}(...args); }
-      finally { state.depth--; if (outer) state.ms += performance.now() - start; }
+      finally { const elapsed = performance.now() - start; state.depth--; if (outer) state.ms += elapsed;
+        state.functionMs['${name}'] = (state.functionMs['${name}'] ?? 0) + elapsed; }
     }\n`
   }
   if (changed) return { code, map: null }
@@ -100,7 +103,7 @@ try {
     }
     assert.deepEqual(errors, [])
     assert.deepEqual(unexpected, [])
-    results.push({ count, plan, initialCalls: initial.calls, initialMs: +initial.ms.toFixed(2), idleCalls, idleMs: +(final.ms - initial.ms).toFixed(2), observationMs: 3200 })
+    results.push({ count, plan, initialCalls: initial.calls, initialMs: +initial.ms.toFixed(2), functionMs: initial.functionMs, idleCalls, idleMs: +(final.ms - initial.ms).toFixed(2), observationMs: 3200 })
     console.log(JSON.stringify(results.at(-1)))
     await context.close()
   }
@@ -116,5 +119,5 @@ try {
   if (!acceptanceOnly && !baseline && !performanceOnly && !timezoneOnly && !overlapOnly && !monthlyPeriodOnly && !wakeSamplesOnly && !longestBlockOnly && !coverageOnly) await checkNightResettling(browser, origin)
   if (acceptanceOnly || (!baseline && !performanceOnly && !wakeSamplesOnly && !longestBlockOnly && !coverageOnly && !monthlyPeriodOnly && !overlapOnly && !timezoneOnly && !nightResettlingOnly)) await checkStatisticsAcceptance(browser, origin)
   await mkdir('.private-backups', { recursive: true })
-  if (results.length) await writeFile(`.private-backups/a22-${baseline ? 'baseline' : 'after'}.json`, JSON.stringify({ browser: browser.version(), mode: 'Vite development, real clock, synthetic 4 sleeps/day of 2 hours', results, freshness }, null, 2))
+  if (results.length) await writeFile(`.private-backups/a22-${measurementLabel || (baseline ? 'baseline' : 'after')}.json`, JSON.stringify({ browser: browser.version(), mode: 'Vite development, real clock, synthetic 4 sleeps/day of 2 hours', results, freshness }, null, 2))
 } finally { await browser?.close(); await server.close() }

@@ -1,6 +1,6 @@
 import type { SleepSession } from './types'
 import { EXTREME_SLEEP_DURATION_MS, FUTURE_TOLERANCE_MS, MIN_ANALYTICS_SLEEP_MS } from './utils'
-import { splitSleepTime } from './sleepTime'
+import { mergeSleepIntervals, splitSleepTime } from './sleepTime'
 import { getDataQualityReport } from './utils'
 
 const MILESTONE_DURATION_MS = 45 * 60 * 1000
@@ -64,17 +64,6 @@ function monthKey(year: number, month: number) {
   return `${year}-${String(month + 1).padStart(2, '0')}`
 }
 
-function mergeIntervals(intervals: Array<{ start: number; end: number }>) {
-  const sorted = intervals.slice().sort((a, b) => a.start - b.start || a.end - b.end)
-  const merged: Array<{ start: number; end: number }> = []
-  sorted.forEach((interval) => {
-    const previous = merged[merged.length - 1]
-    if (previous && interval.start <= previous.end) previous.end = Math.max(previous.end, interval.end)
-    else merged.push({ ...interval })
-  })
-  return merged
-}
-
 function splitClassified(session: SleepSession, start: number, end: number) {
   return splitSleepTime(start, end, session.dayNightOverride).map((segment): ClassifiedInterval => ({
     ...segment, priority: session.dayNightOverride ? 2 : 1
@@ -127,7 +116,7 @@ export function buildSleepDaySource(sessions: SleepSession[], now: number) {
   })
 
   const episodeStartsByDay = new Map<string, number[]>()
-  mergeIntervals(intervals.map(({ start, end }) => ({ start, end }))).forEach((episode) => {
+  mergeSleepIntervals(intervals.map(({ start, end }) => ({ start, end }))).forEach((episode) => {
     const key = dateKey(episode.start)
     episodeStartsByDay.set(key, [...(episodeStartsByDay.get(key) ?? []), episode.end - episode.start])
   })

@@ -36,7 +36,11 @@ Az általános diagram, a gördülő 7/14/30 nap, a háromhavi fejlődés és a 
 
 ## Telefonos folytatás — előkészített terv, még NEM teljesített teszt
 
+**2026-10-03, tulajdonosi halasztás:** a telefonos teszt most várakozik; helyette az önállóan végezhető [A21 javítással](BASIC_STATISTICS_CHECKPOINT_2026-10-03.md) haladtunk. Az alábbi három blokk megmarad, új külön telefonos sorozatot nem adunk hozzá. Az A21 megjelenítésének végső készülékes ellenőrzése ehhez a körhöz kapcsolódik. Az új A21 változások helyiek; a lent rögzített `3197e0d` távoli buildben még nincsenek benne, így a tényleges kezdéskor az aktuális buildet ismét azonosítani kell.
+
 ### Indulási feltételek
+
+**2026-10-03, távoli build ellenőrizve:** a `https://solemi-sleep-internal.pages.dev/` oldal HTTP 200 választ adott; a kiszolgált `/assets/index-DHUF28gI.js` beégetett azonosítója `3197e0d5c3f386ddfc6bffc31d75a92cb4f0b3e6`, azonos a helyi HEAD-del. A staging Worker `/health` törzse és `X-Solemi-Build-Sha` fejléce ugyanezt a SHA-t adta. A helyi HEAD-ből származó elvárt SHA-val futtatott `npm run smoke:staging` PASS: minden válasz verzióazonos, health/CORS rendben, anonim legacy létrehozás/csatlakozás tiltott, fiókos hozzáférés/családi műveletek/tesztcsomag munkamenetet kérnek. Nem történt deploy vagy családi adatváltoztatás. Ez nem igazolja a telefonok gyorsítótárát, bejelentkezését vagy Family+ jogosultságát; ezek még azonosítandók.
 
 Az asszisztens előbb azonosítja és igazolja a javításokat tartalmazó belső build pontos SHA-ját és URL-jét, valamint mindkét telefon Family+ hozzáférését. Az előkészítés során nem telepítettünk új távoli buildet. Telefonon nem adunk meg addig kattintási utasításokat, amíg a tesztkörnyezet nincs konkrétan megnevezve.
 
@@ -62,7 +66,7 @@ A tesztcsaládban létrehozott külön üres gyermeket mindkét telefonon kivál
 
 | Blokk | Állapot | Bizonyíték |
 | --- | --- | --- |
-| Build, telefonok, fiókok/jogosultság, időzóna azonosítva | NYITOTT | SHA, URL, telefon/OS/böngésző vagy PWA, dátum |
+| Build, telefonok, fiókok/jogosultság, időzóna azonosítva | RÉSZBEN KÉSZ | Frontend + Worker `3197e0d`, staging smoke PASS; telefonok/fiókok/jogosultság/időzóna még nyitott |
 | 1. Közös történet és hónaphatár | NYITOTT | Két telefon megfelelő kártyái, egyező adatok |
 | 2. Aktív alvás és lezárás | NYITOTT | Aktív/lezárt állapot és becslési viselkedés |
 | 3. Üres gyermek és visszaváltás | NYITOTT | Gyűjtési állapot, majd helyes visszatérés |

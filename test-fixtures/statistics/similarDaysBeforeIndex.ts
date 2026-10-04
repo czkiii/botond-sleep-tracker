@@ -1,7 +1,9 @@
-import type { SleepSession } from './types'
-import { getDataQualityReport, splitDayNight } from './utils'
+// Frozen pre-A22 first-opening algorithm from 3197e0d. Test oracle only:
+// keep its full-history scans so the indexed implementation is checked independently.
+import type { SleepSession } from '../../src/types'
+import { getDataQualityReport, splitDayNight } from '../../src/utils'
 
-import { localCalendarDayDistance } from './statisticsCalendar'
+import { localCalendarDayDistance } from '../../src/statisticsCalendar'
 
 const HOUR_MS = 60 * 60 * 1000
 export const SIMILAR_DAYS_HISTORY_DAYS = 730
@@ -49,30 +51,6 @@ function overlapsDay(session: SleepSession, dayStart: number, dayEnd: number, no
   const start = Date.parse(session.startTime)
   const end = session.endTime ? Date.parse(session.endTime) : now
   return start < dayEnd && end > dayStart
-}
-
-type IndexedDay = { date: Date; start: number; end: number; clean: SleepSession[]; issues: SleepSession[] }
-
-// Index only the bounded calendar search, in the current viewing timezone.
-// Preserve input order for stable equal-score/next-sleep ties. Inclusive bounds
-// retain midnight wakes and sleeps at the cutoff; snapshotForDay still applies
-// the original strict overlap and cutoff predicates. No cross-call cache.
-function indexHistoryDays(days: IndexedDay[], sessions: SleepSession[], excluded: Set<string>, now: number) {
-  const chronological = days.slice().sort((a, b) => a.start - b.start)
-  for (const session of sessions) {
-    const start = Date.parse(session.startTime), end = session.endTime ? Date.parse(session.endTime) : now
-    if (!Number.isFinite(start) || !Number.isFinite(end)) continue
-    let low = 0, high = chronological.length
-    while (low < high) {
-      const middle = Math.floor((low + high) / 2)
-      if (chronological[middle].end < start) low = middle + 1
-      else high = middle
-    }
-    for (let index = low; index < chronological.length && chronological[index].start <= end; index += 1) {
-      const day = chronological[index]
-      ;(excluded.has(session.id) ? day.issues : day.clean).push(session)
-    }
-  }
 }
 
 function snapshotForDay(sessions: SleepSession[], date: Date, reference: Date, now: number): DaySnapshot | null {
@@ -137,22 +115,17 @@ export function buildSimilarDaysInsight(sessions: SleepSession[], now = Date.now
   const availableHistoryDays = Math.max(1, localCalendarDayDistance(earliestStart, currentDayStart))
   const searchDays = Math.min(SIMILAR_DAYS_HISTORY_DAYS, availableHistoryDays)
   const seenDates = new Set<number>()
-  const days: IndexedDay[] = []
   for (let offset = 1; offset <= searchDays; offset += 1) {
     const date = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate() - offset)
     const dayStart = startOfLocalDay(date)
     if (dayStart >= currentDayStart || seenDates.has(dayStart)) continue
     seenDates.add(dayStart)
     const dayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime()
-    days.push({ date, start: dayStart, end: dayEnd, clean: [], issues: [] })
-  }
-  indexHistoryDays(days, sessions, excluded, now)
-  for (const { date, start: dayStart, end: dayEnd, clean: daySessions, issues } of days) {
-    if (issues.some((session) => overlapsDay(session, dayStart, dayEnd, now))) continue
-    const snapshot = snapshotForDay(daySessions, date, reference, now)
+    if (sessions.some((session) => excluded.has(session.id) && overlapsDay(session, dayStart, dayEnd, now))) continue
+    const snapshot = snapshotForDay(clean, date, reference, now)
     if (!snapshot || snapshot.awakeMs === null) continue
     const cutoff = cutoffForDay(date, reference)
-    const next = daySessions
+    const next = clean
       .filter((session) => Date.parse(session.startTime) >= cutoff && Date.parse(session.startTime) < dayEnd)
       .sort((a, b) => Date.parse(a.startTime) - Date.parse(b.startTime))[0]
     const nextSleep = next ? {

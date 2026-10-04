@@ -168,7 +168,7 @@ export default function App({ writeAccess = 'writer' }: { writeAccess?: WriteAcc
 
   const current = useMemo(() => activeSessions.find((session) => !session.endTime) ?? null, [activeSessions])
   const updateSessions = (sessions: SleepSession[]) => setData((previous) => ({ ...previous, sessions }))
-  const startNow = () => { if (!current) updateSessions([createSession(activeChild.id, new Date().toISOString()), ...data.sessions]) }
+  const startNow = () => { if (!current) { const startedAt = Date.now(); setNow(startedAt); updateSessions([createSession(activeChild.id, new Date(startedAt).toISOString()), ...data.sessions]) } }
   const endNow = () => {
     if (!current) return
     const endTime = new Date().toISOString()
@@ -209,7 +209,7 @@ export default function App({ writeAccess = 'writer' }: { writeAccess?: WriteAcc
   return <div className="app-shell">
     <main className="app-main">
       {page === 'today' && <TodayPage data={data} child={activeChild} sessions={activeSessions} now={now} locale={locale} current={current} onSelectChild={(childId) => setData((previous) => ({ ...previous, settings: { ...previous.settings, activeChildId: childId } }))} onStart={startNow} onEnd={endNow} onAdjustStart={adjustCurrentStart} onOpenEditor={openEditor} onHistory={() => setPage('history')} onSettings={() => setPage('settings')} />}
-      {page === 'history' && <HistoryPage sessions={activeSessions} locale={locale} onEdit={openEditor} onDelete={deleteSession} onNew={() => openEditor('new')} />}
+      {page === 'history' && <HistoryPage now={now} sessions={activeSessions} locale={locale} onEdit={openEditor} onDelete={deleteSession} onNew={() => openEditor('new')} />}
       {page === 'stats' && <StatsPage sessions={activeSessions} locale={locale} childName={activeChild.name} productPlan={previewPlan} premiumInsightsAvailable={accountAuthEnabled ? Boolean(accountAccess?.features.includes('FAMILY_PLUS_INSIGHTS')) : internalPreview && canUsePremiumInsights(previewPlan)} onPreviewPlanChange={internalPreview ? setPreviewPlan : undefined} />}
       {page === 'settings' && <SettingsPage data={data} setData={setData} onBack={() => setPage('today')}
         familySyncAvailable={accountAuthEnabled ? Boolean(accountAccess?.features.includes('FAMILY_SYNC')) : internalPreview && canUseFamilySync(previewPlan)}
@@ -291,7 +291,7 @@ function StorageRecoveryScreen({ error, locale, onRecovered }: { error: DataStor
 }
 
 function TodayPage({ data, child, sessions, now, locale, current, onSelectChild, onStart, onEnd, onAdjustStart, onOpenEditor, onHistory, onSettings }: { data: AppData; child: ChildProfile; sessions: SleepSession[]; now: number; locale: Locale; current: SleepSession | null; onSelectChild: (childId: string) => void; onStart: () => void; onEnd: () => void; onAdjustStart: (minutes: number) => void; onOpenEditor: (value: SleepSession | 'new') => void; onHistory: () => void; onSettings: () => void }) {
-  const todays = todaySessions(sessions).sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
+  const todays = todaySessions(sessions, new Date(now)).sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
   const yesterdayStart = new Date(now); yesterdayStart.setHours(0, 0, 0, 0); yesterdayStart.setDate(yesterdayStart.getDate() - 1)
   const yesterdayEnd = new Date(yesterdayStart); yesterdayEnd.setDate(yesterdayEnd.getDate() + 1)
   const yesterdays = sessions
@@ -306,6 +306,7 @@ function TodayPage({ data, child, sessions, now, locale, current, onSelectChild,
 
   return <section className="screen today-screen">
     <header className="compact-header"><div className="header-copy"><div className="child-header-line"><ChildAvatar child={child} className="child-avatar" />{data.children.length > 1 ? <select aria-label={t(locale, 'chooseChild')} className="child-switcher" value={child.id} onChange={(event) => onSelectChild(event.target.value)}>{data.children.map((item) => <option key={item.id} value={item.id}>{item.name || t(locale, 'unnamedChild')}</option>)}</select> : <strong className="single-child-name">{child.name || t(locale, 'unnamedChild')}</strong>}</div><div className="date-label">{formatDateHeader(new Date(now), locale)}</div><div className="daily-summary">{t(locale, 'todaySoFar')} <strong>{formatDuration(total, locale)}</strong> {t(locale, 'sleepNoun')}</div></div><button className="icon-button" aria-label={t(locale, 'settings')} onClick={onSettings}><Icon name="settings" size={18} /></button></header>
+    <details className="diary-totals-policy"><summary>{t(locale, 'diaryTotalsTitle')}</summary><p>{t(locale, 'diaryTotalsPolicy')}</p></details>
     <div className={`status-orb ${current ? 'sleeping' : 'awake'}`}><div className="orb-content"><div className="orb-status">{current ? t(locale, 'sleeping') : t(locale, 'awake')}</div><div className="orb-time">{formatTimer(elapsed)}</div><div className="orb-sub">{current ? `${t(locale, 'fellAsleep')} ${formatTime(current.startTime, locale)}` : lastCompleted ? `${t(locale, 'wokeUp')} ${formatTime(lastCompleted.endTime!, locale)}` : t(locale, 'noPreviousWake')}</div></div></div>
     <button className="primary-action" onClick={current ? onEnd : onStart}><Icon name={current ? 'sun' : 'moon'} size={20} /><span>{current ? t(locale, 'wokeUp') : t(locale, 'fellAsleep')}</span></button>
     {current && <div className="quick-correction"><span>{t(locale, 'startedEarlier')}</span>{[5, 10, 15].map((minutes) => <button key={minutes} onClick={() => onAdjustStart(-minutes)}>−{minutes}</button>)}<button className="custom-correction" onClick={() => onOpenEditor(current)}>{t(locale, 'customTime')}</button></div>}
@@ -337,16 +338,20 @@ function SleepRow({ session, now, locale, onClick, compact = false }: { session:
   return <button className={`sleep-row ${compact ? 'compact' : ''}`} onClick={onClick}><span className="sleep-row-icon"><Icon name="moon" size={13} /></span><span className="sleep-row-time">{formatTime(session.startTime, locale)} – {session.endTime ? formatTime(session.endTime, locale) : t(locale, 'now')}</span><span className="sleep-row-duration">{formatDuration(durationOf(session, now), locale)}</span>{!compact && <span className="sleep-row-edit"><Icon name="edit" size={12} /></span>}</button>
 }
 
-function HistoryPage({ sessions, locale, onEdit, onDelete, onNew }: { sessions: SleepSession[]; locale: Locale; onEdit: (session: SleepSession) => void; onDelete: (id: string) => void; onNew: () => void }) {
+function HistoryPage({ sessions, now, locale, onEdit, onDelete, onNew }: { now: number; sessions: SleepSession[]; locale: Locale; onEdit: (session: SleepSession) => void; onDelete: (id: string) => void; onNew: () => void }) {
+  const todayKey = dateKeyAt(now)
+  const reference = new Date(now)
+  const yesterdayKey = dateKeyAt(new Date(reference.getFullYear(), reference.getMonth(), reference.getDate() - 1).getTime())
+  const historyTimeZone = new Intl.DateTimeFormat().resolvedOptions().timeZone
   const grouped = useMemo(() => {
     const map = new Map<string, SleepSession[]>()
     sessions.slice().sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()).forEach((session) => {
-      const key = new Intl.DateTimeFormat(localeTag(locale), { month: 'long', day: 'numeric', weekday: 'long' }).format(new Date(session.startTime))
+      const key = new Intl.DateTimeFormat(localeTag(locale), { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }).format(new Date(session.startTime))
       map.set(key, (map.get(key) ?? []).concat(session))
     })
     return Array.from(map.entries())
-  }, [sessions, locale])
-  return <section className="screen history-screen"><header className="page-header centered-header"><h1>{t(locale, 'history')}</h1><button className="add-button" onClick={onNew}><Icon name="plus" size={19} /></button></header><div className="history-wrap">{grouped.length === 0 && <div className="empty-card">{t(locale, 'noRecordedSleep')}</div>}{grouped.map(([date, items], index) => <div className="history-group" key={date}><h3>{index === 0 ? `${t(locale, 'today')} – ${date}` : index === 1 ? `${t(locale, 'yesterday')} – ${date}` : date}</h3><div className="sleep-list history-list">{items.map((session) => <SwipeHistoryRow key={session.id} session={session} now={Date.now()} locale={locale} onEdit={() => onEdit(session)} onDelete={() => onDelete(session.id)} />)}</div></div>)}</div></section>
+  }, [sessions, locale, historyTimeZone])
+  return <section className="screen history-screen"><header className="page-header centered-header"><h1>{t(locale, 'history')}</h1><button className="add-button" onClick={onNew}><Icon name="plus" size={19} /></button></header><div className="history-wrap">{grouped.length === 0 && <div className="empty-card">{t(locale, 'noRecordedSleep')}</div>}{grouped.map(([date, items]) => <div className="history-group" key={date}><h3>{dateKeyAt(Date.parse(items[0].startTime)) === todayKey ? `${t(locale, 'today')} – ${date}` : dateKeyAt(Date.parse(items[0].startTime)) === yesterdayKey ? `${t(locale, 'yesterday')} – ${date}` : date}</h3><div className="sleep-list history-list">{items.map((session) => <SwipeHistoryRow key={session.id} session={session} now={now} locale={locale} onEdit={() => onEdit(session)} onDelete={() => onDelete(session.id)} />)}</div></div>)}</div></section>
 }
 
 function dateKeyAt(time: number) {
@@ -489,6 +494,7 @@ const StatsPage = memo(function StatsPage({ sessions, locale, childName, product
       <details><summary>{t(locale, 'statisticsOverlapTitle')}</summary><p>{t(locale, 'statisticsOverlapPolicy')}</p></details>
     </div>
     <div className="chart-card compact-chart-card"><h2>{t(locale, 'sleepDuration')}</h2><div className="bar-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={chart} margin={{ top: 8, right: 2, bottom: 0, left: -26 }}><XAxis dataKey="label" tickLine={false} axisLine={false} /><YAxis domain={[0, 14]} tickLine={false} axisLine={false} /><Tooltip contentStyle={{ background: '#0d1a2b', border: '1px solid #1c3352', borderRadius: 10 }} formatter={(value) => [`${value} ${chartUnit}`, t(locale, 'sleep')]} /><Bar dataKey="hours" fill="#579dff" radius={[4, 4, 1, 1]} maxBarSize={17} onClick={(entry: any) => setSelectedDate(entry?.payload?.dateKey ?? null)} /></BarChart></ResponsiveContainer></div></div>
+    <details className="statistics-totals-policy"><summary>{t(locale, 'statisticsTotalsTitle')}</summary><p>{t(locale, 'statisticsTotalsPolicy')}</p></details>
     <h2 className="overview-title">{t(locale, 'overview24h')}</h2>
     <div className="overview-compact"><SleepTimeline sessions={sessions} now={now} day={timelineDate} locale={locale} /><div className="stats-row"><StatCard label={display.label} value={formatDuration(display.total, locale)} suffix={selectedStats ? undefined : t(locale, 'perDay')} /><StatCard label={t(locale, 'daytime')} value={formatDuration(display.day, locale)} icon="sun" /><StatCard label={t(locale, 'nighttime')} value={formatDuration(display.night, locale)} icon="moon" /></div></div>
     {insights && similarDays && prediction && development && sleepChange && monthlyReport && wakeWindow && routine ? <><div className="insights-card wake-card"><div className="insights-card-head"><div><span>{t(locale, 'insights')}</span><h2>{t(locale, 'wakeWindow')}</h2></div>{primaryWakeMs !== null && <b>{t(locale, 'sampleCountShort', { count: primaryWakeSampleCount })}</b>}</div>

@@ -1,5 +1,7 @@
 # A22 — statisztikai újraszámolás, mérés és folytatási összefoglaló
 
+**2026-10-03 folytatás:** az itt még nyitott első prémium számítás gyorsítása is helyben elkészült; [friss mérés és megálló](STATISTICS_INITIAL_OPEN_CHECKPOINT_2026-10-03.md). A lenti szöveg a szeptember 30-i eredmény történeti leírása.
+
 Dátum: 2026-09-30. Feladatszint: GPT-6 Astra · erős.
 
 ## Megálló
