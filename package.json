@@ -14,6 +14,7 @@
     "test:family-join": "node scripts/check-family-bootstrap.mjs",
     "test:child-deletion": "node scripts/check-child-deletion.mjs",
     "test:settings": "node scripts/check-settings-accessibility.mjs",
+    "test:conflicts": "node scripts/check-conflict-accessibility.mjs",
     "test:basic-statistics": "node scripts/check-basic-statistics.mjs",
     "test:statistics": "node scripts/check-statistics-performance.mjs",
     "preview": "vite preview"

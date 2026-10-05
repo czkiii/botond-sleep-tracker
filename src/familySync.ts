@@ -3,6 +3,7 @@ import { createDefaultData, getLocalMetadata, inspectBackup, loadData, saveDataA
 import { accountDeviceName, accountRequest } from './accountAuth'
 import { fetchJson } from './apiTransport'
 import { downloadSyncSnapshot } from './syncSnapshot'
+import { conflictReviewKey } from './conflictPreview'
 import { getActiveAccountWorkspaceId } from './accountWorkspace'
 import { deleteChildPhoto } from './photoStore'
 
@@ -1004,8 +1005,13 @@ async function flushPendingNow() {
   return changedLocal
 }
 
-export function resolveSyncConflict(operationId: string, resolution: 'local' | 'family') {
-  return serializeSync(() => resolveSyncConflictNow(operationId, resolution))
+export function resolveSyncConflict(operationId: string, resolution: 'local' | 'family', reviewed?: string) {
+  return serializeSync(() => {
+    if (reviewed !== undefined && reviewed !== conflictReviewKey(readStore(), loadData(), operationId)) {
+      throw new Error('SYNC_CONFLICT_CHANGED')
+    }
+    return resolveSyncConflictNow(operationId, resolution)
+  })
 }
 
 async function resolveSyncConflictNow(operationId: string, resolution: 'local' | 'family') {

@@ -1,4 +1,6 @@
-import { ChangeEvent, PointerEvent as ReactPointerEvent, memo, useEffect, useMemo, useRef, useState } from 'react'
+import { Modal } from './Modal'
+import { conflictCopy } from './conflictPreview'
+import { ChangeEvent, PointerEvent as ReactPointerEvent, memo, useId, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { languageOptions, localeTag, t } from './i18n'
 import type { Locale } from './i18n'
@@ -572,7 +574,7 @@ const StatsPage = memo(function StatsPage({ sessions, locale, childName, product
       {prediction.status === 'collecting' && <p className="routine-empty">{t(locale, 'predictionCollecting', { count: prediction.sampleCount })}</p>}
       {prediction.status === 'ready' && prediction.windowStart !== null && prediction.windowEnd !== null && <><strong className="prediction-window">{formatPredictionWindow(prediction.windowStart, prediction.windowEnd, now, locale)}</strong><p className={`prediction-state ${prediction.windowState}`}>{t(locale, prediction.windowState === 'upcoming' ? 'predictionUpcoming' : prediction.windowState === 'likely-now' ? 'predictionLikelyNow' : 'predictionPassed')}</p><small>{t(locale, 'predictionBasis', { count: prediction.sampleCount, order: t(locale, prediction.bucket === 'day-1' ? 'firstNap' : prediction.bucket === 'day-2' ? 'secondNap' : prediction.bucket === 'day-3-plus' ? 'laterNap' : prediction.bucket === 'night-resettling' ? 'nightResettling' : 'bedtimeSleep') })}</small><small className="prediction-range-explanation">{t(locale, 'predictionRangeExplanation')}</small><small className="prediction-disclaimer">{t(locale, 'predictionDisclaimer')}</small></>}
     </div></> : <LockedInsightsOverview locale={locale} />}
-    {developmentPickerOpen && <div className="development-picker-overlay" role="dialog" aria-modal="true" aria-labelledby="development-picker-title"><div className="development-picker-sheet"><header><h2 id="development-picker-title">{t(locale, 'customDevelopmentRange')}</h2><button type="button" aria-label={t(locale, 'cancel')} onClick={() => setDevelopmentPickerOpen(false)}><Icon name="close" size={18} /></button></header><div className="development-picker-fields"><label>{t(locale, 'fromDate')}<span className="month-stepper"><button type="button" aria-label={t(locale, 'previousMonth')} disabled={developmentDraftStartIndex <= 0} onClick={() => moveDevelopmentMonth('start', -1)}>‹</button><strong>{developmentMonthOptions[developmentDraftStartIndex]?.label ?? developmentDraftStart}</strong><button type="button" aria-label={t(locale, 'nextMonth')} disabled={developmentDraftStartIndex < 0 || developmentDraftStartIndex >= developmentDraftEndIndex} onClick={() => moveDevelopmentMonth('start', 1)}>›</button></span></label><label>{t(locale, 'toDate')}<span className="month-stepper"><button type="button" aria-label={t(locale, 'previousMonth')} disabled={developmentDraftEndIndex <= developmentDraftStartIndex} onClick={() => moveDevelopmentMonth('end', -1)}>‹</button><strong>{developmentMonthOptions[developmentDraftEndIndex]?.label ?? developmentDraftEnd}</strong><button type="button" aria-label={t(locale, 'nextMonth')} disabled={developmentDraftEndIndex < 0 || developmentDraftEndIndex >= developmentMonthOptions.length - 1} onClick={() => moveDevelopmentMonth('end', 1)}>›</button></span></label></div><small>{t(locale, 'selectedDevelopmentRange', { start: developmentMonthOptions[developmentDraftStartIndex]?.label ?? developmentDraftStart, end: developmentMonthOptions[developmentDraftEndIndex]?.label ?? developmentDraftEnd })}</small><div className="development-picker-actions"><button type="button" onClick={() => setDevelopmentPickerOpen(false)}>{t(locale, 'cancel')}</button><button type="button" className="primary" onClick={applyDevelopmentRange}>{t(locale, 'apply')}</button></div></div></div>}
+    {developmentPickerOpen && <Modal className="development-picker-overlay" label={t(locale, 'customDevelopmentRange')} onClose={() => setDevelopmentPickerOpen(false)}><div className="development-picker-sheet"><header><h2 id="development-picker-title">{t(locale, 'customDevelopmentRange')}</h2><button type="button" aria-label={t(locale, 'cancel')} onClick={() => setDevelopmentPickerOpen(false)}><Icon name="close" size={18} /></button></header><div className="development-picker-fields"><label>{t(locale, 'fromDate')}<span className="month-stepper"><button type="button" aria-label={t(locale, 'previousMonth')} disabled={developmentDraftStartIndex <= 0} onClick={() => moveDevelopmentMonth('start', -1)}>‹</button><strong>{developmentMonthOptions[developmentDraftStartIndex]?.label ?? developmentDraftStart}</strong><button type="button" aria-label={t(locale, 'nextMonth')} disabled={developmentDraftStartIndex < 0 || developmentDraftStartIndex >= developmentDraftEndIndex} onClick={() => moveDevelopmentMonth('start', 1)}>›</button></span></label><label>{t(locale, 'toDate')}<span className="month-stepper"><button type="button" aria-label={t(locale, 'previousMonth')} disabled={developmentDraftEndIndex <= developmentDraftStartIndex} onClick={() => moveDevelopmentMonth('end', -1)}>‹</button><strong>{developmentMonthOptions[developmentDraftEndIndex]?.label ?? developmentDraftEnd}</strong><button type="button" aria-label={t(locale, 'nextMonth')} disabled={developmentDraftEndIndex < 0 || developmentDraftEndIndex >= developmentMonthOptions.length - 1} onClick={() => moveDevelopmentMonth('end', 1)}>›</button></span></label></div><small>{t(locale, 'selectedDevelopmentRange', { start: developmentMonthOptions[developmentDraftStartIndex]?.label ?? developmentDraftStart, end: developmentMonthOptions[developmentDraftEndIndex]?.label ?? developmentDraftEnd })}</small><div className="development-picker-actions"><button type="button" onClick={() => setDevelopmentPickerOpen(false)}>{t(locale, 'cancel')}</button><button type="button" className="primary" onClick={applyDevelopmentRange}>{t(locale, 'apply')}</button></div></div></Modal>}
   </section>
 })
 
@@ -856,7 +858,7 @@ function DataReplacementDialog({ locale, source, scope, familyName, summary, dia
     : familyClear ? t(locale, 'clearFamilyData')
       : source === 'restore' ? t(locale, 'restoreSafetyBackup') : t(locale, scope === 'family' ? 'importFamilyData' : 'importData')
   const line = (counts: ReplacementSummary['children']) => t(locale, 'replacementCounts', counts)
-  return <div className="development-picker-overlay data-replacement-overlay" role="dialog" aria-modal="true" aria-labelledby="data-replacement-title">
+  return <Modal className="development-picker-overlay data-replacement-overlay" label={title} busy={busy} onClose={onClose}>
     <div className="development-picker-sheet data-replacement-sheet">
       <header><div><small>{t(locale, scope === 'family' ? 'replacementFamilyScope' : 'replacementLocalScope')}</small><h2 id="data-replacement-title">{title}</h2></div><button type="button" aria-label={t(locale, 'cancel')} onClick={onClose} disabled={busy}><Icon name="close" size={18} /></button></header>
       <p>{t(locale, familyClear ? 'familyClearImpact' : scope === 'family' ? 'replacementFamilyImpact' : source === 'clear-local' ? 'localClearImpact' : 'replacementLocalImpact', { family: familyName || '' })}</p>
@@ -868,7 +870,7 @@ function DataReplacementDialog({ locale, source, scope, familyName, summary, dia
       {familyClear && <><button type="button" className="replacement-export" onClick={onExport}>{t(locale, 'exportBeforeFamilyClear')}</button><label className="family-name-confirm">{t(locale, 'typeFamilyName', { family: familyName || '' })}<input value={typedFamilyName} onChange={(event) => setTypedFamilyName(event.target.value)} autoComplete="off" /></label></>}
       <div className="development-picker-actions"><button type="button" onClick={onClose} disabled={busy}>{t(locale, 'cancel')}</button><button type="button" className={destructive ? 'danger' : 'primary'} onClick={onConfirm} disabled={busy || (familyClear && typedFamilyName.trim() !== familyName)}>{busy ? t(locale, 'saving') : t(locale, destructive ? 'delete' : 'apply')}</button></div>
     </div>
-  </div>
+  </Modal>
 }
 
 function importDiagnosticText(locale: Locale, diagnostic: ImportDiagnostic) {
@@ -963,13 +965,13 @@ function PhotoCropper({ candidate, locale, onCancel, onDone }: { candidate: Crop
     }
   }
 
-  return <div className="photo-crop-overlay"><div className="photo-crop-screen">
-    <header className="photo-crop-header"><button type="button" onClick={onCancel} disabled={processing}><Icon name="close" size={20} /></button><h2>{t(locale, 'positionPhoto')}</h2><button type="button" className="crop-done" onClick={confirm} disabled={processing}>{processing ? t(locale, 'saving') : t(locale, 'done')}</button></header>
-    <div className="photo-crop-body"><p>{t(locale, 'positionPhotoHint')}</p><div className="photo-crop-stage" style={{ width: viewportSize, height: viewportSize }} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd} onPointerCancel={pointerEnd}>
+  return <Modal className="photo-crop-overlay" label={t(locale, 'positionPhoto')} busy={processing} onClose={onCancel}><div className="photo-crop-screen">
+    <header className="photo-crop-header"><button type="button" aria-label={t(locale, 'cancel')} onClick={onCancel} disabled={processing}><Icon name="close" size={20} /></button><h2>{t(locale, 'positionPhoto')}</h2><button type="button" className="crop-done" onClick={confirm} disabled={processing}>{processing ? t(locale, 'saving') : t(locale, 'done')}</button></header>
+    <div className="photo-crop-body"><p>{t(locale, 'positionPhotoHint')}</p><div className="photo-crop-stage" tabIndex={0} role="group" aria-label={t(locale, 'positionPhotoHint')} onKeyDown={event => { if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key) || processing) return; event.preventDefault(); setOffset(previous => constrain(previous.x + (event.key === 'ArrowLeft' ? -10 : event.key === 'ArrowRight' ? 10 : 0), previous.y + (event.key === 'ArrowUp' ? -10 : event.key === 'ArrowDown' ? 10 : 0))) }} style={{ width: viewportSize, height: viewportSize }} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd} onPointerCancel={pointerEnd}>
       <img src={candidate.url} alt="" draggable={false} style={{ width: imageWidth, height: imageHeight, transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px))` }} />
       <span className="photo-crop-ring" />
     </div><label className="photo-zoom"><span>{t(locale, 'zoomPhoto')}</span><input type="range" min="1" max="3" step="0.01" value={zoom} onChange={(event) => changeZoom(Number(event.target.value))} /></label></div>
-  </div></div>
+  </div></Modal>
 }
 
 function ChildEditor({ child, locale, onClose, onSave, onDelete }: { child: ChildProfile | null; locale: Locale; onClose: () => void; onSave: (child: ChildProfile) => boolean; onDelete?: () => void }) {
@@ -991,12 +993,6 @@ function ChildEditor({ child, locale, onClose, onSave, onDelete }: { child: Chil
   const [previewUrl, setPreviewUrl] = useState<string | null | undefined>(undefined)
   const [cropCandidate, setCropCandidate] = useState<CropCandidate | null>(null)
   const [saving, setSaving] = useState(false)
-  useEffect(() => {
-    if (!cropCandidate) return
-    const previousFocus = document.activeElement
-    dialog.current?.querySelector<HTMLButtonElement>('.photo-crop-screen button')?.focus()
-    return () => { if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus() }
-  }, [cropCandidate])
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl) }, [previewUrl])
   const choosePhoto = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -1030,19 +1026,35 @@ function ChildEditor({ child, locale, onClose, onSave, onDelete }: { child: Chil
 }
 
 type WheelItem = { value: string; label: string }
-function WheelColumn({ items, value, disabled, onChange }: { items: WheelItem[]; value: string; disabled?: boolean; onChange: (value: string) => void }) {
+function WheelColumn({ items, value, label, disabled, onChange }: { label: string; items: WheelItem[]; value: string; disabled?: boolean; onChange: (value: string) => void }) {
   const ref = useRef<HTMLDivElement>(null)
+  const id = useId()
   const row = 46
-  useEffect(() => {
+  useLayoutEffect(() => {
     const index = Math.max(0, items.findIndex((item) => item.value === value))
-    requestAnimationFrame(() => ref.current?.scrollTo({ top: index * row, behavior: 'auto' }))
+    // Synchronize before paint: an old queued animation frame must not undo
+    // a newer keyboard selection through the scroll handler.
+    ref.current?.scrollTo({ top: index * row, behavior: 'instant' })
   }, [items, value])
   const handleScroll = () => {
     if (!ref.current || disabled) return
     const index = Math.max(0, Math.min(items.length - 1, Math.round(ref.current.scrollTop / row)))
     if (items[index] && items[index].value !== value) onChange(items[index].value)
   }
-  return <div ref={ref} className={`wheel-column ${disabled ? 'disabled' : ''}`} onScroll={handleScroll}>{items.map((item) => <button type="button" key={item.value} className={item.value === value ? 'selected' : ''} disabled={disabled} onClick={() => onChange(item.value)}>{item.label}</button>)}</div>
+  const select = (index: number) => onChange(items[Math.max(0, Math.min(items.length - 1, index))].value)
+  return <div ref={ref} className={`wheel-column ${disabled ? 'disabled' : ''}`} role="listbox"
+    tabIndex={disabled ? -1 : 0} aria-label={label} aria-disabled={disabled || undefined}
+    aria-activedescendant={`${id}-${value}`} onScroll={handleScroll}
+    onKeyDown={event => {
+      if (disabled || !['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return
+      event.preventDefault()
+      const index = items.findIndex(item => item.value === value)
+      select(event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : index + (event.key === 'ArrowDown' ? 1 : -1))
+    }}>
+    {items.map(item => <button type="button" role="option" tabIndex={-1} id={`${id}-${item.value}`}
+      aria-selected={item.value === value} key={item.value} className={item.value === value ? 'selected' : ''}
+      disabled={disabled} onClick={() => { ref.current?.focus(); onChange(item.value) }}>{item.label}</button>)}
+  </div>
 }
 
 function DateTimeWheel({ label, icon, value, locale, disabled, onChange }: { label: string; icon: 'moon' | 'sun'; value: string; locale: Locale; disabled?: boolean; onChange: (value: string) => void }) {
@@ -1051,7 +1063,7 @@ function DateTimeWheel({ label, icon, value, locale, disabled, onChange }: { lab
   const update = (dateValue = parts.date, hour = parts.hour, minute = parts.minute) => onChange(partsToIso(dateValue, hour, minute))
   const hours = Array.from({ length: 24 }, (_, hour) => ({ value: String(hour), label: pad(hour) }))
   const minutes = Array.from({ length: 60 }, (_, minute) => ({ value: String(minute), label: pad(minute) }))
-  return <div className={`wheel-block ${disabled ? 'disabled' : ''}`}><div className="wheel-label"><Icon name={icon} size={16} /><span>{label}</span></div><div className="wheel-columns custom-wheel"><WheelColumn items={dates} value={parts.date} disabled={disabled} onChange={(next) => update(next)} /><WheelColumn items={hours} value={String(parts.hour)} disabled={disabled} onChange={(next) => update(parts.date, Number(next), parts.minute)} /><WheelColumn items={minutes} value={String(parts.minute)} disabled={disabled} onChange={(next) => update(parts.date, parts.hour, Number(next))} /><div className="wheel-focus" /></div></div>
+  return <div className={`wheel-block ${disabled ? 'disabled' : ''}`}><div className="wheel-label"><Icon name={icon} size={16} /><span>{label}</span></div><div className="wheel-columns custom-wheel"><WheelColumn label={`${label}: ${conflictCopy[locale].date}`} items={dates} value={parts.date} disabled={disabled} onChange={(next) => update(next)} /><WheelColumn label={`${label}: ${conflictCopy[locale].hour}`} items={hours} value={String(parts.hour)} disabled={disabled} onChange={(next) => update(parts.date, Number(next), parts.minute)} /><WheelColumn label={`${label}: ${conflictCopy[locale].minute}`} items={minutes} value={String(parts.minute)} disabled={disabled} onChange={(next) => update(parts.date, parts.hour, Number(next))} /><div className="wheel-focus" /></div></div>
 }
 
 function SleepEditor({ childId, session, locale, currentExists, onClose, onSave, onDelete }: { childId: string; session: SleepSession | null; locale: Locale; currentExists: boolean; onClose: () => void; onSave: (session: SleepSession) => void; onDelete: (id: string) => void }) {
@@ -1068,10 +1080,10 @@ function SleepEditor({ childId, session, locale, currentExists, onClose, onSave,
     const nowIso = new Date().toISOString()
     onSave(session ? { ...session, startTime: start, endTime: endIso, note, dayNightOverride, updatedAt: nowIso } : { ...createSession(childId, start, endIso), note, dayNightOverride })
   }
-  return <div className="editor-overlay"><div className="editor-screen"><header className="editor-header"><button onClick={onClose}><Icon name="close" size={18} /></button><h1>{session ? t(locale, 'details') : t(locale, 'recordSleep')}</h1><span /></header><div className="editor-body"><DateTimeWheel label={t(locale, 'fellAsleep')} icon="moon" value={start} locale={locale} onChange={setStart} /><label className={`toggle-row active-sleep-toggle ${stillSleeping ? 'active' : ''}`}><span className="toggle-label"><Icon name="moon" size={16} /> <span><strong>{t(locale, 'stillSleeping')}</strong><small>{t(locale, 'stillSleepingHint')}</small></span></span><input type="checkbox" checked={stillSleeping} onChange={(event) => setStillSleeping(event.target.checked)} /></label>{!stillSleeping && <DateTimeWheel label={t(locale, 'wokeUp')} icon="sun" value={end} locale={locale} onChange={setEnd} />}<div className="classification-block"><strong>{t(locale, 'sleepType')}</strong><div className="classification-options"><button className={dayNightOverride === null ? 'active' : ''} onClick={() => setDayNightOverride(null)}>{t(locale, 'automatic')}</button><button className={dayNightOverride === 'day' ? 'active' : ''} onClick={() => setDayNightOverride('day')}>{t(locale, 'daytime')}</button><button className={dayNightOverride === 'night' ? 'active' : ''} onClick={() => setDayNightOverride('night')}>{t(locale, 'nighttime')}</button></div><small>{t(locale, 'automaticRule', { dayStart: pad(DEFAULT_DAY_START_MINUTES / 60), nightStart: pad(DEFAULT_NIGHT_START_MINUTES / 60) })}</small></div><label className="note-field">{t(locale, 'note')}<textarea value={note} maxLength={2000} onChange={(event) => setNote(event.target.value)} placeholder={t(locale, 'optionalNote')} /></label></div><div className="editor-actions centered-actions">{session && <button className="delete-button" onClick={() => onDelete(session.id)}>{t(locale, 'delete')}</button>}<button className="save-button" onClick={submit}>{t(locale, 'save')}</button></div></div></div>
+  return <Modal className="editor-overlay" label={session ? t(locale, 'details') : t(locale, 'recordSleep')} onClose={onClose}><div className="editor-screen"><header className="editor-header"><button aria-label={t(locale, 'cancel')} onClick={onClose}><Icon name="close" size={18} /></button><h1>{session ? t(locale, 'details') : t(locale, 'recordSleep')}</h1><span /></header><div className="editor-body"><DateTimeWheel label={t(locale, 'fellAsleep')} icon="moon" value={start} locale={locale} onChange={setStart} /><label className={`toggle-row active-sleep-toggle ${stillSleeping ? 'active' : ''}`}><span className="toggle-label"><Icon name="moon" size={16} /> <span><strong>{t(locale, 'stillSleeping')}</strong><small>{t(locale, 'stillSleepingHint')}</small></span></span><input type="checkbox" checked={stillSleeping} onChange={(event) => setStillSleeping(event.target.checked)} /></label>{!stillSleeping && <DateTimeWheel label={t(locale, 'wokeUp')} icon="sun" value={end} locale={locale} onChange={setEnd} />}<div className="classification-block"><strong>{t(locale, 'sleepType')}</strong><div className="classification-options"><button aria-pressed={dayNightOverride === null} className={dayNightOverride === null ? 'active' : ''} onClick={() => setDayNightOverride(null)}>{t(locale, 'automatic')}</button><button aria-pressed={dayNightOverride === 'day'} className={dayNightOverride === 'day' ? 'active' : ''} onClick={() => setDayNightOverride('day')}>{t(locale, 'daytime')}</button><button aria-pressed={dayNightOverride === 'night'} className={dayNightOverride === 'night' ? 'active' : ''} onClick={() => setDayNightOverride('night')}>{t(locale, 'nighttime')}</button></div><small>{t(locale, 'automaticRule', { dayStart: pad(DEFAULT_DAY_START_MINUTES / 60), nightStart: pad(DEFAULT_NIGHT_START_MINUTES / 60) })}</small></div><label className="note-field">{t(locale, 'note')}<textarea value={note} maxLength={2000} onChange={(event) => setNote(event.target.value)} placeholder={t(locale, 'optionalNote')} /></label></div><div className="editor-actions centered-actions">{session && <button className="delete-button" onClick={() => onDelete(session.id)}>{t(locale, 'delete')}</button>}<button className="save-button" onClick={submit}>{t(locale, 'save')}</button></div></div></Modal>
 }
 
 function BottomNav({ page, locale, onChange }: { page: Page; locale: Locale; onChange: (page: Page) => void }) {
   const items: Array<[Page, 'home' | 'history' | 'stats', string]> = [['today', 'home', t(locale, 'sleeps')], ['history', 'history', t(locale, 'history')], ['stats', 'stats', t(locale, 'statistics')]]
-  return <nav className="bottom-nav">{items.map(([key, icon, label]) => <button key={key} className={page === key ? 'active' : ''} onClick={() => onChange(key)}><span><Icon name={icon} size={18} /></span><small>{label}</small></button>)}</nav>
+  return <nav className="bottom-nav">{items.map(([key, icon, label]) => <button key={key} aria-current={page === key ? 'page' : undefined} className={page === key ? 'active' : ''} onClick={() => onChange(key)}><span><Icon name={icon} size={18} /></span><small>{label}</small></button>)}</nav>
 }

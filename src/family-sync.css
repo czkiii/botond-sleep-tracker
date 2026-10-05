@@ -88,6 +88,7 @@
   padding: 18px 12px 0;
 }
 .family-sync-sheet {
+  overflow-wrap: anywhere;
   width: min(100%, 520px);
   max-height: calc(100dvh - 24px);
   overflow-y: auto;
@@ -101,6 +102,7 @@
 }
 .family-sync-handle { width: 38px; height: 4px; border-radius: 999px; background: rgba(190, 215, 245, .22); margin: 2px auto 12px; }
 .family-sync-sheet header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.family-sync-sheet header > div { min-width: 0; }
 .family-sync-sheet header small { display: block; color: #79b9ff; font-size: 11px; font-weight: 700; letter-spacing: .02em; margin-bottom: 3px; }
 .family-sync-sheet h2 { margin: 0; font-size: 22px; line-height: 1.1; }
 .family-sync-sheet header > button { width: 34px; height: 34px; border: 0; border-radius: 50%; background: rgba(255,255,255,.06); color: #cfe3fa; font-size: 24px; line-height: 1; }
@@ -169,3 +171,19 @@
   .family-sync-overlay { align-items: center; padding: 20px; }
   .family-sync-sheet { border-bottom: 1px solid rgba(111, 171, 255, .18); border-radius: 26px; padding-bottom: 22px; }
 }
+.conflict-navigation { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.conflict-navigation strong { text-align: center; min-width: 0; }
+.conflict-navigation button { min-width: 44px; min-height: 44px; border: 1px solid #41658b; border-radius: 12px; color: #eaf4ff; background: #142c45; font-size: 26px; }
+.conflict-navigation button:disabled { opacity: .4; }
+.conflict-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.conflict-version { min-width: 0; border: 1px solid #41658b; border-radius: 14px; padding: 12px; background: #0b2036; overflow-wrap: anywhere; }
+.conflict-version h3 { margin: 0 0 10px; font-size: 15px; }
+.conflict-version dl { margin: 0; display: grid; gap: 10px; }
+.conflict-field { border-left: 3px solid transparent; padding-left: 7px; }
+.conflict-field.changed { border-left-color: #83c5ff; }
+.conflict-field dt { color: #b1c9e2; font-size: 12px; }
+.conflict-field dd { margin: 3px 0 0; font-size: 14px; line-height: 1.45; white-space: pre-wrap; }
+.conflict-field.changed dt { font-weight: 800; }
+.family-sync-sheet header > button { min-width: 44px; min-height: 44px; flex-shrink: 0; }
+.family-sync-primary, .family-sync-secondary, .family-sync-link { padding: 10px; overflow-wrap: anywhere; }
+@media (max-width: 420px) { .conflict-comparison { grid-template-columns: minmax(0, 1fr); } }

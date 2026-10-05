@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { t } from './i18n'
+import { Modal } from './Modal'
+import { ConflictComparison } from './ConflictComparison'
+import { conflictCopy, conflictReviewKey } from './conflictPreview'
 import type { Locale } from './i18n'
 import { exportData, loadData } from './storage'
 import { familyDissolutionCopy } from './familyDissolutionCopy'
@@ -122,7 +125,9 @@ export default function FamilySyncLayer() {
   const [error, setError] = useState('')
   const [connected, setConnected] = useState(() => Boolean(getSyncStore().connection))
   const [pendingCount, setPendingCount] = useState(() => getSyncStore().pending.length)
-  const [conflictCount, setConflictCount] = useState(() => getSyncStore().conflicts.length)
+  const [conflicts, setConflicts] = useState(() => getSyncStore().conflicts)
+  const [selectedConflictId, setSelectedConflictId] = useState('')
+  const conflictCount = conflicts.length
   const [missingSessions, setMissingSessions] = useState(() => getSyncStore().missingSessions)
   const [online, setOnline] = useState(() => navigator.onLine)
   const [lastSyncAt, setLastSyncAt] = useState(() => Number(localStorage.getItem(LAST_SYNC_KEY) || 0))
@@ -144,8 +149,12 @@ export default function FamilySyncLayer() {
   const deletionText = childDeletionCopy[locale]
   const dissolutionText = familyDissolutionCopy[locale]
   const bootstrapText = familyBootstrapCopy[locale]
-  const firstConflict = getSyncStore().conflicts[0]
-  const childConflict = firstConflict?.entityType === 'CHILD' ? firstConflict : null
+  const comparisonText = conflictCopy[locale]
+  const conflict = conflicts.find(item => item.operationId === selectedConflictId) ?? conflicts[0]
+  const conflictIndex = conflict ? conflicts.indexOf(conflict) : 0
+  const reviewedData = loadData()
+  const reviewedStore = getSyncStore()
+  const reviewedKey = conflict ? conflictReviewKey({ ...reviewedStore, conflicts: [conflict] }, reviewedData, conflict.operationId) : ''
   const familySyncAvailable = import.meta.env.VITE_ACCOUNT_AUTH === 'true'
     ? !accessChecking && !accessCheckFailed && serverFamilySync === true
     : internalPreview && canUseFamilySync(previewPlan)
@@ -153,6 +162,7 @@ export default function FamilySyncLayer() {
   const friendlyError = (err: unknown) => {
     const apiError = err as SyncError
     const code = apiError?.code || (err instanceof Error ? err.message : '')
+    if (code === 'SYNC_CONFLICT_CHANGED') return comparisonText.changed
     if (code === 'FAMILY_BOOTSTRAP_CHANGED') return bootstrapText.changed
     if (code === 'INVITE_NOT_FOUND') return text.inviteNotFound
     if (code === 'INVITE_ALREADY_USED') return text.inviteUsed
@@ -179,7 +189,7 @@ export default function FamilySyncLayer() {
   const markSynced = () => {
     const store = getSyncStore()
     setPendingCount(store.pending.length)
-    setConflictCount(store.conflicts.length)
+    setConflicts(store.conflicts)
     setMissingSessions(store.missingSessions)
     setUploadFailure(store.failure?.code || '')
     setChildDeletionRejected(Boolean(store.childDeletionRejected))
@@ -294,7 +304,7 @@ export default function FamilySyncLayer() {
       setConnected(Boolean(next))
       setConnectionName(next?.familyName || '')
       setPendingCount(store.pending.length)
-      setConflictCount(store.conflicts.length)
+      setConflicts(store.conflicts)
       setMissingSessions(store.missingSessions)
       if (store.missingSessions.length || store.conflicts.length) setMode('home')
       setUploadFailure(store.failure?.code || '')
@@ -576,11 +586,10 @@ export default function FamilySyncLayer() {
   }
 
   const handleConflict = async (resolution: 'local' | 'family') => {
-    const conflict = getSyncStore().conflicts[0]
-    if (!conflict) return
+    if (!conflict || busy || !online) return
     setBusy(true); setError('')
     try {
-      await resolveSyncConflict(conflict.operationId, resolution)
+      await resolveSyncConflict(conflict.operationId, resolution, reviewedKey)
       markSynced()
     } catch (err) {
       setError(friendlyError(err))
@@ -599,7 +608,7 @@ export default function FamilySyncLayer() {
 
   const settingsEntry = settingsTarget ? createPortal(
     <div className="settings-card family-sync-settings-card">
-      <button className="family-sync-settings-button" onClick={openPanel} aria-label={text.title}>
+      <button className="family-sync-settings-button" onClick={openPanel} aria-label={text.title} aria-haspopup="dialog">
         <span className={`family-sync-settings-icon ${familySyncAvailable && connected ? 'connected' : ''} ${!familySyncAvailable && !accessChecking && !accessCheckFailed ? 'locked' : ''}`}>{familySyncAvailable || accessChecking || accessCheckFailed ? '☁' : '🔒'}</span>
         <span className="family-sync-settings-copy">
           <strong>{connected && connectionName ? connectionName : text.title}</strong>
@@ -614,10 +623,10 @@ export default function FamilySyncLayer() {
 
   return <>
     {settingsEntry}
-    {open && <div className="family-sync-overlay" onClick={() => !busy && setOpen(false)}>
+    {open && <Modal className="family-sync-overlay" label={text.title} busy={busy} onClose={() => setOpen(false)}>
       <section className="family-sync-sheet" onClick={(event) => event.stopPropagation()}>
         <div className="family-sync-handle" />
-        <header><div><small>{status}</small><h2>{text.title}</h2></div><button onClick={() => setOpen(false)} disabled={busy}>×</button></header>
+        <header><div><small role="status">{status}</small><h2>{text.title}</h2></div><button aria-label={text.close} onClick={() => setOpen(false)} disabled={busy}>×</button></header>
         {(accessChecking || accessCheckFailed) && <div className="family-sync-content family-sync-locked">
           <strong>{accessChecking ? text.syncing : text.error}</strong>
           {accessCheckFailed && <button className="family-sync-secondary" onClick={() => window.location.reload()}>{t(locale, 'retry')}</button>}
@@ -665,19 +674,20 @@ export default function FamilySyncLayer() {
           <button className="family-sync-primary" onClick={() => setMode('create')} disabled={busy}>{text.create}</button>
           <button className="family-sync-secondary" onClick={() => setMode('join')} disabled={busy}>{text.join}</button>
         </div>}
-        {familySyncAvailable && mode === 'create' && !connected && <div className="family-sync-content">
-          <p>{text.familyName}</p>
-          <input className="family-sync-name-input" value={familyName} onChange={(event) => setFamilyName(event.target.value.slice(0, 60))} placeholder={text.familyNamePlaceholder} autoCorrect="off" />
-          <button className="family-sync-primary" onClick={handleCreate} disabled={busy || !familyName.trim()}>{busy ? text.syncing : text.createButton}</button>
-          <button className="family-sync-link" onClick={() => setMode('home')} disabled={busy}>{text.cancel}</button>
-        </div>}
-        {familySyncAvailable && mode === 'join' && !connected && <div className="family-sync-content">
+        {familySyncAvailable && mode === 'create' && !connected && <form className="family-sync-content" onSubmit={event => { event.preventDefault(); if (!busy && online && familyName.trim()) void handleCreate() }}>
+          <label htmlFor="family-name">{text.familyName}</label>
+          <input id="family-name" disabled={busy} className="family-sync-name-input" value={familyName} onChange={(event) => setFamilyName(event.target.value.slice(0, 60))} placeholder={text.familyNamePlaceholder} autoCorrect="off" />
+          <button type="submit" className="family-sync-primary" disabled={busy || !online || !familyName.trim()}>{busy ? text.syncing : text.createButton}</button>
+          <button type="button" className="family-sync-link" onClick={() => setMode('home')} disabled={busy}>{text.cancel}</button>
+        </form>}
+        {familySyncAvailable && mode === 'join' && !connected && <form className="family-sync-content" onSubmit={event => { event.preventDefault(); if (!busy && online && code.trim()) void handleJoin() }}>
           <p>{text.join}</p>
           <p>{bootstrapText.intro}</p>
-          <input className="family-sync-code-input" value={code} onChange={(event) => setCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10))} placeholder={text.codePlaceholder} autoCapitalize="characters" autoCorrect="off" />
-          <button className="family-sync-primary" onClick={handleJoin} disabled={busy || !code.trim()}>{busy ? text.syncing : text.joinButton}</button>
-          <button className="family-sync-link" onClick={() => setMode('home')} disabled={busy}>{text.cancel}</button>
-        </div>}
+          <label htmlFor="family-code">{text.codePlaceholder}</label>
+          <input id="family-code" disabled={busy} className="family-sync-code-input" value={code} onChange={(event) => setCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10))} placeholder={text.codePlaceholder} autoCapitalize="characters" autoCorrect="off" />
+          <button type="submit" className="family-sync-primary" disabled={busy || !online || !code.trim()}>{busy ? text.syncing : text.joinButton}</button>
+          <button type="button" className="family-sync-link" onClick={() => setMode('home')} disabled={busy}>{text.cancel}</button>
+        </form>}
         {mode === 'leave-admin' && <div className="family-sync-content">
           <strong>{accountMembership?.role === 'ADMIN' ? text.leaveAdminTitle : text.leaveAccount}</strong>
           <p>{accountMembership?.role === 'ADMIN' ? text.leaveAdminHelp : text.leaveAccountConfirm}</p>
@@ -704,14 +714,17 @@ export default function FamilySyncLayer() {
           <button className="family-sync-link" onClick={() => { setMode('home'); setDissolution(null) }} disabled={busy}>{text.cancel}</button>
         </div>}
         {mode === 'home' && connectionEnded && <div className="family-sync-content"><p role="status">{dissolutionText.ended}</p></div>}
-        {familySyncAvailable && mode === 'home' && connected && conflictCount > 0 && <div className="family-sync-content">
-          <div className="family-sync-status-card"><span>!</span><div><strong>{childConflict ? bootstrapText.conflictTitle : text.conflictTitle}</strong><small>{childConflict ? bootstrapText.conflictHelp : text.conflictHelp}</small></div></div>
-          {childConflict && <div className="family-sync-status-card"><div>
-            <strong>{bootstrapText.local}</strong><small>{loadData().children.find(child => child.id === childConflict.entityId)?.name || bootstrapText.unnamed} · {loadData().children.find(child => child.id === childConflict.entityId)?.birthDate || '—'}</small>
-            <strong>{bootstrapText.family}</strong><small>{childConflict.serverValue.name || bootstrapText.unnamed} · {childConflict.serverValue.birthDate || '—'}</small>
-          </div></div>}
-          <button className="family-sync-primary" onClick={() => handleConflict('local')} disabled={busy}>{text.keepLocal}</button>
-          <button className="family-sync-secondary" onClick={() => handleConflict('family')} disabled={busy}>{text.keepFamily}</button>
+        {familySyncAvailable && mode === 'home' && connected && conflict && <div className="family-sync-content">
+          <div className="conflict-navigation">
+            <button aria-label={comparisonText.previous} disabled={busy || conflictIndex === 0} onClick={() => { setSelectedConflictId(conflicts[conflictIndex - 1].operationId); setError('') }}>‹</button>
+            <strong role="status">{comparisonText.count(conflictIndex + 1, conflictCount)}</strong>
+            <button aria-label={comparisonText.next} disabled={busy || conflictIndex === conflictCount - 1} onClick={() => { setSelectedConflictId(conflicts[conflictIndex + 1].operationId); setError('') }}>›</button>
+          </div>
+          <strong>{conflict.entityType === 'CHILD' ? bootstrapText.conflictTitle : text.conflictTitle}</strong>
+          <ConflictComparison conflict={conflict} data={reviewedData} pending={reviewedStore.pending} />
+          {!online && <p role="status">{text.offlineHint}</p>}
+          <button className="family-sync-primary" onClick={() => handleConflict('local')} disabled={busy || !online}>{text.keepLocal}</button>
+          <button className="family-sync-secondary" onClick={() => handleConflict('family')} disabled={busy || !online}>{text.keepFamily}</button>
         </div>}
         {familySyncAvailable && mode === 'home' && connected && conflictCount === 0 && <div className="family-sync-content">
           <div className="family-sync-status-card"><span>{missingSessions.length ? '!' : online && !syncIssue ? '✓' : '↻'}</span><div><strong>{connectionName || text.connected}</strong><small>{detailHint}</small></div></div>
@@ -732,7 +745,7 @@ export default function FamilySyncLayer() {
           <strong>{deletionText.title}</strong><p>{deletionText.recovered}</p>
           <button className="family-sync-secondary" onClick={dismissChildDeletionNotice}>{deletionText.dismiss}</button>
         </div>}
-        {error && <div className="family-sync-error">{error}</div>}
+        {error && <div className="family-sync-error" role="alert">{error}</div>}
         {familySyncAvailable && mode === 'home' && connected && missingSessions.map((missing) => {
           const local = loadData().sessions.find((item) => item.id === missing.sessionId)
           const reviewed = missing.repairOperationIds?.length ? missing.localValue : local
@@ -760,6 +773,6 @@ export default function FamilySyncLayer() {
           {internalPreview && <small> · {uploadFailure}</small>}
         </div>}
       </section>
-    </div>}
+    </Modal>}
   </>
 }
