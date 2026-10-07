@@ -1,3 +1,5 @@
+import { PdfExportDialog } from './PdfExportDialog'
+import { pdfCopy } from './pdfCopy'
 import { Modal } from './Modal'
 import { conflictCopy } from './conflictPreview'
 import { ChangeEvent, PointerEvent as ReactPointerEvent, memo, useId, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
@@ -23,7 +25,7 @@ import { buildSleepChangeInsight, CHANGE_MIN_RECENT_DAYS, CHANGE_MIN_BASELINE_DA
 import type { SleepChangeMetric, SleepChangeSignal } from './sleepChange'
 import { buildMonthlyFamilyReport } from './monthlyReport'
 import type { MonthlyReportMetric, MonthlyReportMilestone, MonthlyReportTrend } from './monthlyReport'
-import { INTERNAL_PLAN_PREVIEW_EVENT, INTERNAL_PLAN_PREVIEW_KEY, canUseFamilySync, canUsePremiumInsights, parseProductPlan, premiumInsightFeatures, productPlans } from './entitlements'
+import { INTERNAL_PLAN_PREVIEW_EVENT, INTERNAL_PLAN_PREVIEW_KEY, canExportPdf, canUseFamilySync, canUsePremiumInsights, parseProductPlan, premiumInsightFeatures, productPlans } from './entitlements'
 import type { PremiumInsightFeature, ProductPlan } from './entitlements'
 import { DEFAULT_DAY_START_MINUTES, DEFAULT_NIGHT_START_MINUTES, LONG_SLEEP_GUARDRAIL_MS, awakeSince, durationOf, formatDateHeader, formatDuration, formatTime, formatTimer, getDataQualityWarnings, todaySessions, totalToday } from './utils'
 import SleepTimeline from './SleepTimeline'
@@ -222,7 +224,7 @@ export default function App({ writeAccess = 'writer' }: { writeAccess?: WriteAcc
       {page === 'stats' && <StatsPage sessions={activeSessions} locale={locale} childName={activeChild.name} productPlan={previewPlan} premiumInsightsAvailable={accountAuthEnabled ? Boolean(accountAccess?.features.includes('FAMILY_PLUS_INSIGHTS') && (!accountAccess.offlineUntil || now < accountAccess.offlineUntil)) : internalPreview && canUsePremiumInsights(previewPlan)} onPreviewPlanChange={internalPreview ? setPreviewPlan : undefined} />}
       {page === 'settings' && <SettingsPage data={data} setData={setData} onBack={() => setPage('today')}
         familySyncAvailable={accountAuthEnabled ? Boolean(accountAccess?.features.includes('FAMILY_SYNC')) : internalPreview && canUseFamilySync(previewPlan)}
-        familyRole={accountAccess?.membership?.role ?? null} />}
+        pdfAvailable={accountAuthEnabled ? Boolean(accountAccess?.features.includes('PDF_EXPORT') && (!accountAccess.offlineUntil || now < accountAccess.offlineUntil)) : internalPreview && canExportPdf(previewPlan)} familyRole={accountAccess?.membership?.role ?? null} />}
     </main>
     {page !== 'settings' && <BottomNav page={page} locale={locale} onChange={setPage} />}
     {editor && <SleepEditor childId={activeChild.id} session={editor === 'new' ? null : editor} locale={locale} currentExists={Boolean(current)} onClose={() => setEditor(null)} onSave={saveEditor} onDelete={deleteSession} />}
@@ -688,9 +690,10 @@ type ReplacementScope = 'local' | 'family'
 type PendingReplacement = { incoming: AppData; source: ReplacementSource; scope: ReplacementScope;
   familyName?: string; diagnostics: ImportDiagnostic[]; base: string }
 
-function SettingsPage({ data, setData, onBack, familySyncAvailable, familyRole }: { data: AppData; setData: (data: AppData) => void; onBack: () => void; familySyncAvailable: boolean; familyRole: 'ADMIN' | 'MEMBER' | null }) {
+function SettingsPage({ data, setData, onBack, familySyncAvailable, familyRole, pdfAvailable }: { data: AppData; setData: (data: AppData) => void; onBack: () => void; familySyncAvailable: boolean; pdfAvailable: boolean; familyRole: 'ADMIN' | 'MEMBER' | null }) {
   const locale = data.settings.locale
   const [editingChild, setEditingChild] = useState<ChildProfile | 'new' | null>(null)
+  const [pdfOpen, setPdfOpen] = useState(false)
   const [loadingDemo, setLoadingDemo] = useState(false)
   const [safetyBackup, setSafetyBackup] = useState<SafetyBackup | null>(() => loadSafetyBackup())
   const [pendingReplacement, setPendingReplacement] = useState<PendingReplacement | null>(null)
@@ -809,13 +812,14 @@ function SettingsPage({ data, setData, onBack, familySyncAvailable, familyRole }
       </div>
     })}</div>
     <div data-family-sync-slot />
-    <div className="settings-card action-stack"><button onClick={() => exportData(data)}>{t(locale, 'exportData')}</button><label className="file-button">{t(locale, replacementReadiness.scope === 'family' ? 'importFamilyData' : 'importData')}<input type="file" accept="application/json" onChange={handleImport} /></label>{safetyBackup && <button className="safety-restore-button" onClick={() => openReplacement(safetyBackup.data, 'restore')}>{t(locale, 'restoreSafetyBackup')}</button>}{import.meta.env.VITE_INTERNAL_PREVIEW === 'true' && <button className="internal-demo-button" onClick={loadDemoData} disabled={loadingDemo}>{loadingDemo ? t(locale, 'loadingDemoData') : t(locale, 'loadDemoData')}</button>}<button className="danger" onClick={() => openReplacement(emptyDiary(), 'clear-local')}>{t(locale, 'clearLocalData')}</button>{replacementReadiness.scope === 'family' && familyRole === 'ADMIN' && <button className="danger danger-family" onClick={() => openReplacement(emptyDiary(), 'clear-family')}>{t(locale, 'clearFamilyData')}</button>}</div>
+    <div className="settings-card action-stack"><button className="pdf-export-button" aria-haspopup="dialog" onClick={() => setPdfOpen(true)}>{pdfCopy[locale].title}{!pdfAvailable && ' · Family'}</button><button onClick={() => exportData(data)}>{t(locale, 'exportData')}</button><label className="file-button">{t(locale, replacementReadiness.scope === 'family' ? 'importFamilyData' : 'importData')}<input type="file" accept="application/json" onChange={handleImport} /></label>{safetyBackup && <button className="safety-restore-button" onClick={() => openReplacement(safetyBackup.data, 'restore')}>{t(locale, 'restoreSafetyBackup')}</button>}{import.meta.env.VITE_INTERNAL_PREVIEW === 'true' && <button className="internal-demo-button" onClick={loadDemoData} disabled={loadingDemo}>{loadingDemo ? t(locale, 'loadingDemoData') : t(locale, 'loadDemoData')}</button>}<button className="danger" onClick={() => openReplacement(emptyDiary(), 'clear-local')}>{t(locale, 'clearLocalData')}</button>{replacementReadiness.scope === 'family' && familyRole === 'ADMIN' && <button className="danger danger-family" onClick={() => openReplacement(emptyDiary(), 'clear-family')}>{t(locale, 'clearFamilyData')}</button>}</div>
     {replacementReadiness.scope === 'family' && familyRole === 'MEMBER' && <p className="muted family-admin-hint">{t(locale, 'familyClearAdminOnly')}</p>}
     {safetyBackup && <p className="muted safety-backup-hint">{t(locale, 'safetyBackupAvailable', { date: new Intl.DateTimeFormat(localeTag(locale), { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(safetyBackup.exportedAt)), count: safetyBackup.data.sessions.length })}</p>}
     <p className="muted">{t(locale, replacementReadiness.scope === 'family' ? 'familyDataShared' : 'localOnly', { family: replacementReadiness.familyName || '' })}</p>
     <div className="settings-card settings-language-card">
       <label>{t(locale, 'language')}<select className="language-select" value={locale} onChange={changeLocale}>{languageOptions.map((language) => <option key={language.value} value={language.value}>{language.flag} {language.label}</option>)}</select></label>
     </div></section>
+    {pdfOpen && <PdfExportDialog data={data} available={pdfAvailable} onClose={() => setPdfOpen(false)} />}
     {editingChild && <ChildEditor child={editingChild === 'new' ? null : editingChild as ChildProfile} locale={locale} onClose={() => setEditingChild(null)} onSave={(next) => {
       const current = loadData()
       if (editingChild === 'new') setData({ ...current, children: [...current.children, next], settings: { ...current.settings, activeChildId: next.id } })

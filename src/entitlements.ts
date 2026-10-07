@@ -25,6 +25,10 @@ export function canUseFamilySync(plan: ProductPlan) {
   return plan === 'family' || plan === 'familyPlus'
 }
 
+export function canExportPdf(plan: ProductPlan) {
+  return plan === 'family' || plan === 'familyPlus'
+}
+
 export function parseProductPlan(value: unknown): ProductPlan | null {
   return productPlans.includes(value as ProductPlan) ? value as ProductPlan : null
 }

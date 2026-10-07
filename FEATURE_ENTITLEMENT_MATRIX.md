@@ -3,7 +3,7 @@
 Status: **LOCKED FOR ARCHITECTURE**  
 Date: 2026-08-24
 
-**V1 scope override — 2026-09-20:** see `OWNER_DECISIONS_REVIEW_2026-09-20.md` and its five owner-supplied sources. This matrix specifies the target product, not implementation readiness. Technical release gates remain open.
+**V1 scope override — 2026-09-20:** see `OWNER_DECISIONS_REVIEW_2026-09-20.md` and its five owner-supplied sources. This matrix specifies the target product, not implementation readiness. Technical release gates remain open. Trial rules are superseded by `SOLEMI_V1_TRIAL_RULES_2026-10-01.md`. The 2026-10-07 implementation/promise inventory is in `PDF_EXPORT_CHECKPOINT_2026-10-07.md`.
 
 **Product decision update — 2026-09-17; staging accepted — 2026-09-19:** `PRODUCT_DIRECTION.md` is authoritative. Keep Free / Family (990 HUF/month) / Family+ (1490 HUF/month). Every active family member inherits the paid capabilities granted by any active member's valid subscription, regardless of creator/admin role. Family+ analytics are no longer subscriber-only. Worker and client implementation plus the two-account, two-phone staging matrix are accepted.
 
@@ -76,7 +76,7 @@ Family users see the same structure, with Family+ cards still locked where appli
 - Paywall is available from Settings.
 - Paywall also appears when a user intentionally opens a locked feature.
 - No random startup/interruption paywall.
-- One 7-day trial per user across both paid plans; the user chooses Family or Family+. Switching plans must not grant another trial.
+- One lifetime 7-day trial per Solemi account across both paid plans; the user chooses Family or Family+. A Family can use at most four distinct users' trials in total. Activation records the account and, when present, Family. Starting without a Family still consumes the account's trial. Joining a Family, changing families/devices, reinstalling or restoring data never resets usage or creates parallel access. A Family whose four slots are consumed cannot accept a new trial even from an unused account. Full rules: `SOLEMI_V1_TRIAL_RULES_2026-10-01.md`; server enforcement and store alignment remain release work.
 - Trial uses payment method / auto-renew where the platform flow supports it.
 - If trial ends without paid continuation, its personal grant expires; another active family member's valid subscription can still grant family access.
 - Monthly + annual options.
@@ -89,7 +89,7 @@ Family users see the same structure, with Family+ cards still locked where appli
 
 - create/activate Family entitlement;
 - make automatic local safety backup before first cloud bootstrap;
-- upload canonical local family dataset;
+- create a new family's canonical dataset only through the validated creation flow; when joining an existing family, show local/family diary review and require explicit selection before bootstrap (no automatic merge or upload of the local diary);
 - verify sync before marking bootstrap complete.
 
 ### Free/Family -> Family+

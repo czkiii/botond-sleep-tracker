@@ -1019,3 +1019,13 @@ dialog.child-editor-dialog:not([open]) { display: none; }
 .native-modal:not([open]) { display: none; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .native-modal :focus-visible { outline: 2px solid #a8d6ff; outline-offset: 3px; }
+.pdf-export-sheet { max-height: calc(100dvh - 40px); overflow-y: auto; overflow-wrap: anywhere; }
+.pdf-export-sheet p { margin: 0; font-size: 13px; line-height: 1.5; color: #b1c9e2; }
+.pdf-export-sheet label { display: grid; gap: 8px; font-size: 13px; min-width: 0; }
+.pdf-export-sheet input[type="date"], .pdf-export-sheet select { width: 100%; min-width: 0; min-height: 44px; padding: 8px; color: #edf6ff; background: #081624; border: 1px solid #41658b; border-radius: 10px; font: inherit; }
+.pdf-date-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.pdf-export-sheet .pdf-notes-option { display: flex; align-items: center; min-height: 44px; }
+.pdf-notes-option input { width: 22px; height: 22px; flex-shrink: 0; }
+.pdf-download { min-height: 48px; padding: 12px; border: 1px solid #41658b; border-radius: 12px; background: #2264a5; color: white; font: inherit; }
+.pdf-export-sheet [role="alert"] { color: #ffb5bf; }
+@media (max-width: 360px) { .pdf-date-fields { grid-template-columns: 1fr; } }

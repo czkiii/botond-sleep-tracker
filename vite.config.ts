@@ -17,7 +17,7 @@ export default defineConfig(({ mode }) => {
         // over/reload an open diary while it may contain an unsaved draft.
         registerType: 'prompt',
         injectRegister: false,
-        includeAssets: ['app-icon.png'],
+        includeAssets: ['app-icon.png', 'fonts/NotoSans-Regular.ttf'],
         workbox: {
           cleanupOutdatedCaches: true,
           clientsClaim: false,

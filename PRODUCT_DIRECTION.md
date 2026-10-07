@@ -17,14 +17,18 @@ Az elemzések saját feljegyzésekből származó leíró statisztikák és viss
 | Csomag | Havi ár | Fő érték |
 |---|---:|---|
 | Free | 0 Ft | Teljes helyi alap-alvásnapló, előzmény, korrekció, alapstatisztika és több gyermek. |
-| Family | 990 Ft | Free + közös, eszközök közötti családi alvásnapló. |
+| Family | 990 Ft | Free + közös, eszközök közötti családi alvásnapló és PDF-naplóexport. |
 | Family+ | 1 490 Ft | Family + kiválasztott haladó statisztikák és az alvás változásait bemutató jelentések. |
 
 A közös szinkron önálló fizetős érték a terméktervben. Konkurens ingyenes megoldás létezése nem automatikus ok a csomag elhagyására. Family+ tényleges választható többlet; nem kizárólag árpszichológiai összehasonlító csomag. A csomagokat most megtartjuk; az auditok Free + egyetlen Plus ajánlata nem elfogadott döntés.
 
 Induláskor havi és éves ajánlat lesz; az éves cél 10 havi díjért 12 hónap. Konkrét store árpontok, regionális árak, áruházi megjelenítés és a díjak/adók utáni gazdaságosság még nincs véglegesítve. Egyetlen 7 napos trial jár felhasználónként, Family vagy Family+ csomagra választhatóan. A havi árak jóváhagyott termékterv, nem már működő bolti ajánlat vagy bizonyított fizetési hajlandóság.
 
-V1-ben PDF export szükséges Family/Family+ jogosultsággal. Push, fix és adaptív emlékeztető, valamint életkori norma szerinti összehasonlítás nem része a V1-nek. A saját naplóadatok elemzése és a jelenlegi navigáció megmaradhat. Google és Apple belépés egyaránt szükséges. Ezek elfogadott scope-döntések, nem készültségi állítások.
+V1-ben PDF export szükséges Family/Family+ jogosultsággal. A 2026-10-07-i helyi megvalósítás gyermekre és időszakra szűrt, megosztható naplókivonat; nem a Family+ havi elemzés PDF-változata, nem visszaállítási mentés és nem teljes account-adatexport. A JSON-mentés ingyenes marad. [Felmérés és készültség](PDF_EXPORT_CHECKPOINT_2026-10-07.md).
+
+A trial részletes, újabb szabálya: [2026-10-01-i tulajdonosi döntés](SOLEMI_V1_TRIAL_RULES_2026-10-01.md). Egy Solemi-account életében egyszer 7 nap, egy Familyn belül összesen legfeljebb négy külön felhasználói trial; család nélkül aktiválva is felhasználtnak számít az account joga. Család-/eszközváltás, újratelepítés és visszaállítás nem resetel és nem ad párhuzamos trialt. Ez termékszabály; szerveroldali kikényszerítése és bolti összehangolása még nyitott.
+
+Push, fix és adaptív emlékeztető, valamint életkori norma szerinti összehasonlítás nem része a V1-nek. A saját naplóadatok elemzése és a jelenlegi navigáció megmaradhat. Google és Apple belépés egyaránt szükséges. Ezek elfogadott scope-döntések, nem készültségi állítások.
 
 ## Családi hozzáférés — kötelező szabály
 
