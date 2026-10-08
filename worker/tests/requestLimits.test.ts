@@ -78,13 +78,15 @@ describe('request budgets before database/provider work', () => {
     await expect(consumeLimit(limiter, 'invite:a')).rejects.toMatchObject({ status: 429 })
     await expect(consumeLimit(limiter, 'invite:b')).resolves.toBeUndefined()
   })
-  it('ships isolated staging/production namespaces and explicit budgets', () => {
+  it('ships isolated rate budgets without paid-only CPU overrides on the Free account', () => {
     const configs = ['wrangler.jsonc', 'wrangler.staging.jsonc'].map(file => JSON.parse(readFileSync(new URL(`../${file}`, import.meta.url), 'utf8')))
     const ids = configs.flatMap(c => c.ratelimits.map((r: { namespace_id: string }) => r.namespace_id))
     expect(new Set(ids).size).toBe(6)
     for (const config of configs) {
       expect(config.ratelimits.map((r: { simple: unknown }) => r.simple)).toEqual([6000, 120, 30].map(limit => ({ limit, period: 60 })))
-      expect(config.limits.cpu_ms).toBe(50)
+      // Cloudflare rejects even a small explicit CPU limit on Workers Free (100328).
+      // Omitting it retains the platform's Free-plan CPU limit.
+      expect(config.limits?.cpu_ms).toBeUndefined()
     }
   })
 })

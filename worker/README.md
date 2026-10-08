@@ -21,11 +21,14 @@ install: zero audit findings, Worker typecheck, `deploy:staging -- --dry-run`
 and the full 791/791 tests. The previous Node 24 check also covered native
 SVG-to-PNG processing. This does not confirm a remote Cloudflare deployment.
 
-Read-only staging schema inspection on 2026-10-08 found migrations 007–010
-missing (`billing_account_links`, `store_subscription_state`,
-`google_token_replacements`, `account_trials`, `effective_entitlement_grants`
-absent). Back up and apply the missing migrations in order before deploying
-the trial-aware Worker. The remote schema was not modified in this check.
+Read-only staging schema inspection on 2026-10-08 initially found migrations
+007–010 missing. They were subsequently applied to `solemi-sleep-db-staging`
+after a full export and successful rehearsal against that export. Comparing
+before/after exports confirmed identical row counts and SHA-256 fingerprints
+for all 17 pre-existing tables. Remote foreign-key checks passed; the new view
+preserved all 9 existing grants and no trial was activated. Private SQL exports
+and the rehearsal report are in the git-ignored `.private-backups/` directory.
+This migration result applies only to staging, not production.
 
 ## What is already implemented
 
@@ -45,6 +48,22 @@ the trial-aware Worker. The remote schema was not modified in this check.
 - CORS for the current GitHub Pages frontend and local Vite development
 
 ## Cloudflare setup
+
+### Workers Free configuration (2026-10-08)
+
+The staging build log confirmed Cloudflare error 100328: this account uses
+Workers Free and rejects explicit `limits.cpu_ms`, including the former 50 ms
+setting. Both Worker configs omit that paid-only setting and use the platform's
+Free CPU limit (currently 10 ms per HTTP request). Rate-limit bindings remain.
+This fixes configuration compatibility; it does not prove that every workload
+fits the Free CPU budget. A later Paid-plan change must explicitly review and
+set a cost-control CPU limit before deployment.
+[Cloudflare CPU limits](https://developers.cloudflare.com/workers/platform/limits/#cpu-time).
+
+GitHub Frontend/Worker checks passed for `b79c54f`; Cloudflare deployment was
+rejected before activation. The staging smoke cannot pass until its expected
+Worker commit is deployed. The staging database prerequisites are now applied;
+the CPU configuration fix still needs committing/pushing and remote verification.
 
 ### A11 trial migration / release ordering (2026-10-07)
 
