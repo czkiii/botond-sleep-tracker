@@ -25,5 +25,10 @@
   },
   "dependencies": {
     "jose": "6.2.12"
+  },
+  "overrides": {
+    "miniflare": {
+      "sharp": "0.35.5"
+    }
   }
 }

@@ -2,6 +2,20 @@
 
 Cloudflare Worker + D1 backend for Solemi Sleep Family Sync V1.
 
+## Development dependency security fix (2026-10-08)
+
+The Miniflare dependency of Wrangler 4.147.0 pins `sharp` 0.35.4, which is
+affected by [GHSA-wq5f-xc86-pv6w](https://github.com/advisories/GHSA-wq5f-xc86-pv6w).
+The scoped npm override in this directory selects `sharp` 0.35.5 (prebuilt
+librsvg 2.63.2) and the lockfile includes the updated platform packages.
+Keep the override until upstream Miniflare selects a patched version; remove
+it only after a clean install, audit and Worker checks pass without it.
+Do not use `npm audit fix --force` to downgrade Wrangler or disable the audit.
+
+Verified locally after a clean `npm --prefix worker ci`: zero audit findings,
+Worker typecheck, `deploy:staging -- --dry-run`, 299/299 Worker tests and native
+SVG-to-PNG smoke check. This does not confirm a remote Cloudflare deployment.
+
 ## What is already implemented
 
 - Create a family and first device
