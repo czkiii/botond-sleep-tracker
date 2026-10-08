@@ -6,15 +6,26 @@ Cloudflare Worker + D1 backend for Solemi Sleep Family Sync V1.
 
 The Miniflare dependency of Wrangler 4.147.0 pins `sharp` 0.35.4, which is
 affected by [GHSA-wq5f-xc86-pv6w](https://github.com/advisories/GHSA-wq5f-xc86-pv6w).
-The scoped npm override in this directory selects `sharp` 0.35.5 (prebuilt
+The Worker package's top-level npm override selects `sharp` 0.35.5 (prebuilt
 librsvg 2.63.2) and the lockfile includes the updated platform packages.
+Do not nest this override under `miniflare`: with the pinned prerelease
+Miniflare, npm 10.9.9 fails `ci` with missing sharp 0.35.4 entries, while
+npm 11.19.0 accepts the same files. The top-level sharp override works with
+the CI npm version and preserves the patched lockfile without adding old binaries.
 Keep the override until upstream Miniflare selects a patched version; remove
 it only after a clean install, audit and Worker checks pass without it.
 Do not use `npm audit fix --force` to downgrade Wrangler or disable the audit.
 
-Verified locally after a clean `npm --prefix worker ci`: zero audit findings,
-Worker typecheck, `deploy:staging -- --dry-run`, 299/299 Worker tests and native
-SVG-to-PNG smoke check. This does not confirm a remote Cloudflare deployment.
+Verified locally with CI's Node 22.23.3 and npm 10.9.9 after a clean Worker
+install: zero audit findings, Worker typecheck, `deploy:staging -- --dry-run`
+and the full 791/791 tests. The previous Node 24 check also covered native
+SVG-to-PNG processing. This does not confirm a remote Cloudflare deployment.
+
+Read-only staging schema inspection on 2026-10-08 found migrations 007–010
+missing (`billing_account_links`, `store_subscription_state`,
+`google_token_replacements`, `account_trials`, `effective_entitlement_grants`
+absent). Back up and apply the missing migrations in order before deploying
+the trial-aware Worker. The remote schema was not modified in this check.
 
 ## What is already implemented
 
