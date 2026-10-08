@@ -1,7 +1,7 @@
 # Solemi V1 — trial szabály
 
 Tulajdonosi döntés: 2026-10-01, a beszélgetésben megadott szabályok alapján.
-Státusz: elfogadott termékkövetelmény, nem elkészült implementáció.
+Státusz: elfogadott termékkövetelmény; a szerveroldali helyi rész 2026-10-07-én megvalósítva és géppel ellenőrizve. Kiadás, paywall és Apple/Google ajánlat-egyeztetés még nyitott. [Implementáció és határok](TRIAL_RULES_CHECKPOINT_2026-10-07.md).
 A korábbi eltérő trial-leírásokat ez pontosítja. Az A11 előfizetési munka része; nem változtatja meg a jelenlegi feladatsorrendet.
 
 ## Jóváhagyott szabályok
@@ -17,13 +17,15 @@ A korábbi eltérő trial-leírásokat ez pontosítja. Az A11 előfizetési munk
 - V1-ben nincs IP-, device fingerprint- vagy hasonló agresszív visszaélés-védelem. A legfeljebb négy külön accounttal elérhető hosszabb családi kipróbálás tudatos üzleti engedmény.
 - Marketing: „Próbáld ki 7 napig ingyen.” A 4/Family korlát nem kiemelt reklámüzenet, de szerepeljen a részletes feltételekben.
 
-## Az A11 megvalósításakor tisztázandó részletek
+## Tulajdonossal pontosítva — 2026-10-07
 
-Ezekre a tulajdonosi szöveg nem ad teljes szabályt; nem kezeljük őket már eldöntött viselkedésként:
+A három korábban nyitott kérdésre a tulajdonos a beszélgetésben az alábbi választ adta:
 
-- Family nélküli aktiválás után az első családi hozzárendelés mikor és hogyan fogyaszt családi keretet; mi történik, ha a célcsalád már elérte a négyes határt.
-- Aktív trial áthelyezhető-e másik Familyre, vagy az eredeti Familyhez kötött marad; áthelyezés esetén a régi hozzáférés és a családi számlálók sorsa.
-- Külön tagok egyidejű trial-aktiválása megengedett-e; a próbák időben átfednek vagy sorban indulhatnak. A 28 napos elméleti maximum önmagában nem definiál sorba állítást.
+- Family nélkül indított trial a hátralévő idővel hozzárendelhető az első Familyhez, és ezzel elfogyaszt egy családi helyet. Betelt keretnél nem ad családi próbahozzáférést.
+- A már hozzárendelt trial az eredeti Familyhez kötődik, nem vihető másikba. Kilépés/új család nem hoz létre második trialt és nem nullázza a keretet.
+- Egy Familyben egyszerre csak egy családi trial futhat. Másik tag ilyenkor nem indíthat újabbat; az elutasítás nem fogyasztja az account még felhasználatlan jogát. Nincs automatikus trial-sorbaállítás.
+
+A helyi megvalósításban a tagság önmagában akkor is létrejöhet, ha egy korábban család nélkül indított trial nem köthető oda (betelt keret vagy másik aktív családi próba). A személyes trial eredeti lejárata megmarad, a család nem örökli ezt a jogot. Az időközben felszabaduló, még nem betelt Familyhez külön hozzárendelési kérés adható, csak az eredeti trialból hátralévő idővel. Kilépés után az eredeti családi hely és időszak nem szabadul fel; a család a kilépett tag trialját nem használhatja. Visszalépés ugyanoda a megmaradt időre helyreállíthatja a megosztott hozzáférést.
 
 ## Meglévő feladatokhoz kapcsolás
 

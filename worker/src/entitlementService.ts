@@ -12,7 +12,7 @@ export class EntitlementService {
 
   async accountFeatures(accountId: string, now = Date.now()) {
     const result = await this.db.prepare(`SELECT DISTINCT feature_key
-      FROM account_entitlements
+      FROM effective_entitlement_grants
       WHERE account_id = ? AND revoked_at IS NULL
         AND valid_from <= ? AND valid_until > ?
       ORDER BY feature_key`).bind(accountId, now, now).all<FeatureRow>()
@@ -27,9 +27,10 @@ export class EntitlementService {
   async familyFeatures(familyId: string, now = Date.now()) {
     const result = await this.db.prepare(`SELECT DISTINCT e.feature_key
       FROM legacy_family_memberships m
-      JOIN account_entitlements e ON e.account_id = m.account_id
+      JOIN effective_entitlement_grants e ON e.account_id = m.account_id
       WHERE m.family_id = ? AND m.status = 'ACTIVE'
         AND e.revoked_at IS NULL AND e.valid_from <= ? AND e.valid_until > ?
+        AND (e.is_trial = 0 OR e.trial_family_id = m.family_id)
       ORDER BY e.feature_key`).bind(familyId, now, now).all<FeatureRow>()
     return result.results.map((row) => row.feature_key)
   }

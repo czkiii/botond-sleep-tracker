@@ -97,10 +97,12 @@ beforeEach(() => {
   sqlite = new DatabaseSync(':memory:')
   sqlite.exec(schema)
   sqlite.exec(accountMigration)
+  sqlite.exec(readFileSync(new URL('../migrations/005_family_memberships.sql', import.meta.url), 'utf8'))
   sqlite.exec(entitlementMigration)
   sqlite.exec(billingMigration)
   sqlite.exec(orderingMigration)
   sqlite.exec(replacementMigration)
+  sqlite.exec(readFileSync(new URL('../migrations/010_account_trials.sql', import.meta.url), 'utf8'))
   insertAccount()
   sequence = 1
   service = new StoreBillingService(sqliteBinding(sqlite), 'SANDBOX', {
@@ -113,6 +115,15 @@ beforeEach(() => {
 afterEach(() => sqlite.close())
 
 describe('store billing migration', () => {
+  it.each([{ status: 'TRIALING' as const, trialEndsAt: now + 100000 },
+    { status: 'ACTIVE' as const, trialEndsAt: now + 100000 }])('cannot issue a parallel store trial before offer reconciliation: %j', async changes => {
+    await service.getOrCreateAccountLink('acc_a', 'APPLE', now)
+    const subscription = snapshot(changes)
+    await expect(service.applyVerifiedSubscription({ accountId: 'acc_a', subscription, event: event(subscription) }))
+      .rejects.toMatchObject({ code: 'STORE_TRIAL_REQUIRES_RECONCILIATION' })
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM subscriptions').get()!.n).toBe(0)
+    expect(activeFeatures()).toEqual([])
+  })
   it('preserves existing subscription and entitlement rows', () => {
     using legacy = new DatabaseSync(':memory:')
     legacy.exec(schema)

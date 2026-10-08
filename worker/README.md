@@ -21,6 +21,35 @@ Cloudflare Worker + D1 backend for Solemi Sleep Family Sync V1.
 
 ## Cloudflare setup
 
+### A11 trial migration / release ordering (2026-10-07)
+
+Before deploying the trial-aware Worker, back up and apply
+`migrations/010_account_trials.sql` after migrations 003–009. Access queries now
+read `effective_entitlement_grants`, so this migration is required even while
+activation is disabled. Do not push to an automatically deploying Worker before
+its database is ready. The migration is additive; old Worker code can still read
+the original paid grants, but rollback to it does not recognize the new trials.
+
+`TRIAL_ENABLED=true` explicitly exposes the authenticated `GET /v1/auth/trial`,
+`POST /v1/auth/trial/activate` and `POST /v1/auth/trial/bind` routes. It is absent
+from checked-in runtime configs, so activation remains off. The flag disables
+new requests, not grants already recorded. Activation accepts only `product`
+(`FAMILY` / `FAMILY_PLUS`) and an account-scoped `operationId` (8–100 ASCII
+letters/digits/underscore/hyphen); account, Family and timestamps are server-owned.
+Bind retries cannot transfer an already bound trial or extend its deadline.
+
+Before rollout, inspect historical store trials, including active `TRIALING`
+subscriptions. Known store trial history is backfilled as consumed account usage,
+without guessing its Family or issuing new rights. Historical family allocation
+and existing active store-trial grants require reconciliation before activation.
+The store service rejects current store-trial snapshots with
+`STORE_TRIAL_REQUIRES_RECONCILIATION` until offer eligibility, acknowledgement and
+the ledger are integrated. Do not advertise an enabled native trial offer yet.
+
+See [trial checkpoint](../TRIAL_RULES_CHECKPOINT_2026-10-07.md) for tests, limits,
+deployment prerequisites and account-erasure retention work. No remote migration
+or activation was performed by the local implementation task.
+
 Run these commands from this `worker` directory.
 
 ```bash

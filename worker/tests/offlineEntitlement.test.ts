@@ -36,7 +36,7 @@ beforeEach(async () => {
   db = new DatabaseSync(':memory:')
   db.exec(readFileSync(new URL('../schema.sql', import.meta.url), 'utf8'))
   for (const name of ['003_accounts_and_sessions.sql', '004_auth_challenges_and_refresh_history.sql',
-    '005_family_memberships.sql', '006_subscriptions_and_entitlements.sql']) {
+    '005_family_memberships.sql', '006_subscriptions_and_entitlements.sql', '010_account_trials.sql']) {
     db.exec(readFileSync(new URL(`../migrations/${name}`, import.meta.url), 'utf8'))
   }
   db.prepare(`INSERT INTO accounts (id, status, created_at, updated_at, last_login_at) VALUES ('owner', 'ACTIVE', ?, ?, ?)`).run(now, now, now)

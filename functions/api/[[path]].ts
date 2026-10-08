@@ -4,8 +4,8 @@ const MAX_JSON_BODY_BYTES = 64 * 1024
 // Keep this contract aligned with the Worker's explicit routes. A new auth
 // endpoint must be reviewed here before it can receive browser credentials.
 const ROUTES: Array<[RegExp, string[]]> = [
-  [/^\/api\/v1\/auth\/(?:challenge|me|access|family\/(?:members|dissolution-preview))$/, ['GET']],
-  [/^\/api\/v1\/auth\/(?:google|refresh|logout|test\/plan|family\/(?:claim|create|bootstrap|join|leave|dissolve|data\/clear))$/, ['POST']],
+  [/^\/api\/v1\/auth\/(?:challenge|me|access|trial|family\/(?:members|dissolution-preview))$/, ['GET']],
+  [/^\/api\/v1\/auth\/(?:google|refresh|logout|test\/plan|trial\/(?:activate|bind)|family\/(?:claim|create|bootstrap|join|leave|dissolve|data\/clear))$/, ['POST']],
   [/^\/api\/v1\/(?:sync|device)$/, ['GET']],
   [/^\/api\/v1\/(?:invites|device\/leave|children|sessions(?:\/start|\/[^/]+\/end)?)$/, ['POST']],
   [/^\/api\/v1\/(?:children|sessions)\/[^/]+$/, ['PATCH', 'DELETE']]

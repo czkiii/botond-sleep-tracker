@@ -1,5 +1,6 @@
 import { AuthError, AuthService, SESSION_MS } from './authService'
 import { EntitlementService } from './entitlementService'
+import { TrialService, TrialError } from './trialService'
 import type { TestPlan } from './entitlementService'
 import { buildSha } from './buildIdentity'
 import { offlineEntitlement } from './offlineEntitlement'
@@ -17,6 +18,7 @@ interface Env extends LimitEnv {
   ACCOUNT_FAMILY_BRIDGE?: string
   ENTITLEMENT_ENFORCEMENT?: string
   ENTITLEMENT_TEST_MODE?: string
+  TRIAL_ENABLED?: string
   RECONCILIATION_CONFLICTS?: string
 }
 
@@ -1601,6 +1603,21 @@ async function accountAuthRoute(request: Request, env: Env, path: string) {
       return ok(request, env, { ...await entitlementService(env).accessState(access.account.id),
         offlineGrant: await offlineEntitlement(env.DB, env.OFFLINE_ENTITLEMENT_PRIVATE_JWK, access) })
     }
+    if (path === '/v1/auth/trial' && request.method === 'GET') {
+      if (env.TRIAL_ENABLED !== 'true') throw new ApiError(404, 'NOT_FOUND')
+      const access = await service.authenticate(accountBearer(request))
+      return ok(request, env, await new TrialService(env.DB).state(access.account.id))
+    }
+    if (request.method === 'POST' && ['/v1/auth/trial/activate', '/v1/auth/trial/bind'].includes(path)) {
+      requireAllowedAuthOrigin(request, env)
+      if (env.TRIAL_ENABLED !== 'true') throw new ApiError(404, 'NOT_FOUND')
+      const access = await service.authenticate(accountBearer(request))
+      const trial = new TrialService(env.DB)
+      if (path.endsWith('/bind')) return ok(request, env, await trial.bindToActiveFamily(access.account.id))
+      const body = await readJson(request)
+      if (!['FAMILY', 'FAMILY_PLUS'].includes(String(body.product)) || typeof body.operationId !== 'string') throw new ApiError(400, 'TRIAL_INVALID_REQUEST')
+      return ok(request, env, await trial.activate(access.account.id, body.product as 'FAMILY' | 'FAMILY_PLUS', body.operationId))
+    }
     if (request.method === 'POST' && path === '/v1/auth/test/plan') {
       requireAllowedAuthOrigin(request, env)
       if (env.ENTITLEMENT_TEST_MODE !== 'true') throw new ApiError(404, 'NOT_FOUND')
@@ -1673,6 +1690,7 @@ async function accountAuthRoute(request: Request, env: Env, path: string) {
     throw new ApiError(404, 'NOT_FOUND', 'Endpoint not found.')
   } catch (error) {
     if (error instanceof ApiError) throw error
+    if (error instanceof TrialError) throw new ApiError(error.code === 'TRIAL_INVALID_REQUEST' ? 400 : 409, error.code)
     if (error instanceof AuthError) throw new ApiError(error.status, error.code, error.code, error.data)
     throw error
   }

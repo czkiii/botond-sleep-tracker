@@ -10,7 +10,7 @@ import { sqliteBinding } from './sqliteD1'
 const app = 'https://solemi-sleep-internal.pages.dev'
 const api = 'https://solemi-sleep-sync-staging.czki-adam.workers.dev'
 const mutations = ['google', 'refresh', 'logout', 'test/plan', 'family/claim', 'family/create',
-  'family/bootstrap', 'family/join', 'family/leave', 'family/dissolve', 'family/data/clear']
+  'family/bootstrap', 'family/join', 'family/leave', 'family/dissolve', 'family/data/clear', 'trial/activate', 'trial/bind']
 let db: DatabaseSync, env: Parameters<typeof worker.fetch>[1]
 let session: Awaited<ReturnType<AuthService['login']>>, service: AuthService
 let forwarded: ReturnType<typeof vi.fn>
@@ -19,7 +19,7 @@ beforeEach(async () => {
   db = new DatabaseSync(':memory:')
   db.exec(readFileSync(new URL('../schema.sql', import.meta.url), 'utf8'))
   for (const file of ['003_accounts_and_sessions.sql', '004_auth_challenges_and_refresh_history.sql',
-    '005_family_memberships.sql', '006_subscriptions_and_entitlements.sql']) {
+    '005_family_memberships.sql', '006_subscriptions_and_entitlements.sql', '010_account_trials.sql']) {
     db.exec(readFileSync(new URL(`../migrations/${file}`, import.meta.url), 'utf8'))
   }
   env = { DB: sqliteBinding(db), TOKEN_PEPPER: 'test-pepper', ALLOWED_ORIGINS: app,
@@ -40,9 +40,21 @@ function request(path: string, headers: HeadersInit = {}, method = 'POST', body 
       'Content-Type': 'application/json', ...headers }, ...(method === 'GET' ? {} : { body }) })
 }
 const snapshot = () => ['account_sessions', 'used_refresh_tokens', 'account_devices', 'auth_challenges',
-  'families', 'legacy_family_memberships', 'account_entitlements'].map(table => db.prepare(`SELECT * FROM ${table}`).all())
+  'families', 'legacy_family_memberships', 'account_entitlements', 'account_trials'].map(table => db.prepare(`SELECT * FROM ${table}`).all())
 
 describe('A18 proxy and Worker authentication boundary', () => {
+  it('activates and reads trial through the proxy using only the authenticated account', async () => {
+    env.TRIAL_ENABLED = 'true'
+    const response = await onRequest({ request: request('trial/activate', { Origin: app, 'Sec-Fetch-Site': 'same-origin' }, 'POST',
+      JSON.stringify({ product: 'FAMILY_PLUS', operationId: 'proxy-request', accountId: 'attacker', familyId: 'fake', endsAt: Date.now() + 99999999999 })) })
+    expect(response.status).toBe(200)
+    expect(db.prepare('SELECT account_id FROM account_trials').all()).toEqual([{ account_id: session.account.id }])
+    const read = await onRequest({ request: request('trial', { Origin: app }, 'GET') })
+    expect(read.status).toBe(200)
+    expect(await read.json()).toMatchObject({ data: { used: true, trial: { active: true, familyId: null } } })
+    expect((await onRequest({ request: request('trial/bind', { Origin: app }) })).status).toBe(200)
+    expect((await onRequest({ request: request('trial/activate', { Origin: app }, 'GET') })).status).toBe(405)
+  })
   it.each([undefined, 'null', 'https://foreign.example', 'https://sibling.solemi-sleep-internal.pages.dev',
     `${app}.attacker.example`, `${app}/`, 'http://solemi-sleep-internal.pages.dev'])(
     'rejects Origin %s before forwarding or changing any account state', async origin => {

@@ -7,14 +7,14 @@ import { SignJWT } from 'jose'
 
 const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8')
 const migrations = ['003_accounts_and_sessions.sql', '004_auth_challenges_and_refresh_history.sql',
-  '005_family_memberships.sql', '006_subscriptions_and_entitlements.sql']
+  '005_family_memberships.sql', '006_subscriptions_and_entitlements.sql', '010_account_trials.sql']
   .map((name) => readFileSync(new URL(`../migrations/${name}`, import.meta.url), 'utf8')).join('\n')
 const origin = 'https://solemi-sleep-internal.pages.dev'
 let sqlite: DatabaseSync
 let env: { DB: D1Database; TOKEN_PEPPER: string; ALLOWED_ORIGINS: string;
   SOLEMI_ENVIRONMENT?: string;
   GOOGLE_CLIENT_ID?: string; AUTH_SECRET?: string; ACCOUNT_FAMILY_BRIDGE?: string;
-  ENTITLEMENT_ENFORCEMENT?: string; ENTITLEMENT_TEST_MODE?: string;
+  ENTITLEMENT_ENFORCEMENT?: string; ENTITLEMENT_TEST_MODE?: string; TRIAL_ENABLED?: string;
   RECONCILIATION_CONFLICTS?: string }
 
 beforeEach(() => {
@@ -81,6 +81,43 @@ function setTestPlan(access: string, plan: 'free' | 'family' | 'familyPlus') {
     body: JSON.stringify({ plan })
   })
 }
+
+describe('A11 authenticated trial routes', () => {
+  const headers = (token: string) => ({ Origin: origin, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' })
+  const activate = (token: string, body = { product: 'FAMILY_PLUS', operationId: 'route-request' }) => fetch('/v1/auth/trial/activate', {
+    method: 'POST', headers: headers(token), body: JSON.stringify(body) })
+  it('is disabled by default, requires authentication and validates product/request ID', async () => {
+    const token = await accountAccess('trial-owner', 'trial-device', 'trial-session')
+    expect((await activate(token)).status).toBe(404)
+    env.TRIAL_ENABLED = 'true'
+    expect((await activate('fake')).status).toBe(401)
+    expect((await activate(token, { product: 'FREE', operationId: 'route-request' })).status).toBe(400)
+    expect((await activate(token, { product: 'FAMILY', operationId: 'short' })).status).toBe(400)
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM account_trials').get()!.n).toBe(0)
+  })
+  it('survives logout/device session replacement without a second account trial', async () => {
+    env.TRIAL_ENABLED = 'true'
+    const token = await accountAccess('trial-owner', 'trial-device', 'trial-session')
+    expect((await activate(token)).status).toBe(200)
+    sqlite.exec("UPDATE account_sessions SET revoked_at = 1 WHERE account_id = 'trial-owner'")
+    const nextToken = await accountAccess('trial-owner', 'new-device', 'new-session')
+    const denied = await activate(nextToken, { product: 'FAMILY', operationId: 'new-request' })
+    expect(denied.status).toBe(409)
+    expect(await denied.json()).toMatchObject({ error: { code: 'TRIAL_ACCOUNT_USED' } })
+    expect((await activate(nextToken)).status).toBe(200)
+  })
+  it('creates a family from a family-less trial and binds it inside the membership transaction', async () => {
+    env.TRIAL_ENABLED = 'true'; env.ENTITLEMENT_ENFORCEMENT = 'true'
+    const token = await accountAccess('trial-owner', 'trial-device', 'trial-session')
+    await activate(token)
+    const response = await fetch('/v1/auth/family/create', { method: 'POST', headers: headers(token), body: JSON.stringify({ familyName: 'Trial family', childName: 'Fixture' }) })
+    expect(response.status).toBe(201)
+    const created = await response.json() as { data: { membership: { familyId: string } } }
+    expect(sqlite.prepare("SELECT family_id FROM account_trials WHERE account_id = 'trial-owner'").get()!.family_id).toBe(created.data.membership.familyId)
+    const access = await fetch('/v1/auth/access', { headers: headers(token) })
+    expect(await access.json()).toMatchObject({ data: { familySync: { canSync: true }, familyFeatures: ['FAMILY_PLUS_INSIGHTS', 'FAMILY_SYNC', 'PDF_EXPORT'] } })
+  })
+})
 
 describe('A06 enforced family access boundaries', () => {
   afterEach(() => vi.restoreAllMocks())

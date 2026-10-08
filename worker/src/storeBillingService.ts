@@ -53,6 +53,7 @@ export type StoreBillingServiceErrorCode =
   | 'LINKED_SUBSCRIPTION_OWNERSHIP_MISMATCH'
   | 'LINKED_SUBSCRIPTION_CONFLICT'
   | 'STORE_ENVIRONMENT_MISMATCH'
+  | 'STORE_TRIAL_REQUIRES_RECONCILIATION'
 
 export class StoreBillingServiceError extends Error {
   constructor(readonly code: StoreBillingServiceErrorCode, message: string) {
@@ -116,6 +117,12 @@ export class StoreBillingService {
   }, firstPurchaseRetry = true): Promise<StoreBillingApplyResult> {
     const event = validateVerifiedStoreEvent(input.event)
     const subscription = validateVerifiedStoreSubscription(input.subscription)
+    // Store adapters must reconcile offer eligibility with the Solemi ledger
+    // before enabling store trials. Fail closed rather than mint a second,
+    // transferable or longer trial via an otherwise verified store snapshot.
+    if (subscription.status === 'TRIALING' || (subscription.trialEndsAt !== null && subscription.trialEndsAt > subscription.verifiedAt)) {
+      throw new StoreBillingServiceError('STORE_TRIAL_REQUIRES_RECONCILIATION', 'Store trial integration is not enabled')
+    }
     if (subscription.environment !== this.expectedEnvironment) {
       throw new StoreBillingServiceError('STORE_ENVIRONMENT_MISMATCH',
         'Verified store environment differs from the server environment')
