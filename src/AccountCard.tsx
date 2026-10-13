@@ -6,6 +6,8 @@ import { deviceToReplaceWhenKeeping } from './accountDeviceSelection'
 import { deleteChildPhoto } from './photoStore'
 import { localeTag, t } from './i18n'
 import type { Locale } from './i18n'
+import AccountDataControls, { AccountRecovery } from './AccountDataControls'
+import type { RecoveryState } from './AccountDataControls'
 
 export default function AccountCard({ locale }: { locale: Locale }) {
   const button = useRef<HTMLDivElement>(null)
@@ -14,6 +16,7 @@ export default function AccountCard({ locale }: { locale: Locale }) {
   const [error, setError] = useState('')
   const [devices, setDevices] = useState<AccountDevice[]>([])
   const [replacement, setReplacement] = useState<AccountDevice | null>(null)
+  const [recovery, setRecovery] = useState<RecoveryState | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -36,6 +39,12 @@ export default function AccountCard({ locale }: { locale: Locale }) {
       if (!cancelled) { setAccount(current); setReplacement(null); setDevices([]); setStatus('ready'); setError('') }
     }, (failure) => {
       if (cancelled) return
+      if (failure.code === 'ACCOUNT_RECOVERY_REQUIRED' && failure.data && typeof failure.data === 'object') {
+        const data = failure.data as RecoveryState
+        if (typeof data.accountId === 'string' && typeof data.recoveryToken === 'string' && Number.isFinite(data.recoverUntil)) {
+          setRecovery(data); setAccount(null); setStatus('error'); setError(''); return
+        }
+      }
       const choices = deviceChoices(failure)
       if (choices.length) { setDevices(choices); setReplacement(null); setStatus('deviceLimit'); setError('') }
       else { setStatus('error'); setError(failure.code === 'DEVICE_LIMIT_REACHED' ? t(locale, 'accountNetworkError') : authError(locale, failure)) }
@@ -62,6 +71,8 @@ export default function AccountCard({ locale }: { locale: Locale }) {
     {replacement && status === 'signedOut' && <small className="account-replace-confirm">{t(locale, 'accountReplaceConfirm', { device: replacement.name || t(locale, 'unknownDevice') })}</small>}
     {status === 'signedOut' && <div ref={button} className="google-signin-button" />}
     {status === 'ready' && <button type="button" className="account-signout" onClick={() => setStatus('signOutChoice')}>{t(locale, 'signOut')}</button>}
+    {status === 'ready' && account && import.meta.env.VITE_ACCOUNT_DELETION === 'true' && <AccountDataControls key={account.id} locale={locale} accountId={account.id} onDeleted={() => { setAccount(null); setStatus('signedOut') }} />}
+    {recovery && <AccountRecovery locale={locale} recovery={recovery} onDone={() => { setRecovery(null); setStatus('signedOut') }} />}
     {status === 'signOutChoice' && <div className="account-signout-choice">
       <strong>{t(locale, 'signOutChoiceTitle')}</strong>
       <small>{t(locale, 'signOutChoiceHint')}</small>
@@ -81,7 +92,7 @@ export default function AccountCard({ locale }: { locale: Locale }) {
         <span>{t(locale, 'accountReplaceDevice')} · {formatLastSeen(locale, device.last_seen_at)}</span>
       </button>)}</div>
     </div>}
-    {status === 'error' && <button type="button" className="account-retry" onClick={() => setStatus('signedOut')}>{t(locale, 'retry')}</button>}
+    {status === 'error' && <button type="button" className="account-retry" onClick={() => { setRecovery(null); setStatus('signedOut') }}>{t(locale, 'retry')}</button>}
     {error && <small className="account-error">{error}</small>}
     <small className="account-data-note">{t(locale, 'accountDataLocal')}</small>
   </div>

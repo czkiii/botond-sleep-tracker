@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { activateInteractiveAccountWorkspace, activateRestoredAccountWorkspace, activateSignedOutWorkspace, accountWorkspaceNeedsGuestChoice, getActiveAccountWorkspaceId, recoverAccountWorkspaceSwitch } from './accountWorkspace'
+import { activateInteractiveAccountWorkspace, activateRestoredAccountWorkspace, activateSignedOutWorkspace, accountWorkspaceNeedsGuestChoice, getActiveAccountWorkspaceId, recoverAccountWorkspaceSwitch, removeAccountWorkspace, flushPhotoErasure } from './accountWorkspace'
 import { STORAGE_KEY, createDefaultData, loadData } from './storage'
 
 class MemoryStorage implements Storage {
@@ -61,6 +61,65 @@ afterEach(() => {
 })
 
 describe('account-bound local workspaces', () => {
+  it('retries interrupted photo erasure after the account snapshot has gone', async () => {
+    const storage = setup()
+    const data = diary('Deleted account')
+    data.children[0].photoRef = 'pending-photo'
+    storage.setItem(STORAGE_KEY, JSON.stringify(data))
+    activateRestoredAccountWorkspace('account-a')
+    activateSignedOutWorkspace(true)
+    await expect(flushPhotoErasure(async () => { throw new Error('IndexedDB unavailable') })).rejects.toThrow('IndexedDB unavailable')
+    expect(storage.getItem('solemiSleep:pendingPhotoErasure:v1')).toContain('pending-photo')
+    expect(storage.getItem('solemiSleep:workspaceData:v1:account:account-a')).toBeNull()
+    const removed: string[] = []
+    await flushPhotoErasure(async ref => { removed.push(ref) })
+    expect(removed).toEqual(['pending-photo'])
+    expect(storage.getItem('solemiSleep:pendingPhotoErasure:v1')).toBeNull()
+  })
+
+  it('protects a retained diary photo if a crash occurred before the workspace switch', async () => {
+    const storage = setup()
+    const data = diary('Retained account')
+    data.children[0].photoRef = 'retained-photo'
+    storage.setItem(STORAGE_KEY, JSON.stringify(data))
+    storage.setItem('solemiSleep:pendingPhotoErasure:v1', JSON.stringify(['retained-photo', 'orphan-photo']))
+    const removed: string[] = []
+    await flushPhotoErasure(async ref => { removed.push(ref) })
+    expect(removed).toEqual(['orphan-photo'])
+    expect(loadData().children[0].photoRef).toBe('retained-photo')
+  })
+
+  it('preserves the diary when durable photo cleanup cannot be queued', () => {
+    const storage = new FailingStorage()
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage })
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { language: 'hu-HU' } })
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { dispatchEvent: () => true } })
+    const data = diary('Retained account')
+    data.children[0].photoRef = 'retained-photo'
+    storage.setItem(STORAGE_KEY, JSON.stringify(data))
+    activateRestoredAccountWorkspace('account-a')
+    storage.failOn = 'pendingPhotoErasure'
+    expect(() => activateSignedOutWorkspace(true)).toThrow('quota')
+    expect(getActiveAccountWorkspaceId()).toBe('account-a')
+    expect(loadData().children[0].photoRef).toBe('retained-photo')
+  })
+
+  it('removes a recovered account snapshot and backup-only photos without deleting another account or shared photo', () => {
+    const storage = setup()
+    const data = diary('Deleted account')
+    data.children[0].photoRef = 'shared-photo'
+    Object.assign(data.__solemiLocal, { safetyBackupV1: { data: { children: [{ photoRef: 'backup-only-photo' }] } } })
+    storage.setItem(STORAGE_KEY, JSON.stringify(data))
+    activateRestoredAccountWorkspace('account-a')
+    activateInteractiveAccountWorkspace('account-b', false)
+    const other = diary('Keep this account')
+    other.children[0].photoRef = 'shared-photo'
+    storage.setItem(STORAGE_KEY, JSON.stringify(other))
+    expect(removeAccountWorkspace('account-a')).toEqual(['backup-only-photo'])
+    expect(getActiveAccountWorkspaceId()).toBe('account-b')
+    expect(loadData().children[0].name).toBe('Keep this account')
+    expect(storage.getItem('solemiSleep:workspaceData:v1:account:account-a')).toBeNull()
+  })
   it('binds an existing authenticated installation to its restored account without replacing data', () => {
     const storage = setup()
     storage.setItem(STORAGE_KEY, JSON.stringify(diary('Anna')))

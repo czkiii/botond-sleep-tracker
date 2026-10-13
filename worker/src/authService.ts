@@ -3,6 +3,7 @@ import { AccountStore } from './accountStore'
 import type { AccountRow, SessionAccess } from './accountStore'
 import { verifyGoogleToken } from './googleAuth'
 import type { GoogleIdentity } from './googleAuth'
+import { AccountDeletionService, recoveryProof } from './accountDeletion'
 
 export const SESSION_MS = 30 * 24 * 60 * 60 * 1000
 export const CHALLENGE_MS = 10 * 60 * 1000
@@ -56,6 +57,18 @@ export class AuthService {
         if (!account) throw error
       }
       account = await this.store.findGoogleAccount(identity.issuer, identity.subject)
+    }
+    if (account?.status === 'DELETION_PENDING') {
+      const deletion = new AccountDeletionService(this.db)
+      const pending = await deletion.pending(account.id)
+      if (pending && pending.purge_after > now) {
+        throw new AuthError('ACCOUNT_RECOVERY_REQUIRED', 403, {
+          accountId: account.id,
+          recoveryToken: await recoveryProof(this.config.secret, account.id, pending.id, now),
+          recoverUntil: pending.purge_after
+        })
+      }
+      if (pending) await deletion.finalize(pending.id, now)
     }
     if (!account || account.status !== 'ACTIVE') throw new AuthError('ACCOUNT_UNAVAILABLE', 403)
     await this.db.batch([

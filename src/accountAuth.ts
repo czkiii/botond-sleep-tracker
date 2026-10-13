@@ -164,6 +164,10 @@ export async function beginGoogleSignIn(
         restoreCompleted = true
         announceAccount(account)
       } catch (error) {
+        if (error instanceof AccountAuthError && error.code === 'ACCOUNT_RECOVERY_REQUIRED') {
+          const accountId = (error.data as { accountId?: string } | undefined)?.accountId
+          if (accountId && getActiveAccountWorkspaceId() === accountId) finishAccountDeletion(accountId, false)
+        }
         onError(error instanceof AccountAuthError ? error : new AccountAuthError('LOCAL_WORKSPACE_FAILED'))
       }
     }
@@ -212,6 +216,25 @@ export async function signOutAccount(deleteLocalData = false) {
 function authEpoch() { return localStorage.getItem(EPOCH_KEY) || '' }
 function assertEpoch(epoch: string) {
   if (authEpoch() !== epoch) throw new AccountAuthError('ACCOUNT_CONTEXT_CHANGED')
+}
+
+// Server-side deletion has already revoked the session; do not require another
+// authenticated request in order to clear this device's credentials and workspace.
+export function finishAccountDeletion(accountId: string, deleteLocalData: boolean) {
+  if (getActiveAccountWorkspaceId() !== accountId) throw new AccountAuthError('ACCOUNT_CONTEXT_CHANGED')
+  beginAuthChange()
+  sessionStorage.removeItem(ACCESS_KEY)
+  restoredAccount = null
+  restoreCompleted = true
+  const workspace = activateSignedOutWorkspace(deleteLocalData)
+  announceAccess(null)
+  announceAccount(null)
+  window.google?.accounts.id.disableAutoSelect()
+  return workspace
+}
+
+export function recoverDeletedAccount(token: string, action: 'restore' | 'finalize') {
+  return request(`/v1/auth/account/${action}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
 }
 function beginAuthChange() {
   const epoch = crypto.randomUUID()

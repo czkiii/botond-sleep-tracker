@@ -14,8 +14,11 @@ import './background-theme.css'
 import './family-sync.css'
 import { STORAGE_RECOVERED_EVENT, loadDataResult } from './storage'
 import { restoreAccount } from './accountAuth'
-import { recoverAccountWorkspaceSwitch } from './accountWorkspace'
+import { recoverAccountWorkspaceSwitch, flushPhotoErasure } from './accountWorkspace'
+import { deleteChildPhoto } from './photoStore'
 import { t } from './i18n'
+import AccountCard from './AccountCard'
+import { accountDeletionCopy } from './accountDeletionCopy'
 
 const internalPreview = import.meta.env.VITE_INTERNAL_PREVIEW === 'true'
 const internalStagingSync = internalPreview && Boolean(import.meta.env.VITE_SYNC_API_BASE)
@@ -40,7 +43,7 @@ function SolemiRoot() {
     setAccountReady(false)
     setAccountStartupError(false)
     let stopped = false
-    void restoreAccount().then(() => {
+    void restoreAccount().then(() => flushPhotoErasure(deleteChildPhoto)).then(() => {
       if (!stopped) {
         setStorageReady(loadDataResult().status !== 'recovery-required')
         setAccountReady(true)
@@ -87,6 +90,19 @@ function SolemiRoot() {
     const locale = loadDataResult().data.settings.locale
     return <div className="app-startup-error"><strong>{t(locale, 'accountLocalStorageError')}</strong>
       <button type="button" onClick={() => window.location.reload()}>{t(locale, 'retry')}</button></div>
+  }
+  // The same authenticated self-service flow is reachable without installing an app.
+  // Respect the existing single-writer lock; this page must not race another tab.
+  if (accountAuthEnabled && import.meta.env.VITE_ACCOUNT_DELETION === 'true'
+    && window.location.pathname.replace(/\/+$/, '').endsWith('/delete-account')) {
+    const locale = loadDataResult().data.settings.locale
+    if (writeAccess !== 'writer') return <main className="app-startup-error">
+      <h1>{t(locale, 'tabAccessTitle')}</h1><p>{t(locale, 'tabAccessHint')}</p></main>
+    const copy = accountDeletionCopy(locale)
+    return <main className="settings-screen" style={{ maxWidth: 520, margin: '0 auto', padding: 16 }}>
+      <h1>Solemi Sleep — {copy.title}</h1><p>{copy.explanation}</p>
+      <AccountCard locale={locale} />
+    </main>
   }
   return <>
     {internalPreview && <div className="internal-preview-banner">INTERNAL / TEST <span>Family Sync {internalStagingSync ? 'staging' : 'disabled'} · {buildSha}</span></div>}

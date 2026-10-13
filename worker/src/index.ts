@@ -1,6 +1,8 @@
 import { AuthError, AuthService, SESSION_MS } from './authService'
 import { EntitlementService } from './entitlementService'
 import { TrialService, TrialError } from './trialService'
+import { AccountDeletionService, DeletionError, verifyRecoveryProof } from './accountDeletion'
+import type { DeletionPreview } from './accountDeletion'
 import type { TestPlan } from './entitlementService'
 import { buildSha } from './buildIdentity'
 import { offlineEntitlement } from './offlineEntitlement'
@@ -19,6 +21,7 @@ interface Env extends LimitEnv {
   ENTITLEMENT_ENFORCEMENT?: string
   ENTITLEMENT_TEST_MODE?: string
   TRIAL_ENABLED?: string
+  ACCOUNT_DELETION_ENABLED?: string
   RECONCILIATION_CONFLICTS?: string
 }
 
@@ -1603,6 +1606,35 @@ async function accountAuthRoute(request: Request, env: Env, path: string) {
       return ok(request, env, { ...await entitlementService(env).accessState(access.account.id),
         offlineGrant: await offlineEntitlement(env.DB, env.OFFLINE_ENTITLEMENT_PRIVATE_JWK, access) })
     }
+    if (path.startsWith('/v1/auth/account/')) {
+      if (request.method === 'POST') requireAllowedAuthOrigin(request, env)
+      if (env.ACCOUNT_DELETION_ENABLED !== 'true') throw new ApiError(404, 'NOT_FOUND')
+      const deletion = new AccountDeletionService(env.DB)
+      if (request.method === 'POST' && ['/v1/auth/account/restore', '/v1/auth/account/finalize'].includes(path)) {
+        const proof = await verifyRecoveryProof(env.AUTH_SECRET!, accountBearer(request))
+        const pending = await deletion.pending(proof.accountId)
+        if (!pending || pending.id !== proof.requestId) {
+          const finalized = path.endsWith('/finalize') && await env.DB.prepare(`SELECT id FROM account_deletions
+            WHERE id = ? AND account_id = ? AND state = 'FINALIZED'`).bind(proof.requestId, proof.accountId).first()
+          if (finalized) return okWithCookie(request, env, { deleted: true }, refreshCookie('', 0))
+          throw new DeletionError('RECOVERY_UNAVAILABLE')
+        }
+        if (path.endsWith('/restore')) return ok(request, env, await deletion.restore(proof.accountId, proof.requestId))
+        await deletion.finalize(proof.requestId)
+        return okWithCookie(request, env, { deleted: true }, refreshCookie('', 0))
+      }
+      const access = await service.authenticate(accountBearer(request))
+      if (request.method === 'GET' && path === '/v1/auth/account/deletion-preview') return ok(request, env, await deletion.preview(access.account.id))
+      if (request.method === 'GET' && path === '/v1/auth/account/export') return ok(request, env, await deletion.exportAccount(access.account.id))
+      if (request.method === 'POST' && path === '/v1/auth/account/delete') {
+        const body = await readJson(request)
+        if (!['IMMEDIATE', 'RECOVERY'].includes(String(body.mode)) || !body.preview || typeof body.preview !== 'object') throw new ApiError(400, 'DELETION_INVALID_REQUEST')
+        const result = await deletion.request(access.account.id, body.mode as 'IMMEDIATE' | 'RECOVERY',
+          body.preview as DeletionPreview, typeof body.familyName === 'string' ? body.familyName : '')
+        return okWithCookie(request, env, result, refreshCookie('', 0))
+      }
+      throw new ApiError(404, 'NOT_FOUND')
+    }
     if (path === '/v1/auth/trial' && request.method === 'GET') {
       if (env.TRIAL_ENABLED !== 'true') throw new ApiError(404, 'NOT_FOUND')
       const access = await service.authenticate(accountBearer(request))
@@ -1691,6 +1723,7 @@ async function accountAuthRoute(request: Request, env: Env, path: string) {
   } catch (error) {
     if (error instanceof ApiError) throw error
     if (error instanceof TrialError) throw new ApiError(error.code === 'TRIAL_INVALID_REQUEST' ? 400 : 409, error.code)
+    if (error instanceof DeletionError) throw new ApiError(error.status, error.code)
     if (error instanceof AuthError) throw new ApiError(error.status, error.code, error.code, error.data)
     throw error
   }
@@ -1764,6 +1797,9 @@ async function route(request: Request, env: Env) {
 }
 
 export default {
+  async scheduled(_event: unknown, env: Env) {
+    if (env.ACCOUNT_DELETION_ENABLED === 'true') await new AccountDeletionService(env.DB).purgeDue()
+  },
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       return await route(request, env)

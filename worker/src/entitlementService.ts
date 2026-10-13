@@ -14,6 +14,7 @@ export class EntitlementService {
     const result = await this.db.prepare(`SELECT DISTINCT feature_key
       FROM effective_entitlement_grants
       WHERE account_id = ? AND revoked_at IS NULL
+        AND EXISTS (SELECT 1 FROM accounts a WHERE a.id = account_id AND a.status = 'ACTIVE')
         AND valid_from <= ? AND valid_until > ?
       ORDER BY feature_key`).bind(accountId, now, now).all<FeatureRow>()
     return result.results.map((row) => row.feature_key)

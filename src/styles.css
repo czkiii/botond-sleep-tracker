@@ -664,6 +664,13 @@ svg { display: block; }
 .account-signout-choice button { min-height: 42px; border: 1px solid var(--line); border-radius: 12px; color: #d9ebff; background: #0b1d30; font: inherit; font-size: 12px; font-weight: 700; }
 .account-signout-choice button.danger { color: #ffb5bd; border-color: rgba(255, 130, 145, .22); }
 .account-signout-choice button.link { min-height: 34px; border: 0; background: transparent; color: #8fb8e8; }
+.account-data-controls { min-width: 0; font-size: 13px; line-height: 1.5; }
+.account-data-controls p, .account-data-controls h3 { margin: 4px 0; }
+.account-data-controls a { color: #9ed0ff; text-decoration: underline; }
+.account-data-controls label { display: block; }
+.account-data-controls input:not([type="checkbox"]) { display: block; box-sizing: border-box; width: 100%; min-height: 42px; margin-top: 8px; padding: 8px; border: 1px solid var(--line); border-radius: 10px; background: #071626; color: #e7f2ff; font: inherit; }
+.account-data-controls input[type="checkbox"] { margin-right: 8px; }
+.account-data-controls button:disabled { opacity: .5; cursor: not-allowed; }
 .app-startup-loading { min-height: 100dvh; background: #020b18; }
 .app-startup-error { min-height: 100dvh; padding: 32px 24px; display: grid; align-content: center; justify-items: center; gap: 18px; color: #e7f2ff; background: #020b18; text-align: center; }
 .app-startup-error strong { max-width: 360px; font-size: 14px; line-height: 1.5; }

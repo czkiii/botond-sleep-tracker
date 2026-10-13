@@ -11,6 +11,7 @@
     "test:pdf": "node scripts/check-pdf-export.mjs",
     "test:pwa": "node scripts/check-pwa-lifecycle.mjs",
     "test:account-access": "node scripts/check-account-access.mjs",
+    "test:account-deletion": "node scripts/check-account-deletion.mjs",
     "test:security": "node scripts/check-security-headers.mjs",
     "test:family-join": "node scripts/check-family-bootstrap.mjs",
     "test:child-deletion": "node scripts/check-child-deletion.mjs",

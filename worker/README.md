@@ -60,10 +60,17 @@ fits the Free CPU budget. A later Paid-plan change must explicitly review and
 set a cost-control CPU limit before deployment.
 [Cloudflare CPU limits](https://developers.cloudflare.com/workers/platform/limits/#cpu-time).
 
-GitHub Frontend/Worker checks passed for `b79c54f`; Cloudflare deployment was
-rejected before activation. The staging smoke cannot pass until its expected
-Worker commit is deployed. The staging database prerequisites are now applied;
-the CPU configuration fix still needs committing/pushing and remote verification.
+Remote verification completed on 2026-10-09 for
+`be1508332693a6774ce5e072617029ec4a438faa` (`Fix Worker Free-plan deployment configuration`).
+All five GitHub checks passed: Frontend, Worker, Cloudflare Pages, Workers Builds
+and [staging smoke](https://github.com/czkiii/botond-sleep-tracker/actions/runs/37835678581/job/113514384544).
+The previously cancelled smoke job passed after rerunning. A separate direct
+smoke on 2026-10-09 confirmed that every response came from this exact Worker
+commit, health/CORS worked, anonymous family creation/join were blocked and
+account/family/test-plan endpoints required a session. The old failed Cloudflare
+retry targeted `b79c54f`, which still contained the rejected CPU setting.
+Staging migrations 007–010 are applied; production migration, trial activation
+and authenticated two-account acceptance remain separate release gates.
 
 ### A11 trial migration / release ordering (2026-10-07)
 
@@ -298,7 +305,31 @@ explicit staging flags; the manual endpoint is unavailable without the former.
 See `STAGING_ENTITLEMENT_MIGRATION_2026-09-15.md` for the staging migration and
 verification record.
 
-### Sleep reconciliation
+### Account deletion — local implementation, disabled (2026-10-13)
+
+Migration `011_account_deletion.sql` adds guarded deletion/recovery requests,
+minimal erasure receipts and inactive-account entitlement guards. It has **not**
+been applied remotely. The API requires `ACCOUNT_DELETION_ENABLED=true`; the
+frontend separately requires `VITE_ACCOUNT_DELETION=true`. Neither is enabled
+in the checked-in environment configuration.
+
+The implementation supports immediate deletion or at most 30 days of recovery,
+fresh Google proof scoped to a deletion request, personal export and preservation
+of other family members' diaries. A scheduled handler purges up to 50 due requests
+per run. **No cron trigger is configured yet.** Do not enable the feature before
+deploying and monitoring that trigger, applying migration 011, shipping recovery
+UI and provisioning an independent erasure journal. The D1 `erasure_receipts`
+table alone does not survive restoring an older backup; `replayErasure` is a
+maintenance-only primitive, not the external journal integration. Do not disable
+the feature while pending requests need recovery or expiry processing.
+
+Retained trial/billing/deletion data and re-registration policy still need final
+retention decisions. Apple token revocation belongs to the future Apple adapter.
+See [A17 checkpoint and activation sequence](../ACCOUNT_DELETION_CHECKPOINT_2026-10-13.md).
+Validation: 818 tests, both typechecks, frontend build, Worker dry-run, six isolated
+Edge scenarios and the direct web entry passed locally. No deployment performed.
+
+### Sleep reconciliation behavior
 
 When `RECONCILIATION_CONFLICTS=true`, sleep end, patch and delete requests must
 include the family revision last seen by the client as `baseRevision`. A write

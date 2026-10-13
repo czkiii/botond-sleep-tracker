@@ -82,15 +82,15 @@ export class StoreBillingService {
   ) {}
 
   async getOrCreateAccountLink(accountId: string, provider: StoreProvider, now = Date.now()) {
-    const existing = await this.findAccountLink(accountId, provider)
-    if (existing) return existing.external_account_token
-
     const account = await this.db.prepare(
       `SELECT id FROM accounts WHERE id = ? AND status = 'ACTIVE'`
     ).bind(accountId).first<{ id: string }>()
     if (!account) {
       throw new StoreBillingServiceError('ACCOUNT_UNAVAILABLE', 'Active account is required')
     }
+
+    const existing = await this.findAccountLink(accountId, provider)
+    if (existing) return existing.external_account_token
 
     const token = provider === 'APPLE'
       ? this.tokens.appleAccountToken()

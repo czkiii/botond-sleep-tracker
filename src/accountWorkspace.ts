@@ -8,6 +8,29 @@ const LEGACY_SYNC_KEY = 'solemiSleep:sync:v1'
 const DETACHED_FAMILY_KEY = 'solemiSleep:detachedFamily'
 const LAST_SYNC_KEY = 'solemiSleep:lastSyncAt'
 const LAST_INVITE_KEY = 'solemiSleep:lastInvite'
+const PHOTO_ERASURE_KEY = 'solemiSleep:pendingPhotoErasure:v1'
+
+function queuePhotoErasure(refs: string[]) {
+  if (!refs.length) return
+  const previous: unknown = JSON.parse(localStorage.getItem(PHOTO_ERASURE_KEY) || '[]')
+  if (!Array.isArray(previous) || previous.some(ref => typeof ref !== 'string')) throw new Error('PHOTO_ERASURE_QUEUE_INVALID')
+  localStorage.setItem(PHOTO_ERASURE_KEY, JSON.stringify([...new Set([...previous, ...refs])]))
+}
+
+export async function flushPhotoErasure(removePhoto: (ref: string) => Promise<void>) {
+  const queued: unknown = JSON.parse(localStorage.getItem(PHOTO_ERASURE_KEY) || '[]')
+  if (!Array.isArray(queued) || queued.some(ref => typeof ref !== 'string')) throw new Error('PHOTO_ERASURE_QUEUE_INVALID')
+  if (!queued.length) return
+  const retained = photoRefsInRetainedDiaries()
+  if (!retained) throw new Error('PHOTO_REFERENCES_UNAVAILABLE')
+  for (const ref of queued as string[]) {
+    if (!retained.has(ref)) await removePhoto(ref)
+    // Persist progress after each deletion; a failed IndexedDB write remains retryable.
+    const current: string[] = JSON.parse(localStorage.getItem(PHOTO_ERASURE_KEY) || '[]')
+    localStorage.setItem(PHOTO_ERASURE_KEY, JSON.stringify(current.filter(value => value !== ref)))
+  }
+  if (localStorage.getItem(PHOTO_ERASURE_KEY) === '[]') localStorage.removeItem(PHOTO_ERASURE_KEY)
+}
 
 type Workspace = { kind: 'guest' } | { kind: 'account'; accountId: string }
 type WorkspaceSnapshot = {
@@ -222,13 +245,31 @@ export function activateSignedOutWorkspace(deleteAccountData = false) {
     return { changed: false, deletedPhotoRefs: [] as string[] }
   }
   if (current.kind === 'guest') return { changed: false, deletedPhotoRefs: [] as string[] }
-  const photoRefs = deleteAccountData
-    ? loadData().children.flatMap((child) => child.photoRef ? [child.photoRef] : []) : []
+  const photoRefs = deleteAccountData ? snapshotPhotoRefs(currentSnapshot()) : []
+  queuePhotoErasure(photoRefs)
   const guest = savedSnapshot(guestWorkspace) ?? emptySnapshot()
   const changed = switchWorkspace(guestWorkspace, guest, deleteAccountData ? current : undefined)
   const retainedRefs = deleteAccountData ? photoRefsInRetainedDiaries() : null
   return { changed, deletedPhotoRefs: retainedRefs
     ? photoRefs.filter((ref) => !retainedRefs.has(ref)) : [] }
+}
+
+function snapshotPhotoRefs(snapshot: WorkspaceSnapshot | null) {
+  if (!snapshot?.diary) return [] as string[]
+  const data = JSON.parse(snapshot.diary) as { children?: Array<{ photoRef?: string }>; __solemiLocal?: { safetyBackupV1?: { data?: { children?: Array<{ photoRef?: string }> } } } }
+  return [...new Set([...(data.children ?? []), ...(data.__solemiLocal?.safetyBackupV1?.data?.children ?? [])]
+    .flatMap(child => typeof child.photoRef === 'string' ? [child.photoRef] : []))]
+}
+
+export function removeAccountWorkspace(accountId: string) {
+  recoverAccountWorkspaceSwitch()
+  if (getActiveAccountWorkspaceId() === accountId) return activateSignedOutWorkspace(true).deletedPhotoRefs
+  const target: Workspace = { kind: 'account', accountId }
+  const refs = snapshotPhotoRefs(savedSnapshot(target))
+  queuePhotoErasure(refs)
+  localStorage.removeItem(workspaceStorageKey(target))
+  const retained = photoRefsInRetainedDiaries()
+  return retained ? refs.filter(ref => !retained.has(ref)) : []
 }
 
 export function getActiveAccountWorkspaceId() {
