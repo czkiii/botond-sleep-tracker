@@ -3,6 +3,7 @@ import { EntitlementService } from './entitlementService'
 import { TrialService, TrialError } from './trialService'
 import { AccountDeletionService, DeletionError, verifyRecoveryProof } from './accountDeletion'
 import type { DeletionPreview } from './accountDeletion'
+import { deletionJournal } from './deletionJournal'
 import type { TestPlan } from './entitlementService'
 import { buildSha } from './buildIdentity'
 import { offlineEntitlement } from './offlineEntitlement'
@@ -22,6 +23,10 @@ interface Env extends LimitEnv {
   ENTITLEMENT_TEST_MODE?: string
   TRIAL_ENABLED?: string
   ACCOUNT_DELETION_ENABLED?: string
+  ACCOUNT_DELETION_MAINTENANCE?: string
+  DELETION_SOURCE_DATABASE_ID?: string
+  ERASURE_JOURNAL?: D1Database
+  RESTORE_MAINTENANCE?: string
   RECONCILIATION_CONFLICTS?: string
 }
 
@@ -1042,7 +1047,7 @@ function accountAuth(env: Env) {
   if (!env.GOOGLE_CLIENT_ID || !env.AUTH_SECRET || env.AUTH_SECRET.length < 32) {
     throw new ApiError(503, 'AUTH_NOT_CONFIGURED', 'Account sign-in is not configured.')
   }
-  return new AuthService(env.DB, { clientId: env.GOOGLE_CLIENT_ID, secret: env.AUTH_SECRET })
+  return new AuthService(env.DB, { clientId: env.GOOGLE_CLIENT_ID, secret: env.AUTH_SECRET, deletionJournal: deletionJournal(env) })
 }
 
 function requireAllowedAuthOrigin(request: Request, env: Env) {
@@ -1609,7 +1614,7 @@ async function accountAuthRoute(request: Request, env: Env, path: string) {
     if (path.startsWith('/v1/auth/account/')) {
       if (request.method === 'POST') requireAllowedAuthOrigin(request, env)
       if (env.ACCOUNT_DELETION_ENABLED !== 'true') throw new ApiError(404, 'NOT_FOUND')
-      const deletion = new AccountDeletionService(env.DB)
+      const deletion = new AccountDeletionService(env.DB, deletionJournal(env))
       if (request.method === 'POST' && ['/v1/auth/account/restore', '/v1/auth/account/finalize'].includes(path)) {
         const proof = await verifyRecoveryProof(env.AUTH_SECRET!, accountBearer(request))
         const pending = await deletion.pending(proof.accountId)
@@ -1627,6 +1632,7 @@ async function accountAuthRoute(request: Request, env: Env, path: string) {
       if (request.method === 'GET' && path === '/v1/auth/account/deletion-preview') return ok(request, env, await deletion.preview(access.account.id))
       if (request.method === 'GET' && path === '/v1/auth/account/export') return ok(request, env, await deletion.exportAccount(access.account.id))
       if (request.method === 'POST' && path === '/v1/auth/account/delete') {
+        if (env.ACCOUNT_DELETION_MAINTENANCE !== 'true') throw new ApiError(503, 'DELETION_MAINTENANCE_UNAVAILABLE')
         const body = await readJson(request)
         if (!['IMMEDIATE', 'RECOVERY'].includes(String(body.mode)) || !body.preview || typeof body.preview !== 'object') throw new ApiError(400, 'DELETION_INVALID_REQUEST')
         const result = await deletion.request(access.account.id, body.mode as 'IMMEDIATE' | 'RECOVERY',
@@ -1798,9 +1804,13 @@ async function route(request: Request, env: Env) {
 
 export default {
   async scheduled(_event: unknown, env: Env) {
-    if (env.ACCOUNT_DELETION_ENABLED === 'true') await new AccountDeletionService(env.DB).purgeDue()
+    if (env.RESTORE_MAINTENANCE === 'true' || env.ACCOUNT_DELETION_MAINTENANCE !== 'true') return
+    const result = await new AccountDeletionService(env.DB, deletionJournal(env)).maintain()
+    console.log(JSON.stringify({ event: 'deletion_maintenance', ...result }))
+    if (result.failed) throw new Error('DELETION_MAINTENANCE_FAILED')
   },
   async fetch(request: Request, env: Env): Promise<Response> {
+    if (env.RESTORE_MAINTENANCE === 'true') return new Response('Maintenance', { status: 503, headers: { 'Retry-After': '300', 'Cache-Control': 'no-store' } })
     try {
       return await route(request, env)
     } catch (error) {

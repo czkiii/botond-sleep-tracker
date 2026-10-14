@@ -8,7 +8,10 @@ import { AuthService } from '../src/authService'
 import worker from '../src/index'
 import { SignJWT } from 'jose'
 import { StoreBillingService } from '../src/storeBillingService'
+import { D1DeletionJournal } from '../src/deletionJournal'
 
+let journalDb: DatabaseSync, journalBinding: D1Database, journalService: D1DeletionJournal
+let queries = 0
 let db: DatabaseSync, service: AccountDeletionService, binding: D1Database
 const now = 1800000000000, secret = 'test-secret-at-least-32-characters-long'
 function count(table: string) { return Number(db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get()!.n) }
@@ -36,12 +39,122 @@ beforeEach(() => {
   db.exec(readFileSync(new URL('../schema.sql', import.meta.url), 'utf8'))
   for (const file of readdirSync(new URL('../migrations/', import.meta.url)).filter(x=>x.endsWith('.sql') && x >= '003').sort())
     db.exec(readFileSync(new URL(`../migrations/${file}`, import.meta.url), 'utf8'))
-  binding=sqliteBinding(db); service=new AccountDeletionService(binding)
+    journalDb = new DatabaseSync(':memory:')
+  journalDb.exec(readFileSync(new URL('../erasure-journal/schema.sql', import.meta.url),'utf8'))
+  journalDb.exec("INSERT INTO journal_identity VALUES (1,'staging','source-db')")
+  queries = 0
+  journalBinding = sqliteBinding(journalDb,()=>queries++)
+  journalService = new D1DeletionJournal(journalBinding,'staging','source-db')
+  binding=sqliteBinding(db,()=>queries++); service=new AccountDeletionService(binding,journalService)
   account('a'); account('b')
 })
-afterEach(()=>db.close())
+afterEach(()=>{db.close(); journalDb.close()})
 
 describe('A17 account erasure and recovery',()=>{
+  it('bounds the SQL count for immediate erasure and a full maintenance run below the Free ceiling',async()=>{
+    family(); device()
+    const preview=await service.preview('a')
+    queries=0
+    await service.request('a','IMMEDIATE',preview,'Family',now)
+    // Keep headroom for HTTP authentication; batch statements count individually here.
+    expect(queries).toBeLessThanOrEqual(44)
+    await service.request('b','RECOVERY',await service.preview('b'),'',now)
+    for(let i=0;i<51;i++) db.prepare('INSERT INTO auth_challenges VALUES (?,?,?)').run('old'+i,now-2,now-1)
+    queries=0
+    await service.maintain(now+RECOVERY_MS)
+    expect(queries).toBeLessThanOrEqual(44)
+    expect(count('auth_challenges')).toBe(1)
+  })
+  it('requires an independent journal before accepting a deletion', async()=>{
+    const unconfigured = new AccountDeletionService(binding)
+    await expect(unconfigured.request('a','IMMEDIATE',await service.preview('a'),'',now)).rejects.toThrow('DELETION_JOURNAL_UNAVAILABLE')
+    expect(count('account_deletions')).toBe(0)
+  })
+  it('does not erase before the independent journal confirms, and resumes after outage', async()=>{
+    family()
+    const r = await service.request('a','RECOVERY',await service.preview('a'),'Family',now)
+    const offline = new AccountDeletionService(binding,{async write(){throw new Error('offline')}})
+    await expect(offline.finalize(r.requestId,now+1)).rejects.toThrow('offline')
+    expect(count('children')).toBe(1)
+    await expect(service.restore('a',r.requestId,now+2)).rejects.toThrow('RECOVERY_UNAVAILABLE')
+    await service.finalize(r.requestId,now+3)
+    expect(count('children')).toBe(0)
+    expect(journalDb.prepare('SELECT state,resolved_at FROM deletion_journal').get()).toEqual({state:'ERASE',resolved_at:now+1})
+  })
+  it('records the irreversible decision before a failed local purge, idempotently',async()=>{
+    family()
+    const r=await service.request('a','RECOVERY',await service.preview('a'),'Family',now)
+    db.exec("CREATE TRIGGER failure BEFORE DELETE ON children BEGIN SELECT RAISE(ABORT,'failed'); END")
+    await expect(service.finalize(r.requestId,now+1)).rejects.toThrow('failed')
+    expect(journalDb.prepare('SELECT state FROM deletion_journal').get()!.state).toBe('ERASE')
+    await expect(service.restore('a',r.requestId,now+2)).rejects.toThrow('RECOVERY_UNAVAILABLE')
+    db.exec('DROP TRIGGER failure')
+    await service.maintain(now+3)
+    expect(count('children')).toBe(0)
+    expect(journalDb.prepare('SELECT COUNT(*) AS n FROM deletion_journal').get()!.n).toBe(1)
+  })
+  it('resumes a recovery chosen before expiry after journal outage, without a conflicting purge',async()=>{
+    const r=await service.request('a','RECOVERY',await service.preview('a'),'',now)
+    const offline=new AccountDeletionService(binding,{async write(){throw new Error('offline')}})
+    await expect(offline.restore('a',r.requestId,now+1)).rejects.toThrow('offline')
+    await expect(service.finalize(r.requestId,now+2)).rejects.toThrow('RECOVERY_IN_PROGRESS')
+    expect(await service.maintain(now+RECOVERY_MS+1)).toMatchObject({processed:1,failed:0,dueRemaining:0})
+    expect(db.prepare("SELECT status FROM accounts WHERE id='a'").get()!.status).toBe('ACTIVE')
+    expect(journalDb.prepare('SELECT state,resolved_at FROM deletion_journal').get()).toEqual({state:'RESTORE',resolved_at:now+1})
+  })
+  it('retries an unacknowledged request whose initial journal write failed',async()=>{
+    const offline=new AccountDeletionService(binding,{async write(){throw new Error('offline')}})
+    await expect(offline.request('a','RECOVERY',await service.preview('a'),'',now)).rejects.toThrow('offline')
+    expect(journalDb.prepare('SELECT COUNT(*) AS n FROM deletion_journal').get()!.n).toBe(0)
+    await service.maintain(now+1)
+    expect(journalDb.prepare('SELECT state FROM deletion_journal').get()!.state).toBe('PENDING')
+    expect((await service.pending('a'))?.purge_after).toBe(now+RECOVERY_MS)
+  })
+  it('rejects another environment journal and prevents journal changes after resolution',async()=>{
+    const wrong = new AccountDeletionService(binding,new D1DeletionJournal(journalBinding,'production','source-db'))
+    await expect(wrong.request('a','RECOVERY',await service.preview('a'),'',now)).rejects.toThrow('DELETION_JOURNAL_IDENTITY_MISMATCH')
+    const pending=await service.pending('a')
+    await service.finalize(pending!.id,now+1)
+    expect(()=>journalDb.exec("UPDATE deletion_journal SET state='RESTORE'")).toThrow('JOURNAL_IMMUTABLE')
+    expect(()=>journalDb.exec('DELETE FROM deletion_journal')).toThrow('JOURNAL_APPEND_ONLY')
+  })
+  it('limits each maintenance run and lets later accounts proceed after a failure',async()=>{
+    await service.request('a','RECOVERY',await service.preview('a'),'',now)
+    await service.request('b','RECOVERY',await service.preview('b'),'',now+1)
+    db.exec("CREATE TRIGGER broken BEFORE DELETE ON account_identities WHEN OLD.account_id='a' BEGIN SELECT RAISE(ABORT,'failed'); END")
+    expect(await service.maintain(now+RECOVERY_MS+2)).toMatchObject({processed:0,failed:1,dueRemaining:2})
+    expect(await service.maintain(now+RECOVERY_MS+3)).toMatchObject({processed:1,failed:0,dueRemaining:1})
+    expect(db.prepare("SELECT status FROM accounts WHERE id='b'").get()!.status).toBe('DELETED')
+    expect(db.prepare('SELECT due_remaining FROM deletion_maintenance_runs').get()!.due_remaining).toBe(1)
+  })
+  it('blocks HTTP and scheduled work during a database restore',async()=>{
+    const env={DB:binding,TOKEN_PEPPER:'pepper',ALLOWED_ORIGINS:'https://app.test',RESTORE_MAINTENANCE:'true',ACCOUNT_DELETION_MAINTENANCE:'true'}
+    expect((await worker.fetch(new Request('https://api.test/health'),env)).status).toBe(503)
+    await worker.scheduled({},env)
+    expect(count('deletion_maintenance_runs')).toBe(0)
+  })
+  it('continues accepted deletion work with the UI flag off and fails closed without the journal',async()=>{
+    await service.request('a','RECOVERY',await service.preview('a'),'',Date.now()-RECOVERY_MS-1)
+    const env={DB:binding,TOKEN_PEPPER:'pepper',ALLOWED_ORIGINS:'https://app.test',ACCOUNT_DELETION_ENABLED:'false',
+      ACCOUNT_DELETION_MAINTENANCE:'true',ERASURE_JOURNAL:journalBinding,SOLEMI_ENVIRONMENT:'staging',DELETION_SOURCE_DATABASE_ID:'source-db'}
+    await expect(worker.scheduled({}, {...env,ERASURE_JOURNAL:undefined})).rejects.toThrow('DELETION_JOURNAL_UNAVAILABLE')
+    expect(db.prepare("SELECT status FROM accounts WHERE id='a'").get()!.status).toBe('DELETION_PENDING')
+    await worker.scheduled({},env)
+    expect(db.prepare("SELECT status FROM accounts WHERE id='a'").get()!.status).toBe('DELETED')
+  })
+  it('makes competing restore and finalization choose exactly one durable decision',async()=>{
+    const r=await service.request('a','RECOVERY',await service.preview('a'),'',now)
+    let release!: ()=>void, started!: ()=>void
+    const ready=new Promise<void>(resolve=>{started=resolve})
+    const wait=new Promise<void>(resolve=>{release=resolve})
+    const slow=new AccountDeletionService(binding,{async write(record){started(); await wait; await journalService.write(record)}})
+    const erase=slow.finalize(r.requestId,now+1)
+    await ready
+    await expect(service.restore('a',r.requestId,now+2)).rejects.toThrow('RECOVERY_UNAVAILABLE')
+    release(); await erase
+    expect(journalDb.prepare('SELECT state FROM deletion_journal').get()!.state).toBe('ERASE')
+    expect(db.prepare("SELECT status FROM accounts WHERE id='a'").get()!.status).toBe('DELETED')
+  })
   it('erases a sole family and identity without resetting its trial ledger', async()=>{
     family(); device()
     const trial = new TrialService(binding)
@@ -178,7 +291,7 @@ describe('A17 account erasure and recovery',()=>{
     db.prepare("UPDATE account_sessions SET created_at=?,expires_at=?").run(time-1000,time+600000)
     const token=await new SignJWT({sid:'s',did:'ad'}).setProtectedHeader({alg:'HS256',typ:'JWT'}).setIssuer('solemi-auth')
       .setAudience('solemi-account').setSubject('a').setIssuedAt(Math.floor(time/1000)).setExpirationTime(Math.floor(time/1000)+300).sign(new TextEncoder().encode(secret))
-    const env={DB:binding,TOKEN_PEPPER:'pepper',ALLOWED_ORIGINS:'https://app.test',GOOGLE_CLIENT_ID:'client',AUTH_SECRET:secret,ACCOUNT_DELETION_ENABLED:'true'}
+    const env={DB:binding,TOKEN_PEPPER:'pepper',ALLOWED_ORIGINS:'https://app.test',GOOGLE_CLIENT_ID:'client',AUTH_SECRET:secret,ACCOUNT_DELETION_ENABLED:'true',ACCOUNT_DELETION_MAINTENANCE:'true',ERASURE_JOURNAL:journalBinding,SOLEMI_ENVIRONMENT:'staging',DELETION_SOURCE_DATABASE_ID:'source-db',API_LIMITER:{limit:async()=>({success:true})},AUTH_LIMITER:{limit:async()=>({success:true})},INVITE_LIMITER:{limit:async()=>({success:true})}}
     const call=(path:string,method='GET',data?:unknown,auth=token,origin='https://app.test')=>worker.fetch(new Request(`https://api.test/v1/auth/account/${path}`,
       {method,headers:{Origin:origin,Authorization:`Bearer ${auth}`,'Content-Type':'application/json'},...(data?{body:JSON.stringify(data)}:{})}),env)
     expect((await call('export','GET',undefined,'bad')).status).toBe(401)

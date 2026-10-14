@@ -1,5 +1,7 @@
 # A17 — fióktörlés és adatkezelés: helyi fejlesztési checkpoint
 
+**Folytatás, 2026-10-14:** az alábbi történeti állapot után az üzemeltetési helyi előkészítés is elkészült. Az aktuális ütemező egy fiókot kezel futásonként; részletek és további feltételek az [új checkpointban](ACCOUNT_DELETION_OPERATIONS_2026-10-13.md). Az előző blokk az `ae8d1db` commitban szerepel.
+
 Dátum: 2026-10-13. Ág: `feat/child-profile-v4`, kiinduló HEAD: `be15083`.
 Feladatszint: GPT-6 Astra · erős. Most nincs tulajdonosi kézi tesztkérés.
 

@@ -1,14 +1,15 @@
 import { DatabaseSync } from 'node:sqlite'
 import type { SQLInputValue } from 'node:sqlite'
 
-export function sqliteBinding(sqlite: DatabaseSync): D1Database {
+export function sqliteBinding(sqlite: DatabaseSync, onQuery: () => void = () => {}) : D1Database {
   class Statement {
     private values: SQLInputValue[] = []
     constructor(private sql: string) {}
     bind(...values: SQLInputValue[]) { this.values = values; return this }
-    async first() { return sqlite.prepare(this.sql).get(...this.values) ?? null }
-    async all() { return { results: sqlite.prepare(this.sql).all(...this.values) } }
+    async first() { onQuery(); return sqlite.prepare(this.sql).get(...this.values) ?? null }
+    async all() { onQuery(); return { results: sqlite.prepare(this.sql).all(...this.values) } }
     async run() {
+      onQuery()
       // D1 counts trigger and foreign-key cascade changes as well as direct writes.
       const totalChanges = () => Number(sqlite.prepare('SELECT total_changes() AS n').get()!.n)
       const before = totalChanges()

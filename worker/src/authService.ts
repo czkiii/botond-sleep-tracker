@@ -4,6 +4,7 @@ import type { AccountRow, SessionAccess } from './accountStore'
 import { verifyGoogleToken } from './googleAuth'
 import type { GoogleIdentity } from './googleAuth'
 import { AccountDeletionService, recoveryProof } from './accountDeletion'
+import type { DeletionJournal } from './deletionJournal'
 
 export const SESSION_MS = 30 * 24 * 60 * 60 * 1000
 export const CHALLENGE_MS = 10 * 60 * 1000
@@ -29,7 +30,7 @@ function publicAccount(account: AccountRow) {
 
 export class AuthService {
   private store: AccountStore
-  constructor(private db: D1Database, private config: { clientId: string; secret: string },
+  constructor(private db: D1Database, private config: { clientId: string; secret: string; deletionJournal?: DeletionJournal },
     private verify: typeof verifyGoogleToken = verifyGoogleToken) {
     this.store = new AccountStore(db)
   }
@@ -59,7 +60,7 @@ export class AuthService {
       account = await this.store.findGoogleAccount(identity.issuer, identity.subject)
     }
     if (account?.status === 'DELETION_PENDING') {
-      const deletion = new AccountDeletionService(this.db)
+      const deletion = new AccountDeletionService(this.db, this.config.deletionJournal)
       const pending = await deletion.pending(account.id)
       if (pending && pending.purge_after > now) {
         throw new AuthError('ACCOUNT_RECOVERY_REQUIRED', 403, {

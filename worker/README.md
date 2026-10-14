@@ -305,29 +305,46 @@ explicit staging flags; the manual endpoint is unavailable without the former.
 See `STAGING_ENTITLEMENT_MIGRATION_2026-09-15.md` for the staging migration and
 verification record.
 
-### Account deletion — local implementation, disabled (2026-10-13)
+### Account deletion — local implementation and operations, disabled (2026-10-14)
 
 Migration `011_account_deletion.sql` adds guarded deletion/recovery requests,
-minimal erasure receipts and inactive-account entitlement guards. It has **not**
-been applied remotely. The API requires `ACCOUNT_DELETION_ENABLED=true`; the
-frontend separately requires `VITE_ACCOUNT_DELETION=true`. Neither is enabled
-in the checked-in environment configuration.
+minimal receipts and inactive-account entitlement guards. Migration 012 adds
+persistent erase/restore decisions, retry state and a maintenance status row.
+Neither migration was applied remotely in this task. Checked-in activation
+flags and remote resources remain unchanged.
 
-The implementation supports immediate deletion or at most 30 days of recovery,
-fresh Google proof scoped to a deletion request, personal export and preservation
-of other family members' diaries. A scheduled handler purges up to 50 due requests
-per run. **No cron trigger is configured yet.** Do not enable the feature before
-deploying and monitoring that trigger, applying migration 011, shipping recovery
-UI and provisioning an independent erasure journal. The D1 `erasure_receipts`
-table alone does not survive restoring an older backup; `replayErasure` is a
-maintenance-only primitive, not the external journal integration. Do not disable
-the feature while pending requests need recovery or expiry processing.
+Immediate deletion or at most 30-day recovery uses a separate D1 binding,
+`ERASURE_JOURNAL`, whose schema is in `erasure-journal/schema.sql`. Its identity
+must match `SOLEMI_ENVIRONMENT` and `DELETION_SOURCE_DATABASE_ID`. It records
+requests and irreversible ERASE/RESTORE decisions before erasure/reactivation;
+retries cannot reverse the chosen outcome. Explicit sequence numbers survive
+SQL export/import. Never restore this journal alongside an older diary backup.
+
+The scheduled handler processes at most one account and 50 expired sessions /
+50 challenges per invocation, with 15-minute retry backoff and aggregate status.
+`ACCOUNT_DELETION_MAINTENANCE=true` is independent of the new-request UI flag.
+New requests require both maintenance and `ACCOUNT_DELETION_ENABLED=true`;
+frontend activation still requires `VITE_ACCOUNT_DELETION=true`. Keep recovery
+available while accepted requests are pending. No remote cron is configured by
+this change. `scripts/prepare-deletion-config.mjs` generates a reviewable local
+candidate with a separate D1 binding and five-minute cron, both flags disabled.
+
+`scripts/prepare-deletion-restore.mjs` processes frozen SQL exports offline,
+replays journal decisions, revokes old credentials and produces a new SQL file
+plus hash report. It requires Node >=24.10 for SQLite authorization that denies
+attached databases, filesystem exports and unsafe pragmas. The full test job
+uses Node 24; the Worker typecheck/package job continues on Node 22.
+`RESTORE_MAINTENANCE=true` blocks HTTP and scheduled processing; operators must
+also freeze other writers and drain in-flight work before exporting the journal.
+The tool does not establish export freshness or deploy a restored database.
 
 Retained trial/billing/deletion data and re-registration policy still need final
 retention decisions. Apple token revocation belongs to the future Apple adapter.
-See [A17 checkpoint and activation sequence](../ACCOUNT_DELETION_CHECKPOINT_2026-10-13.md).
-Validation: 818 tests, both typechecks, frontend build, Worker dry-run, six isolated
-Edge scenarios and the direct web entry passed locally. No deployment performed.
+See [operations, activation and restore runbook](../ACCOUNT_DELETION_OPERATIONS_2026-10-13.md)
+and [earlier UI checkpoint](../ACCOUNT_DELETION_CHECKPOINT_2026-10-13.md).
+Validation: 841 tests, both typechecks, frontend build and staging dry-run passed;
+42 targeted tests cover journals, outage/race recovery, offline CLI and limits.
+No deployment or real account deletion performed.
 
 ### Sleep reconciliation behavior
 
