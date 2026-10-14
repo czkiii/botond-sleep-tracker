@@ -338,8 +338,13 @@ uses Node 24; the Worker typecheck/package job continues on Node 22.
 also freeze other writers and drain in-flight work before exporting the journal.
 The tool does not establish export freshness or deploy a restored database.
 
-Retained trial/billing/deletion data and re-registration policy still need final
-retention decisions. Apple token revocation belongs to the future Apple adapter.
+The owner approved retention and re-registration product rules on 2026-10-14;
+see [the decision record](../A17_RETENTION_DECISIONS_2026-10-14.md). The new
+Google-bound trial marker and deadline-based record cleanup are NOT implemented
+yet. Existing account IDs alone do not prevent a second trial after permanent
+deletion and re-registration. Keep activation disabled until these rules, their
+restore behavior and legal basis are verified. Apple token revocation belongs
+to the future Apple adapter.
 See [operations, activation and restore runbook](../ACCOUNT_DELETION_OPERATIONS_2026-10-13.md)
 and [earlier UI checkpoint](../ACCOUNT_DELETION_CHECKPOINT_2026-10-13.md).
 Validation: 841 tests, both typechecks, frontend build and staging dry-run passed;

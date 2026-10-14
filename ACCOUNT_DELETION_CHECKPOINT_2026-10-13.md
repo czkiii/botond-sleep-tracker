@@ -39,7 +39,9 @@ A Worker-próbák SQLite-on, a migrációkkal ellenőrzik a tényleges SQL-tranz
 
 Ismételhető parancsok: `npm test`, `npm run typecheck`, `npm --prefix worker run typecheck`, `npm run build`, `npm --prefix worker run deploy:staging -- --dry-run`, `npm run test:account-deletion` (Playwright elérési út a gépen a `SOLEMI_PLAYWRIGHT_MODULE` változóval adható meg).
 
-## Trial: egy még nem jóváhagyott részlet
+## Trial: az alábbi rész történeti, a döntés már megszületett
+
+**2026-10-14:** a tulajdonos azonos Google-belépésnél kizárta az új trialt végleges fióktörlés után is; minimális jelölés a trialprogram fennállásáig, éves felülvizsgálattal. [Jóváhagyott szabály és még szükséges implementáció](A17_RETENTION_DECISIONS_2026-10-14.md). Az alábbi bekezdések a korábbi, meghaladott feltételezést dokumentálják.
 
 A korábban elfogadott egyszeri accounttrial és négy családi trial szabálya megmarad. A teljes fióktörlés utáni **új regisztráció összekapcsolásáról** feltett kiegészítő kérdésre még nincs válasz.
 

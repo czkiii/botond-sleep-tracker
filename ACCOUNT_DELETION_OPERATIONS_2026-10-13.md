@@ -4,6 +4,8 @@ Elkezdve: 2026-10-13; helyi lezárás: 2026-10-14 · GPT-6 Astra, erős · kiind
 
 ## Státusz
 
+**Újabb döntési checkpoint:** a megőrzési idők és az újraregisztrációs trialszabály 2026-10-14-én [tulajdonosi jóváhagyást kapott](A17_RETENTION_DECISIONS_2026-10-14.md). A lenti korábbi döntési nyitottságot ez felülírja. A technikai érvényesítés és a távoli aktiválás még nyitott.
+
 Az üzemeltetési **helyi előkészítés elkészült**: külön D1-nyilvántartás adaptere és sémája, megszakításbiztos véglegesítési/helyreállítási döntés, korlátozott ütemezett feldolgozó, konfiguráció-előkészítő, offline mentés-helyreállító és gépi próbák. Távoli adatbázist, cron-feladatot vagy funkciót nem hoztunk létre és nem kapcsoltunk be. Commit/push/deploy nem történt.
 
 Ez a dokumentum az előző [A17 checkpoint](ACCOUNT_DELETION_CHECKPOINT_2026-10-13.md) üzemeltetési hiányait viszi tovább. A végleges megőrzési idők, a törlés utáni újraregisztráció trial-kezelése és az Apple/store-integráció továbbra is külön nyitott feltétel. Kézi felhasználói teszt most nem szükséges.
@@ -88,7 +90,7 @@ Célzott próbák: journal-kiesés mindkét döntésnél, késői újrapróbál�
 
 ## Folytatás és GitHub Desktop
 
-Következő: **A17 végleges adatmegőrzési és trial-újraregisztrációs döntések, tájékoztató-szövegek összehangolása. GPT-6 Astra · erős; kézi app-teszt nem kell, rövid tulajdonosi döntések szükségesek.** Ezután jöhet a külön jóváhagyott staging bekötés és gépi üzemeltetési főpróba. Apple/store és teljes kiadási kapu megmarad.
+Az itt eredetileg következőként jelölt termékegyeztetés [elkészült](A17_RETENTION_DECISIONS_2026-10-14.md). **Következő: A17 — a jóváhagyott trialjelölés és megőrzési határidők technikai érvényesítése. GPT-6 Astra · erős; kézi app-teszt nélkül indítható.** Ezután jöhet a külön jóváhagyott staging bekötés és gépi üzemeltetési főpróba. Apple/store és teljes kiadási kapu megmarad.
 
 Summary: `Prepare independent deletion journal and safe backup recovery`
 

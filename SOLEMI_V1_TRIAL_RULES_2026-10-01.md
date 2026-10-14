@@ -29,9 +29,11 @@ A helyi megvalósításban a tagság önmagában akkor is létrejöhet, ha egy k
 
 ## Meglévő feladatokhoz kapcsolás
 
+**2026-10-14-i tulajdonosi pontosítás:** végleges fióktörlés után ugyanazzal a Google-belépéssel újra regisztrálva nem jár új trial, ha a korábbi már felhasználódott. Elkülönített minimális trialjelölés őrzi ezt; a jelölés az egyszeri trialprogram fennállásáig marad, legalább éves szükségességi felülvizsgálattal; a program megszűnésekor törlendő. Ez célhoz kötött, nem anonim adat, nem jogalap nélküli korlátlan tárolás. A törlés önmagában nem fogyaszt el egy még fel nem használt trialt. A szerveroldali újraregisztráció-védelem még megvalósítandó, távoli aktiválás nem történt. [Aktuális A17 döntések és megvalósítási határ](A17_RETENTION_DECISIONS_2026-10-14.md).
+
 - A11: szerveroldali account- és Family-nyilvántartás, egyszeri aktiválás, párhuzamos kérések és ismétlések elleni atomi védelem; a Solemi-szabály és az Apple/Google trial-jogosultság összehangolása.
 - A04/A16: tagságváltás és hozzáférés kezelése, új vagy párhuzamos trial létrehozása nélkül.
-- A17: accounttörlés és trial-előzmények megőrzésének összhangja; a szükséges adat és megőrzési idő külön meghatározandó, nem vezetünk be korlátlan személyesadat-megőrzést ebből a döntésből.
+- A17: accounttörlés és trial-előzmények megőrzésének összhangja; a szükséges minimális jelölés és a programhoz kötött megőrzés 2026-10-14-én pontosítva; megvalósítás, jogalap és tényleges törlési bizonyíték még szükséges.
 - A23: marketing, paywall és részletes feltételek azonos szabályt közöljenek.
 
 A szabályhoz szükséges próbák a meglévő billing tesztcsomag részei lesznek. Új kézi tesztkört ez a dokumentum nem indít.
