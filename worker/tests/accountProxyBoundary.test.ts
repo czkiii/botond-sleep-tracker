@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
+import { trialRegistryFixture } from './trialRegistryFixture'
 import { onRequest } from '../../functions/api/[[path]]'
 import worker from '../src/index'
 import { AuthService } from '../src/authService'
@@ -12,20 +13,20 @@ const api = 'https://solemi-sleep-sync-staging.czki-adam.workers.dev'
 const mutations = ['google', 'refresh', 'logout', 'test/plan', 'family/claim', 'family/create',
   'family/bootstrap', 'family/join', 'family/leave', 'family/dissolve', 'family/data/clear', 'trial/activate', 'trial/bind',
   'account/delete', 'account/restore', 'account/finalize']
-let db: DatabaseSync, env: Parameters<typeof worker.fetch>[1]
+let db: DatabaseSync, registry: DatabaseSync, env: Parameters<typeof worker.fetch>[1]
 let session: Awaited<ReturnType<AuthService['login']>>, service: AuthService
 let forwarded: ReturnType<typeof vi.fn>
 
 beforeEach(async () => {
   db = new DatabaseSync(':memory:')
   db.exec(readFileSync(new URL('../schema.sql', import.meta.url), 'utf8'))
-  for (const file of ['003_accounts_and_sessions.sql', '004_auth_challenges_and_refresh_history.sql',
-    '005_family_memberships.sql', '006_subscriptions_and_entitlements.sql', '010_account_trials.sql']) {
+  for (const file of readdirSync(new URL('../migrations/', import.meta.url)).filter(x => x.endsWith('.sql') && x >= '003').sort()) {
     db.exec(readFileSync(new URL(`../migrations/${file}`, import.meta.url), 'utf8'))
   }
   env = { DB: sqliteBinding(db), TOKEN_PEPPER: 'test-pepper', ALLOWED_ORIGINS: app,
     AUTH_SECRET: 'local-test-secret-with-at-least-32-characters', GOOGLE_CLIENT_ID: 'test.apps.googleusercontent.com',
     ACCOUNT_FAMILY_BRIDGE: 'true', ENTITLEMENT_ENFORCEMENT: 'true' }
+  const fixture = await trialRegistryFixture(); registry = fixture.db; Object.assign(env, fixture.env)
   service = new AuthService(env.DB, { clientId: env.GOOGLE_CLIENT_ID!, secret: env.AUTH_SECRET! }, async () => ({
     issuer: 'https://accounts.google.com', subject: 'fixture', email: 'fixture@example.test', name: 'Fixture', picture: null
   }))
@@ -33,7 +34,7 @@ beforeEach(async () => {
   forwarded = vi.fn((input: RequestInfo | URL, init?: RequestInit) => worker.fetch(new Request(input, init), env))
   vi.stubGlobal('fetch', forwarded)
 })
-afterEach(() => { db.close(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.resetModules() })
+afterEach(() => { db.close(); registry.close(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.resetModules() })
 
 function request(path: string, headers: HeadersInit = {}, method = 'POST', body = '{}') {
   return new Request(`${app}/api/v1/auth/${path}`, { method,

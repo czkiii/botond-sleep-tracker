@@ -10,6 +10,7 @@ export function deletionConfig(base, journalId) {
     || base.d1_databases.some(db => db.database_id === journalId)) throw new Error('DISTINCT_JOURNAL_DATABASE_REQUIRED')
   if (base.d1_databases.some(db => db.binding === 'ERASURE_JOURNAL')) throw new Error('JOURNAL_ALREADY_CONFIGURED')
   return {...base, vars:{...base.vars, ACCOUNT_DELETION_ENABLED:'false', ACCOUNT_DELETION_MAINTENANCE:'false',
+    RETENTION_MAINTENANCE:'false', TRIAL_IDENTITY_KEY_VERSION:'v1',
     DELETION_SOURCE_DATABASE_ID:primary.database_id},
     triggers:{...base.triggers, crons:[...new Set([...(base.triggers?.crons || []),'*/5 * * * *'])]},
     d1_databases:[...base.d1_databases,{binding:'ERASURE_JOURNAL',database_name:`solemi-erasure-journal-${environment}`,database_id:journalId}]}

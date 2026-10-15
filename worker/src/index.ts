@@ -4,6 +4,8 @@ import { TrialService, TrialError } from './trialService'
 import { AccountDeletionService, DeletionError, verifyRecoveryProof } from './accountDeletion'
 import type { DeletionPreview } from './accountDeletion'
 import { deletionJournal } from './deletionJournal'
+import { trialIdentity, TrialIdentityError } from './trialIdentity'
+import { RetentionService } from './retention'
 import type { TestPlan } from './entitlementService'
 import { buildSha } from './buildIdentity'
 import { offlineEntitlement } from './offlineEntitlement'
@@ -24,6 +26,9 @@ interface Env extends LimitEnv {
   TRIAL_ENABLED?: string
   ACCOUNT_DELETION_ENABLED?: string
   ACCOUNT_DELETION_MAINTENANCE?: string
+  RETENTION_MAINTENANCE?: string
+  TRIAL_IDENTITY_SECRET?: string
+  TRIAL_IDENTITY_KEY_VERSION?: string
   DELETION_SOURCE_DATABASE_ID?: string
   ERASURE_JOURNAL?: D1Database
   RESTORE_MAINTENANCE?: string
@@ -1043,11 +1048,18 @@ async function reusableAccountDeviceMapping(env: Env, access: AccountAccess) {
 
 const REFRESH_COOKIE = 'solemi_refresh'
 
+// Resolve lazily: existing sign-in is available before registry provisioning,
+// but deletion finalization and trial issuance always require the registry.
+function identityGuard(env: Env) {
+  return { ready: () => trialIdentity(env).ready(), used: (id: string) => trialIdentity(env).used(id), preserve: (id: string) => trialIdentity(env).preserve(id) }
+}
+
 function accountAuth(env: Env) {
   if (!env.GOOGLE_CLIENT_ID || !env.AUTH_SECRET || env.AUTH_SECRET.length < 32) {
     throw new ApiError(503, 'AUTH_NOT_CONFIGURED', 'Account sign-in is not configured.')
   }
-  return new AuthService(env.DB, { clientId: env.GOOGLE_CLIENT_ID, secret: env.AUTH_SECRET, deletionJournal: deletionJournal(env) })
+  return new AuthService(env.DB, { clientId: env.GOOGLE_CLIENT_ID, secret: env.AUTH_SECRET,
+    deletionJournal: deletionJournal(env), trialIdentity: identityGuard(env) })
 }
 
 function requireAllowedAuthOrigin(request: Request, env: Env) {
@@ -1614,7 +1626,7 @@ async function accountAuthRoute(request: Request, env: Env, path: string) {
     if (path.startsWith('/v1/auth/account/')) {
       if (request.method === 'POST') requireAllowedAuthOrigin(request, env)
       if (env.ACCOUNT_DELETION_ENABLED !== 'true') throw new ApiError(404, 'NOT_FOUND')
-      const deletion = new AccountDeletionService(env.DB, deletionJournal(env))
+      const deletion = new AccountDeletionService(env.DB, deletionJournal(env), identityGuard(env))
       if (request.method === 'POST' && ['/v1/auth/account/restore', '/v1/auth/account/finalize'].includes(path)) {
         const proof = await verifyRecoveryProof(env.AUTH_SECRET!, accountBearer(request))
         const pending = await deletion.pending(proof.accountId)
@@ -1633,6 +1645,7 @@ async function accountAuthRoute(request: Request, env: Env, path: string) {
       if (request.method === 'GET' && path === '/v1/auth/account/export') return ok(request, env, await deletion.exportAccount(access.account.id))
       if (request.method === 'POST' && path === '/v1/auth/account/delete') {
         if (env.ACCOUNT_DELETION_MAINTENANCE !== 'true') throw new ApiError(503, 'DELETION_MAINTENANCE_UNAVAILABLE')
+        if (env.RETENTION_MAINTENANCE !== 'true') throw new ApiError(503, 'RETENTION_MAINTENANCE_UNAVAILABLE')
         const body = await readJson(request)
         if (!['IMMEDIATE', 'RECOVERY'].includes(String(body.mode)) || !body.preview || typeof body.preview !== 'object') throw new ApiError(400, 'DELETION_INVALID_REQUEST')
         const result = await deletion.request(access.account.id, body.mode as 'IMMEDIATE' | 'RECOVERY',
@@ -1644,13 +1657,13 @@ async function accountAuthRoute(request: Request, env: Env, path: string) {
     if (path === '/v1/auth/trial' && request.method === 'GET') {
       if (env.TRIAL_ENABLED !== 'true') throw new ApiError(404, 'NOT_FOUND')
       const access = await service.authenticate(accountBearer(request))
-      return ok(request, env, await new TrialService(env.DB).state(access.account.id))
+      return ok(request, env, await new TrialService(env.DB, identityGuard(env)).state(access.account.id))
     }
     if (request.method === 'POST' && ['/v1/auth/trial/activate', '/v1/auth/trial/bind'].includes(path)) {
       requireAllowedAuthOrigin(request, env)
       if (env.TRIAL_ENABLED !== 'true') throw new ApiError(404, 'NOT_FOUND')
       const access = await service.authenticate(accountBearer(request))
-      const trial = new TrialService(env.DB)
+      const trial = new TrialService(env.DB, identityGuard(env))
       if (path.endsWith('/bind')) return ok(request, env, await trial.bindToActiveFamily(access.account.id))
       const body = await readJson(request)
       if (!['FAMILY', 'FAMILY_PLUS'].includes(String(body.product)) || typeof body.operationId !== 'string') throw new ApiError(400, 'TRIAL_INVALID_REQUEST')
@@ -1804,8 +1817,16 @@ async function route(request: Request, env: Env) {
 
 export default {
   async scheduled(_event: unknown, env: Env) {
-    if (env.RESTORE_MAINTENANCE === 'true' || env.ACCOUNT_DELETION_MAINTENANCE !== 'true') return
-    const result = await new AccountDeletionService(env.DB, deletionJournal(env)).maintain()
+    if (env.RESTORE_MAINTENANCE === 'true') return
+    // Separate scheduler invocations keep combined SQL below the Free limit.
+    if (env.RETENTION_MAINTENANCE === 'true' && Math.floor(Date.now() / 300000) % 3 !== 0) {
+      if (!env.ERASURE_JOURNAL || !env.SOLEMI_ENVIRONMENT || !env.DELETION_SOURCE_DATABASE_ID) throw new Error('RETENTION_NOT_CONFIGURED')
+      const result = await new RetentionService(env.DB, env.ERASURE_JOURNAL, env.SOLEMI_ENVIRONMENT, env.DELETION_SOURCE_DATABASE_ID).maintain()
+      console.log(JSON.stringify({ event: 'retention_maintenance', ...result }))
+      return
+    }
+    if (env.ACCOUNT_DELETION_MAINTENANCE !== 'true') return
+    const result = await new AccountDeletionService(env.DB, deletionJournal(env), identityGuard(env)).maintain()
     console.log(JSON.stringify({ event: 'deletion_maintenance', ...result }))
     if (result.failed) throw new Error('DELETION_MAINTENANCE_FAILED')
   },
@@ -1820,6 +1841,7 @@ export default {
         return response
       }
       if (error instanceof ApiError) return fail(request, env, error)
+      if (error instanceof TrialIdentityError) return fail(request, env, new ApiError(503, error.message))
       // Provider/DB errors can contain SQL values or credentials.
       console.error('SOLEMI_INTERNAL_ERROR')
       return fail(request, env, new ApiError(500, 'INTERNAL_ERROR', 'Unexpected server error.'))

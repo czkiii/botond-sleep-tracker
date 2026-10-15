@@ -9,6 +9,7 @@ import worker from '../src/index'
 import { SignJWT } from 'jose'
 import { StoreBillingService } from '../src/storeBillingService'
 import { D1DeletionJournal } from '../src/deletionJournal'
+import { trialDigest } from '../src/trialIdentity'
 
 let journalDb: DatabaseSync, journalBinding: D1Database, journalService: D1DeletionJournal
 let queries = 0
@@ -34,7 +35,7 @@ function device() {
   db.exec(`INSERT INTO account_family_devices VALUES ('ad','a','f','d',1,1);
     INSERT INTO invite_codes VALUES ('invite','f','d','date','z',NULL);`)
 }
-beforeEach(() => {
+beforeEach(async () => {
   db = new DatabaseSync(':memory:')
   db.exec(readFileSync(new URL('../schema.sql', import.meta.url), 'utf8'))
   for (const file of readdirSync(new URL('../migrations/', import.meta.url)).filter(x=>x.endsWith('.sql') && x >= '003').sort())
@@ -42,6 +43,9 @@ beforeEach(() => {
     journalDb = new DatabaseSync(':memory:')
   journalDb.exec(readFileSync(new URL('../erasure-journal/schema.sql', import.meta.url),'utf8'))
   journalDb.exec("INSERT INTO journal_identity VALUES (1,'staging','source-db')")
+  journalDb.exec(readFileSync(new URL('../erasure-journal/002_retention.sql', import.meta.url), 'utf8'))
+  journalDb.prepare('INSERT INTO trial_program VALUES (1,1,?,?,?,NULL)')
+    .run('v1', await trialDigest('independent-trial-secret-at-least-32-bytes', 'solemi:trial-key-check:v1'), now)
   queries = 0
   journalBinding = sqliteBinding(journalDb,()=>queries++)
   journalService = new D1DeletionJournal(journalBinding,'staging','source-db')
@@ -116,7 +120,7 @@ describe('A17 account erasure and recovery',()=>{
     const pending=await service.pending('a')
     await service.finalize(pending!.id,now+1)
     expect(()=>journalDb.exec("UPDATE deletion_journal SET state='RESTORE'")).toThrow('JOURNAL_IMMUTABLE')
-    expect(()=>journalDb.exec('DELETE FROM deletion_journal')).toThrow('JOURNAL_APPEND_ONLY')
+    expect(()=>journalDb.exec('DELETE FROM deletion_journal')).toThrow('JOURNAL_RETENTION_REQUIRED')
   })
   it('limits each maintenance run and lets later accounts proceed after a failure',async()=>{
     await service.request('a','RECOVERY',await service.preview('a'),'',now)
@@ -136,7 +140,8 @@ describe('A17 account erasure and recovery',()=>{
   it('continues accepted deletion work with the UI flag off and fails closed without the journal',async()=>{
     await service.request('a','RECOVERY',await service.preview('a'),'',Date.now()-RECOVERY_MS-1)
     const env={DB:binding,TOKEN_PEPPER:'pepper',ALLOWED_ORIGINS:'https://app.test',ACCOUNT_DELETION_ENABLED:'false',
-      ACCOUNT_DELETION_MAINTENANCE:'true',ERASURE_JOURNAL:journalBinding,SOLEMI_ENVIRONMENT:'staging',DELETION_SOURCE_DATABASE_ID:'source-db'}
+      ACCOUNT_DELETION_MAINTENANCE:'true',ERASURE_JOURNAL:journalBinding,SOLEMI_ENVIRONMENT:'staging',DELETION_SOURCE_DATABASE_ID:'source-db',
+      TRIAL_IDENTITY_SECRET:'independent-trial-secret-at-least-32-bytes',TRIAL_IDENTITY_KEY_VERSION:'v1'}
     await expect(worker.scheduled({}, {...env,ERASURE_JOURNAL:undefined})).rejects.toThrow('DELETION_JOURNAL_UNAVAILABLE')
     expect(db.prepare("SELECT status FROM accounts WHERE id='a'").get()!.status).toBe('DELETION_PENDING')
     await worker.scheduled({},env)
@@ -291,7 +296,7 @@ describe('A17 account erasure and recovery',()=>{
     db.prepare("UPDATE account_sessions SET created_at=?,expires_at=?").run(time-1000,time+600000)
     const token=await new SignJWT({sid:'s',did:'ad'}).setProtectedHeader({alg:'HS256',typ:'JWT'}).setIssuer('solemi-auth')
       .setAudience('solemi-account').setSubject('a').setIssuedAt(Math.floor(time/1000)).setExpirationTime(Math.floor(time/1000)+300).sign(new TextEncoder().encode(secret))
-    const env={DB:binding,TOKEN_PEPPER:'pepper',ALLOWED_ORIGINS:'https://app.test',GOOGLE_CLIENT_ID:'client',AUTH_SECRET:secret,ACCOUNT_DELETION_ENABLED:'true',ACCOUNT_DELETION_MAINTENANCE:'true',ERASURE_JOURNAL:journalBinding,SOLEMI_ENVIRONMENT:'staging',DELETION_SOURCE_DATABASE_ID:'source-db',API_LIMITER:{limit:async()=>({success:true})},AUTH_LIMITER:{limit:async()=>({success:true})},INVITE_LIMITER:{limit:async()=>({success:true})}}
+    const env={DB:binding,TOKEN_PEPPER:'pepper',ALLOWED_ORIGINS:'https://app.test',GOOGLE_CLIENT_ID:'client',AUTH_SECRET:secret,ACCOUNT_DELETION_ENABLED:'true',ACCOUNT_DELETION_MAINTENANCE:'true',RETENTION_MAINTENANCE:'true',TRIAL_IDENTITY_SECRET:'independent-trial-secret-at-least-32-bytes',TRIAL_IDENTITY_KEY_VERSION:'v1',ERASURE_JOURNAL:journalBinding,SOLEMI_ENVIRONMENT:'staging',DELETION_SOURCE_DATABASE_ID:'source-db',API_LIMITER:{limit:async()=>({success:true})},AUTH_LIMITER:{limit:async()=>({success:true})},INVITE_LIMITER:{limit:async()=>({success:true})}}
     const call=(path:string,method='GET',data?:unknown,auth=token,origin='https://app.test')=>worker.fetch(new Request(`https://api.test/v1/auth/account/${path}`,
       {method,headers:{Origin:origin,Authorization:`Bearer ${auth}`,'Content-Type':'application/json'},...(data?{body:JSON.stringify(data)}:{})}),env)
     expect((await call('export','GET',undefined,'bad')).status).toBe(401)

@@ -1,31 +1,28 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
+import { trialRegistryFixture } from './trialRegistryFixture'
 import worker from '../src/index'
 import { sqliteBinding } from './sqliteD1'
 import { SignJWT } from 'jose'
 
 const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8')
-const migrations = ['003_accounts_and_sessions.sql', '004_auth_challenges_and_refresh_history.sql',
-  '005_family_memberships.sql', '006_subscriptions_and_entitlements.sql', '010_account_trials.sql']
+const migrations = readdirSync(new URL('../migrations/', import.meta.url)).filter(x => x.endsWith('.sql') && x >= '003').sort()
   .map((name) => readFileSync(new URL(`../migrations/${name}`, import.meta.url), 'utf8')).join('\n')
 const origin = 'https://solemi-sleep-internal.pages.dev'
-let sqlite: DatabaseSync
-let env: { DB: D1Database; TOKEN_PEPPER: string; ALLOWED_ORIGINS: string;
-  SOLEMI_ENVIRONMENT?: string;
-  GOOGLE_CLIENT_ID?: string; AUTH_SECRET?: string; ACCOUNT_FAMILY_BRIDGE?: string;
-  ENTITLEMENT_ENFORCEMENT?: string; ENTITLEMENT_TEST_MODE?: string; TRIAL_ENABLED?: string;
-  RECONCILIATION_CONFLICTS?: string }
+let sqlite: DatabaseSync, registry: DatabaseSync
+let env: Parameters<typeof worker.fetch>[1]
 
-beforeEach(() => {
+beforeEach(async () => {
   sqlite = new DatabaseSync(':memory:')
   sqlite.exec(schema)
   sqlite.exec(migrations)
   env = { DB: sqliteBinding(sqlite), TOKEN_PEPPER: 'test-pepper', ALLOWED_ORIGINS: origin,
     GOOGLE_CLIENT_ID: 'solemi.apps.googleusercontent.com',
     AUTH_SECRET: 'test-secret-with-at-least-32-characters', ACCOUNT_FAMILY_BRIDGE: 'true' }
+  const fixture = await trialRegistryFixture(); registry = fixture.db; Object.assign(env, fixture.env)
 })
-afterEach(() => sqlite.close())
+afterEach(() => { sqlite.close(); registry.close() })
 
 function fetch(path: string, init: RequestInit = {}) {
   return worker.fetch(new Request(`https://sync.example${path}`, init), env)
@@ -43,6 +40,8 @@ async function accountAccess(accountId: string, deviceId: string, suffix: string
     (id, email, display_name, avatar_url, locale, status, created_at, updated_at, last_login_at, deleted_at)
     VALUES (?, ?, NULL, NULL, NULL, 'ACTIVE', ?, ?, ?, NULL)`)
     .run(accountId, `${accountId}@example.com`, now, now, now)
+  sqlite.prepare(`INSERT OR IGNORE INTO account_identities VALUES (?,?,'GOOGLE','https://accounts.google.com',?,?,1,?,?)`)
+    .run('identity-' + accountId, accountId, accountId, `${accountId}@example.com`, now, now)
   sqlite.prepare(`INSERT INTO account_devices
     (id, account_id, installation_hash, credential_hash, name, platform, created_at, last_seen_at, revoked_at, revoke_reason)
     VALUES (?, ?, ?, ?, 'Test browser', 'WEB', ?, ?, NULL, NULL)`)
@@ -86,6 +85,16 @@ describe('A11 authenticated trial routes', () => {
   const headers = (token: string) => ({ Origin: origin, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' })
   const activate = (token: string, body = { product: 'FAMILY_PLUS', operationId: 'route-request' }) => fetch('/v1/auth/trial/activate', {
     method: 'POST', headers: headers(token), body: JSON.stringify(body) })
+  it('fails closed at the HTTP boundary when the independent registry is missing or its key changes', async () => {
+    env.TRIAL_ENABLED = 'true'
+    const token = await accountAccess('trial-owner', 'trial-device', 'trial-session')
+    const original = env.ERASURE_JOURNAL
+    env.ERASURE_JOURNAL = undefined
+    expect((await activate(token)).status).toBe(503)
+    env.ERASURE_JOURNAL = original; env.TRIAL_IDENTITY_SECRET += '-wrong'
+    expect((await activate(token)).status).toBe(503)
+    expect(sqlite.prepare('SELECT * FROM account_trials').all()).toEqual([])
+  })
   it('is disabled by default, requires authentication and validates product/request ID', async () => {
     const token = await accountAccess('trial-owner', 'trial-device', 'trial-session')
     expect((await activate(token)).status).toBe(404)

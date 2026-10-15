@@ -1,4 +1,5 @@
 import type { SubscriptionProduct } from './billingContract'
+import type { TrialIdentityGuard } from './trialIdentity'
 
 export const TRIAL_MS = 7 * 24 * 60 * 60 * 1000
 export const FAMILY_TRIAL_LIMIT = 4
@@ -8,7 +9,7 @@ export class TrialError extends Error {
   constructor(readonly code: string) { super(code) }
 }
 export class TrialService {
-  constructor(private readonly db: D1Database) {}
+  constructor(private readonly db: D1Database, private readonly identity?: TrialIdentityGuard) {}
   private row(accountId: string) {
     return this.db.prepare('SELECT * FROM account_trials WHERE account_id = ?').bind(accountId).first<TrialRow>()
   }
@@ -18,7 +19,8 @@ export class TrialService {
       .bind(accountId).first<{ family_id: string }>()
     const usage = family ? await this.db.prepare(`SELECT COUNT(*) AS used, MAX(ends_at) AS busy_until FROM account_trials WHERE family_id = ?`)
       .bind(family.family_id).first<{ used: number; busy_until: number | null }>() : null
-    return { used: Boolean(trial), usageOrigin: trial?.origin ?? null, trial: trial?.origin === 'SOLEMI' && trial.ends_at !== null ? { product: trial.product, startedAt: trial.started_at, endsAt: trial.ends_at,
+    const previouslyUsed = this.identity ? await this.identity.used(accountId) : false
+    return { used: Boolean(trial) || previouslyUsed, usageOrigin: trial?.origin ?? null, trial: trial?.origin === 'SOLEMI' && trial.ends_at !== null ? { product: trial.product, startedAt: trial.started_at, endsAt: trial.ends_at,
       familyId: trial.family_id, activationFamilyId: trial.activation_family_id, origin: trial.origin,
       active: trial.origin === 'SOLEMI' && trial.started_at <= now && trial.ends_at > now } : null,
       family: family ? { familyId: family.family_id, used: usage?.used ?? 0, limit: FAMILY_TRIAL_LIMIT,
@@ -27,6 +29,11 @@ export class TrialService {
   async activate(accountId: string, product: SubscriptionProduct, operationId: string, now = Date.now()) {
     if (!['FAMILY', 'FAMILY_PLUS'].includes(product) || !/^[a-zA-Z0-9_-]{8,100}$/.test(operationId)
       || !Number.isSafeInteger(now) || now < 0) throw new TrialError('TRIAL_INVALID_REQUEST')
+    if (this.identity) {
+      const gate = await this.db.prepare('SELECT blocked FROM retention_restore_gate WHERE id = 1').first<{ blocked: number }>()
+      if (!gate || gate.blocked) throw new TrialError('TRIAL_RESTORE_RECONCILIATION_REQUIRED')
+      if (await this.identity.used(accountId) && !await this.row(accountId)) throw new TrialError('TRIAL_ACCOUNT_USED')
+    }
     // One SQL write reads the current server-side membership and consumes both
     // limits under SQLite's write serialization. Never trust a client Family ID.
     try {
@@ -52,6 +59,11 @@ export class TrialService {
     return this.state(accountId, now)
   }
   async bindToActiveFamily(accountId: string, now = Date.now()) {
+    if (this.identity) {
+      await this.identity.used(accountId) // validates the independent programme, including outages/end
+      const gate = await this.db.prepare('SELECT blocked FROM retention_restore_gate WHERE id = 1').first<{ blocked: number }>()
+      if (!gate || gate.blocked) throw new TrialError('TRIAL_RESTORE_RECONCILIATION_REQUIRED')
+    }
     // Explicit retry for an initially busy Family. Extends neither the original
     // seven-day deadline nor the old Family's access; an existing binding is final.
     await this.db.prepare(`UPDATE account_trials SET family_id =

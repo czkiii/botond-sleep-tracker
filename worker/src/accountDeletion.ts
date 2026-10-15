@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify } from 'jose'
 import type { DeletionJournal, JournalRecord } from './deletionJournal'
+import type { TrialIdentityGuard } from './trialIdentity'
 
 export const RECOVERY_MS = 30 * 24 * 60 * 60 * 1000
 const encoder = new TextEncoder()
@@ -12,7 +13,7 @@ type Deletion = { id: string; account_id: string; requested_at: number; purge_af
 export type DeletionPreview = { accountId: string; family: Family | null }
 
 export class AccountDeletionService {
-  constructor(private db: D1Database, private journal?: DeletionJournal) {}
+  constructor(private db: D1Database, private journal?: DeletionJournal, private trialIdentity?: TrialIdentityGuard) {}
 
   private async record(row: Deletion, state: 'PENDING' | 'ERASE' | 'RESTORE') {
     if (!this.journal) throw new DeletionError('DELETION_JOURNAL_UNAVAILABLE', 503)
@@ -41,6 +42,7 @@ export class AccountDeletionService {
     if (family && (!Number.isSafeInteger(family.revision) || !Number.isSafeInteger(family.members)
       || family.members < 1 || typeof family.id !== 'string' || typeof family.name !== 'string')) throw new DeletionError('DELETION_INVALID_REQUEST', 400)
     if (family?.members === 1 && confirmedFamilyName !== family.name) throw new DeletionError('FAMILY_NAME_REQUIRED', 400)
+    await this.trialIdentity?.ready?.()
     const id = requestId, due = now + (mode === 'RECOVERY' ? RECOVERY_MS : 0), iso = new Date(now).toISOString()
     const guard = `EXISTS (SELECT 1 FROM account_deletions WHERE id = ? AND state = 'PENDING')`
     // The snapshot is checked inside the same transaction as every state change.
@@ -126,6 +128,9 @@ export class AccountDeletionService {
     row = await this.db.prepare('SELECT * FROM account_deletions WHERE id = ?').bind(requestId).first<Deletion>()
     if (!row || row.state !== 'PENDING') return
     if (row.resolution !== 'ERASE') throw new DeletionError('RECOVERY_IN_PROGRESS')
+    // Preserve consumed eligibility before the raw identity disappears; an
+    // independent-registry failure leaves the suspended account retryable.
+    await this.trialIdentity?.preserve(row.account_id)
     // Independent durable intent precedes physical erasure. Never erase first and log later.
     await this.record(row, 'ERASE')
     const guard = `EXISTS (SELECT 1 FROM account_deletions WHERE id = ? AND state = 'FINALIZED' AND finalized_at = ?)`

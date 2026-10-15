@@ -60,8 +60,16 @@ function dump(sqlite) {
   return output.join('\n') + '\n'
 }
 
-export async function prepareDeletionRestore({backup, journal, environment, sourceDatabaseId, now = Date.now()}) {
+export async function prepareDeletionRestore({backup, journal, environment, sourceDatabaseId, metadata, now = Date.now()}) {
   if (!['staging','production'].includes(environment) || !sourceDatabaseId) throw new Error('RESTORE_IDENTITY_REQUIRED')
+  // Original creation time, not download/copy time. Old deletion evidence can
+  // expire only because accepted backups are bounded and the journal is fresh.
+  if (!metadata || metadata.environment !== environment || metadata.sourceDatabaseId !== sourceDatabaseId
+    || metadata.backupSha256 !== digest(backup) || metadata.journalSha256 !== digest(journal)
+    || !Number.isSafeInteger(metadata.backupCreatedAt) || metadata.backupCreatedAt < 0
+    || metadata.backupCreatedAt > now || metadata.backupCreatedAt + 2592000000 <= now
+    || !Number.isSafeInteger(metadata.journalCapturedAt) || metadata.journalCapturedAt > now
+    || metadata.journalCapturedAt < now - 300000) throw new Error('RESTORE_RETENTION_METADATA_INVALID')
   const db = isolatedDatabase(), log = isolatedDatabase()
   try {
     db.exec(backup); log.exec(journal)
@@ -102,21 +110,26 @@ export async function prepareDeletionRestore({backup, journal, environment, sour
     db.exec(`UPDATE account_sessions SET revoked_at=COALESCE(revoked_at,${now});
       UPDATE devices SET revoked_at=COALESCE(revoked_at,'${new Date(now).toISOString()}');
       DELETE FROM invite_codes; DELETE FROM auth_challenges;`)
+    // Erasure replay alone cannot establish the latest family allowance or
+    // billing state. The prepared copy must pass business-ledger reconciliation.
+    db.exec('UPDATE retention_restore_gate SET blocked = 1 WHERE id = 1; DELETE FROM account_entitlements;')
     if (db.prepare('PRAGMA foreign_key_check').all().length) throw new Error('RESTORE_INTEGRITY_FAILED')
     const sql = dump(db)
-    return {sql, report: {format:'solemi-deletion-restore-v1', environment, sourceDatabaseId, preparedAt:now,
+    return {sql, report: {format:'solemi-deletion-restore-v2', environment, sourceDatabaseId, preparedAt:now,
+      backupCreatedAt:metadata.backupCreatedAt, journalCapturedAt:metadata.journalCapturedAt,
       backupSha256:digest(backup), journalSha256:digest(journal), outputSha256:digest(sql),
-      journalRecords:records.length, affectedAccounts:latest.size, remoteApplied:false}}
+      journalRecords:records.length, affectedAccounts:latest.size, businessReconciliationRequired:true, remoteApplied:false}}
   } finally { db.close(); log.close() }
 }
 
 async function main() {
-  const [backup, journal, environment, sourceDatabaseId, output, acknowledgement] = process.argv.slice(2)
-  if (!backup || !journal || !output || acknowledgement !== '--traffic-frozen')
-    throw new Error('Usage: prepare-deletion-restore.mjs backup.sql journal.sql staging|production source-db-id output.sql --traffic-frozen')
+  const [backup, journal, environment, sourceDatabaseId, output, metadata, acknowledgement] = process.argv.slice(2)
+  if (!backup || !journal || !output || !metadata || acknowledgement !== '--traffic-frozen')
+    throw new Error('Usage: prepare-deletion-restore.mjs backup.sql journal.sql staging|production source-db-id output.sql metadata.json --traffic-frozen')
   const outputPath = resolve(output), reportPath = outputPath + '.report.json'
   if ([resolve(backup),resolve(journal)].includes(outputPath) || existsSync(outputPath) || existsSync(reportPath)) throw new Error('OUTPUT_MUST_BE_NEW')
-  const result = await prepareDeletionRestore({backup:readFileSync(backup,'utf8'),journal:readFileSync(journal,'utf8'),environment,sourceDatabaseId})
+  const result = await prepareDeletionRestore({backup:readFileSync(backup,'utf8'),journal:readFileSync(journal,'utf8'),environment,sourceDatabaseId,
+    metadata:JSON.parse(readFileSync(metadata,'utf8'))})
   // Exclusive files: an interrupted report/output pair is never an approved artifact.
   writeFileSync(outputPath,result.sql,{flag:'wx',mode:0o600})
   writeFileSync(reportPath,JSON.stringify(result.report,null,2),{flag:'wx',mode:0o600})

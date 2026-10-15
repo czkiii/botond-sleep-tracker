@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { DatabaseSync } from 'node:sqlite'
+import { createHash } from 'node:crypto'
 // @ts-expect-error Operational Node script intentionally remains executable without transpilation.
 import { prepareDeletionRestore } from '../scripts/prepare-deletion-restore.mjs'
 // @ts-expect-error Operational Node script.
@@ -29,10 +30,26 @@ function journal(state = 'ERASE', family: string | null = 'f') {
     INSERT INTO journal_identity VALUES (1,'staging','source-db');
     INSERT INTO deletion_journal VALUES (2,'request','a',${family === null ? 'NULL' : "'"+family+"'"},${now-100},${now-100+duration},'${state}',${state==='PENDING'?'NULL':now-1});`
 }
-const prepare = (b=backup(), j=journal()) => prepareDeletionRestore({backup:b,journal:j,environment:'staging',sourceDatabaseId:'source-db',now})
+const metadata = (b: string, j: string, at = now) => ({ environment:'staging', sourceDatabaseId:'source-db',
+  backupCreatedAt:at-86400000, journalCapturedAt:at, backupSha256:createHash('sha256').update(b).digest('hex'),
+  journalSha256:createHash('sha256').update(j).digest('hex') })
+const prepare = (b=backup(), j=journal()) => prepareDeletionRestore({backup:b,journal:j,environment:'staging',sourceDatabaseId:'source-db',metadata:metadata(b,j),now})
 function inspect(sql: string, fn: (db: DatabaseSync)=>void) { const db=new DatabaseSync(':memory:'); try { db.exec(sql); fn(db) } finally { db.close() } }
 
 describe('offline erasure-aware restore preparation',()=>{
+  it('rejects missing/stale metadata, 30-day-old backups and stale independent journal captures', async () => {
+    const b = backup(), j = journal(), base = metadata(b, j)
+    for (const meta of [undefined, { ...base, backupCreatedAt: now - duration },
+      { ...base, journalCapturedAt: now - 300001 }, { ...base, backupSha256: 'wrong' }, { ...base, sourceDatabaseId: 'other' }]) {
+      await expect(prepareDeletionRestore({ backup:b, journal:j, environment:'staging', sourceDatabaseId:'source-db', metadata:meta, now }))
+        .rejects.toThrow('RESTORE_RETENTION_METADATA_INVALID')
+    }
+  })
+  it('locks old trial/paid grants until current business history is reconciled', async () => {
+    const result = await prepare()
+    inspect(result.sql, db => expect(db.prepare('SELECT blocked FROM retention_restore_gate').get()!.blocked).toBe(1))
+    expect(result.report.businessReconciliationRequired).toBe(true)
+  })
   it('rejects attached databases, filesystem exports and unsafe pragmas in either SQL input',async()=>{
     for (const sql of ["ATTACH DATABASE ':memory:' AS other;", "VACUUM INTO ':memory:';", 'PRAGMA writable_schema=ON;']) {
       await expect(prepare(sql+backup())).rejects.toThrow()
@@ -53,14 +70,15 @@ describe('offline erasure-aware restore preparation',()=>{
   })
   it('runs the actual offline CLI and never overwrites an existing prepared artifact',()=>{
     const directory=mkdtempSync(join(tmpdir(),'solemi-erasure-'))
-    const input=join(directory,'backup.sql'), external=join(directory,'journal.sql'), output=join(directory,'prepared.sql')
+    const input=join(directory,'backup.sql'), external=join(directory,'journal.sql'), output=join(directory,'prepared.sql'), meta=join(directory,'metadata.json')
     try {
       writeFileSync(input,backup())
       // Fixtures must be in the past relative to the real CLI clock.
       const clock=Date.now()
       writeFileSync(external,journal().replaceAll(String(now-100),String(clock-2000))
         .replaceAll(String(now-100+duration),String(clock-2000+duration)).replaceAll(String(now-1),String(clock-1000)))
-      const args=[fileURLToPath(new URL('../scripts/prepare-deletion-restore.mjs',import.meta.url)),input,external,'staging','source-db',output,'--traffic-frozen']
+      writeFileSync(meta, JSON.stringify(metadata(readFileSync(input,'utf8'),readFileSync(external,'utf8'),clock)))
+      const args=[fileURLToPath(new URL('../scripts/prepare-deletion-restore.mjs',import.meta.url)),input,external,'staging','source-db',output,meta,'--traffic-frozen']
       const result=spawnSync(process.execPath,args,{encoding:'utf8'})
       expect(result.status,result.stderr).toBe(0)
       const prepared=readFileSync(output,'utf8')

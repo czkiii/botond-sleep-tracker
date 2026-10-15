@@ -1,9 +1,9 @@
 # Solemi Sleep — adatkezelési tájékoztató
 
 Kiadásra előkészített V1 tervezet — MÉG NEM PUBLIKÁLHATÓ VÉGLEGESKÉNT
-Utolsó frissítés: 2026-10-14
+Utolsó frissítés: 2026-10-15
 
-Belső kiadási megjegyzés: a megőrzési és trialtermékszabályokat a tulajdonos jóváhagyta. A szöveg a kiadási célállapotot írja le; az újraregisztrációs trialvédelem, a retention-takarítás és a távoli üzemeltetési beállítások még nem igazoltak. A jogalapok, a szükségességi vizsgálat, a kötelező bizonylatmegőrzés és az adatkezelő adatai még véglegesítendők. [Döntések és megvalósítási határ](A17_RETENTION_DECISIONS_2026-10-14.md).
+Belső kiadási megjegyzés: a megőrzési és trialtermékszabályokat a tulajdonos jóváhagyta. A szöveg a kiadási célállapotot írja le; az újraregisztrációs trialvédelem és retention helyi gépi próbái sikeresek, de a távoli üzemeltetés és a teljes helyreállítás még nem igazolt. Lásd a [helyi technikai checkpoint](A17_RETENTION_IMPLEMENTATION_2026-10-15.md) dokumentumot. A jogalapok, a szükségességi vizsgálat, a kötelező bizonylatmegőrzés és az adatkezelő adatai még véglegesítendők. [Döntések és megvalósítási határ](A17_RETENTION_DECISIONS_2026-10-14.md).
 
 FIGYELEM – KIADÁS ELŐTT KITÖLTENDŐ ADATOK
 [ADATKEZELŐ HIVATALOS NEVE]
@@ -393,4 +393,4 @@ infrastruktúrával össze kell vetni.
 
 A trialjelölés jogos érdekére javasolt hivatkozás kiadás előtt dokumentált szükségességi és érdekmérlegelési vizsgálatot igényel; nem tekintjük ezt automatikusan megadott jogalapnak. Az érintetti tiltakozást/törlési kérelmet egyedileg kell elbírálni, nem utasítható el általánosan az egyszeri trialra hivatkozva. A szolgáltatók, a gyermekadatok tényleges kezelése és a platformos funkciók a kiadott változattal egyeztetendők.
 
-A 30/90 nap és 24 hónap tulajdonosi termékdöntés, nem jogszabályból levezetett általános határidő. Jelenleg az ezeknek megfelelő technikai takarítás és az újraregisztrációs védelem még hiányzik; a tervezet ezért nem publikálható működő szolgáltatás ígéreteként.
+A 30/90 nap és 24 hónap tulajdonosi termékdöntés, nem jogszabályból levezetett általános határidő. A technikai védelem helyi része elkészült; a távoli bekötés, helyreállítási főpróba és kiadási jogi ellenőrzés nélkül a tervezet továbbra sem publikálható működő szolgáltatás ígéreteként.

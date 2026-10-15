@@ -4,7 +4,7 @@ Elkezdve: 2026-10-13; helyi lezárás: 2026-10-14 · GPT-6 Astra, erős · kiind
 
 ## Státusz
 
-**Újabb döntési checkpoint:** a megőrzési idők és az újraregisztrációs trialszabály 2026-10-14-én [tulajdonosi jóváhagyást kapott](A17_RETENTION_DECISIONS_2026-10-14.md). A lenti korábbi döntési nyitottságot ez felülírja. A technikai érvényesítés és a távoli aktiválás még nyitott.
+**Újabb döntési checkpoint:** a megőrzési idők és az újraregisztrációs trialszabály 2026-10-14-én [tulajdonosi jóváhagyást kapott](A17_RETENTION_DECISIONS_2026-10-14.md). A lenti korábbi döntési nyitottságot ez felülírja. A technikai folytatás helyi eredménye és a módosult restore-parancs a 2026-10-15-i [helyi technikai checkpoint](A17_RETENTION_IMPLEMENTATION_2026-10-15.md) dokumentumban található. A távoli aktiválás és a teljes üzleti restore-egyeztetés még nyitott; a lenti parancsleírás történeti.
 
 Az üzemeltetési **helyi előkészítés elkészült**: külön D1-nyilvántartás adaptere és sémája, megszakításbiztos véglegesítési/helyreállítási döntés, korlátozott ütemezett feldolgozó, konfiguráció-előkészítő, offline mentés-helyreállító és gépi próbák. Távoli adatbázist, cron-feladatot vagy funkciót nem hoztunk létre és nem kapcsoltunk be. Commit/push/deploy nem történt.
 

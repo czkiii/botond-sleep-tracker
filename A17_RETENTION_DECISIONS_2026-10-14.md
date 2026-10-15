@@ -1,5 +1,7 @@
 # A17 — megőrzési döntések és trial újraregisztráció után
 
+**2026-10-15-i technikai folytatás:** [helyi technikai checkpoint](A17_RETENTION_IMPLEMENTATION_2026-10-15.md). A lentebb szereplő „még nem készült el” megjegyzések a döntéskori állapotot írják le; a jelenlegi implementáció és a még nyitott restore/üzemeltetési kapu az új checkpointban szerepel.
+
 Dátum: 2026-10-14. Kiinduló commit: `406d0f2`. Státusz: az alábbi öt termékdöntés a beszélgetésben jóváhagyva; a tájékoztatók egyeztetése elkészült. Nem jogi jóváhagyás és nem technikai aktiválás.
 
 ## Már jóváhagyott pontosítás

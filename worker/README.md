@@ -336,15 +336,12 @@ attached databases, filesystem exports and unsafe pragmas. The full test job
 uses Node 24; the Worker typecheck/package job continues on Node 22.
 `RESTORE_MAINTENANCE=true` blocks HTTP and scheduled processing; operators must
 also freeze other writers and drain in-flight work before exporting the journal.
-The tool does not establish export freshness or deploy a restored database.
+The v2 tool requires hash-bound creation/capture metadata, rejects backups at least 30 days old and journal captures over five minutes old, and does not deploy anything. Metadata dates must come from trusted operator records. It sets a persistent business-reconciliation gate and removes stale grants; importing its SQL alone does not authorize reopening traffic.
 
-The owner approved retention and re-registration product rules on 2026-10-14;
-see [the decision record](../A17_RETENTION_DECISIONS_2026-10-14.md). The new
-Google-bound trial marker and deadline-based record cleanup are NOT implemented
-yet. Existing account IDs alone do not prevent a second trial after permanent
-deletion and re-registration. Keep activation disabled until these rules, their
-restore behavior and legal basis are verified. Apple token revocation belongs
-to the future Apple adapter.
+The owner approved retention rules on 2026-10-14. The local implementation is now in
+[the 2026-10-15 runbook](../A17_RETENTION_IMPLEMENTATION_2026-10-15.md): main DB migration 013, independent journal migration 002, a separate HMAC key/programme identity, conditional erasure-journal cleanup, calendar-based billing retention, managed-file expiry tools, and HU/EN/DE deletion copy. New deletion requests require RETENTION_MAINTENANCE as well as the existing deletion maintenance flag. The candidate generator keeps all flags off.
+
+Full business-ledger reconciliation after restore, remote key/DB/cron provisioning, actual provider/file retention schedules and legal validation remain release gates. The restore report explicitly requires business reconciliation; never clear its gate merely because SQL import succeeded. Apple token revocation and verified dispute-event wiring belong to the store integration.
 See [operations, activation and restore runbook](../ACCOUNT_DELETION_OPERATIONS_2026-10-13.md)
 and [earlier UI checkpoint](../ACCOUNT_DELETION_CHECKPOINT_2026-10-13.md).
 Validation: 841 tests, both typechecks, frontend build and staging dry-run passed;
