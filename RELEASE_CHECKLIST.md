@@ -1,16 +1,18 @@
 # Solemi Sleep — belső verziótól a kiadásig
 
-Utolsó frissítés: 2026-10-15
+Utolsó frissítés: 2026-10-16
 
-## Irányadó végrehajtási sorrend — tulajdonosi pontosítás, 2026-10-03
+**Aktuális tulajdonosi sorrend és készültség:** [2026-10-16-i teljes összegzés](RELEASE_OVERVIEW_2026-10-16.md). Hat lezárható munkablokkba rendezi a meglévő feladatokat. Csomagolás előtt külön eredmény a `feat/child-profile-v4 → main` összevonás és az egy meglévő, napi használatú felhasználó adatainak próbált migrációja. A történeti auditbizonyítékok megmaradnak; nyitott jelölő nem jelent újrakezdendő fejlesztést.
+
+## Irányadó végrehajtási sorrend — tulajdonosi pontosítás, 2026-10-16
 
 A korábbi munkablokk-felsorolás nem végrehajtási sorrend. Előbb a jelenlegi appot fejezzük be; Android/iOS csomagolás csak utána indul. A meglévő auditpontok tartalma megmarad, új feladatot ez a rendezés nem ad hozzá.
 
 1. **A jelenlegi app javításainak befejezése:** A22 első megnyitás, A04/A05/A06/A16/A18/A19 megmaradt helyi gépi részei elkészültek; 2026-10-05-én az A20 alváskonfliktus-összehasonlítás és billentyűzetes/fókuszkezelés is. 2026-10-07-én az A23 csomagígéret-felmérés és PDF-export, majd az A11 szerveroldali trial-szabályok helyi blokkja elkészült; az A11 dokumentációja 2026-10-08-án lezárva. A kiadási és valódi készülékes kapuk megmaradnak. Az A17 helyi fióktörlés/helyreállítás/adatexport és trialelőzmény-kezelés gépi blokkja 2026-10-13-án elkészült; 2026-10-14-én a független törlési journal, ütemező és offline restore helyi előkészítése is elkészült. A megőrzési/trialtermékdöntések 2026-10-14-én elfogadva; a jelölés és retention helyi gépi blokkja 2026-10-15-én elkészült (874/874 teszt). Üzleti restore-egyeztetés, távoli bekötés/főpróba és jogi véglegesítés maradt. Kész javítást nem kezdünk újra.
 2. **A V1 tartalmának véglegesítése, még csomagolás előtt:** PDF, csomagleírások/árak, paywall és szerveroldali trial-szabályok; fióktörlés és adatkezelés meglévő kódjának, specifikációjának és szövegeinek összevetése, majd csak a hiányok pótlása. A helyi napló törlését, családmegszüntetést és teljes accounttörlést külön kell igazolni; nem feltételezünk sem teljes hiányt, sem teljes készültséget.
-3. **A kész webes verzió összevont elfogadása:** meglévő gépi eredmények felhasználása, az előkészített A27 telefonos kör és a ténylegesen hiányzó kiadási próbák, amikor a tulajdonos ráér. M1–M6 nem ismétlendő.
+3. **Main-átállás, majd a kész webes verzió összevont elfogadása:** előbb a main két saját commitjának és a jelenlegi felhasználó környezetének leltára, friss mentés, másolatos V3→V4/URL-/fiókátállási próba és visszaút; ezek és a szükséges üzemeltetési feltételek után jóváhagyott merge és külön vezérelt kiadás. Utána a főtesztben a meglévő gépi eredmények, az előkészített A27 telefonos kör és a ténylegesen hiányzó kiadási próbák összegyűjtése. A production buildből a belső tesztcsík és tesztvezérlők kimaradnak; valódi hibajelzés nem törölhető kozmetikai okból. M1–M6 nem ismétlendő. Részletes átállási lépések az aktuális összegzésben.
 4. **Android/iOS csomagolás és platformintegráció:** telepíthető csomagok, natív belépés és valódi store-vásárlás/visszaállítás bekötése, platformos próbák. A store-tól függő részek csak itt véglegesíthetők; a csomagígéretek és a trial termékszabályai már előtte rögzítendők.
-5. **Éles környezet és áruházi beadás lezárása:** domain/config, migráció és visszaállítás, support és store-adatlapok, majd jóváhagyott kiadás. Az ehhez szükséges helyi előkészítés korábban is végezhető.
+5. **Áruházi beadás és indulás lezárása:** store-adatlapok, platformos bizonyítékok, support/monitoring és jóváhagyott kiadás. A main-es felhasználó biztonságos átállásához szükséges domain/config, migráció, mentés és visszaállítás már a 3. pont előfeltétele; nem halasztjuk ezeket a csomagolás utánra.
 
 A fióktörlés/adatkezelés tulajdonosi visszajelzés szerint részben már megvan; a következő ide tartozó munkát a meglévő eredmények leltárával kezdjük. Nyitott auditjelölés önmagában nem jelent teljesen új fejlesztést. A sorrend a kiadási bizonyítékokat nem helyettesíti.
 
@@ -39,8 +41,8 @@ vagy kifejezett, indokolt termékdöntés kell; a puszta priorizálás nem lezá
 - [ ] **[GPT-6 Sol · high]** A05 — Fiókváltás/guest kapcsolat és helyi adatok elkülönítése. Implementáció és `3665d25` commit/push kész. Stagingen külön vendégfelület, tényleges vendégátvételi kérdés és a B-fiók helyes Boti/1799 naplója igazolt. `71f5846` normál Chrome-ban 2026-09-28-án a függő változás kijelentkezés/visszalépés után visszatért, blokkolásfeloldáskor feltöltődött, F5 után is Próbababa függő / 1 alvás / friss szinkron látszik. M4 funkcionális kör lezárva vegyes bizonyítékkal: az InPrivate újraindítás miatt kimaradt vendégmarker-visszaút és az A→B→A elkülönítés gépi lefedettsége külön nevesített; 7/7 accountWorkspace teszt PASS. Az A05 helyi gépi része 2026-10-04-én elkészült: félbemaradt helyi fióktörlés és vendégátvétel helyreállítása, közösen hivatkozott profilkép megőrzése, 6 új próba; teljes 612/612 teszt, frontend typecheck, internal build PASS. [A05 checkpoint](ACCOUNT_WORKSPACE_CHECKPOINT_2026-10-04.md). A jelölő a friss javítás kiadásáig és a valódi újratelepítési/telefonos környezet igazolásáig nyitott. Az árva helyi képfájlok megszakított aszinkron törlése külön adatkezelési auditpont. [M4 tesztnapló](MANUAL_ACCEPTANCE_2026-09-26.md).
 - [ ] **[GPT-6 Astra · high]** A06 — Legacy API fizetős sync-megkerülés lezárása, kompatibilis átállás. Implementáció, regresszió és `eac16ef` commit/push kész: enforcement mellett kötelező account+device+membership+családi entitlement; atomi, fizetős accountos családlétrehozás; raw legacy create/join/sync és invite tiltás; meglévő család adatvesztés nélküli claimje. 2026-10-04: a megmaradt helyi gépi rész kész; eszközlekérés/leválasztás accountos tagságvédelme és az érvénytelen session téves 500 válasza javítva. Free saját eszközkezelés, grant-időhatárok és nem üres legacy napló megőrzése igazolt. 16 új próba, teljes 628/628 teszt, két typecheck és internal build PASS. [A06 checkpoint](FAMILY_ACCESS_CHECKPOINT_2026-10-04.md). Az új javítás kiadása és azonosított staging ellenőrzése még nyitott; most tulajdonosi tesztelés nem szükséges.
 - [ ] **[GPT-6 Astra · high]** A07 — Production config/auth-proxy/entitlement és tesztkapcsolók elkülönítése. Helyi kiadási kapu és Free alapállapot elkészült: GitHub Pages production build blokkolva; a proxy éles hoston nem hív staginget; production Worker hiányos vagy tesztmódú konfigurációval 503-at ad. Frontend és Worker typecheck, 27 fájl / 232 teszt sikeres. Éles Cloudflare Pages host, OAuth origin/cookie, Worker secrets, D1 migráció és mobilos elfogadás még nyitott.
-- [ ] **[GPT-6 Astra · high]** A08 — Billing eseményverseny és sorrend javítása. Helyi atomi event-ütközésvédelem, visszavonás elsőbbsége és párhuzamos első vásárlás regressziói kész; a `008_billing_event_order.sql` csak helyben tesztelt, távoli D1-en nincs alkalmazva. Provider-szintű állapotverzió és éles adapteres verify/webhook/restore elfogadás hiányzik.
-- [ ] **[GPT-6 Astra · high]** A09 — Google linked-token csere és régi grantok visszavonása. Helyi atomi grant-visszavonás és a még nem ismert régi token tombstone-ja kész (`009_google_token_replacements.sql`); távoli D1-migráció, valódi Play API/RTDN és store elfogadás hiányzik.
+- [ ] **[GPT-6 Astra · high]** A08 — Billing eseményverseny és sorrend javítása. Helyi atomi event-ütközésvédelem, visszavonás elsőbbsége és párhuzamos első vásárlás regressziói kész; a `008_billing_event_order.sql` a 2026-10-08-i dokumentált staging 007–010 migráció részeként alkalmazva. Production alkalmazás, provider-szintű állapotverzió és éles adapteres verify/webhook/restore elfogadás hiányzik.
+- [ ] **[GPT-6 Astra · high]** A09 — Google linked-token csere és régi grantok visszavonása. Helyi atomi grant-visszavonás és a még nem ismert régi token tombstone-ja kész (`009_google_token_replacements.sql`); staging alkalmazása 2026-10-08-án dokumentálva. Production migráció, valódi Play API/RTDN és store elfogadás hiányzik.
 - [ ] **[GPT-6 Astra · high]** A10 — Store sandbox/production környezeti kerítés. A helyi billing service kötelező szerveroldali környezetet vár, más környezet snapshotját elutasítja és a meglévő provider-azonosító környezetét nem engedi átírni. Az Apple/Google adapteres bundle/package/product ellenőrzés, a külön D1 és a store sandbox/production elfogadás továbbra is nyitott.
 - [ ] **[GPT-6 Astra · high]** A11 — Hiteles store verify/restore/webhook/acknowledgement és paywall. A [trial-szabály](SOLEMI_V1_TRIAL_RULES_2026-10-01.md) helyi szerveres része elkészült: egyszer 7 nap accountonként, legfeljebb négy trial Familynként, egyszerre egy aktív; család nélküli kezdés után egyszeri kötés a maradék idővel, átvitel és újraindítás nélkül. 791/791 teszt, két typecheck, Worker dry-run és elkülönített helyi D1-migráció PASS. [A11 checkpoint](TRIAL_RULES_CHECKPOINT_2026-10-07.md). Az aktiválás nincs bekapcsolva; a trialt olvasó Worker kiadása előtt a 010 migráció kötelező, kikapcsolt trial mellett is. A korábbi store-trialok összehangolása, a bolti bekötés/paywall és a kiadási ellenőrzés továbbra is nyitott. Most kézi teszt nem szükséges.
 - [ ] **[GPT-6 Astra · high]** A12 — Valós natív iOS/Android kiadás és megfelelő iOS-login.
@@ -61,7 +63,7 @@ vagy kifejezett, indokolt termékdöntés kell; a puszta priorizálás nem lezá
 - [ ] **[GPT-6 Astra · high]** A27 — S01–S15 helyi javításai és az összevont gépi előkészítés kész: 569/569 teszt, teljes statisztikai böngészőcsomag PASS. Közös 162 alvásos napló és háromblokkos telefonos terv elkészült. A célzott valódi telefonos elfogadás még nyitott; [közös elfogadás](A27_COMMON_ACCEPTANCE_2026-10-03.md), [gépi checkpoint](A27_ACCEPTANCE_PREPARATION_CHECKPOINT_2026-10-03.md).
 
 **Jelenlegi döntés: nyilvános fizetős kiadás még nem engedhető tovább.**
-Az audit 185 meglévő tesztje és buildjei sikeresek, de a fenti feladatok nyitottak.
+Az audit indulásakor 185 teszt volt; a legutóbbi dokumentált helyi csomag 874/874 sikeres tesztet tartalmaz. Ez nem helyettesíti a fenti kiadási bizonyítékokat.
 A részletes jelentés megkülönbözteti a bizonyított hibát a további próbát igénylő
 kockázattól. A történeti pipák nem jelentik az auditpontok lezárását.
 
@@ -260,8 +262,8 @@ eltéréseit az A23 pontban, tételes döntéssel kell lezárni.
   - [x] Közös proof-only provider contract, állapotmátrix és célzott helyi tesztek.
   - [x] Apple/Google/Capacitor integrációs sorrend és kötelező tesztmátrix dokumentálása (`STORE_BILLING_INTEGRATION_PLAN.md`).
   - [x] Additív billing account-link és store-state D1 persistence helyben (`007_store_billing_state.sql`; távoli D1-en még nincs alkalmazva).
-  - [x] Additív eseménysorrend-követés helyben (`008_billing_event_order.sql`; távoli D1-en még nincs alkalmazva).
-  - [x] Google linked-token tombstone és régi grantok atomi lezárása helyben (`009_google_token_replacements.sql`; távoli D1-en még nincs alkalmazva).
+  - [x] Additív eseménysorrend-követés (`008_billing_event_order.sql`; staging alkalmazás 2026-10-08-án dokumentálva, production még külön kapu).
+  - [x] Google linked-token tombstone és régi grantok atomi lezárása (`009_google_token_replacements.sql`; staging alkalmazás 2026-10-08-án dokumentálva, production még külön kapu).
   - [ ] **[GPT-6 Astra · high]** Teljesen idempotens, időrendvédett snapshot-alkalmazás: a soros tesztek sikeresek, de A08–A10 auditjavítás szükséges a párhuzamosság, linked token és környezeti kerítés miatt.
   - [ ] **[GPT-6 Astra · high]** StoreKit 2 adapter és App Store Server Notifications V2.
   - [ ] **[GPT-6 Astra · high]** Play Billing 9.x adapter, acknowledgement és RTDN.
@@ -290,15 +292,17 @@ engedélyez automatikus halasztást. A meglévő Prediction kommunikációját i
 
 ## G. Éles kiadás — csak külön jóváhagyással
 
+A main-es webes átállás szükséges lépései csomagolás előtt történnek a [2026-10-16-i terv](RELEASE_OVERVIEW_2026-10-16.md) szerint. Az alábbi pontok ellenőrzőlista, nem automatikusan végrehajtandó parancssorrend; a pontos sorrendet a kompatibilitási főpróba rögzíti.
+
 - [ ] **[GPT-6 Sol · high]** Release commit SHA véglegesítése és megjelölése.
 - [ ] **[GPT-6 Astra · high]** Távoli production D1 mentése. 2026-09-20-i ellenőrzött pillanatfelvétel elkészült; a tényleges migráció előtt friss export kötelező.
 - [ ] **[GPT-6 Astra · high]** `worker/migrations/002_children_v4.sql` alkalmazása production D1-en.
-- [ ] **[GPT-6 Astra · high]** Az aktuális production séma alapján az account/billing 003–007 szükséges migrációinak jóváhagyott sorrendje; előbb staging restore és kompatibilitási próba (A25).
+- [ ] **[GPT-6 Astra · high]** Friss production sémaleltár alapján az aktuális release-ig szükséges migrációk jóváhagyott sorrendje (a forrás most 013-ig tartalmaz migrációt, külön törlési nyilvántartási sémával); előbb elkülönített restore és kompatibilitási próba (A17/A25). Nem alkalmazunk vakon egy régi 003–007-es listát.
 - [ ] **[GPT-6 Astra · high]** Worker deploy pontosan a release commitból.
 - [ ] **[GPT-6 Sol · high]** Production Worker smoke test.
 - [ ] **[GPT-6 Astra · high]** PR review és draft állapot megszüntetése.
 - [ ] **[GPT-6 Astra · high]** PR merge a `main` ágba.
-- [ ] **[GPT-6 Sol · high]** GitHub Pages production deploy ellenőrzése.
+- [ ] **[GPT-6 Astra · high]** A jóváhagyott production Cloudflare Pages/domain/proxy kiadás ellenőrzése, a régi GitHub Pages URL és helyi napló átviteli útjával együtt. A jelenlegi új production konfiguráció nem támogatja a régi GitHub Pages kiadást.
 - [ ] **[GPT-6 Sol · high]** Production smoke test: új telepítés, upgrade, start/stop, multi-child és Family Sync.
 - [ ] **[GPT-6 Sol · high]** Monitoring az első kiadási időszakban.
 - [ ] **[GPT-6 Astra · high]** Szükség esetén dokumentált rollback végrehajtása.
