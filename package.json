@@ -12,6 +12,7 @@
     "test:pwa": "node scripts/check-pwa-lifecycle.mjs",
     "test:account-access": "node scripts/check-account-access.mjs",
     "test:account-deletion": "node scripts/check-account-deletion.mjs",
+    "test:recovery": "vitest run worker/tests/businessRestore.test.ts worker/tests/deletionRestore.test.ts worker/tests/retention.test.ts worker/tests/retainedFiles.test.ts worker/tests/accountDeletion.test.ts worker/tests/retentionRehearsal.test.ts",
     "test:security": "node scripts/check-security-headers.mjs",
     "test:family-join": "node scripts/check-family-bootstrap.mjs",
     "test:child-deletion": "node scripts/check-child-deletion.mjs",

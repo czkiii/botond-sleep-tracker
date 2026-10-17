@@ -7,8 +7,8 @@ import { createHash } from 'node:crypto'
 import { createRequire } from 'node:module'
 const require = createRequire(import.meta.url)
 
-function digest(text) { return createHash('sha256').update(text).digest('hex') }
-function isolatedDatabase() {
+export function digest(text) { return createHash('sha256').update(text).digest('hex') }
+export function isolatedDatabase() {
   if (typeof DatabaseSync.prototype.setAuthorizer !== 'function') throw new Error('RESTORE_REQUIRES_NODE_24_10_OR_NEWER')
   const database = new DatabaseSync(':memory:', {allowExtension: false})
   database.setAuthorizer((action, first, second) => {
@@ -46,7 +46,7 @@ function literal(value) {
   if (value instanceof Uint8Array) return "X'" + Buffer.from(value).toString('hex') + "'"
   throw new Error('UNSUPPORTED_SQL_VALUE')
 }
-function dump(sqlite) {
+export function dump(sqlite) {
   const objects = sqlite.prepare("SELECT type,name,sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY type='table' DESC,name").all()
   const output = ['PRAGMA foreign_keys=OFF;']
   for (const object of objects.filter(x => x.type === 'table')) {
@@ -108,6 +108,7 @@ export async function prepareDeletionRestore({backup, journal, environment, sour
     for (const row of latest.values()) await service.replayJournal(row, now)
     // Backup credentials must not revive even for otherwise unaffected accounts.
     db.exec(`UPDATE account_sessions SET revoked_at=COALESCE(revoked_at,${now});
+      UPDATE account_devices SET revoked_at=${now}, revoke_reason='SECURITY' WHERE revoked_at IS NULL;
       UPDATE devices SET revoked_at=COALESCE(revoked_at,'${new Date(now).toISOString()}');
       DELETE FROM invite_codes; DELETE FROM auth_challenges;`)
     // Erasure replay alone cannot establish the latest family allowance or

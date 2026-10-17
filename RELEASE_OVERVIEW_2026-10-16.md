@@ -2,6 +2,8 @@
 
 Dátum: 2026-10-16. Tulajdonosi kérésre készült összegzés, nem új funkciólista.
 
+**Az összegzés utáni A17 előrelépés, 2026-10-17:** a helyi üzleti restore-egyeztetés után a távoli staging olvasási leltára és az egy Worker/három próba-DB elkülönített előkészítése is kész. 899/899 teszt és két konfiguráció dry-run PASS. Következő a konkrét elkülönített távoli főpróba, nem újabb általános tervezés. [Leltár és végrehajtási csomag](A17_STAGING_REHEARSAL_PREPARATION_2026-10-17.md). A tényleges bekötés/aktiválás nyitott. Az alábbi pillanatfelvétel az eredeti összegzés készítésekor érvényes állapotot őrzi.
+
 Ez a dokumentum az aktuális sorrend összefoglalója. A részletes bizonyítékokat a [kiadási ellenőrzőlista](RELEASE_CHECKLIST.md) és a hivatkozott checkpointok őrzik; a régi „következő feladat” bejegyzések történetiek. Az új sorrend nem minősít korábban nyitott kaput teljesítettnek.
 
 ## Hol tartunk?
