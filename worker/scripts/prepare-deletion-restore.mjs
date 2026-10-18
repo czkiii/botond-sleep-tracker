@@ -13,13 +13,22 @@ export function isolatedDatabase() {
   const database = new DatabaseSync(':memory:', {allowExtension: false})
   database.setAuthorizer((action, first, second) => {
     if (action === constants.SQLITE_ATTACH || action === constants.SQLITE_DETACH) return constants.SQLITE_DENY
-    if (action === constants.SQLITE_PRAGMA && !['foreign_keys','defer_foreign_keys','integrity_check','quick_check','foreign_key_check'].includes(first))
+    if (action === constants.SQLITE_PRAGMA && !['foreign_keys','defer_foreign_keys','integrity_check','quick_check','foreign_key_check','foreign_key_list'].includes(first))
       return constants.SQLITE_DENY
     if (action === constants.SQLITE_FUNCTION && second === 'load_extension') return constants.SQLITE_DENY
     return constants.SQLITE_OK
   })
   return database
 }
+export function loadSqlExport(database, sql) {
+  // Cloudflare exports can create referenced unique indexes after table data.
+  // Only the isolated import has foreign keys off; validate before any replay.
+  database.exec('PRAGMA foreign_keys=OFF;')
+  try { database.exec(sql) } finally { database.exec('PRAGMA foreign_keys=ON;') }
+  if (database.prepare('PRAGMA foreign_keys').get().foreign_keys !== 1
+    || database.prepare('PRAGMA foreign_key_check').all().length) throw new Error('RESTORE_INTEGRITY_FAILED')
+}
+
 function binding(sqlite) {
   const prepare = sql => {
     let values = []
@@ -72,7 +81,7 @@ export async function prepareDeletionRestore({backup, journal, environment, sour
     || metadata.journalCapturedAt < now - 300000) throw new Error('RESTORE_RETENTION_METADATA_INVALID')
   const db = isolatedDatabase(), log = isolatedDatabase()
   try {
-    db.exec(backup); log.exec(journal)
+    loadSqlExport(db, backup); loadSqlExport(log, journal)
     const identity = log.prepare('SELECT * FROM journal_identity WHERE id=1').get()
     if (!identity || identity.environment !== environment || identity.source_database_id !== sourceDatabaseId)
       throw new Error('RESTORE_IDENTITY_MISMATCH')
@@ -105,7 +114,28 @@ export async function prepareDeletionRestore({backup, journal, environment, sour
     const {AccountDeletionService} = await import('data:text/javascript;base64,' + Buffer.from(module.outputFiles[0].text).toString('base64'))
     // Replay only modifies the isolated copy. The frozen external journal is never rewritten.
     const service = new AccountDeletionService(binding(db), {async write() {}})
-    for (const row of latest.values()) await service.replayJournal(row, now)
+    for (const row of latest.values()) {
+      const before = new Set(db.prepare('SELECT id FROM account_deletions WHERE account_id=?').all(row.account_id).map(x => x.id))
+      await service.replayJournal(row, now)
+      if (row.state !== 'ERASE' || !db.prepare("SELECT id FROM accounts WHERE id=? AND status='DELETED'").get(row.account_id)) continue
+      // Erasure replay can synthesize an immediate local request. Keep the
+      // authoritative request identity/timing so later retention can reconcile
+      // it with the independent journal. Never remove pre-existing history.
+      const collision = db.prepare('SELECT account_id FROM account_deletions WHERE id=?').get(row.request_id)
+      if (collision && collision.account_id !== row.account_id) throw new Error('RESTORE_JOURNAL_SCOPE_CHANGED')
+      for (const generated of db.prepare('SELECT id FROM account_deletions WHERE account_id=?').all(row.account_id)) {
+        if (!before.has(generated.id) && generated.id !== row.request_id)
+          db.prepare('DELETE FROM account_deletions WHERE id=?').run(generated.id)
+      }
+      db.prepare(`INSERT INTO account_deletions
+        (id,account_id,mode,requested_at,purge_after,held_family_id,state,finalized_at,resolution,resolution_at,journaled_at,next_attempt_at)
+        VALUES (?,?,?,?,?,?,'FINALIZED',?,'ERASE',?,?,0)
+        ON CONFLICT(id) DO UPDATE SET mode=excluded.mode,requested_at=excluded.requested_at,purge_after=excluded.purge_after,
+        held_family_id=excluded.held_family_id,state=excluded.state,finalized_at=excluded.finalized_at,
+        resolution=excluded.resolution,resolution_at=excluded.resolution_at,journaled_at=excluded.journaled_at,next_attempt_at=0`)
+        .run(row.request_id,row.account_id,row.purge_after === row.requested_at ? 'IMMEDIATE' : 'RECOVERY',
+          row.requested_at,row.purge_after,row.family_id,row.resolved_at,row.resolved_at,now)
+    }
     // Backup credentials must not revive even for otherwise unaffected accounts.
     db.exec(`UPDATE account_sessions SET revoked_at=COALESCE(revoked_at,${now});
       UPDATE account_devices SET revoked_at=${now}, revoke_reason='SECURITY' WHERE revoked_at IS NULL;

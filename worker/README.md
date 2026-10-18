@@ -267,7 +267,8 @@ The safe application rollback at this stage is the preceding Worker, since
 the existing routes ignore these additive tables. Leave the new tables in
 place; do not drop identity data to roll back application code. Once identity
 routes write data, database restore needs a separately tested backup/restore
-procedure. Such a restore is not yet verified here.
+procedure. The compatible-scope isolated rehearsal is documented below; this
+does not establish rollback for the existing production user's migration.
 
 The authorized staging migration was completed on 2026-09-14 with before/after
 exports, foreign-key checks and full legacy content hashes. See
@@ -343,7 +344,17 @@ The owner approved retention rules on 2026-10-14. The local implementation is no
 
 Offline business reconciliation for a compatible account/family scope is now available in `scripts/prepare-business-restore.mjs` (2026-10-16). It takes an old backup, a current frozen full source export, the independent journal and hash-bound capture metadata. It replays erasures on both sides, copies current trial/billing/event/replacement/retention ledgers, requires fresh store proof for live store grants, and rejects scope/schema drift. It never reconstructs missing history from an old grant or from the trial marker alone. The output clears the business gate only after validation; `trafficMayResume:false` still requires operator verification with HTTP/cron frozen. Old account-device credentials are now revoked alongside sessions and family tokens.
 
-Run `npm run test:recovery` from the repository root for the repeatable local rehearsal. See [business restore checkpoint and staging runbook](../A17_BUSINESS_RESTORE_CHECKPOINT_2026-10-16.md) for the CLI, capture window, supported scope, failure handling and isolated remote rehearsal plan. Remote key/DB/cron provisioning, actual provider/file retention schedules, client-state reconciliation and legal validation remain release gates. Do not deploy the synthetic-ID local rehearsal configuration. Apple token revocation and verified dispute-event wiring belong to the store integration.
+Run `npm run test:recovery` from the repository root for the repeatable local rehearsal. See [business restore checkpoint and staging runbook](../A17_BUSINESS_RESTORE_CHECKPOINT_2026-10-16.md) for the CLI, capture window, supported scope and failure handling. Shared staging/production key/DB/cron provisioning, actual provider/file retention schedules, client-state reconciliation and legal validation remain release gates. Do not deploy the synthetic-ID local rehearsal configuration. Apple token revocation and verified dispute-event wiring belong to the store integration.
+
+Before importing a reconciled business restore into an empty D1 target, adapt the verified output locally:
+
+```text
+node worker/scripts/prepare-d1-restore.mjs restored.sql restored.sql.report.json restored.d1.sql
+```
+
+This command requires Node 24.10+ and is run from the repository root. It creates new SQL/report files only; it never imports or deploys. The business report must match the input hash and confirm completed reconciliation with traffic still frozen. Independent journal exports, blocked business state and unsupported cross-table dependency cycles are refused. The adapter creates parent tables and unique indexes before rows, and triggers after rows, then verifies every table's data and foreign keys in a fresh local database. D1 import uses deferred checks without `foreign_keys=OFF`. Import only into the independently verified empty target; compare remote rows and the untouched journal, retain the original logical source identity, and keep HTTP/cron frozen until the documented acceptance checks pass.
+
+Raw Cloudflare exports may create referenced unique indexes after data. The offline loaders therefore temporarily disable foreign keys only in isolated memory and require them enabled, with no violations, before replay. Final erasure replay retains the journal's original request ID and deadline so scheduled retention can confirm the same request after restore. See the [isolated cloud rehearsal evidence](../A17_ISOLATED_REHEARSAL_RESULT_2026-10-18.md) for the tested runtime and boundaries.
 See [operations, activation and restore runbook](../ACCOUNT_DELETION_OPERATIONS_2026-10-13.md)
 and [earlier UI checkpoint](../ACCOUNT_DELETION_CHECKPOINT_2026-10-13.md).
 Validation: 841 tests, both typechecks, frontend build and staging dry-run passed;

@@ -3,7 +3,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { prepareDeletionRestore, isolatedDatabase, digest, dump } from './prepare-deletion-restore.mjs'
+import { prepareDeletionRestore, isolatedDatabase, loadSqlExport, digest, dump } from './prepare-deletion-restore.mjs'
 
 const tables = ['accounts', 'account_identities', 'legacy_family_memberships', 'account_trials',
   'subscriptions', 'subscription_events', 'billing_account_links', 'store_subscription_state',
@@ -66,7 +66,7 @@ export async function prepareBusinessRestore({backup, current, journal, metadata
     metadata:{...metadata, backupSha256:metadata.currentSha256, backupCreatedAt:metadata.currentCapturedAt}})
   const db = isolatedDatabase(), source = isolatedDatabase(), raw = isolatedDatabase(), log = isolatedDatabase()
   try {
-    db.exec(restored.sql); source.exec(fresh.sql); raw.exec(current); log.exec(journal)
+    loadSqlExport(db, restored.sql); loadSqlExport(source, fresh.sql); loadSqlExport(raw, current); loadSqlExport(log, journal)
     // A fresh capture taken from an already blocked restore is not an authority.
     if (raw.prepare('SELECT blocked FROM retention_restore_gate WHERE id=1').get()?.blocked !== 0)
       throw new Error('BUSINESS_SOURCE_BLOCKED')

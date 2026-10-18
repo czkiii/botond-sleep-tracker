@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { DatabaseSync } from 'node:sqlite'
 import { createHash } from 'node:crypto'
+import { RetentionService } from '../src/retention'
+import { sqliteBinding } from './sqliteD1'
 // @ts-expect-error Operational Node script intentionally remains executable without transpilation.
 import { prepareDeletionRestore } from '../scripts/prepare-deletion-restore.mjs'
 // @ts-expect-error Operational Node script.
@@ -37,6 +39,21 @@ const prepare = (b=backup(), j=journal()) => prepareDeletionRestore({backup:b,jo
 function inspect(sql: string, fn: (db: DatabaseSync)=>void) { const db=new DatabaseSync(':memory:'); try { db.exec(sql); fn(db) } finally { db.close() } }
 
 describe('offline erasure-aware restore preparation',()=>{
+  it('retains the original final erasure request so scheduled retention can confirm completion', async () => {
+    const log = journal() + '\n' + readFileSync(new URL('../erasure-journal/002_retention.sql', import.meta.url),'utf8')
+    const result = await prepare(backup(),log)
+    const restored = new DatabaseSync(':memory:'), registry = new DatabaseSync(':memory:')
+    try {
+      restored.exec(result.sql); registry.exec(log)
+      expect(restored.prepare('SELECT id,mode,requested_at,purge_after,state FROM account_deletions').all()).toEqual([
+        {id:'request',mode:'RECOVERY',requested_at:now-100,purge_after:now-100+duration,state:'FINALIZED'}
+      ])
+      await new RetentionService(sqliteBinding(restored),sqliteBinding(registry),'staging','source-db').journalStep(now)
+      expect(registry.prepare('SELECT request_id,completed_at FROM deletion_completion').get()).toEqual({request_id:'request',completed_at:now})
+      expect((await prepare(result.sql,log)).sql).toBe(result.sql)
+    } finally { restored.close(); registry.close() }
+  })
+
   it('rejects missing/stale metadata, 30-day-old backups and stale independent journal captures', async () => {
     const b = backup(), j = journal(), base = metadata(b, j)
     for (const meta of [undefined, { ...base, backupCreatedAt: now - duration },

@@ -2,7 +2,7 @@
 
 Dátum: 2026-10-16. Tulajdonosi kérésre készült összegzés, nem új funkciólista.
 
-**Az összegzés utáni A17 előrelépés, 2026-10-17:** a helyi üzleti restore-egyeztetés után a távoli staging olvasási leltára és az egy Worker/három próba-DB elkülönített előkészítése is kész. 899/899 teszt és két konfiguráció dry-run PASS. Következő a konkrét elkülönített távoli főpróba, nem újabb általános tervezés. [Leltár és végrehajtási csomag](A17_STAGING_REHEARSAL_PREPARATION_2026-10-17.md). A tényleges bekötés/aktiválás nyitott. Az alábbi pillanatfelvétel az eredeti összegzés készítésekor érvényes állapotot őrzi.
+**Az összegzés utáni A17 előrelépés, 2026-10-18:** az üzleti restore-egyeztetés és az elkülönített, valódi Cloudflare bekötési/helyreállítási főpróba is sikeres. A régi napló mellett a friss trial/refund/törlés megmaradt, az ütemező a visszatöltés után is működött; a próba végpontja/cronja lezárva. **906/906** gépi teszt, két typecheck PASS. [Főpróbaeredmény](A17_ISOLATED_REHEARSAL_RESULT_2026-10-18.md). Az 1. blokk kompatibilis körének technikai főpróbája elkészült; a következő feladat a 2. blokkhoz tartozó közös staging-bekötés. A teljes A17 kiadási kapu nyitott a tényleges üzemeltetés/jogi/store feltételekig. Az alábbi pillanatfelvétel az eredeti összegzés készítésekor érvényes állapotot őrzi.
 
 Ez a dokumentum az aktuális sorrend összefoglalója. A részletes bizonyítékokat a [kiadási ellenőrzőlista](RELEASE_CHECKLIST.md) és a hivatkozott checkpointok őrzik; a régi „következő feladat” bejegyzések történetiek. Az új sorrend nem minősít korábban nyitott kaput teljesítettnek.
 
