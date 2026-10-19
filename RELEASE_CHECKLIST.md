@@ -8,6 +8,8 @@ Utolsó frissítés: 2026-10-19
 
 **Közös staging, 2026-10-19:** mentés, 011–013, független journal/kulcs és maintenance-cron bekötve; 21/21 régi tábla és jogosultságok megőrizve. **907/907**, két typecheck, távoli health/CORS/auth smoke PASS. A tényleges retention- és törlési cron-futás is sikeres, nulla karbantartási hibával. [közös staging-bekötés](A17_SHARED_STAGING_INTEGRATION_2026-10-19.md). Nyilvános aktiválás, production és teljes üzemeltetési/jogi elfogadás külön marad.
 
+**Main-átállási pontosítás, 2026-10-19:** [konkrét terv](MAIN_TRANSITION_PLAN_2026-10-19.md): új üres V4-környezet és ellenőrzött naplóimport, a régi DB helyben migrálása helyett. A 195/195 exportpróba kész; a main mentésfájljainak nyilvánossága és a kiadásvezérlés a merge előtt rendezendő. A terv elkészült, végrehajtás nem történt.
+
 ## Irányadó végrehajtási sorrend — tulajdonosi pontosítás, 2026-10-16
 
 A korábbi munkablokk-felsorolás nem végrehajtási sorrend. Előbb a jelenlegi appot fejezzük be; Android/iOS csomagolás csak utána indul. A meglévő auditpontok tartalma megmarad, új feladatot ez a rendezés nem ad hozzá.
@@ -300,8 +302,8 @@ A main-es webes átállás szükséges lépései csomagolás előtt történnek 
 
 - [ ] **[GPT-6 Sol · high]** Release commit SHA véglegesítése és megjelölése.
 - [ ] **[GPT-6 Astra · high]** Távoli production D1 mentése. 2026-09-20-i ellenőrzött pillanatfelvétel elkészült; a tényleges migráció előtt friss export kötelező.
-- [ ] **[GPT-6 Astra · high]** `worker/migrations/002_children_v4.sql` alkalmazása production D1-en.
-- [ ] **[GPT-6 Astra · high]** Friss production sémaleltár alapján az aktuális release-ig szükséges migrációk jóváhagyott sorrendje (a forrás most 013-ig tartalmaz migrációt, külön törlési nyilvántartási sémával); előbb elkülönített restore és kompatibilitási próba (A17/A25). Nem alkalmazunk vakon egy régi 003–007-es listát.
+- [ ] **[GPT-6 Astra · high]** Új üres production V4 D1 és független journal létrehozása az ellenőrzött csomagból. A tulajdonos új tiszta-indulási terve szerint a régi production DB-n nem fut 002 migráció; az új V4 alapsémára 001/002 szintén nem alkalmazandó.
+- [ ] **[GPT-6 Astra · high]** Az új üres DB-n `schema.sql` + 003–013, a külön journalon saját schema + 002_retention és production identity; kulcsok/retention nyilvántartás bekötése. A sémasorrend helyben 27 app-táblával, nulla FK-hibával igazolt; távoli új production bekötés még nincs. A régi DB megmarad a visszaútig.
 - [ ] **[GPT-6 Astra · high]** Worker deploy pontosan a release commitból.
 - [ ] **[GPT-6 Sol · high]** Production Worker smoke test.
 - [ ] **[GPT-6 Astra · high]** PR review és draft állapot megszüntetése.
