@@ -12,7 +12,14 @@
     "ACCOUNT_FAMILY_BRIDGE": "true",
     "ENTITLEMENT_ENFORCEMENT": "true",
     "ENTITLEMENT_TEST_MODE": "true",
-    "RECONCILIATION_CONFLICTS": "true"
+    "RECONCILIATION_CONFLICTS": "true",
+    "ACCOUNT_DELETION_ENABLED": "false",
+    "ACCOUNT_DELETION_MAINTENANCE": "true",
+    "RETENTION_MAINTENANCE": "true",
+    "TRIAL_IDENTITY_KEY_VERSION": "v1",
+    "DELETION_SOURCE_DATABASE_ID": "1fdd9f64-ea4b-4499-9b6e-636462d51d37",
+    "RESTORE_MAINTENANCE": "false",
+    "TRIAL_ENABLED": "false"
   },
   "ratelimits": [
     {
@@ -45,6 +52,14 @@
       "binding": "DB",
       "database_name": "solemi-sleep-db-staging",
       "database_id": "1fdd9f64-ea4b-4499-9b6e-636462d51d37"
+    },
+    {
+      "binding": "ERASURE_JOURNAL",
+      "database_name": "solemi-erasure-journal-staging",
+      "database_id": "2d932996-4b9b-4a78-87fb-34a79acfd700"
     }
-  ]
+  ],
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  }
 }

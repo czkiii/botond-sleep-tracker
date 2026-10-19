@@ -306,6 +306,22 @@ explicit staging flags; the manual endpoint is unavailable without the former.
 See `STAGING_ENTITLEMENT_MIGRATION_2026-09-15.md` for the staging migration and
 verification record.
 
+### Shared staging infrastructure (2026-10-19)
+
+Shared staging now has migrations 011–013, a distinct `ERASURE_JOURNAL` database,
+the independent `TRIAL_IDENTITY_SECRET`/v1 programme, and five-minute maintenance
+scheduling. The tracked staging configuration matches this deployment. Public
+`ACCOUNT_DELETION_ENABLED` and `TRIAL_ENABLED` remain false; frontend activation,
+production provisioning, external key custody, actual backup/log expiry,
+alert delivery and legal review remain separate gates. Do not run the journal
+candidate generator against the already provisioned staging config, replay the
+applied migrations, or regenerate its identity key. See the
+[staging integration record](../A17_SHARED_STAGING_INTEGRATION_2026-10-19.md)
+for resource identities, backups, verification and remaining conditions.
+
+The following dated implementation notes describe earlier checkpoints; their
+"not deployed" statements do not override that current integration record.
+
 ### Account deletion — local implementation and operations, disabled (2026-10-14)
 
 Migration `011_account_deletion.sql` adds guarded deletion/recovery requests,
