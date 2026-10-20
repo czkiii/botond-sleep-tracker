@@ -29,6 +29,9 @@ jobs:
           # Offline restore imports use node:sqlite's authorizer (Node >=24.10).
           node-version: 24
 
+      - name: Check repository hygiene
+        run: npm run check:repository
+
       - name: Install dependencies
         run: npm ci
 

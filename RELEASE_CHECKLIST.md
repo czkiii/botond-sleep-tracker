@@ -1,6 +1,8 @@
 # Solemi Sleep — belső verziótól a kiadásig
 
-Utolsó frissítés: 2026-10-19
+Utolsó frissítés: 2026-10-20
+
+**Main-előkészítés, 2026-10-20:** [helyi tisztítás és merge-próba kész](REPOSITORY_CLEANUP_CHECKPOINT_2026-10-20.md), 907/907 teszt, két typecheck, build, dry-run, audit PASS. A követett privát mentéseket CI tiltja; teljes tesztes workflow-k Node 24-re egyeztetve. Távoli history-tisztítás/PR-cache/merge még nyitott; konkrét hozzáférési hiány a Cloudflare Builds kapcsolóolvasás 403-a. A staging és az export korábbi bizonyítékait nem kell megismételni.
 
 **Aktuális tulajdonosi sorrend és készültség:** [2026-10-16-i teljes összegzés](RELEASE_OVERVIEW_2026-10-16.md). Hat lezárható munkablokkba rendezi a meglévő feladatokat. Csomagolás előtt külön eredmény a `feat/child-profile-v4 → main` összevonás és az egy meglévő, napi használatú felhasználó adatainak próbált migrációja. A történeti auditbizonyítékok megmaradnak; nyitott jelölő nem jelent újrakezdendő fejlesztést.
 

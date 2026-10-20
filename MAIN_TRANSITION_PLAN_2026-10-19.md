@@ -2,6 +2,8 @@
 
 Dátum: 2026-10-19, Europe/Budapest. Feladat: a terv elkészítése, nem az átállás végrehajtása.
 
+**Frissítés, 2026-10-20:** a [helyi előzménytisztítás és merge-előkészítés](REPOSITORY_CLEANUP_CHECKPOINT_2026-10-20.md) elkészült: az alkalmazáskód megőrzésével pontosan négy mentés távolítható el; külön merge-jelölt 907/907 teszt, két typecheck, build, dry-run és audit PASS. A lockfile és a teljes tesztes workflow-k Node-verziója rendezve; új CI-védelem a követett mentések ellen. Az alábbi terv ezekre vonatkozó előkészítési teendői teljesültek. A távoli tisztítás/merge nincs végrehajtva: Cloudflare Builds kapcsolóolvasás 403, majd konkrét távoli main-átírási jóváhagyás kell. A végleges új production konfigurációs build külön marad.
+
 **Döntés:** új, üres V4-környezet; a megőrzendő napló ellenőrzött importja; új belépés és új család. A régi production adatbázist nem alakítjuk helyben V4-re. A „wipe” lehetőségét elfogadta a tulajdonos, de a régi környezet törlése az átállás utolsó, külön engedélyezett lépése. A staging főpróbát és a 195 bejegyzéses exportpróbát nem ismételjük meg.
 
 **A main összevonása és a felhasználó átköltözése két külön esemény.** A merge csak ellenőrzött kiadási kapcsolók mellett történhet; önmagában nem indíthat production deployt. A jelen dokumentum nem változtatja meg a fizetési/store és a teljes kiadás többi feltételét.

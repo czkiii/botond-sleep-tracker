@@ -23,7 +23,11 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # Full restore tests require node:sqlite.setAuthorizer (Node >=24.10).
+          node-version: 24
+
+      - name: Check repository hygiene
+        run: npm run check:repository
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
