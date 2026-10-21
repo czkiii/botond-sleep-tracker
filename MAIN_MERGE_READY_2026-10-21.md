@@ -1,5 +1,7 @@
 # Main-merge: lezárt előkészítés és végrehajtási lap
 
+**Végrehajtás elindítva, 2026-10-21:** az ismert lockfile-konfliktus a `5f71401` feature-merge-commitban feloldva, a teljes fájlfa változtatása nélkül. A közben feltöltött `b6f9506` frontend CI-jét új npm audit-találatok állították meg. Célzott javítás: Vite `7.3.6 → 7.3.7`, Vitest `4.1.11 → 4.1.12`, rögzített lockfile; telepítés után nulla audit-találat. Alkalmazásforrás nem változott. Az alábbi korábbi 907/907 eredmény történeti bizonyíték; az új eszközverziókat a végső commit rendes CI-futása ellenőrzi, sikerét előre nem állítjuk. [Vite kiadás](https://github.com/vitejs/vite/releases/tag/v7.3.7), [Vitest kiadás](https://github.com/vitest-dev/vitest/releases/tag/v4.1.12).
+
 **Állapot, 2026-10-21:** az előkészítés kész. A tényleges merge, az ág-védelem aktiválása és az élesítés nem történt meg. Ezek végrehajtási lépések, nem új fejlesztési vagy tesztelési projektek. Kézi app-teszt most nem kell.
 
 **Tulajdonosi döntés:** GitHub Support-kérést nem küldünk, és az nem merge- vagy kiadási előfeltétel. A normál ágak mentésektől megtisztított története megmarad. A korábban igazolt PR-hivatkozás/cache esetleges elérhetősége ismert maradvány; teljes visszamenőleges eltávolítást nem állítunk. A repository későbbi privatizálását a régi GitHub Pages kiváltása után kezeljük, most nem változtatjuk meg a láthatóságot.
