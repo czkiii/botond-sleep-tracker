@@ -1,16 +1,16 @@
 # Solemi — konkrét main-átállási terv
 
-**Végrehajtási frissítés, 2026-10-21:** a jóváhagyott main-előzménytisztítás kész (a529a64); helyi main egyeztetve, hét távoli ágban nulla mentési blob. A régi oldal és Worker változatlan, automatikus GitHub Pages-kiadás letiltva. A GitHub PR #3 régi merge-ref/cache eltávolítása még nyitott; Support-kérés előkészítve, nincs elküldve. Valódi merge és új production bekötés még nem történt. [Bizonyíték](REPOSITORY_CLEANUP_CHECKPOINT_2026-10-20.md).
+**Aktuális állapot, 2026-10-21 — előkészítés lezárva:** [main-merge végrehajtási lap](MAIN_MERGE_READY_2026-10-21.md). A main tiszta (`a529a64`), a Pages automatikus kiadása tiltva; a friss merge-előnézet feloldva pontosan a feature fájlfáját adja. A 907/907 próbához képest csak dokumentáció változott. **Tulajdonosi döntés: GitHub Support-kérést nem küldünk; a régi PR/cache esetleges elérhetősége ismert maradvány, nem merge-kapu.** Ág-védelem aktiválása, konfliktusfeloldó commit/feltöltés és külön jelzett main-merge következik; production bekötés utána. Most nincs távoli módosítás vagy kézi app-teszt.
 
 Dátum: 2026-10-19, Europe/Budapest. Feladat: a terv elkészítése, nem az átállás végrehajtása.
 
-**Frissítés, 2026-10-20:** a [helyi előzménytisztítás és merge-előkészítés](REPOSITORY_CLEANUP_CHECKPOINT_2026-10-20.md) elkészült: az alkalmazáskód megőrzésével pontosan négy mentés távolítható el; külön merge-jelölt 907/907 teszt, két typecheck, build, dry-run és audit PASS. A lockfile és a teljes tesztes workflow-k Node-verziója rendezve; új CI-védelem a követett mentések ellen. Az alábbi terv ezekre vonatkozó előkészítési teendői teljesültek. A távoli tisztítás/merge nincs végrehajtva: Cloudflare Builds kapcsolóolvasás 403, majd konkrét távoli main-átírási jóváhagyás kell. A végleges új production konfigurációs build külön marad.
+**Történeti frissítés, 2026-10-20 (az azóta teljesült teendőket a fenti aktuális állapot felülírja):** a [helyi előzménytisztítás és merge-előkészítés](REPOSITORY_CLEANUP_CHECKPOINT_2026-10-20.md) elkészült: az alkalmazáskód megőrzésével pontosan négy mentés távolítható el; külön merge-jelölt 907/907 teszt, két typecheck, build, dry-run és audit PASS. A lockfile és a teljes tesztes workflow-k Node-verziója rendezve; új CI-védelem a követett mentések ellen. Az alábbi terv ezekre vonatkozó előkészítési teendői teljesültek. A távoli tisztítás/merge nincs végrehajtva: Cloudflare Builds kapcsolóolvasás 403, majd konkrét távoli main-átírási jóváhagyás kell. A végleges új production konfigurációs build külön marad.
 
 **Döntés:** új, üres V4-környezet; a megőrzendő napló ellenőrzött importja; új belépés és új család. A régi production adatbázist nem alakítjuk helyben V4-re. A „wipe” lehetőségét elfogadta a tulajdonos, de a régi környezet törlése az átállás utolsó, külön engedélyezett lépése. A staging főpróbát és a 195 bejegyzéses exportpróbát nem ismételjük meg.
 
 **A main összevonása és a felhasználó átköltözése két külön esemény.** A merge csak ellenőrzött kiadási kapcsolók mellett történhet; önmagában nem indíthat production deployt. A jelen dokumentum nem változtatja meg a fizetési/store és a teljes kiadás többi feltételét.
 
-## 1. Ellenőrzött kiindulás
+## 1. Október 19-i kiindulási leltár — történeti állapot
 
 | Tétel | Megfigyelt állapot és következmény |
 |---|---|
@@ -29,7 +29,7 @@ Dátum: 2026-10-19, Europe/Budapest. Feladat: a terv elkészítése, nem az át�
 
 Távoli olvasási bizonyítékok: GitHub repository/branch/rulesets API; privát `worker/.private-backups/production-transition-2026-10-19/release-settings.json`. Cloudflare Worker Builds branch/triggerek, GitHub Pages aktív artifact és OAuth-originek teljes távoli ellenőrzése még nincs kész; ezek a kiadásvezérlés egyetlen fennmaradó leltárkörébe tartoznak. Titokérték nem került a jelentésbe.
 
-### Meglévő nyilvános mentések — konkrét merge előtti teendő
+### Nyilvános mentések — azóta végrehajtott rendezés előzménye
 
 A main négy `.private-backups/` fájlja már a nyilvános repository része. A fejlesztési ág aktuális fájlfájában nincsenek, de egy szokásos merge a main-en lévő hozzáadásokat megtarthatja. A `.gitignore` a már követett fájlokra nem védelem.
 
@@ -75,23 +75,21 @@ Ezt a konkrét sémasorrendet most két üres, memóriabeli SQLite adatbázison 
 
 ## 3. Végrehajtási sorrend — öt lezárható lépés
 
-### I. Összevonási és kiadási kapu előkészítése
+### I. Előkészítés kész; kontrollált main-merge
 
-1. A nyilvános mentések rendezése, a fenti URL- és hozzáférési döntés rögzítése. A távoli Worker Builds/Pages/GitHub kapcsolók teljes leltára: melyik ág, melyik parancs, melyik D1. Productiont érintő automatikus kiadás az átállásig kikapcsolva; a belső staging külön marad.
-2. A main védelme: PR és kötelező sikeres frontend/Worker CI; nincs automatikus merge. Távoli beállítást csak konkrétan előkészítve változtatunk.
-3. Elkülönített merge-jelölt a frissen ellenőrzött mainből és a fejlesztési ágból. A `package.json` mellé a fejlesztési ág hozzá tartozó lockfile-ja marad; kézzel összefésült régi lockfile helyett tiszta `npm ci` ellenőrzés. A négy mentés nem kerülhet a jelölt követett fájljai közé.
-4. A teljes tesztet futtató workflow-k Node-verzióját egyeztetni kell: a CI frontend már Node 24, de az `internal-preview.yml` és a kézi `deploy-pages.yml` még Node 22 alatt futtat teljes tesztet. A restore eszköz kifejezetten `node:sqlite.setAuthorizer`-t, Node >=24.10-et igényel. A merge előtti kiadási pipeline ezt rendezze; most nem futottak újra ezek a távoli jobok.
-5. A végleges merge-jelöltre egyszer tiszta telepítés, teljes teszt, frontend/Worker typecheck, tényleges production beállítású frontend build és az új Worker feltöltés nélküli csomagpróbája. Pontos SHA és nullás privátfájl-lista a bizonyítékban. A 907/907 korábbi teszt nem helyettesíti a módosított jelölt ellenőrzését, de a kész funkciókat nem kezdjük újratesztelési projektként elölről.
+A friss bizonyítékokat és a pontos végrehajtást a [lezárt merge-előkészítés](MAIN_MERGE_READY_2026-10-21.md) tartalmazza. A lockfile feloldása és a Node-verziók próbája kész; a main-tisztítás és a kiadási kapcsolóleltár lezárt. Ezeket nem indítjuk újra.
 
-**Kész, ha:** az összevonás tartalma és a kiadási kapcsolók ellenőrizhetők, a merge nem indít éles váltást. Kézi app-teszt nem szükséges ehhez a lépéshez.
+Következik: a dokumentáció commitja, a main előzményeinek feature ágba emelése a kipróbált konfliktusfeloldással, feltöltés, a végső SHA-n szokásos CI, a kész main-védelem aktiválása és visszaolvasása, majd külön jelzett/jóváhagyott PR-merge. A legacy kiadás tiltva marad. Új production konfiguráció vagy appcím-döntés nem szükséges a kiadás nélküli kódösszevonáshoz.
 
-### II. Új környezet bekötése és main összevonás
+**Kész, ha:** az új kód mainen van, azonosított SHA-val és sikeres CI-vel; a régi app tovább működik. Most kézi app-teszt nem szükséges.
 
-1. Az új D1/journal, kulcsok, sémák, pontos Worker, app Pages/proxy és OAuth-origin bekötése az előkészített csomagból. A marketing és legacy rendszer nem változik. Előbb ellenőrzött backend, utána hozzá illeszkedő frontend; előzetes privát/korlátozott elérés, készülő appra még nincs felhasználó-átirányítás.
-2. Célzott gépi ellenőrzés: buildazonosság, health, proxy/CORS, belépés nélküli védelem, production tesztkapcsolók tiltása, journal identity és cron állapot. Belépés/családi import másolatos próbáját a jóváhagyott átmeneti hozzáféréssel külön, ártalmatlan adatokkal végezzük. Ehhez nem használjuk a naponta írt eredeti naplót.
-3. A már ellenőrzött PR jóváhagyott összevonása main-re. A main végső SHA-jának megfelelő artifactot azonosítjuk/építjük; csak a külön kiadási lépéssel kerül az új környezetre. A feature-ág és staging nem lesz a production adatok célja.
+### II. Új környezet bekötése, a main-merge után
 
-**Kész, ha:** az új app és szerver azonosított kódot futtat, a production hozzáférés használható, a régi rendszer még működik. A main-re kerülés ettől a ponttól nem függ az áruházi csomagolástól.
+Az appcím és az átálló család átmeneti hozzáférésének döntése után az új D1/journal, kulcsok, sémák, Worker, Pages/proxy és OAuth-origin a fenti konfigurációs szerződés szerint készül el. Előbb a tényleges production konfigurációs build és dry-run, majd külön jelzett/jóváhagyott bekötés; a marketing és a legacy rendszer nem változik.
+
+Célzott gépi ellenőrzés: main-SHA/buildazonosság, health, proxy/CORS, belépés nélküli védelem, tesztkapcsolók tiltása, journal identity és cron. Az új hozzáférési és importút bekötését külön ártalmatlan adatokkal igazoljuk; a kész staging helyreállítási főpróbát nem ismételjük.
+
+**Kész, ha:** az új app és szerver azonosított main-kódot futtat, a hozzáférés használható, és a régi rendszer még működik. Ezután következhet az egyszeri felhasználói költözés.
 
 ### III. Végső mentés és rövid naplózási szünet
 
@@ -131,15 +129,10 @@ Ezután a meglévő összevont webes főteszt következik: tényleges készülé
 
 A visszaút első két esete az eredeti környezet megtartására épül. Új valós V4-adatok után a régi export egyszerű visszatöltése nem elfogadott rollback. A felhasználónak ezt az átállási ablak előtt jelezzük; nem ígérünk nem tesztelt, veszteségmentes V4→V3 automatizmust.
 
-## 5. Most elkészült / ami a végrehajtáshoz még kell
+## 5. Aktuális rövid lista
 
-**Kész ebben a munkamenetben:** helyi és GitHub main-leltár; két saját commit értékelése; merge-konfliktus előnézet; távoli Pages/Worker-beállítások olvasása; konkrét új célkörnyezet-javaslat; üres sémasorrend gépi ellenőrzése; mentési/importálási/visszaállási sorrend. Csak dokumentáció és Gitből kizárt olvasási bizonyíték készült; nincs új appkód, main-merge, távoli írás, wipe vagy deploy. Teljes tesztcsomagot nem futtattunk újra dokumentáció miatt.
+- **Előkészítés kész:** main-tisztítás, kiadási kapcsolóleltár, konkrét main-védelmi beállítás, egyetlen lockfile-konfliktus megoldása és a 907/907 bizonyíték aktuális kódhoz egyeztetése. Support-küldés nincs a tervben.
+- **Következő végrehajtás:** konfliktusfeloldó commit/feltöltés, main-védelem aktiválása, végső CI és külön jelzett main-merge. [Pontos lépések](MAIN_MERGE_READY_2026-10-21.md).
+- **Utána:** app-URL és átmeneti családi hozzáférés véglegesítése; új production csomag és bekötés; friss mentéses egyszeri költözés a III–IV. lépés szerint; összevont főteszt.
 
-**Végrehajtás előtt lezárandó rövid lista:**
-
-1. A main nyilvános mentéseinek repository-adatvédelmi rendezése és az összevonási alap frissítése.
-2. App-URL és az egy család átmeneti hozzáférésének döntése; a kiadásvezérlés hiányzó távoli kapcsolóinak ellenőrzése.
-3. Production konfiguráció/deploy-csomag és merge-jelölt készítése, pontos CI-kapukkal (beleértve a Node-verziót); új környezet bekötése.
-4. Egyszeri, friss mentéses felhasználói átállás a fenti III–IV. lépéssel; utána az összevont főteszt.
-
-**Következő javasolt feladat:** a main-en lévő nyilvános mentések rendezésének konkrét, adatmegőrző csomagja és a merge előtti kiadásvezérlési előkészítés. **GPT-6 Astra · erős; kézi app-teszt nélkül indítható.** Távoli előzménytisztítás/láthatóságváltás csak a kész csomag és a régi Pagesre gyakorolt hatás ismeretében; most csak a terv készült el.
+**Következő: a kész main-merge végrehajtási lap alkalmazása. GPT-6 Astra · erős; kézi app-teszt nem szükséges.** A tényleges merge és élesítés előtt külön jelzés/jóváhagyás marad.

@@ -1,10 +1,10 @@
 # Solemi Sleep — belső verziótól a kiadásig
 
-**Végrehajtási frissítés, 2026-10-21:** a jóváhagyott main-előzménytisztítás kész (a529a64); helyi main egyeztetve, hét távoli ágban nulla mentési blob. A régi oldal és Worker változatlan, automatikus GitHub Pages-kiadás letiltva. A GitHub PR #3 régi merge-ref/cache eltávolítása még nyitott; Support-kérés előkészítve, nincs elküldve. Valódi merge és új production bekötés még nem történt. [Bizonyíték](REPOSITORY_CLEANUP_CHECKPOINT_2026-10-20.md).
+**Aktuális állapot, 2026-10-21 — előkészítés lezárva:** [main-merge végrehajtási lap](MAIN_MERGE_READY_2026-10-21.md). A main tiszta (`a529a64`), a Pages automatikus kiadása tiltva; a friss merge-előnézet feloldva pontosan a feature fájlfáját adja. A 907/907 próbához képest csak dokumentáció változott. **Tulajdonosi döntés: GitHub Support-kérést nem küldünk; a régi PR/cache esetleges elérhetősége ismert maradvány, nem merge-kapu.** Ág-védelem aktiválása, konfliktusfeloldó commit/feltöltés és külön jelzett main-merge következik; production bekötés utána. Most nincs távoli módosítás vagy kézi app-teszt.
 
-Utolsó frissítés: 2026-10-20
+Utolsó frissítés: 2026-10-21
 
-**Main-előkészítés, 2026-10-20:** [helyi tisztítás és merge-próba kész](REPOSITORY_CLEANUP_CHECKPOINT_2026-10-20.md), 907/907 teszt, két typecheck, build, dry-run, audit PASS. A követett privát mentéseket CI tiltja; teljes tesztes workflow-k Node 24-re egyeztetve. Távoli history-tisztítás/PR-cache/merge még nyitott; konkrét hozzáférési hiány a Cloudflare Builds kapcsolóolvasás 403-a. A staging és az export korábbi bizonyítékait nem kell megismételni.
+**Történeti main-előkészítés, 2026-10-20 (aktuális állapot fent):** [helyi tisztítás és merge-próba kész](REPOSITORY_CLEANUP_CHECKPOINT_2026-10-20.md), 907/907 teszt, két typecheck, build, dry-run, audit PASS. A követett privát mentéseket CI tiltja; teljes tesztes workflow-k Node 24-re egyeztetve. Távoli history-tisztítás/PR-cache/merge még nyitott; konkrét hozzáférési hiány a Cloudflare Builds kapcsolóolvasás 403-a. A staging és az export korábbi bizonyítékait nem kell megismételni.
 
 **Aktuális tulajdonosi sorrend és készültség:** [2026-10-16-i teljes összegzés](RELEASE_OVERVIEW_2026-10-16.md). Hat lezárható munkablokkba rendezi a meglévő feladatokat. Csomagolás előtt külön eredmény a `feat/child-profile-v4 → main` összevonás és az egy meglévő, napi használatú felhasználó adatainak próbált migrációja. A történeti auditbizonyítékok megmaradnak; nyitott jelölő nem jelent újrakezdendő fejlesztést.
 
@@ -145,7 +145,8 @@ Az ellenőrzött release candidate kontrollált backend-migrációval, smoke tes
   - [x] átfedő session;
   - [x] extrém hosszú session;
   - [x] hibás bejegyzés nem hidalható át két tiszta session között.
-- [ ] **[GPT-6 Sol · medium]** Kötelező zöld checkek beállítása merge előtt.
+- [x] **[GPT-6 Astra · high]** Main-védelem és kötelező checkek konkrét előkészítése; [végrehajtási lap](MAIN_MERGE_READY_2026-10-21.md).
+- [ ] **[GPT-6 Astra · high]** Az előkészített main-védelem aktiválása és visszaolvasása; végleges SHA-n zöld Frontend checks és Worker checks. Nem új általános tesztkör.
 
 **Kapu:** ugyanaz a commit minden GitHub-futásban zöld typechecket, tesztet és buildet ad.
 

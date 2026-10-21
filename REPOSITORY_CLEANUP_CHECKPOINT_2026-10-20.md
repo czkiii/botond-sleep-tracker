@@ -1,6 +1,6 @@
 # Nyilvános mentések rendezése és merge-előkészítés
 
-Állapot, 2026-10-21: **a jóváhagyott távoli main-tisztítás és a helyi referencia-egyeztetés kész; a GitHub PR-cache eltávolítása még nyitott. Valódi merge nem történt.** Kézi app-teszt nem szükséges.
+Állapot, 2026-10-21: **a távoli main-tisztítás kész. Tulajdonosi döntésre GitHub Support-kérést nem küldünk; a régi PR/cache esetleges elérhetősége ismert maradvány, nem merge-kapu.** A [main-merge előkészítése lezárva](MAIN_MERGE_READY_2026-10-21.md); valódi merge még nem történt.
 
 ## Távoli végrehajtás eredménye — 2026-10-20–21
 
@@ -12,11 +12,11 @@ Október 21-i friss utóellenőrzés:
 - A kiszolgált régi Pages HTML HTTP 200, SHA-256 azonos a tisztítás előttivel; a workflow továbbra is disabled_manually.
 - A régi solemi-sleep-sync Worker módosítási ideje változatlan: 2026-08-24T22:07:51.161377Z. Cloudflare DB-műveletet vagy deployt nem végeztünk.
 - A fő munkakönyvtár main és origin/main hivatkozása egyaránt a529a64. Az inaktív helyi main pontos régi SHA ellenőrzésével lett átállítva; a feature ág és a helyi dokumentáció megmaradt. A régi állapot a privát visszaállítási csomagban és helyi Git-objektumokban még megvan, nincs teljes helyi adattörlésnek állítva.
-- **Nyitott:** refs/pull/3/merge továbbra is a 4d0645b7d8135b712f169957f0540a9a19371106 commitra mutat, amelynek őse a mentési commit. Ezért a teljes nyilvános eltávolítás még nem igazolt. A frissített, beküldésre kész Support-szöveg privát SUPPORT_DRAFT.md fájlban van; elküldéshez külön felhasználói felhatalmazás szükséges.
+- **Korábbi utóellenőrzésben igazolt maradvány:** refs/pull/3/merge továbbra is a 4d0645b7d8135b712f169957f0540a9a19371106 commitra mutat, amelynek őse a mentési commit. Ezért a teljes nyilvános eltávolítás még nem igazolt. A privát SUPPORT_DRAFT.md történeti piszkozat; a tulajdonos későbbi utasítása szerint nem küldjük el. A maradványt nem állítjuk eltávolítottnak.
 
 Az előző körben a helyi fetch művelet automatikus jóváhagyás-ellenőrzése használati korlát miatt megszakadt; az a parancs nem hajtódott végre. Október 21-én a megengedett ellenőrzés és referenciafrissítés sikeresen lefutott. Nem kellett a távoli push-t vagy a 907 tesztet megismételni.
 
-Bizonyítékok a privát munkakönyvtárban: remote-execution.json, post-cleanup-verification.json és legacy-worker-postcheck.json. A main megtisztítása nem az új app kiadása és nem PR-merge. A korábbi, alábbi végrehajtási lista most már eljárásleírás; az aktuális nyitott pont a PR-cache és a mentési másolatok megőrzésének rendezése.
+Bizonyítékok a privát munkakönyvtárban: remote-execution.json, post-cleanup-verification.json és legacy-worker-postcheck.json. A main megtisztítása nem az új app kiadása és nem PR-merge. A korábbi, alábbi végrehajtási lista most már eljárásleírás; a PR-cache maradványt a tulajdonosi döntés szerint tudomásul vesszük. A helyi másolatok meglévő megőrzési szabályai ettől nem változnak.
 
 ## Elkészült
 
@@ -47,14 +47,14 @@ A tesztelt indexfához hozzáadtuk a fenti öt CI/script-módosítást. Azonosí
 
 A frontend build az alap konfigurációval futott; ez **nem** a még létrehozandó új production erőforrások és kulcsok végleges buildje. A dry-run helyi azonosítót használt, nem állít kiadott commitot. A 195/195 naplóimport-próbát és az A17 staging-főpróbát nem ismételtük.
 
-## Távoli végrehajtás: egy rövid, lezárandó lépés
+## Távoli végrehajtás — történeti eljárás, nem ismétlendő
 
 **Tulajdonosi képi ellenőrzés, 2026-10-20:** a legacy `solemi-sleep-sync` Settings / Builds részében a Git repository mellett **Connect** látszik: nincs csatlakoztatott Workers Builds repository. A staging képen a repository `czkiii/botond-sleep-tracker`, Production branch `feat/child-profile-v4`, Disable builds kikapcsolva, Build command nincs, Deploy command `npm run deploy:staging`, Root directory `/worker`. A staging a külön `wrangler.staging.jsonc` fájlt választó meglévő wrapperrel készül; a dashboard alapértelmezett `worker/wrangler.jsonc` névfigyelmeztetése miatt ezt nem írjuk át. A **Previews Base** képen a **Builds for Preview branches** kapcsoló kikapcsolva. A megjelenített preview parancs `npx wrangler preview`, root `/worker`; kikapcsolt preview mellett nem indul ettől main-build. A buildváltozók/titkok listája üres; ez nem a Worker futásidejű titkainak listája. A Workers Builds képi ellenőrzése ezzel teljes. Távoli beállítást nem módosítottunk.
 
 1. **Kiadási kapcsolók:** a GitHub `Deploy to GitHub Pages` workflow azonosítója `339938895`, jelenleg aktív; a régi main pushra publikál. Ezt a main referencia változtatása előtt le kell tiltani, és a váltásig tiltva tartani. A már kiszolgált régi oldalt nem töröljük. A repository láthatóságát nem váltjuk át vakon: az a régi Pages elérhetőségét is érintheti.
 2. **API-hozzáférési hiány és képi pótlása:** a Cloudflare Workers Builds triggerlekérdezése a legacy és staging Worker esetén is HTTP 403 / `10000` választ adott. Ez szolgáltatói jogosultsághiány, nem automatikus jóváhagyási elutasítás. A legacy Git-kapcsolat hiányát és a staging Production ágát a fenti tulajdonosi képek már igazolják; ezeket nem kérjük újra. A staging preview-buildje a további képen kikapcsolva; ezzel a kapcsolóleltár hiánya lezárva. A távoli végrehajtás előtt az ismert GitHub Pages automatikus kiadását kell letiltani, majd az előkészített main-referencia módosítása jóváhagyható.
 3. **Tulajdonosi jóváhagyással, pontos referenciavédelemmel:** kizárólag main `57357fd… → a529a64…`. Nincs mirror-push, más ágak átírása, repository-láthatóság-váltás vagy adatbázis-művelet. Ha a távoli main időközben megváltozik, a művelet megáll. A privát végrehajtási lap tartalmazza a teljes SHA-kat és a konkrét parancsot.
-4. **Utóellenőrzés:** main SHA, változatlan többi ág, régi Pages elérhetősége, nem indult legacy kiadás. A PR #3 merge-referenciáját és a korábbi commit/cache elérhetőségét külön ellenőrizzük. A GitHub által kezelt cache/ref eltávolítására szükség esetén GitHub Support-kérés kell; ennek piszkozata elkészült, elküldés nem történt.
+4. **Utóellenőrzés:** main SHA, változatlan többi ág, régi Pages elérhetősége, nem indult legacy kiadás. A PR #3 merge-referenciáját és a korábbi commit/cache elérhetőségét külön ellenőrizzük. Support-piszkozat készült, de a későbbi tulajdonosi döntés szerint nem küldjük el; ez nem része a további végrehajtásnak.
 5. **Valódi merge előtt:** a dokumentált main-védelem/kötelező frontend és Worker check, az aktuális feature commit zöld CI-je és a kiadási kapcsolók ellenőrzése marad. A mostani helyi próba nem jogosít automatikus merge-re vagy production kiadásra.
 
 Az előzménytisztítás után a régi klónokból tilos visszapusholni a szennyezett main-t. A helyi munka megőrzése után friss klón vagy ellenőrzött referenciafrissítés szükséges. A régi mentési commitot visszaútként sem publikáljuk újra; az alkalmazáskód a tiszta mainen változatlan.
@@ -69,8 +69,8 @@ Források a szolgáltatói eljáráshoz: [GitHub sensitive-data removal](https:/
 
 ## GitHub Desktop
 
-**Summary:** `Record completed main cleanup and remaining GitHub cache removal`
+**Korábbi commit Summary-ja:** `Record completed main cleanup and remaining GitHub cache removal`
 
-**Description:** `Record the approved main history cleanup, disabled automatic Pages deployment, local main alignment and fresh verification. All seven branch histories are free of the backup blobs; the legacy page and Worker are unchanged. GitHub PR #3 cache removal remains pending; no merge or production cutover occurred.`
+**Korábbi commit Descriptionje (a Support-küldést azóta elvetettük):** `Record the approved main history cleanup, disabled automatic Pages deployment, local main alignment and fresh verification. All seven branch histories are free of the backup blobs; the legacy page and Worker are unchanged. GitHub PR #3 cache removal remains pending; no merge or production cutover occurred.`
 
-**Következő:** a GitHub PR #3 régi merge-hivatkozásának és cache-ének Support általi eltávolítása, majd a main merge-védelmének és az új éles környezet kiadási csomagjának előkészítése. **GPT-6 Astra · erős; kézi app-teszt nem szükséges.** A tisztítást és a kész merge-próbát nem kezdjük újra.
+**Következő:** a [kész main-merge végrehajtási lap](MAIN_MERGE_READY_2026-10-21.md) alkalmazása. **GPT-6 Astra · erős; kézi app-teszt nem szükséges.** Nincs Support-küldés, új history-tisztítás vagy a kész merge-próba ismétlése.
