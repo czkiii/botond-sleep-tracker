@@ -1,5 +1,7 @@
 # Solemi — konkrét main-átállási terv
 
+**Végrehajtási frissítés, 2026-10-21:** a jóváhagyott main-előzménytisztítás kész (a529a64); helyi main egyeztetve, hét távoli ágban nulla mentési blob. A régi oldal és Worker változatlan, automatikus GitHub Pages-kiadás letiltva. A GitHub PR #3 régi merge-ref/cache eltávolítása még nyitott; Support-kérés előkészítve, nincs elküldve. Valódi merge és új production bekötés még nem történt. [Bizonyíték](REPOSITORY_CLEANUP_CHECKPOINT_2026-10-20.md).
+
 Dátum: 2026-10-19, Europe/Budapest. Feladat: a terv elkészítése, nem az átállás végrehajtása.
 
 **Frissítés, 2026-10-20:** a [helyi előzménytisztítás és merge-előkészítés](REPOSITORY_CLEANUP_CHECKPOINT_2026-10-20.md) elkészült: az alkalmazáskód megőrzésével pontosan négy mentés távolítható el; külön merge-jelölt 907/907 teszt, két typecheck, build, dry-run és audit PASS. A lockfile és a teljes tesztes workflow-k Node-verziója rendezve; új CI-védelem a követett mentések ellen. Az alábbi terv ezekre vonatkozó előkészítési teendői teljesültek. A távoli tisztítás/merge nincs végrehajtva: Cloudflare Builds kapcsolóolvasás 403, majd konkrét távoli main-átírási jóváhagyás kell. A végleges új production konfigurációs build külön marad.

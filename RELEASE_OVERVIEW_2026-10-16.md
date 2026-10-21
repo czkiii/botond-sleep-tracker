@@ -1,5 +1,7 @@
 # Solemi V1 — lezárási terv és tényleges készültség
 
+**Végrehajtási frissítés, 2026-10-21:** a jóváhagyott main-előzménytisztítás kész (a529a64); helyi main egyeztetve, hét távoli ágban nulla mentési blob. A régi oldal és Worker változatlan, automatikus GitHub Pages-kiadás letiltva. A GitHub PR #3 régi merge-ref/cache eltávolítása még nyitott; Support-kérés előkészítve, nincs elküldve. Valódi merge és új production bekötés még nem történt. [Bizonyíték](REPOSITORY_CLEANUP_CHECKPOINT_2026-10-20.md).
+
 Dátum: 2026-10-16. Tulajdonosi kérésre készült összegzés, nem új funkciólista.
 
 **Legfrissebb előrelépés, 2026-10-20 — a 3. blokkban:** a [repository-tisztítás és merge helyi próbája](REPOSITORY_CLEANUP_CHECKPOINT_2026-10-20.md) kész. Ellenőrzött privát eredeti mentés, szűk main-tisztítás változatlan appkóddal, új CI-mentésvédelem; külön összevonási jelölt **907/907**, két typecheck, build, Worker dry-run és audit PASS. A távoli main még változatlan; a Cloudflare kiadási kapcsolók hiányzó olvasási ellenőrzése, jóváhagyott history-tisztítás és GitHub PR-cache rendezés következik. Ez a meglévő main-átállási blokk folytatása, nem új funkcióprojekt; kézi app-teszt nem kell.

@@ -1,5 +1,7 @@
 # Solemi Sleep — belső verziótól a kiadásig
 
+**Végrehajtási frissítés, 2026-10-21:** a jóváhagyott main-előzménytisztítás kész (a529a64); helyi main egyeztetve, hét távoli ágban nulla mentési blob. A régi oldal és Worker változatlan, automatikus GitHub Pages-kiadás letiltva. A GitHub PR #3 régi merge-ref/cache eltávolítása még nyitott; Support-kérés előkészítve, nincs elküldve. Valódi merge és új production bekötés még nem történt. [Bizonyíték](REPOSITORY_CLEANUP_CHECKPOINT_2026-10-20.md).
+
 Utolsó frissítés: 2026-10-20
 
 **Main-előkészítés, 2026-10-20:** [helyi tisztítás és merge-próba kész](REPOSITORY_CLEANUP_CHECKPOINT_2026-10-20.md), 907/907 teszt, két typecheck, build, dry-run, audit PASS. A követett privát mentéseket CI tiltja; teljes tesztes workflow-k Node 24-re egyeztetve. Távoli history-tisztítás/PR-cache/merge még nyitott; konkrét hozzáférési hiány a Cloudflare Builds kapcsolóolvasás 403-a. A staging és az export korábbi bizonyítékait nem kell megismételni.
