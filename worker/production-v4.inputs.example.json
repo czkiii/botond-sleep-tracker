@@ -1,0 +1,8 @@
+{
+  "databaseId": "NEW_PRODUCTION_D1_UUID",
+  "journalId": "NEW_INDEPENDENT_JOURNAL_UUID",
+  "workerOrigin": "https://solemi-sleep-sync-v4.czki-adam.workers.dev",
+  "googleClientId": "APPROVED_PRODUCTION_WEB_CLIENT.apps.googleusercontent.com",
+  "publicJwk": {"kty":"EC","crv":"P-256","x":"PUBLIC_X","y":"PUBLIC_Y"},
+  "buildSha": "FINAL_REVIEWED_MAIN_40_CHARACTER_SHA"
+}

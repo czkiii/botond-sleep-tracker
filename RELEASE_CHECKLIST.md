@@ -2,7 +2,9 @@
 
 **Lezárás, 2026-10-22:** [PR #3](https://github.com/czkiii/botond-sleep-tracker/pull/3) összevonva; main **`2462e27ec49073104cb48f0b2663087ee8fee91c`**, helyi és origin/main egyezik. A main-védelem aktív, a végleges feature öt ellenőrzése és a main saját Frontend/Worker CI-je sikeres. **65 fájl / 915 teszt PASS**, nulla audit-találat. A régi Pages HTML változatlan (HTTP 200, azonos hash), automatikus kiadása letiltva maradt; production deploy, adatátvitel vagy wipe nem történt. A feature ág megmaradt. Support-kérés nincs a tervben.
 
-**Következő:** az új production Cloudflare konfigurációs és bekötési csomag elkészítése a main alapján; az appcím és az átálló család ideiglenes hozzáférésének véglegesítésével. **GPT-6 Astra · erős; kézi app-teszt nélkül indítható.** A tényleges éles bekötés előtt külön jelzés; a main-merge-et és a kész főpróbákat nem ismételjük.
+**Új éles konfiguráció előkészítve, 2026-10-22:** [bekötési csomag és végrehajtási lap](PRODUCTION_V4_CONFIGURATION_2026-10-22.md). Jóváhagyott appcím: `app.solemi-sleep.app`; a bemutatkozó oldal marad. Az átálló család kiválasztott adminfiókja 90 nap Family+ hozzáférést kap majd a tényleges átállástól, trial és automatikus fizetés nélkül. Helyi csomaggenerátor, privát fiókhoz kötött egyszeri grant, 33/33 célzott próba, Worker dry-run és production frontend build PASS. A csomagolási próbában szintetikus ID/kulcs/SHA szerepelt; éles erőforrás, DNS, secret, adatátvitel és grant alkalmazás nem történt.
+
+**Következő:** az új éles Cloudflare-erőforrások létrehozása és a zárolt bekötés végrehajtása a kész csomaggal. **GPT-6 Astra · erős; kézi app-teszt nélkül indítható.** A tényleges létrehozást és telepítést külön előre jelezzük; a korábbi merge-et és főpróbát nem kezdjük újra.
 
 **Az alábbi korábbi állapotok és lépések történeti előkészítés; a fenti lezárás az irányadó.**
 
