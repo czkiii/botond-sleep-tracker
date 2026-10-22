@@ -1,5 +1,11 @@
 # Main-merge: lezárt előkészítés és végrehajtási lap
 
+**Lezárás, 2026-10-22:** [PR #3](https://github.com/czkiii/botond-sleep-tracker/pull/3) összevonva; main **`2462e27ec49073104cb48f0b2663087ee8fee91c`**, helyi és origin/main egyezik. A main-védelem aktív, a végleges feature öt ellenőrzése és a main saját Frontend/Worker CI-je sikeres. **65 fájl / 915 teszt PASS**, nulla audit-találat. A régi Pages HTML változatlan (HTTP 200, azonos hash), automatikus kiadása letiltva maradt; production deploy, adatátvitel vagy wipe nem történt. A feature ág megmaradt. Support-kérés nincs a tervben.
+
+**Következő:** az új production Cloudflare konfigurációs és bekötési csomag elkészítése a main alapján; az appcím és az átálló család ideiglenes hozzáférésének véglegesítésével. **GPT-6 Astra · erős; kézi app-teszt nélkül indítható.** A tényleges éles bekötés előtt külön jelzés; a main-merge-et és a kész főpróbákat nem ismételjük.
+
+**Az alábbi korábbi állapotok és lépések történeti előkészítés; a fenti lezárás az irányadó.**
+
 **Végrehajtási folytatás, 2026-10-22:** a main-védelem aktív és visszaellenőrzött, PR #3 már nem draft. Az `1e19638` minden checkje sikeres, de a PR-review két konkrét hibát talált. Javításuk: nap/hónap komponensek rendezhető dátumkulcsa; lecserélt/törölt profilképek tartós törlési sora, törlés csak sikeres naplómentés után, más munkaterület és safety backup által használt képek megtartásával. Célzott **37/37** próba és frontend typecheck PASS; a módosított commit teljes CI-je még szükséges. Az előző megszakítást használati korlát miatti automatikus jóváhagyás-ellenőrzési hiba okozta; akkor nem történt main-merge.
 
 **Végrehajtás elindítva, 2026-10-21:** az ismert lockfile-konfliktus a `5f71401` feature-merge-commitban feloldva, a teljes fájlfa változtatása nélkül. A közben feltöltött `b6f9506` frontend CI-jét új npm audit-találatok állították meg. Célzott javítás: Vite `7.3.6 → 7.3.7`, Vitest `4.1.11 → 4.1.12`, rögzített lockfile; telepítés után nulla audit-találat. Alkalmazásforrás nem változott. Az alábbi korábbi 907/907 eredmény történeti bizonyíték; az új eszközverziókat a végső commit rendes CI-futása ellenőrzi, sikerét előre nem állítjuk. [Vite kiadás](https://github.com/vitejs/vite/releases/tag/v7.3.7), [Vitest kiadás](https://github.com/vitest-dev/vitest/releases/tag/v4.1.12).
@@ -60,3 +66,11 @@ A pontos, előkészített API-payload: `worker/.private-backups/repository-clean
 **Visszaút:** felhasználói váltás előtt a régi rendszer változatlanul használható. Ha már új V4-adat keletkezett, nem kapcsolunk vissza vakon V3-ra: előbb megőrizzük az új adatokat, és a már dokumentált V4-helyreállítási utat használjuk. [Részletes visszaút](MAIN_TRANSITION_PLAN_2026-10-19.md#4-visszaút--attól-függ-mikor-történt-a-hiba).
 
 **Következő:** a fenti merge-végrehajtás: konfliktusfeloldás, feature feltöltése, main-védelem bekapcsolása, végső CI, majd külön jelzett main-merge. **GPT-6 Astra · erős; kézi app-teszt nem szükséges.**
+
+## Végrehajtási bizonyíték és GitHub Desktop
+
+- Konfliktusfeloldó feature-commit: `5f71401`; függőségi javítás: `1e19638`; a két review-hiba javítása: `b25c91e`. A fő változások már commitolva, feltöltve és main-be olvasztva.
+- A két review-javítás 37 célzott próbája és a típusellenőrzés helyben sikeres; a teljes 915 teszt a végső [feature CI-ben](https://github.com/czkiii/botond-sleep-tracker/actions/runs/39835386354) futott. [Main CI](https://github.com/czkiii/botond-sleep-tracker/actions/runs/39835604611).
+- A main és a feature merge-kori fájlfája azonos; a helyi munkakönyvtár a staginghez használt feature ágon maradt.
+- Privát bizonyíték: `main-protection-applied.json`, `main-merge-result.json`, `main-merge-verify.json`, `main-merge-test-evidence.json`.
+- Most csak a lezáró dokumentáció marad helyi változásként. **Summary:** `Record completed protected main merge`.

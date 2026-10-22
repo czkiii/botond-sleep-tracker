@@ -1,5 +1,11 @@
 # Nyilvános mentések rendezése és merge-előkészítés
 
+**Lezárás, 2026-10-22:** [PR #3](https://github.com/czkiii/botond-sleep-tracker/pull/3) összevonva; main **`2462e27ec49073104cb48f0b2663087ee8fee91c`**, helyi és origin/main egyezik. A main-védelem aktív, a végleges feature öt ellenőrzése és a main saját Frontend/Worker CI-je sikeres. **65 fájl / 915 teszt PASS**, nulla audit-találat. A régi Pages HTML változatlan (HTTP 200, azonos hash), automatikus kiadása letiltva maradt; production deploy, adatátvitel vagy wipe nem történt. A feature ág megmaradt. Support-kérés nincs a tervben.
+
+**Következő:** az új production Cloudflare konfigurációs és bekötési csomag elkészítése a main alapján; az appcím és az átálló család ideiglenes hozzáférésének véglegesítésével. **GPT-6 Astra · erős; kézi app-teszt nélkül indítható.** A tényleges éles bekötés előtt külön jelzés; a main-merge-et és a kész főpróbákat nem ismételjük.
+
+**Az alábbi korábbi állapotok és lépések történeti előkészítés; a fenti lezárás az irányadó.**
+
 Állapot, 2026-10-21: **a távoli main-tisztítás kész. Tulajdonosi döntésre GitHub Support-kérést nem küldünk; a régi PR/cache esetleges elérhetősége ismert maradvány, nem merge-kapu.** A [main-merge előkészítése lezárva](MAIN_MERGE_READY_2026-10-21.md); valódi merge még nem történt.
 
 ## Távoli végrehajtás eredménye — 2026-10-20–21
