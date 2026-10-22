@@ -11,6 +11,7 @@ import type { DataQualityIssueKind } from './utils'
 import { DataStorageError, REMOTE_DATA_EVENT, createChild, createDefaultData, createSession, exportDamagedData, exportData, importData, inspectBackup, loadData, loadDataResult, loadSafetyBackup, recoverData, saveSafetyBackup } from './storage'
 import type { ImportDiagnostic, ImportInspection, SafetyBackup, SafetyBackupReason } from './storage'
 import { deleteChildPhoto, loadChildPhoto, prepareChildPhoto, saveChildPhoto } from './photoStore'
+import { flushPhotoErasure, saveWithPhotoErasure } from './accountWorkspace'
 import type { AvatarCrop } from './photoStore'
 import { mergeChildDraft, removeChildProfile } from './childProfiles'
 import { familyBootstrapCopy } from './familyBootstrapCopy'
@@ -119,6 +120,8 @@ export default function App({ writeAccess = 'writer' }: { writeAccess?: WriteAcc
     try {
       saveLocalData(lastSavedData.current, data, baseRevision)
       lastSavedData.current = data
+      // ChildEditor schedules React state; erase only after durable persistence.
+      void flushPhotoErasure(deleteChildPhoto).catch(() => {})
     } catch (error) {
       const persisted = loadDataResult()
       lastSavedData.current = persisted.data
@@ -1016,7 +1019,9 @@ function ChildEditor({ child, locale, onClose, onSave, onDelete }: { child: Chil
     setSaving(true)
     try {
       const storedPhotoRef = photoFile ? await saveChildPhoto(draft.id, photoFile) : photoRef
-      if (onSave({ ...draft, name: name.trim(), birthDate: birthDate || null, photoRef: storedPhotoRef, updatedAt: new Date().toISOString() }) === false) {
+      if (await saveWithPhotoErasure(draft.photoRef, storedPhotoRef,
+        () => onSave({ ...draft, name: name.trim(), birthDate: birthDate || null, photoRef: storedPhotoRef, updatedAt: new Date().toISOString() }),
+        deleteChildPhoto) === false) {
         if (photoFile && storedPhotoRef) void deleteChildPhoto(storedPhotoRef).catch(() => {})
         setSaving(false)
       }

@@ -21,15 +21,28 @@ export async function flushPhotoErasure(removePhoto: (ref: string) => Promise<vo
   const queued: unknown = JSON.parse(localStorage.getItem(PHOTO_ERASURE_KEY) || '[]')
   if (!Array.isArray(queued) || queued.some(ref => typeof ref !== 'string')) throw new Error('PHOTO_ERASURE_QUEUE_INVALID')
   if (!queued.length) return
-  const retained = photoRefsInRetainedDiaries()
-  if (!retained) throw new Error('PHOTO_REFERENCES_UNAVAILABLE')
   for (const ref of queued as string[]) {
-    if (!retained.has(ref)) await removePhoto(ref)
+    const retained = photoRefsInRetainedDiaries()
+    if (!retained) throw new Error('PHOTO_REFERENCES_UNAVAILABLE')
+    // A retained backup may later expire; keep its cleanup retryable.
+    if (retained.has(ref)) continue
+    await removePhoto(ref)
     // Persist progress after each deletion; a failed IndexedDB write remains retryable.
     const current: string[] = JSON.parse(localStorage.getItem(PHOTO_ERASURE_KEY) || '[]')
     localStorage.setItem(PHOTO_ERASURE_KEY, JSON.stringify(current.filter(value => value !== ref)))
   }
   if (localStorage.getItem(PHOTO_ERASURE_KEY) === '[]') localStorage.removeItem(PHOTO_ERASURE_KEY)
+}
+
+export async function saveWithPhotoErasure(previousRef: string | null, nextRef: string | null,
+  save: () => boolean, removePhoto: (ref: string) => Promise<void>) {
+  // Record the old reference before saving can make it undiscoverable.
+  if (previousRef && previousRef !== nextRef) queuePhotoErasure([previousRef])
+  if (!save()) return false
+  // A cleanup failure must not report an already committed diary as unsaved.
+  // The durable queue is retried on the next account restore/deletion.
+  await flushPhotoErasure(removePhoto).catch(() => {})
+  return true
 }
 
 type Workspace = { kind: 'guest' } | { kind: 'account'; accountId: string }
@@ -124,10 +137,15 @@ function savedSnapshot(workspace: Workspace) {
 
 function photoRefsInRetainedDiaries(): Set<string> | null {
   try {
+    // During an interrupted switch either snapshot can still be authoritative.
+    if (localStorage.getItem(SWITCH_JOURNAL_KEY)) return null
+    const active = activeWorkspace()
     const diaries = [localStorage.getItem(STORAGE_KEY)]
     for (let index = 0; index < localStorage.length; index++) {
       const key = localStorage.key(index)
       if (!key?.startsWith(WORKSPACE_PREFIX)) continue
+      // The active diary is live; its saved switch snapshot is stale until exit.
+      if (active && key === workspaceStorageKey(active)) continue
       const snapshot = parseSnapshot(localStorage.getItem(key))
       if (!snapshot) return null
       diaries.push(snapshot.diary)

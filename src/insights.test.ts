@@ -20,6 +20,18 @@ function session(id: string, start: string, end: string | null): SleepSession {
 }
 
 describe('buildInsightsFoundation', () => {
+  it.each([
+    ['2026-10-10', ['2026-10-07', '2026-10-08', '2026-10-09']],
+    ['2026-11-01', ['2026-10-29', '2026-10-30', '2026-10-31']],
+    ['2027-01-01', ['2026-12-29', '2026-12-30', '2026-12-31']],
+  ])('counts earlier nap dates chronologically at %s, excluding today', (today, dates) => {
+    const local = (date: string, hour: string) => new Date(`${date}T${hour}:00:00`).toISOString()
+    const naps = dates.map((date, index) => session(`past-${index}`, local(date, '12'), local(date, '13')))
+    naps.push(session('today', local(today, '12'), local(today, '13')))
+    const result = buildInsightsFoundation(naps, Date.parse(local(today, '18')))
+    expect(result.routine.daytimeSleepCount).toEqual({ typicalCount: 1, lowCount: 1, highCount: 1, sampleCount: 3 })
+  })
+
   it('returns an unavailable insight without sleep data', () => {
     const result = buildInsightsFoundation([], NOW)
     expect(result.wakeWindow).toMatchObject({ status: 'unavailable', currentMs: null, typicalMs: null, typicalRange: null, sampleCount: 0, lookbackDays: 14 })

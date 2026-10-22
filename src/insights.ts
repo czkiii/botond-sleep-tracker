@@ -80,7 +80,7 @@ function quantile(values: number[], position: number) {
 
 function localDateKey(iso: string) {
   const date = new Date(iso)
-  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
 function clockMinutes(iso: string) {

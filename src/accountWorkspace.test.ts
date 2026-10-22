@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { activateInteractiveAccountWorkspace, activateRestoredAccountWorkspace, activateSignedOutWorkspace, accountWorkspaceNeedsGuestChoice, getActiveAccountWorkspaceId, recoverAccountWorkspaceSwitch, removeAccountWorkspace, flushPhotoErasure } from './accountWorkspace'
+import { activateInteractiveAccountWorkspace, activateRestoredAccountWorkspace, activateSignedOutWorkspace, accountWorkspaceNeedsGuestChoice, getActiveAccountWorkspaceId, recoverAccountWorkspaceSwitch, removeAccountWorkspace, flushPhotoErasure, saveWithPhotoErasure } from './accountWorkspace'
 import { STORAGE_KEY, createDefaultData, loadData } from './storage'
 
 class MemoryStorage implements Storage {
@@ -61,6 +61,81 @@ afterEach(() => {
 })
 
 describe('account-bound local workspaces', () => {
+  it('waits for deferred diary persistence before erasing a replaced photo', async () => {
+    const storage = setup()
+    const data = diary('Deferred save')
+    data.children[0].photoRef = 'old-photo'
+    storage.setItem(STORAGE_KEY, JSON.stringify(data))
+    const removed: string[] = []
+    await saveWithPhotoErasure('old-photo', 'new-photo', () => true, async ref => { removed.push(ref) })
+    expect(removed).toEqual([])
+    data.children[0].photoRef = 'new-photo'
+    storage.setItem(STORAGE_KEY, JSON.stringify(data))
+    await flushPhotoErasure(async ref => { removed.push(ref) })
+    expect(removed).toEqual(['old-photo'])
+  })
+
+  it.each(['replacement-photo', null])('erases a superseded photo after saving %s, ignoring the stale active snapshot', async nextRef => {
+    const storage = setup()
+    const data = diary('Account')
+    data.children[0].photoRef = 'old-photo'
+    storage.setItem(STORAGE_KEY, JSON.stringify(data))
+    activateRestoredAccountWorkspace('account-a')
+    const removed: string[] = []
+    expect(await saveWithPhotoErasure('old-photo', nextRef, () => {
+      expect(removed).toEqual([])
+      data.children[0].photoRef = nextRef
+      storage.setItem(STORAGE_KEY, JSON.stringify(data))
+      return true
+    }, async ref => { removed.push(ref) })).toBe(true)
+    expect(removed).toEqual(['old-photo'])
+    expect(loadData().children[0].photoRef).toBe(nextRef)
+  })
+
+  it('keeps a superseded photo until both another workspace and a safety backup release it', async () => {
+    const storage = setup()
+    const data = diary('A')
+    data.children[0].photoRef = 'shared-photo'
+    storage.setItem(STORAGE_KEY, JSON.stringify(data))
+    activateRestoredAccountWorkspace('account-a')
+    activateInteractiveAccountWorkspace('account-b', false)
+    const current = diary('B')
+    current.children[0].photoRef = 'shared-photo'
+    Object.assign(current.__solemiLocal, { safetyBackupV1: { data: { children: [{ photoRef: 'shared-photo' }] } } })
+    storage.setItem(STORAGE_KEY, JSON.stringify(current))
+    const removed: string[] = []
+    await saveWithPhotoErasure('shared-photo', null, () => {
+      current.children[0].photoRef = null
+      storage.setItem(STORAGE_KEY, JSON.stringify(current))
+      return true
+    }, async ref => { removed.push(ref) })
+    expect(removed).toEqual([])
+    removeAccountWorkspace('account-a')
+    await flushPhotoErasure(async ref => { removed.push(ref) })
+    expect(removed).toEqual([])
+    storage.setItem(STORAGE_KEY, JSON.stringify(diary('B without backup')))
+    await flushPhotoErasure(async ref => { removed.push(ref) })
+    expect(removed).toEqual(['shared-photo'])
+  })
+
+  it('preserves the original photo when profile saving fails and retries cleanup after a later success', async () => {
+    const storage = setup()
+    const data = diary('A')
+    data.children[0].photoRef = 'old-photo'
+    storage.setItem(STORAGE_KEY, JSON.stringify(data))
+    const removed: string[] = []
+    expect(await saveWithPhotoErasure('old-photo', null, () => false, async ref => { removed.push(ref) })).toBe(false)
+    await flushPhotoErasure(async ref => { removed.push(ref) })
+    expect(removed).toEqual([])
+    expect(await saveWithPhotoErasure('old-photo', null, () => {
+      data.children[0].photoRef = null
+      storage.setItem(STORAGE_KEY, JSON.stringify(data))
+      return true
+    }, async () => { throw new Error('IndexedDB unavailable') })).toBe(true)
+    await flushPhotoErasure(async ref => { removed.push(ref) })
+    expect(removed).toEqual(['old-photo'])
+  })
+
   it('retries interrupted photo erasure after the account snapshot has gone', async () => {
     const storage = setup()
     const data = diary('Deleted account')
