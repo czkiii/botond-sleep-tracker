@@ -1,0 +1,1573 @@
+{
+  "format": "solemi-sleep-backup",
+  "version": 4,
+  "exportedAt": "2026-08-26T14:30:00.000Z",
+  "data": {
+    "version": 4,
+    "settings": {
+      "locale": "hu",
+      "activeChildId": "child_demo_boti",
+      "longSleepReminderEnabled": false
+    },
+    "children": [
+      {
+        "id": "child_demo_boti",
+        "name": "Boti",
+        "birthDate": "2025-08-23",
+        "photoRef": null,
+        "createdAt": "2026-07-28T08:00:00.000Z",
+        "updatedAt": "2026-08-26T14:30:00.000Z"
+      },
+      {
+        "id": "child_demo_frici",
+        "name": "Frici",
+        "birthDate": "2026-08-18",
+        "photoRef": null,
+        "createdAt": "2026-08-19T08:00:00.000Z",
+        "updatedAt": "2026-08-26T14:30:00.000Z"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "demo-boti-2026-07-28-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-07-27T19:00:00+02:00",
+        "endTime": "2026-07-28T07:15:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-07-27T19:00:00+02:00",
+        "updatedAt": "2026-07-28T07:15:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-07-28-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-07-28T09:25:00+02:00",
+        "endTime": "2026-07-28T10:25:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-07-28T09:25:00+02:00",
+        "updatedAt": "2026-07-28T10:25:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-07-28-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-07-28T13:25:00+02:00",
+        "endTime": "2026-07-28T14:40:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-07-28T13:25:00+02:00",
+        "updatedAt": "2026-07-28T14:40:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-07-29-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-07-28T19:04:00+02:00",
+        "endTime": "2026-07-29T07:11:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-07-28T19:04:00+02:00",
+        "updatedAt": "2026-07-29T07:11:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-07-29-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-07-29T09:30:00+02:00",
+        "endTime": "2026-07-29T10:28:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-07-29T09:30:00+02:00",
+        "updatedAt": "2026-07-29T10:28:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-07-29-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-07-29T13:22:00+02:00",
+        "endTime": "2026-07-29T14:39:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-07-29T13:22:00+02:00",
+        "updatedAt": "2026-07-29T14:39:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-07-30-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-07-29T18:55:00+02:00",
+        "endTime": "2026-07-30T07:20:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-07-29T18:55:00+02:00",
+        "updatedAt": "2026-07-30T07:20:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-07-30-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-07-30T09:21:00+02:00",
+        "endTime": "2026-07-30T10:27:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-07-30T09:21:00+02:00",
+        "updatedAt": "2026-07-30T10:27:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-07-30-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-07-30T13:31:00+02:00",
+        "endTime": "2026-07-30T14:44:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-07-30T13:31:00+02:00",
+        "updatedAt": "2026-07-30T14:44:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-07-31-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-07-30T19:02:00+02:00",
+        "endTime": "2026-07-31T07:13:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-07-30T19:02:00+02:00",
+        "updatedAt": "2026-07-31T07:13:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-07-31-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-07-31T09:28:00+02:00",
+        "endTime": "2026-07-31T10:23:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-07-31T09:28:00+02:00",
+        "updatedAt": "2026-07-31T10:23:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-07-31-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-07-31T13:20:00+02:00",
+        "endTime": "2026-07-31T14:43:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-07-31T13:20:00+02:00",
+        "updatedAt": "2026-07-31T14:43:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-01-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-07-31T18:57:00+02:00",
+        "endTime": "2026-08-01T07:18:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-07-31T18:57:00+02:00",
+        "updatedAt": "2026-08-01T07:18:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-01-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-01T09:23:00+02:00",
+        "endTime": "2026-08-01T10:29:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-01T09:23:00+02:00",
+        "updatedAt": "2026-08-01T10:29:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-01-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-01T13:27:00+02:00",
+        "endTime": "2026-08-01T14:36:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-01T13:27:00+02:00",
+        "updatedAt": "2026-08-01T14:36:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-02-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-01T19:00:00+02:00",
+        "endTime": "2026-08-02T07:15:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-01T19:00:00+02:00",
+        "updatedAt": "2026-08-02T07:15:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-02-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-02T09:25:00+02:00",
+        "endTime": "2026-08-02T10:25:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-02T09:25:00+02:00",
+        "updatedAt": "2026-08-02T10:25:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-02-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-02T13:25:00+02:00",
+        "endTime": "2026-08-02T14:40:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-02T13:25:00+02:00",
+        "updatedAt": "2026-08-02T14:40:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-03-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-02T19:04:00+02:00",
+        "endTime": "2026-08-03T07:11:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-02T19:04:00+02:00",
+        "updatedAt": "2026-08-03T07:11:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-03-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-03T09:30:00+02:00",
+        "endTime": "2026-08-03T10:28:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-03T09:30:00+02:00",
+        "updatedAt": "2026-08-03T10:28:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-03-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-03T13:22:00+02:00",
+        "endTime": "2026-08-03T14:39:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-03T13:22:00+02:00",
+        "updatedAt": "2026-08-03T14:39:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-04-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-03T18:55:00+02:00",
+        "endTime": "2026-08-04T07:20:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-03T18:55:00+02:00",
+        "updatedAt": "2026-08-04T07:20:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-04-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-04T09:21:00+02:00",
+        "endTime": "2026-08-04T10:27:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-04T09:21:00+02:00",
+        "updatedAt": "2026-08-04T10:27:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-04-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-04T13:31:00+02:00",
+        "endTime": "2026-08-04T14:44:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-04T13:31:00+02:00",
+        "updatedAt": "2026-08-04T14:44:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-05-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-04T19:02:00+02:00",
+        "endTime": "2026-08-05T07:13:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-04T19:02:00+02:00",
+        "updatedAt": "2026-08-05T07:13:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-05-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-05T09:28:00+02:00",
+        "endTime": "2026-08-05T10:23:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-05T09:28:00+02:00",
+        "updatedAt": "2026-08-05T10:23:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-05-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-05T13:20:00+02:00",
+        "endTime": "2026-08-05T14:43:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-05T13:20:00+02:00",
+        "updatedAt": "2026-08-05T14:43:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-06-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-05T18:57:00+02:00",
+        "endTime": "2026-08-06T07:18:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-05T18:57:00+02:00",
+        "updatedAt": "2026-08-06T07:18:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-06-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-06T09:23:00+02:00",
+        "endTime": "2026-08-06T10:29:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-06T09:23:00+02:00",
+        "updatedAt": "2026-08-06T10:29:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-06-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-06T13:27:00+02:00",
+        "endTime": "2026-08-06T14:36:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-06T13:27:00+02:00",
+        "updatedAt": "2026-08-06T14:36:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-07-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-06T19:00:00+02:00",
+        "endTime": "2026-08-07T07:15:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-06T19:00:00+02:00",
+        "updatedAt": "2026-08-07T07:15:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-07-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-07T09:25:00+02:00",
+        "endTime": "2026-08-07T10:25:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-07T09:25:00+02:00",
+        "updatedAt": "2026-08-07T10:25:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-07-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-07T13:25:00+02:00",
+        "endTime": "2026-08-07T14:40:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-07T13:25:00+02:00",
+        "updatedAt": "2026-08-07T14:40:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-08-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-07T19:04:00+02:00",
+        "endTime": "2026-08-08T07:11:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-07T19:04:00+02:00",
+        "updatedAt": "2026-08-08T07:11:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-08-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-08T09:30:00+02:00",
+        "endTime": "2026-08-08T10:28:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-08T09:30:00+02:00",
+        "updatedAt": "2026-08-08T10:28:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-08-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-08T13:22:00+02:00",
+        "endTime": "2026-08-08T14:39:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-08T13:22:00+02:00",
+        "updatedAt": "2026-08-08T14:39:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-09-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-08T18:55:00+02:00",
+        "endTime": "2026-08-09T07:20:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-08T18:55:00+02:00",
+        "updatedAt": "2026-08-09T07:20:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-09-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-09T09:21:00+02:00",
+        "endTime": "2026-08-09T10:27:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-09T09:21:00+02:00",
+        "updatedAt": "2026-08-09T10:27:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-09-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-09T13:31:00+02:00",
+        "endTime": "2026-08-09T14:44:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-09T13:31:00+02:00",
+        "updatedAt": "2026-08-09T14:44:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-10-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-09T19:02:00+02:00",
+        "endTime": "2026-08-10T07:13:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-09T19:02:00+02:00",
+        "updatedAt": "2026-08-10T07:13:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-10-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-10T09:28:00+02:00",
+        "endTime": "2026-08-10T10:23:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-10T09:28:00+02:00",
+        "updatedAt": "2026-08-10T10:23:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-10-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-10T13:20:00+02:00",
+        "endTime": "2026-08-10T14:43:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-10T13:20:00+02:00",
+        "updatedAt": "2026-08-10T14:43:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-11-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-10T18:57:00+02:00",
+        "endTime": "2026-08-11T07:18:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-10T18:57:00+02:00",
+        "updatedAt": "2026-08-11T07:18:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-11-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-11T09:23:00+02:00",
+        "endTime": "2026-08-11T10:29:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-11T09:23:00+02:00",
+        "updatedAt": "2026-08-11T10:29:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-11-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-11T13:27:00+02:00",
+        "endTime": "2026-08-11T14:36:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-11T13:27:00+02:00",
+        "updatedAt": "2026-08-11T14:36:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-12-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-11T19:50:00+02:00",
+        "endTime": "2026-08-12T06:55:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-11T19:50:00+02:00",
+        "updatedAt": "2026-08-12T06:55:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-12-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-12T09:30:00+02:00",
+        "endTime": "2026-08-12T10:27:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-12T09:30:00+02:00",
+        "updatedAt": "2026-08-12T10:27:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-12-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-12T13:47:00+02:00",
+        "endTime": "2026-08-12T15:05:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-12T13:47:00+02:00",
+        "updatedAt": "2026-08-12T15:05:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-13-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-12T19:54:00+02:00",
+        "endTime": "2026-08-13T06:51:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-12T19:54:00+02:00",
+        "updatedAt": "2026-08-13T06:51:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-13-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-13T09:35:00+02:00",
+        "endTime": "2026-08-13T10:30:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-13T09:35:00+02:00",
+        "updatedAt": "2026-08-13T10:30:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-13-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-13T13:44:00+02:00",
+        "endTime": "2026-08-13T15:04:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-13T13:44:00+02:00",
+        "updatedAt": "2026-08-13T15:04:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-14-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-13T19:45:00+02:00",
+        "endTime": "2026-08-14T07:00:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-13T19:45:00+02:00",
+        "updatedAt": "2026-08-14T07:00:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-14-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-14T09:26:00+02:00",
+        "endTime": "2026-08-14T10:29:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-14T09:26:00+02:00",
+        "updatedAt": "2026-08-14T10:29:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-14-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-14T13:53:00+02:00",
+        "endTime": "2026-08-14T15:09:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-14T13:53:00+02:00",
+        "updatedAt": "2026-08-14T15:09:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-15-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-14T19:52:00+02:00",
+        "endTime": "2026-08-15T06:53:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-14T19:52:00+02:00",
+        "updatedAt": "2026-08-15T06:53:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-15-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-15T09:33:00+02:00",
+        "endTime": "2026-08-15T10:25:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-15T09:33:00+02:00",
+        "updatedAt": "2026-08-15T10:25:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-15-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-15T13:42:00+02:00",
+        "endTime": "2026-08-15T15:08:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-15T13:42:00+02:00",
+        "updatedAt": "2026-08-15T15:08:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-16-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-15T19:47:00+02:00",
+        "endTime": "2026-08-16T06:58:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-15T19:47:00+02:00",
+        "updatedAt": "2026-08-16T06:58:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-16-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-16T09:28:00+02:00",
+        "endTime": "2026-08-16T10:31:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-16T09:28:00+02:00",
+        "updatedAt": "2026-08-16T10:31:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-16-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-16T13:49:00+02:00",
+        "endTime": "2026-08-16T15:01:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-16T13:49:00+02:00",
+        "updatedAt": "2026-08-16T15:01:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-17-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-16T19:50:00+02:00",
+        "endTime": "2026-08-17T06:55:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-16T19:50:00+02:00",
+        "updatedAt": "2026-08-17T06:55:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-17-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-17T09:30:00+02:00",
+        "endTime": "2026-08-17T10:27:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-17T09:30:00+02:00",
+        "updatedAt": "2026-08-17T10:27:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-17-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-17T13:47:00+02:00",
+        "endTime": "2026-08-17T15:05:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-17T13:47:00+02:00",
+        "updatedAt": "2026-08-17T15:05:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-18-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-17T19:54:00+02:00",
+        "endTime": "2026-08-18T06:51:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-17T19:54:00+02:00",
+        "updatedAt": "2026-08-18T06:51:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-18-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-18T09:35:00+02:00",
+        "endTime": "2026-08-18T10:30:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-18T09:35:00+02:00",
+        "updatedAt": "2026-08-18T10:30:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-18-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-18T13:44:00+02:00",
+        "endTime": "2026-08-18T15:04:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-18T13:44:00+02:00",
+        "updatedAt": "2026-08-18T15:04:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-19-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-18T19:45:00+02:00",
+        "endTime": "2026-08-19T07:00:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-18T19:45:00+02:00",
+        "updatedAt": "2026-08-19T07:00:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-19-1",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-19T00:18:00+02:00",
+        "endTime": "2026-08-19T02:27:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-19T00:18:00+02:00",
+        "updatedAt": "2026-08-19T02:27:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-19-2",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-19T03:12:00+02:00",
+        "endTime": "2026-08-19T05:18:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-19T03:12:00+02:00",
+        "updatedAt": "2026-08-19T05:18:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-19-3",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-19T06:09:00+02:00",
+        "endTime": "2026-08-19T08:02:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-19T06:09:00+02:00",
+        "updatedAt": "2026-08-19T08:02:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-19-4",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-19T09:14:00+02:00",
+        "endTime": "2026-08-19T10:58:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-19T09:14:00+02:00",
+        "updatedAt": "2026-08-19T10:58:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-19-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-19T09:26:00+02:00",
+        "endTime": "2026-08-19T10:29:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-19T09:26:00+02:00",
+        "updatedAt": "2026-08-19T10:29:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-19-5",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-19T12:08:00+02:00",
+        "endTime": "2026-08-19T14:03:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-19T12:08:00+02:00",
+        "updatedAt": "2026-08-19T14:03:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-19-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-19T13:53:00+02:00",
+        "endTime": "2026-08-19T15:09:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-19T13:53:00+02:00",
+        "updatedAt": "2026-08-19T15:09:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-19-6",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-19T15:21:00+02:00",
+        "endTime": "2026-08-19T17:04:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-19T15:21:00+02:00",
+        "updatedAt": "2026-08-19T17:04:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-19-7",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-19T18:17:00+02:00",
+        "endTime": "2026-08-19T20:01:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-19T18:17:00+02:00",
+        "updatedAt": "2026-08-19T20:01:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-20-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-19T19:52:00+02:00",
+        "endTime": "2026-08-20T06:38:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-19T19:52:00+02:00",
+        "updatedAt": "2026-08-20T06:38:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-19-8",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-19T21:03:00+02:00",
+        "endTime": "2026-08-19T23:38:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-19T21:03:00+02:00",
+        "updatedAt": "2026-08-19T23:38:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-20-1",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-20T00:26:00+02:00",
+        "endTime": "2026-08-20T02:41:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-20T00:26:00+02:00",
+        "updatedAt": "2026-08-20T02:41:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-20-2",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-20T03:25:00+02:00",
+        "endTime": "2026-08-20T05:31:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-20T03:25:00+02:00",
+        "updatedAt": "2026-08-20T05:31:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-20-3",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-20T06:22:00+02:00",
+        "endTime": "2026-08-20T08:14:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-20T06:22:00+02:00",
+        "updatedAt": "2026-08-20T08:14:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-20-4",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-20T09:28:00+02:00",
+        "endTime": "2026-08-20T11:09:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-20T09:28:00+02:00",
+        "updatedAt": "2026-08-20T11:09:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-20-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-20T09:38:00+02:00",
+        "endTime": "2026-08-20T10:28:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-20T09:38:00+02:00",
+        "updatedAt": "2026-08-20T10:28:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-20-5",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-20T12:19:00+02:00",
+        "endTime": "2026-08-20T14:16:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-20T12:19:00+02:00",
+        "updatedAt": "2026-08-20T14:16:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-20-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-20T14:05:00+02:00",
+        "endTime": "2026-08-20T15:28:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-20T14:05:00+02:00",
+        "updatedAt": "2026-08-20T15:28:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-20-6",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-20T15:33:00+02:00",
+        "endTime": "2026-08-20T17:19:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-20T15:33:00+02:00",
+        "updatedAt": "2026-08-20T17:19:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-20-7",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-20T18:31:00+02:00",
+        "endTime": "2026-08-20T20:16:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-20T18:31:00+02:00",
+        "updatedAt": "2026-08-20T20:16:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-21-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-20T20:32:00+02:00",
+        "endTime": "2026-08-21T06:43:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-20T20:32:00+02:00",
+        "updatedAt": "2026-08-21T06:43:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-20-8",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-20T21:18:00+02:00",
+        "endTime": "2026-08-20T23:47:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-20T21:18:00+02:00",
+        "updatedAt": "2026-08-20T23:47:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-21-1",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-21T00:11:00+02:00",
+        "endTime": "2026-08-21T02:20:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-21T00:11:00+02:00",
+        "updatedAt": "2026-08-21T02:20:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-21-2",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-21T03:02:00+02:00",
+        "endTime": "2026-08-21T05:07:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-21T03:02:00+02:00",
+        "updatedAt": "2026-08-21T05:07:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-21-3",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-21T05:58:00+02:00",
+        "endTime": "2026-08-21T07:51:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-21T05:58:00+02:00",
+        "updatedAt": "2026-08-21T07:51:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-21-4",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-21T09:02:00+02:00",
+        "endTime": "2026-08-21T10:46:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-21T09:02:00+02:00",
+        "updatedAt": "2026-08-21T10:46:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-21-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-21T09:33:00+02:00",
+        "endTime": "2026-08-21T10:34:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-21T09:33:00+02:00",
+        "updatedAt": "2026-08-21T10:34:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-21-5",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-21T11:56:00+02:00",
+        "endTime": "2026-08-21T13:49:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-21T11:56:00+02:00",
+        "updatedAt": "2026-08-21T13:49:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-21-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-21T14:12:00+02:00",
+        "endTime": "2026-08-21T15:21:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-21T14:12:00+02:00",
+        "updatedAt": "2026-08-21T15:21:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-21-6",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-21T15:08:00+02:00",
+        "endTime": "2026-08-21T16:52:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-21T15:08:00+02:00",
+        "updatedAt": "2026-08-21T16:52:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-21-7",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-21T18:04:00+02:00",
+        "endTime": "2026-08-21T19:47:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-21T18:04:00+02:00",
+        "updatedAt": "2026-08-21T19:47:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-22-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-21T20:35:00+02:00",
+        "endTime": "2026-08-22T06:40:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-21T20:35:00+02:00",
+        "updatedAt": "2026-08-22T06:40:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-21-8",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-21T20:49:00+02:00",
+        "endTime": "2026-08-21T23:25:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-21T20:49:00+02:00",
+        "updatedAt": "2026-08-21T23:25:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-22-1",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-22T00:18:00+02:00",
+        "endTime": "2026-08-22T02:27:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-22T00:18:00+02:00",
+        "updatedAt": "2026-08-22T02:27:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-22-2",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-22T03:12:00+02:00",
+        "endTime": "2026-08-22T05:18:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-22T03:12:00+02:00",
+        "updatedAt": "2026-08-22T05:18:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-22-3",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-22T06:09:00+02:00",
+        "endTime": "2026-08-22T08:02:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-22T06:09:00+02:00",
+        "updatedAt": "2026-08-22T08:02:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-22-4",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-22T09:14:00+02:00",
+        "endTime": "2026-08-22T10:58:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-22T09:14:00+02:00",
+        "updatedAt": "2026-08-22T10:58:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-22-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-22T09:35:00+02:00",
+        "endTime": "2026-08-22T10:30:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-22T09:35:00+02:00",
+        "updatedAt": "2026-08-22T10:30:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-22-5",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-22T12:08:00+02:00",
+        "endTime": "2026-08-22T14:03:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-22T12:08:00+02:00",
+        "updatedAt": "2026-08-22T14:03:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-22-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-22T14:10:00+02:00",
+        "endTime": "2026-08-22T15:25:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-22T14:10:00+02:00",
+        "updatedAt": "2026-08-22T15:25:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-22-6",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-22T15:21:00+02:00",
+        "endTime": "2026-08-22T17:04:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-22T15:21:00+02:00",
+        "updatedAt": "2026-08-22T17:04:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-22-7",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-22T18:17:00+02:00",
+        "endTime": "2026-08-22T20:01:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-22T18:17:00+02:00",
+        "updatedAt": "2026-08-22T20:01:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-23-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-22T20:39:00+02:00",
+        "endTime": "2026-08-23T06:36:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-22T20:39:00+02:00",
+        "updatedAt": "2026-08-23T06:36:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-22-8",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-22T21:03:00+02:00",
+        "endTime": "2026-08-22T23:38:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-22T21:03:00+02:00",
+        "updatedAt": "2026-08-22T23:38:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-23-1",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-23T00:26:00+02:00",
+        "endTime": "2026-08-23T02:41:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-23T00:26:00+02:00",
+        "updatedAt": "2026-08-23T02:41:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-23-2",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-23T03:25:00+02:00",
+        "endTime": "2026-08-23T05:31:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-23T03:25:00+02:00",
+        "updatedAt": "2026-08-23T05:31:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-23-3",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-23T06:22:00+02:00",
+        "endTime": "2026-08-23T08:14:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-23T06:22:00+02:00",
+        "updatedAt": "2026-08-23T08:14:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-23-4",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-23T09:28:00+02:00",
+        "endTime": "2026-08-23T11:09:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-23T09:28:00+02:00",
+        "updatedAt": "2026-08-23T11:09:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-23-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-23T09:40:00+02:00",
+        "endTime": "2026-08-23T10:33:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-23T09:40:00+02:00",
+        "updatedAt": "2026-08-23T10:33:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-23-5",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-23T12:19:00+02:00",
+        "endTime": "2026-08-23T14:16:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-23T12:19:00+02:00",
+        "updatedAt": "2026-08-23T14:16:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-23-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-23T14:07:00+02:00",
+        "endTime": "2026-08-23T15:24:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-23T14:07:00+02:00",
+        "updatedAt": "2026-08-23T15:24:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-23-6",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-23T15:33:00+02:00",
+        "endTime": "2026-08-23T17:19:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-23T15:33:00+02:00",
+        "updatedAt": "2026-08-23T17:19:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-23-7",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-23T18:31:00+02:00",
+        "endTime": "2026-08-23T20:16:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-23T18:31:00+02:00",
+        "updatedAt": "2026-08-23T20:16:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-24-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-23T20:30:00+02:00",
+        "endTime": "2026-08-24T06:45:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-23T20:30:00+02:00",
+        "updatedAt": "2026-08-24T06:45:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-23-8",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-23T21:18:00+02:00",
+        "endTime": "2026-08-23T23:47:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-23T21:18:00+02:00",
+        "updatedAt": "2026-08-23T23:47:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-24-1",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-24T00:11:00+02:00",
+        "endTime": "2026-08-24T02:20:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-24T00:11:00+02:00",
+        "updatedAt": "2026-08-24T02:20:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-24-2",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-24T03:02:00+02:00",
+        "endTime": "2026-08-24T05:07:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-24T03:02:00+02:00",
+        "updatedAt": "2026-08-24T05:07:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-24-3",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-24T05:58:00+02:00",
+        "endTime": "2026-08-24T07:51:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-24T05:58:00+02:00",
+        "updatedAt": "2026-08-24T07:51:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-24-4",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-24T09:02:00+02:00",
+        "endTime": "2026-08-24T10:46:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-24T09:02:00+02:00",
+        "updatedAt": "2026-08-24T10:46:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-24-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-24T09:31:00+02:00",
+        "endTime": "2026-08-24T10:32:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-24T09:31:00+02:00",
+        "updatedAt": "2026-08-24T10:32:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-24-5",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-24T11:56:00+02:00",
+        "endTime": "2026-08-24T13:49:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-24T11:56:00+02:00",
+        "updatedAt": "2026-08-24T13:49:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-24-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-24T14:16:00+02:00",
+        "endTime": "2026-08-24T15:29:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-24T14:16:00+02:00",
+        "updatedAt": "2026-08-24T15:29:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-24-6",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-24T15:08:00+02:00",
+        "endTime": "2026-08-24T16:52:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-24T15:08:00+02:00",
+        "updatedAt": "2026-08-24T16:52:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-24-7",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-24T18:04:00+02:00",
+        "endTime": "2026-08-24T19:47:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-24T18:04:00+02:00",
+        "updatedAt": "2026-08-24T19:47:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-25-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-24T20:37:00+02:00",
+        "endTime": "2026-08-25T06:38:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-24T20:37:00+02:00",
+        "updatedAt": "2026-08-25T06:38:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-24-8",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-24T20:49:00+02:00",
+        "endTime": "2026-08-24T23:25:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-24T20:49:00+02:00",
+        "updatedAt": "2026-08-24T23:25:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-25-1",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-25T00:18:00+02:00",
+        "endTime": "2026-08-25T02:27:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-25T00:18:00+02:00",
+        "updatedAt": "2026-08-25T02:27:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-25-2",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-25T03:12:00+02:00",
+        "endTime": "2026-08-25T05:18:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-25T03:12:00+02:00",
+        "updatedAt": "2026-08-25T05:18:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-25-3",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-25T06:09:00+02:00",
+        "endTime": "2026-08-25T08:02:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-25T06:09:00+02:00",
+        "updatedAt": "2026-08-25T08:02:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-25-4",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-25T09:14:00+02:00",
+        "endTime": "2026-08-25T10:58:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-25T09:14:00+02:00",
+        "updatedAt": "2026-08-25T10:58:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-25-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-25T09:38:00+02:00",
+        "endTime": "2026-08-25T10:28:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-25T09:38:00+02:00",
+        "updatedAt": "2026-08-25T10:28:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-25-5",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-25T12:08:00+02:00",
+        "endTime": "2026-08-25T14:03:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-25T12:08:00+02:00",
+        "updatedAt": "2026-08-25T14:03:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-25-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-25T14:05:00+02:00",
+        "endTime": "2026-08-25T15:28:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-25T14:05:00+02:00",
+        "updatedAt": "2026-08-25T15:28:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-25-6",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-25T15:21:00+02:00",
+        "endTime": "2026-08-25T17:04:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-25T15:21:00+02:00",
+        "updatedAt": "2026-08-25T17:04:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-25-7",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-25T18:17:00+02:00",
+        "endTime": "2026-08-25T20:01:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-25T18:17:00+02:00",
+        "updatedAt": "2026-08-25T20:01:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-26-night",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-25T20:32:00+02:00",
+        "endTime": "2026-08-26T06:43:00+02:00",
+        "note": "Éjszakai tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-25T20:32:00+02:00",
+        "updatedAt": "2026-08-26T06:43:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-25-8",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-25T21:03:00+02:00",
+        "endTime": "2026-08-25T23:38:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-25T21:03:00+02:00",
+        "updatedAt": "2026-08-25T23:38:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-26-1",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-26T00:26:00+02:00",
+        "endTime": "2026-08-26T02:41:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-26T00:26:00+02:00",
+        "updatedAt": "2026-08-26T02:41:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-26-2",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-26T03:25:00+02:00",
+        "endTime": "2026-08-26T05:31:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-26T03:25:00+02:00",
+        "updatedAt": "2026-08-26T05:31:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-26-3",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-26T06:22:00+02:00",
+        "endTime": "2026-08-26T08:14:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-26T06:22:00+02:00",
+        "updatedAt": "2026-08-26T08:14:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-26-4",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-26T09:28:00+02:00",
+        "endTime": "2026-08-26T11:09:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-26T09:28:00+02:00",
+        "updatedAt": "2026-08-26T11:09:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-26-nap-1",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-26T09:33:00+02:00",
+        "endTime": "2026-08-26T10:34:00+02:00",
+        "note": "Délelőtti tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-26T09:33:00+02:00",
+        "updatedAt": "2026-08-26T10:34:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-26-5",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-26T12:19:00+02:00",
+        "endTime": "2026-08-26T14:16:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-26T12:19:00+02:00",
+        "updatedAt": "2026-08-26T14:16:00+02:00"
+      },
+      {
+        "id": "demo-boti-2026-08-26-nap-2",
+        "childId": "child_demo_boti",
+        "startTime": "2026-08-26T14:12:00+02:00",
+        "endTime": "2026-08-26T15:21:00+02:00",
+        "note": "Délutáni tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-26T14:12:00+02:00",
+        "updatedAt": "2026-08-26T15:21:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-26-6",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-26T15:33:00+02:00",
+        "endTime": "2026-08-26T17:19:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-26T15:33:00+02:00",
+        "updatedAt": "2026-08-26T17:19:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-26-7",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-26T18:31:00+02:00",
+        "endTime": "2026-08-26T20:16:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-26T18:31:00+02:00",
+        "updatedAt": "2026-08-26T20:16:00+02:00"
+      },
+      {
+        "id": "demo-frici-2026-08-26-8",
+        "childId": "child_demo_frici",
+        "startTime": "2026-08-26T21:18:00+02:00",
+        "endTime": "2026-08-26T23:47:00+02:00",
+        "note": "Újszülött tesztalvás",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-26T21:18:00+02:00",
+        "updatedAt": "2026-08-26T23:47:00+02:00"
+      }
+    ]
+  }
+}

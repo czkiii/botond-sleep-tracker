@@ -3,6 +3,8 @@
 Status: **LOCKED FOR IMPLEMENTATION PLANNING**  
 Locked: 2026-08-24
 
+**Current product direction — 2026-09-17:** see `PRODUCT_DIRECTION.md`. Retain the sleep-only scope, dark interface, large tracking button and quick backdating. Reports describe recorded history and changes; no prescribed sleep schedule, AI assistant, unsolicited recommendations or promises of improved sleep. Keep Free / Family (990 HUF/month) / Family+ (1490 HUF/month), with paid capabilities shared by all active family members whenever any active member subscribes. Older implementation plans below are not statements that all listed features exist; conflicting personal-entitlement rules are superseded.
+
 This document records the product decisions agreed before the next major implementation phase. The goal is to avoid repeated redesign during coding and to keep UX, data model, sync, analytics and business preparation aligned.
 
 ## 1. Child profile and multi-child

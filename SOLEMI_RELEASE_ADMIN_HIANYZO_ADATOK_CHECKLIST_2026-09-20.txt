@@ -1,0 +1,381 @@
+SOLEMI SLEEP – KIADÁS ELŐTT KÉSŐBB KITÖLTENDŐ / ELDÖNTENDŐ LISTA
+Dátum: 2026-09-20
+Cél: egy helyen legyen minden olyan adat, URL, e-mail, céges/jogi információ és technikai részlet,
+ami a Privacy Policy, Terms, store-feltöltés, account deletion és support véglegesítéséhez még hiányzik.
+
+==================================================
+A. MÁRKANÉV / DOMAIN / WEBOLDAL
+==================================================
+
+[ ] Végleges publikus domain
+    Példa: solemi.app / solemisleep.com / solemisleep.hu
+    Megjegyzés: érdemes olyan domaint választani, amit HU/EN/DE közönség is könnyen ért.
+
+[ ] Főoldal URL
+    Példa: https://<domain>/
+
+[ ] Privacy Policy URL
+    Példa: https://<domain>/privacy
+
+[ ] Terms of Service URL
+    Példa: https://<domain>/terms
+
+[ ] Account deletion URL
+    Példa: https://<domain>/delete-account
+
+[ ] Support oldal URL
+    Példa: https://<domain>/support
+
+[ ] Opcionális státusz / service status oldal
+    Példa: https://status.<domain>/
+    Nem kötelező induláskor.
+
+==================================================
+B. E-MAIL CÍMEK
+==================================================
+
+[ ] Support e-mail
+    Javasolt: support@<domain>
+
+[ ] Privacy / adatvédelmi e-mail
+    Javasolt: privacy@<domain>
+    Egyszerű indulásnál lehet ugyanaz, mint a support e-mail.
+
+[ ] Store / fejlesztői kapcsolattartó e-mail
+    Lehet ugyanaz, mint a support, de célszerű domainhez kötött cím.
+
+[ ] Könyvelési / üzleti e-mail
+    Opcionális, belső használatra.
+    Példa: billing@<domain> vagy info@<domain>
+
+==================================================
+C. ADATKEZELŐ HIVATALOS ADATAI
+==================================================
+
+[ ] Adatkezelő hivatalos neve
+    Magánszemély / egyéni vállalkozó / cég – a végleges jogi forma szerint.
+
+[ ] Adatkezelő hivatalos címe / székhelye
+
+[ ] Adószám
+    Csak akkor, ha a publikus dokumentumokban vagy számlázásban szükséges.
+
+[ ] Nyilvántartási szám / cégjegyzékszám
+    Csak a választott jogi formától függően.
+
+[ ] Kapcsolattartó neve
+    Ha szükséges a jogi dokumentumokban.
+
+==================================================
+D. FIÓKTÖRLÉS / RECOVERY
+==================================================
+
+[ ] Végleges webes account-deletion oldal elkészítése
+
+[ ] Végleges szöveg az „azonnali végleges törlés” opcióhoz
+
+[ ] Végleges szöveg a „30 napos helyreállítás” opcióhoz
+
+[ ] Döntés és technikai megvalósítás:
+    - hogyan azonosítjuk biztonságosan a webes törlést kérő felhasználót;
+    - hogyan tudja saját maga visszaállítani a fiókot;
+    - hogyan kérhet azonnali végleges törlést a 30 nap alatt.
+
+[ ] Törlés előtt export gomb minden releváns helyen
+
+[ ] Családi törlésnél második megerősítés
+    Elfogadott irány: családnév begépelése.
+
+==================================================
+E. ADATEXPORT
+==================================================
+
+[ ] Végleges exportformátum
+    Jelenlegi irány: teljes géppel olvasható JSON export.
+
+[ ] Döntés: PDF export pontos tartalma
+    Elfogadott termékdöntés: legyen a V1-ben.
+
+[ ] Export fájlnév-szabály
+    Példa: solemi-export-YYYY-MM-DD.json
+
+[ ] Export tartalma legyen dokumentálva:
+    - fiókadatok?
+    - gyermekprofilok?
+    - alvások?
+    - jegyzetek?
+    - Family Sync metaadatok?
+    - előfizetési/jogosultsági adatokból mi kerüljön bele?
+
+==================================================
+F. ADATMEGŐRZÉS – MÉG KONKRÉTAN RÖGZÍTENDŐ
+==================================================
+
+[ ] Production technikai log retention
+    Jelenlegi V1 javaslat: max. 30 nap normál logokra.
+
+[ ] Biztonsági incidens log retention
+    Csak dokumentált szükség esetén hosszabb.
+
+[ ] Backup retention
+    Pontos időtartam még nincs lezárva.
+
+[ ] Backup törlési mechanizmus
+    Biztosítani kell, hogy restore után korábban végleg törölt fiók ne „éledjen vissza”.
+
+[ ] Store/billing rekordok retentionje
+    Pontosítani kell, hogy mely Apple/Google rekordokat tartjuk meg és meddig.
+
+[ ] Könyvelői megerősítés
+    Pontosan mely Apple/Google bizonylatokra vonatkozik magyar számviteli megőrzés.
+
+==================================================
+G. KÜLSŐ SZOLGÁLTATÓK / ADATFELDOLGOZÓK
+==================================================
+
+[ ] Cloudflare production szolgáltatások végleges listája
+    Példa:
+    - Pages
+    - Workers
+    - D1
+    - esetleges log/analytics szolgáltatás
+
+[ ] Cloudflare production régió / adatrezidencia tényleges beállításainak ellenőrzése
+
+[ ] Google szolgáltatások végleges listája
+    - Google Sign-In
+    - Google Play Billing
+    - egyéb Google SDK, ha lesz
+
+[ ] Apple szolgáltatások végleges listája
+    - Sign in with Apple
+    - App Store / StoreKit
+
+[ ] Egyéb analytics / crash reporting szolgáltató
+    Jelenleg nincs véglegesítve.
+    Ha bekerül, Privacy Policy és store privacy nyilatkozat frissítendő.
+
+[ ] Push notification szolgáltatás
+    Jelenlegi termékdöntés: V1-ben nem szükséges emlékeztető/push funkció.
+    Ha később bekerül, új adatkezelési pont lesz.
+
+==================================================
+H. APPLE-SPECIFIKUS
+==================================================
+
+[ ] Apple Developer account végleges jogi név
+
+[ ] App Store Connect support URL
+
+[ ] App Store Connect Privacy Policy URL
+
+[ ] Sign in with Apple végleges bundle/service konfiguráció
+
+[ ] Apple account deletion token-visszavonás tesztelve
+
+[ ] App Store subscription product ID-k
+    Külön Family havi / éves
+    Külön Family+ havi / éves
+
+[ ] 7 napos trial store-konfiguráció
+    Termékdöntés: egy felhasználónak egyszer összesen,
+    ő dönti el, melyik csomagra használja.
+
+==================================================
+I. GOOGLE PLAY-SPECIFIKUS
+==================================================
+
+[ ] Google Play Developer account végleges jogi név
+
+[ ] Play Console support e-mail
+
+[ ] Play Console Privacy Policy URL
+
+[ ] Play Console account deletion URL
+
+[ ] Data Safety űrlap kitöltése a tényleges adatkezelés alapján
+
+[ ] Google Play subscription product ID-k
+    Family havi / éves
+    Family+ havi / éves
+
+[ ] 7 napos trial konfiguráció
+
+[ ] Closed testing követelmény ellenőrzése a konkrét fejlesztői fióktípus alapján
+
+==================================================
+J. ELŐFIZETÉS / ÁRAZÁS
+==================================================
+
+[x] Family havi ár: 990 Ft/hó
+
+[x] Family+ havi ár: 1490 Ft/hó
+
+[x] Éves csomag induláskor: igen
+
+[x] Éves kedvezmény elv: kb. 2 havi díj kedvezmény
+    („10 hónapot fizetsz, 12-t kapsz”)
+
+[x] 7 napos trial: igen
+
+[x] Trial: egyszer összesen felhasználónként
+
+[x] A felhasználó dönti el, Family vagy Family+ trial legyen
+
+[x] Egy családnak egy aktív előfizetés elegendő
+
+[x] Második családi előfizetést ne ösztönözzük;
+    vásárláskor külön figyelmeztessünk rá.
+
+[ ] Végleges éves árak kiszámítása és store-árszintekhez igazítása
+
+[ ] Deviza / országonkénti árazási stratégia
+    Induláskor lehet automatikus store-konverzió vagy később kézi finomhangolás.
+
+==================================================
+K. PRIVACY POLICY – VÉGLEGESÍTÉSHEZ KITÖLTENDŐ
+==================================================
+
+[ ] Adatkezelő hivatalos neve
+
+[ ] Adatkezelő címe
+
+[ ] Privacy/support e-mail
+
+[ ] Fő domain
+
+[ ] Account deletion URL
+
+[ ] Production adatfeldolgozók pontos listája
+
+[ ] Production log retention
+
+[ ] Backup retention
+
+[ ] Számviteli retention rész könyvelővel véglegesítve
+
+[ ] Jogi alapok végső ellenőrzése a valós production működéshez
+
+[ ] HU verzió végleges
+
+[ ] EN verzió elkészítve
+
+[ ] DE verzió elkészítve
+
+==================================================
+L. TERMS OF SERVICE – MÉG ELKÉSZÍTENDŐ
+==================================================
+
+[ ] Rövid Solemi Terms of Service elkészítése
+
+Tartalmazza legalább:
+- szolgáltatás leírása;
+- Free / Family / Family+ csomagok;
+- havi / éves előfizetés;
+- 7 napos trial;
+- automatikus megújulás;
+- lemondás;
+- egy család = egy előfizetés elv;
+- Family Sync működése;
+- account/family megszüntetés;
+- export;
+- felelősségi korlát;
+- nem orvosi szolgáltatás;
+- alkalmazandó jog és kapcsolattartás.
+
+[ ] Apple egyedi EULA
+    Jelenlegi döntés: induláskor nem szükséges, Apple standard EULA használható.
+
+==================================================
+M. SUPPORT
+==================================================
+
+[x] Induláskor elég egy support e-mail cím.
+
+[ ] Végleges support e-mail létrehozása
+
+[ ] Rövid support oldal
+    Tartalmazza:
+    - e-mail;
+    - alap hibabejelentési útmutató;
+    - build/verzió megadása;
+    - ne küldjenek jelszót vagy érzékeny adatot e-mailben.
+
+[ ] Válaszidő belső cél
+    Nem feltétlenül kell publikálni.
+
+==================================================
+N. MÁR LEZÁRT TERMÉKDÖNTÉSEK – NE NYISSUK ÚJRA OK NÉLKÜL
+==================================================
+
+[x] Külön helyi törlés és családi törlés
+
+[x] Hibrid admin-kilépési modell
+
+[x] Utolsó fizető megszűnésekor Family Sync pause, adat megmarad
+
+[x] Utolsó családtag esetén külön családmegszüntetés
+
+[x] 30 napos offline fizetős jogosultság
+
+[x] PDF export legyen V1-ben
+
+[x] Push/emlékeztetők ne legyenek V1-ben
+
+[x] Életkorhoz viszonyított wake window ne legyen V1-ben;
+    maradjanak a saját gyermek adatai
+
+[x] Jelenlegi navigáció maradjon V1-ben
+
+[x] Sign in with Apple legyen
+
+[x] Más családtag esetén közös családi adatok megmaradnak fióktörléskor
+
+[x] Utolsó tagnál max. 30 napos recovery
+
+[x] Export felajánlása:
+    - fióktörlés előtt;
+    - családból kilépés előtt;
+    - családi adattörlés előtt;
+    - utolsó családtag megszüntetése előtt.
+
+[x] Recovery önkiszolgáló legyen
+
+[x] Family → Family+ váltás azonnali jogosultságot adjon,
+    elszámolást a store kezelje
+
+==================================================
+O. DOMAIN KIVÁLASZTÁSAKOR ELLENŐRIZENDŐ
+==================================================
+
+[ ] Márkanév egyszerűen írható HU/EN/DE nyelven
+
+[ ] Nincs zavaró kötőjel vagy nehezen diktálható forma
+
+[ ] .com / .app / .hu lehetőségek összevetése
+
+[ ] Support e-mail kulturáltan néz ki vele
+
+[ ] Privacy és deletion URL rövid és érthető
+
+[ ] App Store / Play Store fejlesztői névvel nem ütközik
+
+[ ] Védjegy / névütközés külön ellenőrizendő, mielőtt véglegesítjük
+
+==================================================
+P. A KÖVETKEZŐ ADMINISZTRATÍV SORREND
+==================================================
+
+1. Domain kiválasztása és lefoglalása
+2. Support/privacy e-mail létrehozása
+3. Adatkezelő jogi forma és hivatalos adatok véglegesítése
+4. Privacy Policy kitöltése ezekkel
+5. Terms of Service elkészítése
+6. Account deletion weboldal elkészítése
+7. Support oldal elkészítése
+8. Apple/Google developer fiókok publikus adatai
+9. Store subscription termékek létrehozása
+10. Data Safety / App Privacy űrlapok kitöltése
+11. Release előtti jogi és könyvelői végső ellenőrzés
+
+Ez a lista legyen a “nem kódolós release admin” master checklist.

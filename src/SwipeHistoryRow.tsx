@@ -71,7 +71,7 @@ export default function SwipeHistoryRow({ session, now, locale, onEdit, onDelete
     </div>
     <button className="sleep-row swipe-history-content" type="button" style={{ transform: `translate3d(${offset}px, 0, 0)` }} onClick={handleRowClick}>
       <span className="sleep-row-icon"><MoonIcon /></span>
-      <span className="sleep-row-time">{formatTime(session.startTime, locale)} – {session.endTime ? formatTime(session.endTime, locale) : t(locale, 'now')}</span>
+      <span className="sleep-row-main"><span className="sleep-row-time">{formatTime(session.startTime, locale)} – {session.endTime ? formatTime(session.endTime, locale) : t(locale, 'now')}</span>{session.note && <small className="sleep-row-note">{session.note}</small>}</span>
       <span className="sleep-row-duration">{formatDuration(durationOf(session, now), locale)}</span>
       <span className="sleep-row-edit"><EditIcon /></span>
     </button>

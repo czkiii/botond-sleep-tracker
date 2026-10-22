@@ -1,0 +1,1208 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { DatabaseSync } from 'node:sqlite'
+import { readFileSync, readdirSync } from 'node:fs'
+import { trialRegistryFixture } from './trialRegistryFixture'
+import worker from '../src/index'
+import { sqliteBinding } from './sqliteD1'
+import { SignJWT } from 'jose'
+
+const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8')
+const migrations = readdirSync(new URL('../migrations/', import.meta.url)).filter(x => x.endsWith('.sql') && x >= '003').sort()
+  .map((name) => readFileSync(new URL(`../migrations/${name}`, import.meta.url), 'utf8')).join('\n')
+const origin = 'https://solemi-sleep-internal.pages.dev'
+let sqlite: DatabaseSync, registry: DatabaseSync
+let env: Parameters<typeof worker.fetch>[1]
+
+beforeEach(async () => {
+  sqlite = new DatabaseSync(':memory:')
+  sqlite.exec(schema)
+  sqlite.exec(migrations)
+  env = { DB: sqliteBinding(sqlite), TOKEN_PEPPER: 'test-pepper', ALLOWED_ORIGINS: origin,
+    GOOGLE_CLIENT_ID: 'solemi.apps.googleusercontent.com',
+    AUTH_SECRET: 'test-secret-with-at-least-32-characters', ACCOUNT_FAMILY_BRIDGE: 'true' }
+  const fixture = await trialRegistryFixture(); registry = fixture.db; Object.assign(env, fixture.env)
+})
+afterEach(() => { sqlite.close(); registry.close() })
+
+function fetch(path: string, init: RequestInit = {}) {
+  return worker.fetch(new Request(`https://sync.example${path}`, init), env)
+}
+
+async function sha256(value: string) {
+  const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
+  return Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+async function accountAccess(accountId: string, deviceId: string, suffix: string) {
+  const now = Date.now()
+  const sessionId = `ses_${suffix}`
+  sqlite.prepare(`INSERT OR IGNORE INTO accounts
+    (id, email, display_name, avatar_url, locale, status, created_at, updated_at, last_login_at, deleted_at)
+    VALUES (?, ?, NULL, NULL, NULL, 'ACTIVE', ?, ?, ?, NULL)`)
+    .run(accountId, `${accountId}@example.com`, now, now, now)
+  sqlite.prepare(`INSERT OR IGNORE INTO account_identities VALUES (?,?,'GOOGLE','https://accounts.google.com',?,?,1,?,?)`)
+    .run('identity-' + accountId, accountId, accountId, `${accountId}@example.com`, now, now)
+  sqlite.prepare(`INSERT INTO account_devices
+    (id, account_id, installation_hash, credential_hash, name, platform, created_at, last_seen_at, revoked_at, revoke_reason)
+    VALUES (?, ?, ?, ?, 'Test browser', 'WEB', ?, ?, NULL, NULL)`)
+    .run(deviceId, accountId, `installation_${suffix}`, `credential_${suffix}`, now, now)
+  sqlite.prepare(`INSERT INTO account_sessions
+    (id, account_id, device_id, refresh_hash, created_at, last_used_at, expires_at, revoked_at, rotation_counter)
+    VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 0)`)
+    .run(sessionId, accountId, deviceId, `refresh_${suffix}`, now, now, now + 60_000)
+  return new SignJWT({ sid: sessionId, did: deviceId }).setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .setIssuer('solemi-auth').setAudience('solemi-account').setSubject(accountId)
+    .setIssuedAt(Math.floor(now / 1000)).setExpirationTime(Math.floor(now / 1000) + 300)
+    .sign(new TextEncoder().encode(env.AUTH_SECRET!))
+}
+
+async function seedLegacyFamily(token: string) {
+  const now = new Date().toISOString()
+  sqlite.prepare(`INSERT INTO families (id, name, revision, created_at)
+    VALUES ('fam_test', 'Teszt család', 0, ?)`).run(now)
+  sqlite.prepare(`INSERT INTO devices (id, family_id, token_hash, name, created_at, last_seen_at, revoked_at)
+    VALUES ('dev_legacy', 'fam_test', ?, 'Safari', ?, ?, NULL)`)
+    .run(await sha256(`${env.TOKEN_PEPPER}:${token}`), now, now)
+}
+
+async function seedInvite(code: string) {
+  const now = new Date()
+  sqlite.prepare(`INSERT INTO invite_codes
+    (code_hash, family_id, created_by_device_id, created_at, expires_at, used_at)
+    VALUES (?, 'fam_test', 'dev_legacy', ?, ?, NULL)`)
+    .run(await sha256(`${env.TOKEN_PEPPER}:${code}`), now.toISOString(),
+      new Date(now.getTime() + 30 * 60 * 1000).toISOString())
+}
+
+function setTestPlan(access: string, plan: 'free' | 'family' | 'familyPlus') {
+  return fetch('/v1/auth/test/plan', {
+    method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${access}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ plan })
+  })
+}
+
+describe('A11 authenticated trial routes', () => {
+  const headers = (token: string) => ({ Origin: origin, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' })
+  const activate = (token: string, body = { product: 'FAMILY_PLUS', operationId: 'route-request' }) => fetch('/v1/auth/trial/activate', {
+    method: 'POST', headers: headers(token), body: JSON.stringify(body) })
+  it('fails closed at the HTTP boundary when the independent registry is missing or its key changes', async () => {
+    env.TRIAL_ENABLED = 'true'
+    const token = await accountAccess('trial-owner', 'trial-device', 'trial-session')
+    const original = env.ERASURE_JOURNAL
+    env.ERASURE_JOURNAL = undefined
+    expect((await activate(token)).status).toBe(503)
+    env.ERASURE_JOURNAL = original; env.TRIAL_IDENTITY_SECRET += '-wrong'
+    expect((await activate(token)).status).toBe(503)
+    expect(sqlite.prepare('SELECT * FROM account_trials').all()).toEqual([])
+  })
+  it('is disabled by default, requires authentication and validates product/request ID', async () => {
+    const token = await accountAccess('trial-owner', 'trial-device', 'trial-session')
+    expect((await activate(token)).status).toBe(404)
+    env.TRIAL_ENABLED = 'true'
+    expect((await activate('fake')).status).toBe(401)
+    expect((await activate(token, { product: 'FREE', operationId: 'route-request' })).status).toBe(400)
+    expect((await activate(token, { product: 'FAMILY', operationId: 'short' })).status).toBe(400)
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM account_trials').get()!.n).toBe(0)
+  })
+  it('survives logout/device session replacement without a second account trial', async () => {
+    env.TRIAL_ENABLED = 'true'
+    const token = await accountAccess('trial-owner', 'trial-device', 'trial-session')
+    expect((await activate(token)).status).toBe(200)
+    sqlite.exec("UPDATE account_sessions SET revoked_at = 1 WHERE account_id = 'trial-owner'")
+    const nextToken = await accountAccess('trial-owner', 'new-device', 'new-session')
+    const denied = await activate(nextToken, { product: 'FAMILY', operationId: 'new-request' })
+    expect(denied.status).toBe(409)
+    expect(await denied.json()).toMatchObject({ error: { code: 'TRIAL_ACCOUNT_USED' } })
+    expect((await activate(nextToken)).status).toBe(200)
+  })
+  it('creates a family from a family-less trial and binds it inside the membership transaction', async () => {
+    env.TRIAL_ENABLED = 'true'; env.ENTITLEMENT_ENFORCEMENT = 'true'
+    const token = await accountAccess('trial-owner', 'trial-device', 'trial-session')
+    await activate(token)
+    const response = await fetch('/v1/auth/family/create', { method: 'POST', headers: headers(token), body: JSON.stringify({ familyName: 'Trial family', childName: 'Fixture' }) })
+    expect(response.status).toBe(201)
+    const created = await response.json() as { data: { membership: { familyId: string } } }
+    expect(sqlite.prepare("SELECT family_id FROM account_trials WHERE account_id = 'trial-owner'").get()!.family_id).toBe(created.data.membership.familyId)
+    const access = await fetch('/v1/auth/access', { headers: headers(token) })
+    expect(await access.json()).toMatchObject({ data: { familySync: { canSync: true }, familyFeatures: ['FAMILY_PLUS_INSIGHTS', 'FAMILY_SYNC', 'PDF_EXPORT'] } })
+  })
+})
+
+describe('A06 enforced family access boundaries', () => {
+  afterEach(() => vi.restoreAllMocks())
+  const diaryRoutes = [
+    ['GET', '/v1/sync?after=0'], ['POST', '/v1/invites'],
+    ['POST', '/v1/children'], ['PATCH', '/v1/children/child_access'], ['DELETE', '/v1/children/child_access'],
+    ['POST', '/v1/sessions'], ['POST', '/v1/sessions/start'], ['POST', '/v1/sessions/sleep_access/end'],
+    ['PATCH', '/v1/sessions/sleep_access'], ['DELETE', '/v1/sessions/sleep_access']
+  ] as const
+  const deviceRoutes = [['GET', '/v1/device'], ['POST', '/v1/device/leave']] as const
+  const data = () => ['families', 'children', 'sleep_sessions', 'operations', 'invite_codes']
+    .map(table => sqlite.prepare(`SELECT * FROM ${table}`).all())
+  async function setup() {
+    env.ENTITLEMENT_ENFORCEMENT = 'true'
+    env.ENTITLEMENT_TEST_MODE = 'true'
+    await seedLegacyFamily('family-access-token')
+    const owner = await accountAccess('acc_owner', 'adev_owner', 'access_owner')
+    const headers = { Origin: origin, Authorization: `Bearer ${owner}`, 'Content-Type': 'application/json',
+      'X-Solemi-Family-Token': 'family-access-token' }
+    expect((await fetch('/v1/auth/family/claim', { method: 'POST', headers,
+      body: JSON.stringify({ familyDeviceToken: 'family-access-token' }) })).status).toBe(200)
+    expect((await setTestPlan(owner, 'family')).status).toBe(200)
+    sqlite.prepare(`INSERT INTO children (id, family_id, name, created_at, updated_at, revision)
+      VALUES ('child_access', 'fam_test', 'Private diary', '2026-10-04', '2026-10-04', 1)`).run()
+    sqlite.prepare(`INSERT INTO sleep_sessions (id, family_id, child_id, start_time, note, created_at, updated_at, revision)
+      VALUES ('sleep_access', 'fam_test', 'child_access', '2026-10-04T08:00:00Z', 'Private note', '2026-10-04', '2026-10-04', 2)`).run()
+    sqlite.prepare(`UPDATE families SET revision = 2`).run()
+    return { owner, headers }
+  }
+  it.each(['legacy-only', 'missing-account', 'invalid-token', 'expired-session', 'revoked-session',
+    'revoked-account-device', 'revoked-family-device', 'other-account', 'other-device', 'left-member'] as const)(
+    'rejects %s on every diary and device endpoint without changing family data', async (state) => {
+      const { headers } = await setup()
+      // Auth rejection must be a controlled API response, never INTERNAL_ERROR.
+      const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+      let status = 401, code = 'SESSION_INVALID'
+      if (state === 'legacy-only') { headers.Authorization = 'Bearer family-access-token'; delete (headers as Record<string, string>)['X-Solemi-Family-Token'] }
+      if (state === 'missing-account') delete (headers as Record<string, string>).Authorization
+      if (state === 'invalid-token') headers.Authorization = 'Bearer invalid-account-token'
+      if (state === 'expired-session') vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 61_000)
+      if (state === 'revoked-session') sqlite.prepare(`UPDATE account_sessions SET revoked_at = 1`).run()
+      if (state === 'revoked-account-device') sqlite.prepare(`UPDATE account_devices SET revoked_at = 1, revoke_reason = 'USER_REVOKED'`).run()
+      if (state === 'revoked-family-device') {
+        sqlite.prepare(`UPDATE devices SET revoked_at = '2026-10-04T00:00:00Z'`).run()
+        status = 403; code = 'DEVICE_REVOKED'
+      }
+      if (state === 'other-account' || state === 'other-device') {
+        headers.Authorization = `Bearer ${await accountAccess(state === 'other-account' ? 'acc_other' : 'acc_owner', 'adev_other', 'access_other')}`
+        status = 403; code = 'FAMILY_MEMBERSHIP_REQUIRED'
+      }
+      if (state === 'left-member') {
+        sqlite.prepare(`UPDATE legacy_family_memberships SET status = 'LEFT', ended_at = 1`).run()
+        status = 403; code = 'FAMILY_MEMBERSHIP_REQUIRED'
+      }
+      const before = data()
+      const deviceBefore = sqlite.prepare(`SELECT revoked_at FROM devices WHERE id = 'dev_legacy'`).get()
+      for (const [method, path] of [...diaryRoutes, ...deviceRoutes]) {
+        const response = await fetch(path, { method, headers, ...(method === 'GET' ? {} : { body: '{}' }) })
+        expect(response.status, `${method} ${path}`).toBe(status)
+        expect(await response.json()).toMatchObject({ ok: false, error: { code } })
+      }
+      expect(logged).not.toHaveBeenCalled()
+      expect(data()).toEqual(before)
+      expect(sqlite.prepare(`SELECT revoked_at FROM devices WHERE id = 'dev_legacy'`).get()).toEqual(deviceBefore)
+    })
+
+  it('blocks every paid diary endpoint for Free but allows its own device inspection and detachment', async () => {
+    const { owner, headers } = await setup()
+    expect((await setTestPlan(owner, 'free')).status).toBe(200)
+    const before = data()
+    for (const [method, path] of diaryRoutes) {
+      const response = await fetch(path, { method, headers, ...(method === 'GET' ? {} : { body: '{}' }) })
+      expect(response.status, `${method} ${path}`).toBe(403)
+      expect(await response.json()).toMatchObject({ error: { code: 'FAMILY_SYNC_PAUSED' } })
+    }
+    expect((await fetch('/v1/device', { headers })).status).toBe(200)
+    expect((await fetch('/v1/device/leave', { method: 'POST', headers, body: '{}' })).status).toBe(200)
+    expect(data()).toEqual(before)
+  })
+
+  it.each(['not-started', 'start-boundary', 'end-boundary', 'revoked', 'unrelated-feature'] as const)(
+    'uses actual family sync entitlement for %s', async (state) => {
+      const { headers } = await setup()
+      const now = Date.now()
+      vi.spyOn(Date, 'now').mockReturnValue(now)
+      sqlite.prepare(`UPDATE account_entitlements SET valid_from = ?, valid_until = ?`).run(now, now + 1000)
+      if (state === 'not-started') sqlite.prepare(`UPDATE account_entitlements SET valid_from = ?`).run(now + 1)
+      if (state === 'end-boundary') sqlite.prepare(`UPDATE account_entitlements SET valid_from = ?, valid_until = ?`).run(now - 1000, now)
+      if (state === 'revoked') sqlite.prepare(`UPDATE account_entitlements SET revoked_at = ?`).run(now)
+      if (state === 'unrelated-feature') sqlite.prepare(`DELETE FROM account_entitlements WHERE feature_key = 'FAMILY_SYNC'`).run()
+      const response = await fetch('/v1/sync?after=0', { headers })
+      expect(response.status).toBe(state === 'start-boundary' ? 200 : 403)
+      if (state === 'start-boundary') expect(await response.json()).toMatchObject({ data: { sessions: [{ note: 'Private note' }] } })
+      else expect(await response.json()).toMatchObject({ error: { code: 'FAMILY_SYNC_PAUSED' } })
+    })
+})
+
+describe('A04 remaining account leave cases', () => {
+  async function setup() {
+    await seedLegacyFamily('owner-family-token')
+    const tokens: Record<string, string> = {}
+    for (const name of ['owner', 'b', 'c']) tokens[name] = await accountAccess(`acc_${name}`, `adev_${name}`, `leave_${name}`)
+    expect((await fetch('/v1/auth/family/claim', { method: 'POST',
+      headers: { Origin: origin, Authorization: `Bearer ${tokens.owner}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyDeviceToken: 'owner-family-token' }) })).status).toBe(200)
+    for (const [name, joined] of [['b', 100], ['c', 200]] as const) {
+      sqlite.prepare(`INSERT INTO legacy_family_memberships VALUES (?, 'fam_test', ?, 'MEMBER', 'ACTIVE', ?, NULL)`)
+        .run(`mem_${name}`, `acc_${name}`, joined)
+      sqlite.prepare(`INSERT INTO devices VALUES (?, 'fam_test', ?, ?, '2026-10-04', '2026-10-04', NULL)`)
+        .run(`dev_${name}`, await sha256(`${env.TOKEN_PEPPER}:${name}-family-token`), name)
+      sqlite.prepare(`INSERT INTO account_family_devices VALUES (?, ?, 'fam_test', ?, 100, 100)`)
+        .run(`adev_${name}`, `acc_${name}`, `dev_${name}`)
+    }
+    sqlite.prepare(`INSERT INTO children (id, family_id, name, created_at, updated_at, revision)
+      VALUES ('child_leave', 'fam_test', 'Keep me', '2026-10-04', '2026-10-04', 1)`).run()
+    sqlite.prepare(`INSERT INTO sleep_sessions (id, family_id, child_id, start_time, end_time, note, created_at, updated_at, revision)
+      VALUES ('sleep_leave', 'fam_test', 'child_leave', '2026-10-03T12:00:00Z', NULL, 'Still sleeping', '2026-10-03', '2026-10-03', 2)`).run()
+    sqlite.prepare(`UPDATE families SET revision = 2 WHERE id = 'fam_test'`).run()
+    return tokens
+  }
+  const headers = (token: string) => ({ Origin: origin, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' })
+  const leave = (token: string, successorAccountId?: string) => fetch('/v1/auth/family/leave', {
+    method: 'POST', headers: headers(token), body: JSON.stringify(successorAccountId ? { successorAccountId } : {})
+  })
+  const members = () => sqlite.prepare('SELECT account_id, role, status FROM legacy_family_memberships ORDER BY account_id').all()
+  const diary = () => ['families', 'children', 'sleep_sessions'].map(table => sqlite.prepare(`SELECT * FROM ${table} ORDER BY id`).all())
+
+  it('uses stable membership-id order for equal join dates and ignores ended members', async () => {
+    const tokens = await setup(), before = diary()
+    sqlite.prepare(`UPDATE legacy_family_memberships SET joined_at = 100 WHERE account_id = 'acc_c'`).run()
+    const ended = await accountAccess('acc_ended', 'adev_ended', 'ended')
+    expect(ended).toBeTruthy()
+    sqlite.prepare(`INSERT INTO legacy_family_memberships VALUES ('mem_0', 'fam_test', 'acc_ended', 'MEMBER', 'LEFT', 0, 1)`).run()
+    expect((await leave(tokens.owner)).status).toBe(200)
+    expect(sqlite.prepare(`SELECT account_id FROM legacy_family_memberships WHERE role = 'ADMIN' AND status = 'ACTIVE'`).all()).toEqual([{ account_id: 'acc_b' }])
+    expect(diary()).toEqual(before)
+  })
+
+  it('rejects a stale member leave after that member has become admin, then transfers on retry', async () => {
+    const tokens = await setup(), before = diary(), batch = env.DB.batch.bind(env.DB)
+    // B has already read MEMBER when the owner's complete leave commits.
+    env.DB.batch = (async (statements: D1PreparedStatement[]) => {
+      env.DB.batch = batch
+      expect((await leave(tokens.owner)).status).toBe(200)
+      return batch(statements)
+    }) as D1Database['batch']
+    const stale = await leave(tokens.b)
+    expect(stale.status).toBe(409)
+    expect(await stale.json()).toMatchObject({ error: { code: 'FAMILY_MEMBERSHIP_CHANGED' } })
+    expect(sqlite.prepare(`SELECT role, status FROM legacy_family_memberships WHERE account_id = 'acc_b'`).get()).toEqual({ role: 'ADMIN', status: 'ACTIVE' })
+    expect(sqlite.prepare(`SELECT revoked_at FROM devices WHERE id = 'dev_b'`).get()).toEqual({ revoked_at: null })
+    expect((await leave(tokens.b)).status).toBe(200)
+    expect(sqlite.prepare(`SELECT role, status FROM legacy_family_memberships WHERE account_id = 'acc_c'`).get()).toEqual({ role: 'ADMIN', status: 'ACTIVE' })
+    expect(diary()).toEqual(before)
+  })
+
+  it('does not leave or revoke devices if the chosen successor leaves before the transaction', async () => {
+    const tokens = await setup(), before = diary(), batch = env.DB.batch.bind(env.DB)
+    env.DB.batch = (async (statements: D1PreparedStatement[]) => {
+      env.DB.batch = batch
+      expect((await leave(tokens.b)).status).toBe(200)
+      return batch(statements)
+    }) as D1Database['batch']
+    expect((await leave(tokens.owner, 'acc_b')).status).toBe(409)
+    expect(sqlite.prepare(`SELECT role, status FROM legacy_family_memberships WHERE account_id = 'acc_owner'`).get()).toEqual({ role: 'ADMIN', status: 'ACTIVE' })
+    expect(sqlite.prepare(`SELECT revoked_at FROM devices WHERE id = 'dev_legacy'`).get()).toEqual({ revoked_at: null })
+    expect((await leave(tokens.owner)).status).toBe(200)
+    expect(diary()).toEqual(before)
+  })
+
+  it('rolls back membership and promotion together if device revocation fails', async () => {
+    const tokens = await setup(), before = members(), data = diary()
+    sqlite.exec(`CREATE TRIGGER fail_leave BEFORE UPDATE OF revoked_at ON devices
+      BEGIN SELECT RAISE(ABORT, 'injected revocation failure'); END`)
+    expect((await leave(tokens.owner)).status).toBe(500)
+    expect(members()).toEqual(before)
+    expect(diary()).toEqual(data)
+    expect(sqlite.prepare(`SELECT COUNT(*) AS n FROM account_family_devices`).get()).toEqual({ n: 3 })
+  })
+
+  it.each([
+    ['owner', false], ['b', false], ['owner', true], ['b', true]
+  ] as const)('payer %s leaving, another payer %s: preserves diary and enforces the remaining entitlement', async (payer, anotherPayer) => {
+    const tokens = await setup(), before = diary()
+    env.ENTITLEMENT_ENFORCEMENT = 'true'
+    env.ENTITLEMENT_TEST_MODE = 'true'
+    expect((await setTestPlan(tokens[payer], 'familyPlus')).status).toBe(200)
+    if (anotherPayer) expect((await setTestPlan(tokens.c, 'family')).status).toBe(200)
+    const syncHeaders = { ...headers(tokens.c), 'X-Solemi-Family-Token': 'c-family-token' }
+    expect((await fetch('/v1/sync?after=0', { headers: syncHeaders })).status).toBe(200)
+    expect((await leave(tokens[payer])).status).toBe(200)
+    const access = await fetch('/v1/auth/access', { headers: headers(tokens.c) })
+    expect(await access.json()).toMatchObject({ data: { familySync: { status: anotherPayer ? 'ACTIVE' : 'PAUSED', canSync: anotherPayer },
+      familyFeatures: anotherPayer ? ['FAMILY_SYNC', 'PDF_EXPORT'] : [] } })
+    const sync = await fetch('/v1/sync?after=0', { headers: syncHeaders })
+    expect(sync.status).toBe(anotherPayer ? 200 : 403)
+    if (!anotherPayer) {
+      expect(await sync.json()).toMatchObject({ error: { code: 'FAMILY_SYNC_PAUSED' } })
+      const write = await fetch('/v1/sessions/sleep_leave', { method: 'PATCH', headers: syncHeaders,
+        body: JSON.stringify({ operationId: 'blocked-leave-write', baseRevision: 2, patch: { note: 'Must not apply' } }) })
+      expect(write.status).toBe(403)
+      expect(await write.json()).toMatchObject({ error: { code: 'FAMILY_SYNC_PAUSED' } })
+    }
+    expect(diary()).toEqual(before)
+    expect((await fetch('/v1/auth/me', { headers: headers(tokens[payer]) })).status).toBe(200)
+    const payerAccess = await fetch('/v1/auth/access', { headers: headers(tokens[payer]) })
+    expect(await payerAccess.json()).toMatchObject({ data: { membership: null, accountFeatures: ['FAMILY_PLUS_INSIGHTS', 'FAMILY_SYNC', 'PDF_EXPORT'] } })
+    // Retrying a successful leave is harmless; a remaining payer can resume without restoring data.
+    expect((await leave(tokens[payer])).status).toBe(200)
+    expect((await setTestPlan(tokens.c, 'family')).status).toBe(200)
+    expect((await fetch('/v1/sync?after=0', { headers: syncHeaders })).status).toBe(200)
+    expect(diary()).toEqual(before)
+  })
+})
+
+describe('last-member family dissolution', () => {
+  async function setup() {
+    await seedLegacyFamily('dissolve-token')
+    const access = await accountAccess('acc_owner', 'adev_owner', 'dissolve')
+    const headers = { Origin: origin, Authorization: `Bearer ${access}`, 'Content-Type': 'application/json' }
+    expect((await fetch('/v1/auth/family/claim', { method: 'POST', headers,
+      body: JSON.stringify({ familyDeviceToken: 'dissolve-token' }) })).status).toBe(200)
+    await seedInvite('DISSOLVE')
+    const at = '2026-09-23T10:00:00.000Z'
+    sqlite.prepare(`INSERT INTO children (id, family_id, name, birth_date, created_at, updated_at, revision)
+      VALUES ('child_dissolve', 'fam_test', 'Demo', NULL, ?, ?, 1)`).run(at, at)
+    sqlite.prepare(`INSERT INTO sleep_sessions (id, family_id, child_id, start_time, end_time, note, created_at, updated_at, revision)
+      VALUES ('sleep_dissolve', 'fam_test', 'child_dissolve', ?, ?, 'Export me', ?, ?, 2)`).run(at, at, at, at)
+    sqlite.prepare(`INSERT INTO operations VALUES ('op_dissolve', 'fam_test', 'dev_legacy', 'CREATE_SESSION', ?)`).run(at)
+    sqlite.prepare(`UPDATE families SET revision = 2 WHERE id = 'fam_test'`).run()
+    return { access, headers }
+  }
+  const body = () => JSON.stringify({ familyId: 'fam_test', expectedFamilyName: 'Teszt család', expectedRevision: 2 })
+  const tableNames = ['families', 'children', 'sleep_sessions', 'operations', 'invite_codes', 'devices', 'legacy_family_memberships', 'account_family_devices']
+  const snapshot = () => tableNames.map(table => sqlite.prepare(`SELECT * FROM ${table} ORDER BY 1`).all())
+
+  it('exports a Free last admin snapshot and permanently removes only that family, allowing a new family', async () => {
+    const { access, headers } = await setup()
+    env.ENTITLEMENT_ENFORCEMENT = 'true'
+    env.ENTITLEMENT_TEST_MODE = 'true'
+    const secondAccess = await accountAccess('acc_owner', 'adev_second', 'dissolve_second')
+    const secondHeaders = { ...headers, Authorization: `Bearer ${secondAccess}` }
+    const secondBootstrap = await fetch('/v1/auth/family/bootstrap', { method: 'POST', headers: secondHeaders, body: '{}' })
+    const second = await secondBootstrap.json() as { data: { connection: { deviceToken: string } } }
+    const preview = await fetch('/v1/auth/family/dissolution-preview', { headers })
+    expect(preview.status).toBe(200)
+    expect(await preview.json()).toMatchObject({ data: { familyId: 'fam_test', revision: 2,
+      children: [{ id: 'child_dissolve' }], sessions: [{ id: 'sleep_dissolve', note: 'Export me' }] } })
+    sqlite.prepare(`INSERT INTO families VALUES ('untouched', 'Other', 0, '2026-09-23')`).run()
+    const batch = env.DB.batch.bind(env.DB)
+    let familyDeleteChanges = 0
+    env.DB.batch = (async (statements: D1PreparedStatement[]) => {
+      const results = await batch(statements)
+      familyDeleteChanges = results[results.length - 1].meta.changes
+      return results
+    }) as D1Database['batch']
+    const response = await fetch('/v1/auth/family/dissolve', { method: 'POST', headers, body: body() })
+    // The family and its membership are both removed by the final DELETE.
+    expect(familyDeleteChanges).toBeGreaterThan(1)
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ data: { dissolved: true, familyId: 'fam_test' } })
+    for (const table of tableNames.filter(t => t !== 'families')) {
+      expect(sqlite.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get()).toEqual({ n: 0 })
+    }
+    expect(sqlite.prepare('SELECT id FROM families').all()).toEqual([{ id: 'untouched' }])
+    expect(sqlite.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+    expect((await fetch('/v1/auth/me', { headers })).status).toBe(200)
+    expect((await fetch('/v1/auth/me', { headers: secondHeaders })).status).toBe(200)
+    expect((await fetch('/v1/sync?after=0', { headers: { ...secondHeaders, 'X-Solemi-Family-Token': second.data.connection.deviceToken } })).status).toBe(401)
+    expect((await fetch('/v1/auth/family/join', { method: 'POST', headers, body: JSON.stringify({ code: 'DISSOLVE' }) })).status).toBe(404)
+    expect(await (await fetch('/v1/auth/access', { headers })).json()).toMatchObject({ data: { membership: null } })
+    expect((await fetch('/v1/auth/family/claim', { method: 'POST', headers,
+      body: JSON.stringify({ familyDeviceToken: 'dissolve-token' }) })).status).toBe(401)
+    await setTestPlan(access, 'family')
+    expect((await fetch('/v1/auth/family/create', { method: 'POST', headers,
+      body: JSON.stringify({ familyName: 'New family', childId: 'child_dissolve' }) })).status).toBe(201)
+    const afterNewFamily = snapshot()
+    expect((await fetch('/v1/auth/family/dissolve', { method: 'POST', headers, body: body() })).status).toBe(200)
+    expect(snapshot()).toEqual(afterNewFamily)
+  })
+
+  it('preserves the personal paid entitlement when the family is dissolved', async () => {
+    const { access, headers } = await setup()
+    env.ENTITLEMENT_TEST_MODE = 'true'
+    await setTestPlan(access, 'familyPlus')
+    const before = sqlite.prepare('SELECT * FROM account_entitlements ORDER BY id').all()
+    expect((await fetch('/v1/auth/family/dissolve', { method: 'POST', headers, body: body() })).status).toBe(200)
+    expect(sqlite.prepare('SELECT * FROM account_entitlements ORDER BY id').all()).toEqual(before)
+  })
+
+  it.each([
+    ['wrong name', { expectedFamilyName: 'Wrong' }],
+    ['stale revision', { expectedRevision: 1 }],
+    ['missing revision', { expectedRevision: null }]
+  ])('rejects %s without changing the family', async (_label, patch) => {
+    const { headers } = await setup()
+    const before = snapshot()
+    const response = await fetch('/v1/auth/family/dissolve', { method: 'POST', headers,
+      body: JSON.stringify({ ...JSON.parse(body()), ...patch }) })
+    expect([400, 409]).toContain(response.status)
+    expect(snapshot()).toEqual(before)
+  })
+
+  it('denies members and nonmembers, and blocks the admin while another active member remains', async () => {
+    const { headers } = await setup()
+    const member = await accountAccess('acc_member', 'adev_member', 'dissolve_member')
+    const outsider = await accountAccess('acc_outsider', 'adev_outsider', 'dissolve_outsider')
+    sqlite.prepare(`INSERT INTO legacy_family_memberships VALUES ('member', 'fam_test', 'acc_member', 'MEMBER', 'ACTIVE', 1, NULL)`).run()
+    const before = snapshot()
+    for (const [token, status] of [[member, 403], [outsider, 403]] as const) {
+      const requestHeaders = { ...headers, Authorization: `Bearer ${token}` }
+      expect((await fetch('/v1/auth/family/dissolution-preview', { headers: requestHeaders })).status).toBe(status)
+      expect((await fetch('/v1/auth/family/dissolve', { method: 'POST', headers: requestHeaders, body: body() })).status).toBe(status)
+    }
+    expect((await fetch('/v1/auth/family/dissolve', { method: 'POST', headers, body: body() })).status).toBe(409)
+    expect(snapshot()).toEqual(before)
+  })
+
+  it.each(['join', 'edit'])('protects against a concurrent %s after the preliminary authorization', async (race) => {
+    const { headers } = await setup()
+    await accountAccess('acc_race', 'adev_race', 'race')
+    const originalBatch = env.DB.batch.bind(env.DB)
+    let afterConcurrentChange: unknown
+    env.DB.batch = (async (statements: D1PreparedStatement[]) => {
+      if (race === 'join') sqlite.prepare(`INSERT INTO legacy_family_memberships VALUES ('racer', 'fam_test', 'acc_race', 'MEMBER', 'ACTIVE', 1, NULL)`).run()
+      else sqlite.prepare(`UPDATE families SET revision = revision + 1 WHERE id = 'fam_test'`).run()
+      afterConcurrentChange = snapshot()
+      return originalBatch(statements)
+    }) as D1Database['batch']
+    expect((await fetch('/v1/auth/family/dissolve', { method: 'POST', headers, body: body() })).status).toBe(409)
+    expect(snapshot()).toEqual(afterConcurrentChange)
+  })
+
+  it('rolls back every deletion if a later statement fails', async () => {
+    const { headers } = await setup()
+    sqlite.exec(`CREATE TRIGGER fail_dissolution BEFORE DELETE ON children BEGIN SELECT RAISE(ABORT, 'simulated failure'); END;`)
+    const before = snapshot()
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      expect((await fetch('/v1/auth/family/dissolve', { method: 'POST', headers, body: body() })).status).toBe(500)
+    } finally { errorLog.mockRestore() }
+    expect(snapshot()).toEqual(before)
+  })
+
+  it('rejects an export snapshot when the diary changes during the read', async () => {
+    const { headers } = await setup()
+    const prepare = env.DB.prepare.bind(env.DB)
+    env.DB.prepare = ((sql: string) => {
+      const statement = prepare(sql)
+      if (sql.startsWith('SELECT * FROM sleep_sessions')) {
+        const all = statement.all.bind(statement)
+        statement.all = (async () => {
+          const rows = await all()
+          sqlite.prepare(`UPDATE families SET revision = revision + 1 WHERE id = 'fam_test'`).run()
+          return rows
+        }) as D1PreparedStatement['all']
+      }
+      return statement
+    }) as D1Database['prepare']
+    const preview = await fetch('/v1/auth/family/dissolution-preview', { headers })
+    expect(preview.status).toBe(409)
+    expect(await preview.json()).toMatchObject({ error: { code: 'FAMILY_DISSOLUTION_CHANGED' } })
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM sleep_sessions').get()).toEqual({ n: 1 })
+  })
+
+  it('requires a valid account and same allowed Origin for dissolution', async () => {
+    const { headers } = await setup()
+    const before = snapshot()
+    expect((await fetch('/v1/auth/family/dissolve', { method: 'POST', headers: { ...headers, Origin: 'https://evil.example' }, body: body() })).status).toBe(403)
+    expect((await fetch('/v1/auth/family/dissolve', { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: body() })).status).toBe(401)
+    expect(snapshot()).toEqual(before)
+  })
+})
+
+describe('account auth routes', () => {
+  it('refuses an incomplete or test-enabled production Worker configuration', async () => {
+    env.SOLEMI_ENVIRONMENT = 'production'
+    const incomplete = await fetch('/health')
+    expect(incomplete.status).toBe(503)
+    expect(await incomplete.json()).toMatchObject({ error: { code: 'RELEASE_NOT_CONFIGURED' } })
+
+    env.ALLOWED_ORIGINS = 'https://solemi-sleep.app'
+    env.ACCOUNT_FAMILY_BRIDGE = 'true'
+    env.ENTITLEMENT_ENFORCEMENT = 'true'
+    env.RECONCILIATION_CONFLICTS = 'true'
+    env.ENTITLEMENT_TEST_MODE = 'true'
+    const testEnabled = await fetch('/health')
+    expect(testEnabled.status).toBe(503)
+
+    delete env.ENTITLEMENT_TEST_MODE
+    expect((await fetch('/health')).status).toBe(200)
+  })
+  it('returns a stored one-use challenge and public client ID with credentialed CORS', async () => {
+    const response = await fetch('/v1/auth/challenge', { headers: { Origin: origin } })
+    const body = await response.json() as { data: { nonce: string; clientId: string } }
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBe(origin)
+    expect(response.headers.get('Access-Control-Allow-Credentials')).toBe('true')
+    expect(body.data.clientId).toBe(env.GOOGLE_CLIENT_ID)
+    expect(body.data.nonce).toMatch(/^[a-f0-9]{64}$/)
+    expect(sqlite.prepare('SELECT nonce_hash FROM auth_challenges').get()).not.toEqual({ nonce_hash: body.data.nonce })
+  })
+
+  it('keeps health available while account auth is not configured', async () => {
+    delete env.GOOGLE_CLIENT_ID
+    delete env.AUTH_SECRET
+    expect((await fetch('/health')).status).toBe(200)
+    const response = await fetch('/v1/auth/challenge')
+    expect(response.status).toBe(503)
+    expect(await response.json()).toMatchObject({ error: { code: 'AUTH_NOT_CONFIGURED' } })
+  })
+
+  it('rejects oversized JSON before parsing, even without a trustworthy Content-Length', async () => {
+    const body = JSON.stringify({ credential: 'x'.repeat(64 * 1024) })
+    const oversized = await fetch('/v1/auth/google', {
+      method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body
+    })
+    expect(oversized.status).toBe(413)
+    expect(await oversized.json()).toMatchObject({ error: { code: 'REQUEST_TOO_LARGE' } })
+    expect(sqlite.prepare('SELECT count(*) AS count FROM account_sessions').get()).toMatchObject({ count: 0 })
+
+    const declared = await fetch('/v1/auth/google', {
+      method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', 'Content-Length': '65537' },
+      body: '{}'
+    })
+    expect(declared.status).toBe(413)
+  })
+
+  it('rejects cross-origin cookie mutations and missing refresh cookies', async () => {
+    const foreign = await fetch('/v1/auth/refresh', { method: 'POST', headers: { Origin: 'https://attacker.example' } })
+    expect(foreign.status).toBe(403)
+    expect(await foreign.json()).toMatchObject({ error: { code: 'ORIGIN_NOT_ALLOWED' } })
+    const missing = await fetch('/v1/auth/refresh', { method: 'POST', headers: { Origin: origin } })
+    expect(missing.status).toBe(401)
+    expect(await missing.json()).toMatchObject({ error: { code: 'SESSION_INVALID' } })
+  })
+
+  it('advertises credential support only to allowed origins', async () => {
+    const response = await fetch('/v1/auth/refresh', { method: 'OPTIONS', headers: { Origin: origin } })
+    expect(response.status).toBe(204)
+    expect(response.headers.get('Access-Control-Allow-Credentials')).toBe('true')
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBe(origin)
+  })
+
+  it('claims a legacy family once and restores it on the same account second device', async () => {
+    const legacyToken = 'ss_dv_existing-family-token'
+    await seedLegacyFamily(legacyToken)
+    const firstAccess = await accountAccess('acc_owner', 'adev_safari', 'first')
+
+    const claimed = await fetch('/v1/auth/family/claim', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${firstAccess}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyDeviceToken: legacyToken })
+    })
+    expect(claimed.status).toBe(200)
+    expect(await claimed.json()).toMatchObject({ data: { familyId: 'fam_test', role: 'ADMIN' } })
+    expect(sqlite.prepare(`SELECT family_id, account_id, role, status FROM legacy_family_memberships`).get())
+      .toEqual({ family_id: 'fam_test', account_id: 'acc_owner', role: 'ADMIN', status: 'ACTIVE' })
+
+    const secondAccess = await accountAccess('acc_owner', 'adev_chrome', 'second')
+    const restored = await fetch('/v1/auth/family/bootstrap', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${secondAccess}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deviceName: 'Chrome · Windows' })
+    })
+    expect(restored.status).toBe(200)
+    const restoredBody = await restored.json() as { data: { connection: { familyId: string; deviceToken: string } } }
+    expect(restoredBody.data.connection.familyId).toBe('fam_test')
+    expect(restoredBody.data.connection.deviceToken).toMatch(/^ss_dv_/)
+
+    const sync = await fetch('/v1/sync?after=0', {
+      headers: { Authorization: `Bearer ${restoredBody.data.connection.deviceToken}` }
+    })
+    expect(sync.status).toBe(200)
+    expect(await sync.json()).toMatchObject({ data: { familyName: 'Teszt család', revision: 0 } })
+    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM account_family_devices').get()).toEqual({ count: 2 })
+  })
+
+  it('creates a paid family atomically through the account route and closes legacy writes', async () => {
+    env.ENTITLEMENT_ENFORCEMENT = 'true'
+    env.ENTITLEMENT_TEST_MODE = 'true'
+    const access = await accountAccess('acc_owner', 'adev_owner', 'account_create')
+    expect((await setTestPlan(access, 'family')).status).toBe(200)
+
+    const legacyCreate = await fetch('/v1/families', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyName: 'Megkerülés', deviceName: 'Régi kliens' })
+    })
+    expect(legacyCreate.status).toBe(401)
+    expect(await legacyCreate.json()).toMatchObject({ error: { code: 'ACCOUNT_REQUIRED' } })
+
+    const created = await fetch('/v1/auth/family/create', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${access}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyName: 'Új család', deviceName: 'Safari', childId: 'child_owned',
+        childName: 'Baba', birthDate: '2026-01-02' })
+    })
+    expect(created.status).toBe(201)
+    const body = await created.json() as { data: { membership: { role: string }; connection: {
+      familyId: string; deviceId: string; deviceToken: string } } }
+    expect(body.data.membership.role).toBe('ADMIN')
+    expect(sqlite.prepare(`SELECT family_id, account_id, role, status FROM legacy_family_memberships`).get())
+      .toEqual({ family_id: body.data.connection.familyId, account_id: 'acc_owner', role: 'ADMIN', status: 'ACTIVE' })
+    expect(sqlite.prepare(`SELECT account_device_id, legacy_device_id FROM account_family_devices`).get())
+      .toEqual({ account_device_id: 'adev_owner', legacy_device_id: body.data.connection.deviceId })
+    expect(sqlite.prepare(`SELECT name, birth_date FROM children WHERE id = 'child_owned'`).get())
+      .toEqual({ name: 'Baba', birth_date: '2026-01-02' })
+
+    const rawSync = await fetch('/v1/sync?after=0', {
+      headers: { Authorization: `Bearer ${body.data.connection.deviceToken}` }
+    })
+    expect(rawSync.status).toBe(401)
+    expect(await rawSync.json()).toMatchObject({ error: { code: 'SESSION_INVALID' } })
+
+    const authorizedSync = await fetch('/v1/sync?after=0', { headers: {
+      Authorization: `Bearer ${access}`, 'X-Solemi-Family-Token': body.data.connection.deviceToken
+    } })
+    expect(authorizedSync.status).toBe(200)
+
+    const rawInvite = await fetch('/v1/invites', {
+      method: 'POST', headers: { Authorization: `Bearer ${body.data.connection.deviceToken}` }
+    })
+    expect(rawInvite.status).toBe(401)
+    const authorizedInvite = await fetch('/v1/invites', { method: 'POST', headers: {
+      Authorization: `Bearer ${access}`, 'X-Solemi-Family-Token': body.data.connection.deviceToken
+    } })
+    expect(authorizedInvite.status).toBe(201)
+  })
+
+  it('keeps an unclaimed legacy family claimable but blocks raw diary access during enforcement', async () => {
+    env.ENTITLEMENT_ENFORCEMENT = 'true'
+    env.ENTITLEMENT_TEST_MODE = 'true'
+    const legacyToken = 'ss_dv_compatible-claim'
+    await seedLegacyFamily(legacyToken)
+    sqlite.prepare(`INSERT INTO children (id, family_id, name, created_at, updated_at, revision)
+      VALUES ('child_legacy', 'fam_test', 'Existing child', '2026-10-04', '2026-10-04', 1)`).run()
+    sqlite.prepare(`INSERT INTO sleep_sessions (id, family_id, child_id, start_time, note, created_at, updated_at, revision)
+      VALUES ('sleep_legacy', 'fam_test', 'child_legacy', '2026-10-04T08:00:00Z', 'Existing note', '2026-10-04', '2026-10-04', 2)`).run()
+    sqlite.prepare(`UPDATE families SET revision = 2`).run()
+    const diary = () => ['families', 'children', 'sleep_sessions'].map(table => sqlite.prepare(`SELECT * FROM ${table}`).all())
+    const before = diary()
+
+    const blocked = await fetch('/v1/sync?after=0', {
+      headers: { Authorization: `Bearer ${legacyToken}` }
+    })
+    expect(blocked.status).toBe(401)
+    expect(await blocked.json()).toMatchObject({ error: { code: 'SESSION_INVALID' } })
+
+    const access = await accountAccess('acc_owner', 'adev_owner', 'compatible_claim')
+    const claim = await fetch('/v1/auth/family/claim', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${access}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyDeviceToken: legacyToken })
+    })
+    expect(claim.status).toBe(200)
+    const headers = { Authorization: `Bearer ${access}`, 'X-Solemi-Family-Token': legacyToken }
+    const paused = await fetch('/v1/sync?after=0', { headers })
+    expect(paused.status).toBe(403)
+    expect(await paused.json()).toMatchObject({ error: { code: 'FAMILY_SYNC_PAUSED' } })
+    expect((await fetch('/v1/device', { headers })).status).toBe(200)
+    expect(diary()).toEqual(before)
+    expect((await setTestPlan(access, 'family')).status).toBe(200)
+    const migrated = await fetch('/v1/sync?after=0', { headers: {
+      Authorization: `Bearer ${access}`, 'X-Solemi-Family-Token': legacyToken
+    } })
+    expect(migrated.status).toBe(200)
+    expect(await migrated.json()).toMatchObject({ data: { familyName: 'Teszt család',
+      children: [{ id: 'child_legacy', name: 'Existing child' }],
+      sessions: [{ id: 'sleep_legacy', note: 'Existing note', endTime: null }] } })
+    expect(diary()).toEqual(before)
+  })
+
+  it('does not create server rows when a free account calls the authenticated family route', async () => {
+    env.ENTITLEMENT_ENFORCEMENT = 'true'
+    const access = await accountAccess('acc_free', 'adev_free', 'free_create')
+    const response = await fetch('/v1/auth/family/create', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${access}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyName: 'Nem jöhet létre', deviceName: 'Chrome' })
+    })
+    expect(response.status).toBe(403)
+    expect(await response.json()).toMatchObject({ error: { code: 'FAMILY_SYNC_SUBSCRIPTION_REQUIRED' } })
+    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM families').get()).toEqual({ count: 0 })
+    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM devices').get()).toEqual({ count: 0 })
+    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM legacy_family_memberships').get()).toEqual({ count: 0 })
+  })
+
+  it('does not let a different account claim an already owned legacy family', async () => {
+    const legacyToken = 'ss_dv_existing-family-token'
+    await seedLegacyFamily(legacyToken)
+    const owner = await accountAccess('acc_owner', 'adev_owner', 'owner')
+    const other = await accountAccess('acc_other', 'adev_other', 'other')
+    const request = (access: string) => fetch('/v1/auth/family/claim', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${access}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyDeviceToken: legacyToken })
+    })
+    expect((await request(owner)).status).toBe(200)
+    const rejected = await request(other)
+    expect(rejected.status).toBe(409)
+    expect(await rejected.json()).toMatchObject({ error: { code: 'ACCOUNT_INVITE_REQUIRED' } })
+  })
+
+  it('redeems an invite as a member account and returns a working family connection', async () => {
+    const legacyToken = 'ss_dv_existing-family-token'
+    const inviteCode = 'SOLEMI7'
+    await seedLegacyFamily(legacyToken)
+    const owner = await accountAccess('acc_owner', 'adev_owner', 'owner')
+    const claim = await fetch('/v1/auth/family/claim', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${owner}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyDeviceToken: legacyToken })
+    })
+    expect(claim.status).toBe(200)
+    await seedInvite(inviteCode)
+
+    const member = await accountAccess('acc_member', 'adev_member', 'member')
+    const joined = await fetch('/v1/auth/family/join', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${member}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: inviteCode, deviceName: 'Chrome · Android' })
+    })
+    expect(joined.status).toBe(201)
+    const body = await joined.json() as { data: { membership: { role: string }; connection: { deviceToken: string } } }
+    expect(body.data.membership.role).toBe('MEMBER')
+    expect(sqlite.prepare(`SELECT role, status FROM legacy_family_memberships
+      WHERE account_id = 'acc_member'`).get()).toEqual({ role: 'MEMBER', status: 'ACTIVE' })
+    expect(sqlite.prepare(`SELECT family_id FROM account_family_devices
+      WHERE account_device_id = 'adev_member'`).get()).toEqual({ family_id: 'fam_test' })
+
+    const sync = await fetch('/v1/sync?after=0', {
+      headers: { Authorization: `Bearer ${body.data.connection.deviceToken}` }
+    })
+    expect(sync.status).toBe(200)
+
+    const reused = await fetch('/v1/auth/family/join', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${member}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: inviteCode, deviceName: 'Chrome · Android' })
+    })
+    expect(reused.status).toBe(409)
+    expect(await reused.json()).toMatchObject({ error: { code: 'INVITE_ALREADY_USED' } })
+  })
+
+  it('requires the family creator to claim the family before an account invite can be redeemed', async () => {
+    const legacyToken = 'ss_dv_existing-family-token'
+    const inviteCode = 'SOLEMI8'
+    await seedLegacyFamily(legacyToken)
+    await seedInvite(inviteCode)
+    const member = await accountAccess('acc_member', 'adev_member', 'unclaimed')
+    const response = await fetch('/v1/auth/family/join', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${member}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: inviteCode, deviceName: 'Firefox · Windows' })
+    })
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({ error: { code: 'FAMILY_OWNER_ACCOUNT_REQUIRED' } })
+    expect(sqlite.prepare('SELECT used_at FROM invite_codes').get()).toEqual({ used_at: null })
+  })
+
+  it('moves admin to the oldest remaining member and revokes every device when an account leaves', async () => {
+    const legacyToken = 'ss_dv_leave_owner'
+    const inviteCode = 'LEAVE01'
+    await seedLegacyFamily(legacyToken)
+    const owner = await accountAccess('acc_owner', 'adev_owner_first', 'leave_owner_first')
+    expect((await fetch('/v1/auth/family/claim', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${owner}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyDeviceToken: legacyToken })
+    })).status).toBe(200)
+
+    const ownerSecond = await accountAccess('acc_owner', 'adev_owner_second', 'leave_owner_second')
+    const restored = await fetch('/v1/auth/family/bootstrap', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${ownerSecond}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deviceName: 'Owner second phone' })
+    })
+    const restoredBody = await restored.json() as { data: { connection: { deviceId: string; deviceToken: string } } }
+    await seedInvite(inviteCode)
+    const member = await accountAccess('acc_member', 'adev_member', 'leave_member')
+    expect((await fetch('/v1/auth/family/join', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${member}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: inviteCode, deviceName: 'Member phone' })
+    })).status).toBe(201)
+
+    const left = await fetch('/v1/auth/family/leave', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${owner}` }
+    })
+    expect(left.status).toBe(200)
+    expect(await left.json()).toMatchObject({ data: { left: true, membership: null, adminTransferred: true } })
+    expect(sqlite.prepare(`SELECT account_id, role, status FROM legacy_family_memberships ORDER BY account_id`).all())
+      .toEqual([
+        { account_id: 'acc_member', role: 'ADMIN', status: 'ACTIVE' },
+        { account_id: 'acc_owner', role: 'ADMIN', status: 'LEFT' }
+      ])
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM devices
+      WHERE id IN ('dev_legacy', ?) AND revoked_at IS NOT NULL`)
+      .get(restoredBody.data.connection.deviceId)).toEqual({ count: 2 })
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM account_family_devices
+      WHERE account_id = 'acc_owner'`).get()).toEqual({ count: 0 })
+
+    const noReconnect = await fetch('/v1/auth/family/bootstrap', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${ownerSecond}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deviceName: 'Owner second phone' })
+    })
+    expect(await noReconnect.json()).toMatchObject({ data: { membership: null } })
+    const revokedSync = await fetch('/v1/sync?after=0', {
+      headers: { Authorization: `Bearer ${restoredBody.data.connection.deviceToken}` }
+    })
+    expect(revokedSync.status).toBe(403)
+    expect(await revokedSync.json()).toMatchObject({ error: { code: 'DEVICE_REVOKED' } })
+  })
+
+  it('reuses a device after an older leave left a revoked family mapping behind', async () => {
+    env.ENTITLEMENT_ENFORCEMENT = 'true'
+    env.ENTITLEMENT_TEST_MODE = 'true'
+    await seedLegacyFamily('stale_owner_token')
+    const owner = await accountAccess('acc_owner', 'adev_owner', 'stale_owner')
+    const ownerHeaders = { Origin: origin, Authorization: `Bearer ${owner}`, 'Content-Type': 'application/json' }
+    expect((await fetch('/v1/auth/family/claim', { method: 'POST', headers: ownerHeaders,
+      body: JSON.stringify({ familyDeviceToken: 'stale_owner_token' }) })).status).toBe(200)
+    await seedInvite('STALE01')
+    const member = await accountAccess('acc_member', 'adev_member', 'stale_member')
+    const memberHeaders = { Origin: origin, Authorization: `Bearer ${member}`, 'Content-Type': 'application/json' }
+    const joined = await fetch('/v1/auth/family/join', { method: 'POST', headers: memberHeaders,
+      body: JSON.stringify({ code: 'STALE01' }) })
+    expect(joined.status).toBe(201)
+    const oldDevice = (await joined.json() as { data: { connection: { deviceId: string } } }).data.connection.deviceId
+    expect((await fetch('/v1/auth/family/leave', { method: 'POST', headers: memberHeaders, body: '{}' })).status).toBe(200)
+    // Reproduce the mapping left by the previous Worker version.
+    sqlite.prepare(`UPDATE legacy_family_memberships SET status = 'ACTIVE', ended_at = NULL
+      WHERE account_id = 'acc_member'`).run()
+    sqlite.prepare(`INSERT INTO account_family_devices
+      (account_device_id, account_id, family_id, legacy_device_id, created_at, updated_at)
+      VALUES ('adev_member', 'acc_member', 'fam_test', ?, 1, 1)`).run(oldDevice)
+    sqlite.prepare(`UPDATE legacy_family_memberships SET status = 'LEFT', ended_at = 2
+      WHERE account_id = 'acc_member'`).run()
+    expect((await setTestPlan(member, 'familyPlus')).status).toBe(200)
+    const created = await fetch('/v1/auth/family/create', { method: 'POST', headers: memberHeaders,
+      body: JSON.stringify({ familyName: 'Separate test', childId: 'new_test_child' }) })
+    expect(created.status).toBe(201)
+    expect(sqlite.prepare(`SELECT family_id FROM account_family_devices
+      WHERE account_device_id = 'adev_member'`).get()).not.toEqual({ family_id: 'fam_test' })
+    expect(sqlite.prepare(`SELECT revoked_at FROM devices WHERE id = ?`).get(oldDevice))
+      .toMatchObject({ revoked_at: expect.any(String) })
+    expect(sqlite.prepare(`SELECT status FROM legacy_family_memberships
+      WHERE account_id = 'acc_owner'`).get()).toEqual({ status: 'ACTIVE' })
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM families`).get()).toEqual({ count: 2 })
+  })
+
+  it('can rejoin a family on the same device after leaving, without reviving its old token', async () => {
+    await seedLegacyFamily('rejoin_owner_token')
+    const owner = await accountAccess('acc_owner', 'adev_owner', 'rejoin_owner')
+    const ownerHeaders = { Origin: origin, Authorization: `Bearer ${owner}`, 'Content-Type': 'application/json' }
+    expect((await fetch('/v1/auth/family/claim', { method: 'POST', headers: ownerHeaders,
+      body: JSON.stringify({ familyDeviceToken: 'rejoin_owner_token' }) })).status).toBe(200)
+    await seedInvite('REJOIN01')
+    const member = await accountAccess('acc_member', 'adev_member', 'rejoin_member')
+    const memberHeaders = { Origin: origin, Authorization: `Bearer ${member}`, 'Content-Type': 'application/json' }
+    const first = await fetch('/v1/auth/family/join', { method: 'POST', headers: memberHeaders,
+      body: JSON.stringify({ code: 'REJOIN01' }) })
+    expect(first.status).toBe(201)
+    const oldToken = (await first.json() as { data: { connection: { deviceToken: string } } }).data.connection.deviceToken
+    expect((await fetch('/v1/auth/family/leave', { method: 'POST', headers: memberHeaders, body: '{}' })).status).toBe(200)
+    await seedInvite('REJOIN02')
+    const second = await fetch('/v1/auth/family/join', { method: 'POST', headers: memberHeaders,
+      body: JSON.stringify({ code: 'REJOIN02' }) })
+    expect(second.status).toBe(201)
+    const newToken = (await second.json() as { data: { connection: { deviceToken: string } } }).data.connection.deviceToken
+    expect(newToken).not.toBe(oldToken)
+    expect((await fetch('/v1/sync?after=0', { headers: { Authorization: `Bearer ${oldToken}` } })).status).toBe(403)
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM account_family_devices
+      WHERE account_device_id = 'adev_member'`).get()).toEqual({ count: 1 })
+  })
+
+  it('lists possible successors and honors the admin selected for transfer', async () => {
+    const legacyToken = 'ss_dv_selected_successor'
+    await seedLegacyFamily(legacyToken)
+    const owner = await accountAccess('acc_owner', 'adev_owner', 'selected_owner')
+    expect((await fetch('/v1/auth/family/claim', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${owner}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyDeviceToken: legacyToken })
+    })).status).toBe(200)
+    await accountAccess('acc_oldest', 'adev_oldest', 'selected_oldest')
+    await accountAccess('acc_chosen', 'adev_chosen', 'selected_chosen')
+    sqlite.prepare(`UPDATE accounts SET display_name = 'Older member' WHERE id = 'acc_oldest'`).run()
+    sqlite.prepare(`UPDATE accounts SET display_name = 'Chosen member' WHERE id = 'acc_chosen'`).run()
+    sqlite.prepare(`INSERT INTO legacy_family_memberships
+      (id, family_id, account_id, role, status, joined_at, ended_at)
+      VALUES ('mem_oldest', 'fam_test', 'acc_oldest', 'MEMBER', 'ACTIVE', 10, NULL),
+             ('mem_chosen', 'fam_test', 'acc_chosen', 'MEMBER', 'ACTIVE', 20, NULL)`).run()
+
+    const members = await fetch('/v1/auth/family/members', {
+      headers: { Authorization: `Bearer ${owner}` }
+    })
+    expect(members.status).toBe(200)
+    expect(await members.json()).toMatchObject({ data: { members: [
+      { accountId: 'acc_oldest', name: 'Older member' },
+      { accountId: 'acc_chosen', name: 'Chosen member' }
+    ] } })
+
+    const invalid = await fetch('/v1/auth/family/leave', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${owner}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ successorAccountId: 'acc_not_a_member' })
+    })
+    expect(invalid.status).toBe(409)
+    expect(await invalid.json()).toMatchObject({ error: { code: 'FAMILY_SUCCESSOR_INVALID' } })
+    expect(sqlite.prepare(`SELECT status FROM legacy_family_memberships WHERE account_id = 'acc_owner'`).get())
+      .toEqual({ status: 'ACTIVE' })
+
+    const left = await fetch('/v1/auth/family/leave', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${owner}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ successorAccountId: 'acc_chosen' })
+    })
+    expect(left.status).toBe(200)
+    expect(sqlite.prepare(`SELECT account_id FROM legacy_family_memberships
+      WHERE family_id = 'fam_test' AND status = 'ACTIVE' AND role = 'ADMIN'`).get())
+      .toEqual({ account_id: 'acc_chosen' })
+  })
+
+  it('requires the separate dissolution flow when the final member tries to leave', async () => {
+    const legacyToken = 'ss_dv_last_member'
+    await seedLegacyFamily(legacyToken)
+    const owner = await accountAccess('acc_owner', 'adev_owner', 'last_member')
+    expect((await fetch('/v1/auth/family/claim', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${owner}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyDeviceToken: legacyToken })
+    })).status).toBe(200)
+
+    const rejected = await fetch('/v1/auth/family/leave', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${owner}` }
+    })
+    expect(rejected.status).toBe(409)
+    expect(await rejected.json()).toMatchObject({ error: { code: 'FAMILY_DISSOLUTION_REQUIRED' } })
+    expect(sqlite.prepare(`SELECT role, status, ended_at FROM legacy_family_memberships`).get())
+      .toEqual({ role: 'ADMIN', status: 'ACTIVE', ended_at: null })
+    expect(sqlite.prepare(`SELECT revoked_at FROM devices`).get()).toEqual({ revoked_at: null })
+  })
+
+  it('pauses family sync when the leaving member was the final payer', async () => {
+    env.ENTITLEMENT_ENFORCEMENT = 'true'
+    env.ENTITLEMENT_TEST_MODE = 'true'
+    const legacyToken = 'ss_dv_payer_leave_owner'
+    const inviteCode = 'PAYLEFT'
+    await seedLegacyFamily(legacyToken)
+    const owner = await accountAccess('acc_owner', 'adev_owner', 'payer_leave_owner')
+    expect((await fetch('/v1/auth/family/claim', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${owner}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyDeviceToken: legacyToken })
+    })).status).toBe(200)
+    await seedInvite(inviteCode)
+
+    const payer = await accountAccess('acc_payer', 'adev_payer', 'payer_leave_member')
+    const joined = await fetch('/v1/auth/family/join', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${payer}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: inviteCode, deviceName: 'Payer phone' })
+    })
+    expect(joined.status).toBe(201)
+    expect((await fetch('/v1/auth/test/plan', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${payer}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan: 'family' })
+    })).status).toBe(200)
+
+    const before = await fetch('/v1/auth/access', { headers: { Authorization: `Bearer ${owner}` } })
+    expect(await before.json()).toMatchObject({ data: {
+      familySync: { status: 'ACTIVE', canSync: true, familyId: 'fam_test' }
+    } })
+
+    const left = await fetch('/v1/auth/family/leave', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${payer}` }
+    })
+    expect(left.status).toBe(200)
+    const ownerAfter = await fetch('/v1/auth/access', { headers: { Authorization: `Bearer ${owner}` } })
+    expect(await ownerAfter.json()).toMatchObject({ data: {
+      membership: { familyId: 'fam_test', role: 'ADMIN' },
+      familyFeatures: [],
+      familySync: { status: 'PAUSED', canSync: false, familyId: 'fam_test' }
+    } })
+    const payerAfter = await fetch('/v1/auth/access', { headers: { Authorization: `Bearer ${payer}` } })
+    expect(await payerAfter.json()).toMatchObject({ data: {
+      membership: null,
+      accountFeatures: ['FAMILY_SYNC', 'PDF_EXPORT'],
+      familyFeatures: [],
+      familySync: { status: 'NO_ACTIVE_MEMBERSHIP', canSync: false }
+    } })
+  })
+
+  it('shares the highest active family plan and pauses after the last grant ends', async () => {
+    env.ENTITLEMENT_ENFORCEMENT = 'true'
+    env.ENTITLEMENT_TEST_MODE = 'true'
+    const legacyToken = 'ss_dv_entitlement-owner-token'
+    const inviteCode = 'SOLEMI9'
+    await seedLegacyFamily(legacyToken)
+    const owner = await accountAccess('acc_owner', 'adev_owner', 'ent_owner')
+    expect((await fetch('/v1/auth/family/claim', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${owner}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyDeviceToken: legacyToken })
+    })).status).toBe(200)
+    await seedInvite(inviteCode)
+
+    const member = await accountAccess('acc_member', 'adev_member', 'ent_member')
+    const joined = await fetch('/v1/auth/family/join', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${member}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: inviteCode, deviceName: 'Chrome · Android' })
+    })
+    const joinedBody = await joined.json() as { data: { connection: { deviceToken: string } } }
+
+    const setPlan = (access: string, plan: 'free' | 'family' | 'familyPlus') => fetch('/v1/auth/test/plan', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${access}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan })
+    })
+    expect((await setPlan(owner, 'familyPlus')).status).toBe(200)
+    const freeMember = await setPlan(member, 'free')
+    expect(freeMember.status).toBe(200)
+    expect(await freeMember.json()).toMatchObject({ data: {
+      features: ['FAMILY_PLUS_INSIGHTS', 'FAMILY_SYNC', 'PDF_EXPORT'],
+      accountFeatures: [],
+      familyFeatures: ['FAMILY_PLUS_INSIGHTS', 'FAMILY_SYNC', 'PDF_EXPORT'],
+      familySync: { status: 'ACTIVE', canSync: true, familyId: 'fam_test' }
+    } })
+
+    const memberSync = await fetch('/v1/sync?after=0', {
+      headers: { Authorization: `Bearer ${member}`,
+        'X-Solemi-Family-Token': joinedBody.data.connection.deviceToken }
+    })
+    expect(memberSync.status).toBe(200)
+
+    const signedOutSync = await fetch('/v1/sync?after=0', {
+      headers: { Authorization: `Bearer ${joinedBody.data.connection.deviceToken}` }
+    })
+    expect(signedOutSync.status).toBe(401)
+    expect(await signedOutSync.json()).toMatchObject({ error: { code: 'SESSION_INVALID' } })
+
+    const mismatchedAccount = await fetch('/v1/sync?after=0', {
+      headers: { Authorization: `Bearer ${owner}`,
+        'X-Solemi-Family-Token': joinedBody.data.connection.deviceToken }
+    })
+    expect(mismatchedAccount.status).toBe(403)
+    expect(await mismatchedAccount.json()).toMatchObject({ error: { code: 'FAMILY_MEMBERSHIP_REQUIRED' } })
+
+    const ownerAccess = await fetch('/v1/auth/access', {
+      headers: { Authorization: `Bearer ${owner}` }
+    })
+    expect(await ownerAccess.json()).toMatchObject({ data: {
+      features: ['FAMILY_PLUS_INSIGHTS', 'FAMILY_SYNC', 'PDF_EXPORT'],
+      accountFeatures: ['FAMILY_PLUS_INSIGHTS', 'FAMILY_SYNC', 'PDF_EXPORT'],
+      familyFeatures: ['FAMILY_PLUS_INSIGHTS', 'FAMILY_SYNC', 'PDF_EXPORT'],
+      familySync: { status: 'ACTIVE', canSync: true }
+    } })
+
+    expect((await setPlan(member, 'familyPlus')).status).toBe(200)
+    expect((await setPlan(owner, 'free')).status).toBe(200)
+    const inheritedFromMember = await fetch('/v1/auth/access', {
+      headers: { Authorization: `Bearer ${owner}` }
+    })
+    expect(await inheritedFromMember.json()).toMatchObject({ data: {
+      features: ['FAMILY_PLUS_INSIGHTS', 'FAMILY_SYNC', 'PDF_EXPORT'],
+      accountFeatures: [],
+      familyFeatures: ['FAMILY_PLUS_INSIGHTS', 'FAMILY_SYNC', 'PDF_EXPORT']
+    } })
+
+    const downgradedMember = await setPlan(member, 'family')
+    expect(await downgradedMember.json()).toMatchObject({ data: {
+      features: ['FAMILY_SYNC', 'PDF_EXPORT'],
+      accountFeatures: ['FAMILY_SYNC', 'PDF_EXPORT'],
+      familyFeatures: ['FAMILY_SYNC', 'PDF_EXPORT'],
+      familySync: { status: 'ACTIVE', canSync: true }
+    } })
+
+    expect((await setPlan(member, 'free')).status).toBe(200)
+    const paused = await fetch('/v1/sync?after=0', {
+      headers: { Authorization: `Bearer ${member}`,
+        'X-Solemi-Family-Token': joinedBody.data.connection.deviceToken }
+    })
+    expect(paused.status).toBe(403)
+    expect(await paused.json()).toMatchObject({ error: { code: 'FAMILY_SYNC_PAUSED' } })
+  })
+
+  it('does not expose the manual plan endpoint outside the staging test mode', async () => {
+    const access = await accountAccess('acc_owner', 'adev_owner', 'no_test_mode')
+    const response = await fetch('/v1/auth/test/plan', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${access}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan: 'familyPlus' })
+    })
+    expect(response.status).toBe(404)
+    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM subscriptions').get()).toEqual({ count: 0 })
+  })
+
+  it('lets only the active family admin clear the shared diary and keeps retries idempotent', async () => {
+    const adminFamilyToken = 'ss_dv_admin_clear'
+    await seedLegacyFamily(adminFamilyToken)
+    const adminAccess = await accountAccess('acc_admin', 'adev_admin', 'admin_clear')
+    const claim = await fetch('/v1/auth/family/claim', {
+      method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${adminAccess}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyDeviceToken: adminFamilyToken })
+    })
+    expect(claim.status).toBe(200)
+
+    const memberFamilyToken = 'ss_dv_member_clear'
+    const memberAccess = await accountAccess('acc_member', 'adev_member', 'member_clear')
+    const at = '2026-09-20T10:00:00.000Z'
+    sqlite.prepare(`INSERT INTO devices (id, family_id, token_hash, name, created_at, last_seen_at, revoked_at)
+      VALUES ('dev_member', 'fam_test', ?, 'Chrome', ?, ?, NULL)`)
+      .run(await sha256(`${env.TOKEN_PEPPER}:${memberFamilyToken}`), at, at)
+    sqlite.prepare(`INSERT INTO legacy_family_memberships
+      (id, family_id, account_id, role, status, joined_at, ended_at)
+      VALUES ('mem_member', 'fam_test', 'acc_member', 'MEMBER', 'ACTIVE', ?, NULL)`).run(Date.parse(at))
+    sqlite.prepare(`INSERT INTO account_family_devices
+      (account_device_id, account_id, family_id, legacy_device_id, created_at, updated_at)
+      VALUES ('adev_member', 'acc_member', 'fam_test', 'dev_member', ?, ?)`).run(Date.parse(at), Date.parse(at))
+    sqlite.prepare(`INSERT INTO children
+      (id, family_id, name, birth_date, created_at, updated_at, deleted_at, revision)
+      VALUES ('child_clear', 'fam_test', 'Baba', NULL, ?, ?, NULL, 0)`).run(at, at)
+    sqlite.prepare(`INSERT INTO sleep_sessions
+      (id, family_id, child_id, start_time, end_time, note, day_night_override,
+       created_at, updated_at, deleted_at, revision)
+      VALUES ('sleep_clear', 'fam_test', 'child_clear', ?, ?, '', NULL, ?, ?, NULL, 0)`)
+      .run(at, '2026-09-20T11:00:00.000Z', at, at)
+
+    const clear = (access: string, familyToken: string, operationId: string, replacementChildId: string) =>
+      fetch('/v1/auth/family/data/clear', {
+        method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${access}`,
+          'X-Solemi-Family-Token': familyToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operationId, expectedFamilyName: 'Teszt család', replacementChildId })
+      })
+
+    const denied = await clear(memberAccess, memberFamilyToken, 'clear_member', 'child_member_blank')
+    expect(denied.status).toBe(403)
+    expect(await denied.json()).toMatchObject({ error: { code: 'FAMILY_ADMIN_REQUIRED' } })
+    expect(sqlite.prepare(`SELECT deleted_at FROM sleep_sessions WHERE id = 'sleep_clear'`).get())
+      .toEqual({ deleted_at: null })
+
+    env.ENTITLEMENT_ENFORCEMENT = 'true'
+    const completed = await clear(adminAccess, adminFamilyToken, 'clear_admin', 'child_after_clear')
+    expect(completed.status).toBe(200)
+    expect(await completed.json()).toMatchObject({ data: { revision: 1, child: { id: 'child_after_clear', name: '' } } })
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM sleep_sessions WHERE deleted_at IS NULL`).get())
+      .toEqual({ count: 0 })
+    expect(sqlite.prepare(`SELECT id FROM children WHERE deleted_at IS NULL`).all())
+      .toEqual([{ id: 'child_after_clear' }])
+
+    const retry = await clear(adminAccess, adminFamilyToken, 'clear_admin', 'child_after_clear')
+    expect(retry.status).toBe(200)
+    expect((await retry.json() as { data: { revision: number } }).data.revision).toBe(1)
+  })
+
+  it('rejects a stale edit of the same sleep but accepts an unrelated sleep edit', async () => {
+    env.RECONCILIATION_CONFLICTS = 'true'
+    const firstToken = 'ss_dv_conflict_first'
+    const secondToken = 'ss_dv_conflict_second'
+    await seedLegacyFamily(firstToken)
+    const at = '2026-09-14T18:00:00.000Z'
+    sqlite.prepare(`INSERT INTO devices
+      (id, family_id, token_hash, name, created_at, last_seen_at, revoked_at)
+      VALUES ('dev_second', 'fam_test', ?, 'Chrome', ?, ?, NULL)`)
+      .run(await sha256(`${env.TOKEN_PEPPER}:${secondToken}`), at, at)
+    sqlite.prepare(`INSERT INTO children
+      (id, family_id, name, birth_date, created_at, updated_at, deleted_at, revision)
+      VALUES ('child_test', 'fam_test', 'Baba', NULL, ?, ?, NULL, 1)`).run(at, at)
+    sqlite.prepare(`INSERT INTO sleep_sessions
+      (id, family_id, child_id, start_time, end_time, note, day_night_override,
+       created_at, updated_at, deleted_at, revision)
+      VALUES ('sleep_shared', 'fam_test', 'child_test', ?, ?, '', NULL, ?, ?, NULL, 2),
+             ('sleep_other', 'fam_test', 'child_test', ?, ?, '', NULL, ?, ?, NULL, 2)`)
+      .run('2026-09-14T10:00:00.000Z', '2026-09-14T11:00:00.000Z', at, at,
+        '2026-09-14T12:00:00.000Z', '2026-09-14T13:00:00.000Z', at, at)
+    sqlite.prepare(`UPDATE families SET revision = 2 WHERE id = 'fam_test'`).run()
+
+    const patch = (token: string, id: string, operationId: string, note: string) => fetch(`/v1/sessions/${id}`, {
+      method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ operationId, baseRevision: 2, patch: { note } })
+    })
+    const first = await patch(firstToken, 'sleep_shared', 'op_first', 'Első telefon')
+    expect(first.status).toBe(200)
+    expect(await first.json()).toMatchObject({ data: { session: { note: 'Első telefon', revision: 3 } } })
+
+    const conflict = await patch(secondToken, 'sleep_shared', 'op_second', 'Második telefon')
+    expect(conflict.status).toBe(409)
+    expect(await conflict.json()).toMatchObject({
+      error: { code: 'SYNC_CONFLICT' },
+      data: { conflict: { entityType: 'SESSION', entityId: 'sleep_shared',
+        baseRevision: 2, serverRevision: 3, serverValue: { note: 'Első telefon' } } }
+    })
+    expect(sqlite.prepare(`SELECT note FROM sleep_sessions WHERE id = 'sleep_shared'`).get())
+      .toEqual({ note: 'Első telefon' })
+
+    const unrelated = await patch(secondToken, 'sleep_other', 'op_other', 'Másik alvás')
+    expect(unrelated.status).toBe(200)
+    expect(await unrelated.json()).toMatchObject({ data: { session: { note: 'Másik alvás' } } })
+  })
+})

@@ -1,0 +1,331 @@
+SOLEMI SLEEP – ADATKEZELÉSI TÁJÉKOZTATÓ
+Kiadásra szánt, platformfüggetlen V1 szöveg
+Utolsó frissítés: 2026-09-20
+
+FIGYELEM – KIADÁS ELŐTT KITÖLTENDŐ ADATOK
+[ADATKEZELŐ HIVATALOS NEVE]
+[ADATKEZELŐ SZÉKHELYE / POSTAI CÍME]
+[ADATKEZELŐ E-MAIL CÍME]
+[SOLEMI SUPPORT / PRIVACY E-MAIL]
+[HONLAP]
+[FIÓKTÖRLÉSI WEBOLDAL]
+Ezek nélkül a tájékoztató tartalmilag kész, de nem publikálható véglegesként.
+
+1. A TÁJÉKOZTATÓ HATÁLYA
+
+Ez az Adatkezelési Tájékoztató a Solemi Sleep alkalmazásra és a hozzá kapcsolódó
+webes, felhőszinkronizációs és fiókkezelési szolgáltatásokra vonatkozik.
+
+A Solemi Sleep iOS-en, Androidon és – ahol elérhető – webes felületen is
+működhet. Ez az egyetlen tájékoztató valamennyi támogatott platformra vonatkozik.
+Ha egy adatkezelési művelet csak valamely platformon fordul elő, azt külön
+jelezzük.
+
+2. AZ ADATKEZELŐ
+
+Adatkezelő:
+[ADATKEZELŐ HIVATALOS NEVE]
+Cím:
+[ADATKEZELŐ CÍME]
+Kapcsolat:
+[PRIVACY/SUPPORT E-MAIL]
+Honlap:
+[HONLAP]
+
+3. MI A SOLEMI SLEEP?
+
+A Solemi Sleep szülők és gondviselők számára készült alvásnapló és
+mintaelemző alkalmazás. A szolgáltatás lehetővé teszi több gyermek
+alvásbejegyzéseinek rögzítését, szerkesztését, statisztikai áttekintését,
+valamint opcionálisan a Family Sync használatát több családtag és eszköz között.
+
+A Solemi Sleep nem orvosi diagnosztikai szolgáltatás, és a saját adatokból
+képzett minták nem minősülnek orvosi diagnózisnak vagy kezelési javaslatnak.
+
+4. MILYEN ADATOKAT KEZELÜNK?
+
+4.1. Fiókadatok
+Ha fiókot hozol létre vagy bejelentkezel, kezelhetjük:
+- a szolgáltatótól kapott felhasználói azonosítót;
+- e-mail címet;
+- megjelenített nevet;
+- a fiók és családi tagság belső azonosítóit.
+
+4.2. Bejelentkezési és biztonsági adatok
+A szolgáltatás működéséhez kezelhetünk:
+- munkamenet- és hozzáférési tokeneket;
+- eszközazonosítókat és eszköznevet;
+- biztonsági és telepítési azonosítókat;
+- belépési, kijelentkezési és tokenfrissítési technikai adatokat.
+
+4.3. Gyermekprofil adatai
+A felhasználó megadhat:
+- gyermeknevet vagy becenevet;
+- születési dátumot.
+
+A gyermekprofil a családi napló része. A Solemi Sleepet felnőtt szülő vagy
+gondviselő használja; a szolgáltatás nem gyermekek közvetlen használatára készült.
+
+4.4. Alvásnapló
+Kezelhetjük:
+- alvás kezdete és vége;
+- nappali/éjszakai besorolás vagy kézi felülírás;
+- felhasználói jegyzet;
+- módosítási és szinkronizációs technikai metaadatok.
+
+Ezekből a Solemi saját adatokon alapuló statisztikákat, trendeket és mintákat
+számíthat.
+
+4.5. Profilkép
+A gyermekhez választott profilkép a jelenlegi V1 termékdöntés szerint kizárólag
+az adott eszközön marad, és nem kerül Family Syncen keresztül szerverre.
+Ha ez a működés a jövőben megváltozik, ezt a tájékoztatót a változás előtt
+frissítjük.
+
+4.6. Family Sync adatok
+Family vagy Family+ használatakor kezeljük a családi tagságot, szerepkört,
+meghívási/szinkronizációs állapotokat és a közösen szinkronizált gyermek- és
+alvásadatokat.
+
+4.7. Előfizetés és vásárlás
+Fizetős csomagnál kezelhetünk:
+- store szolgáltató (Apple App Store vagy Google Play);
+- előfizetés belső és store-azonosítói;
+- csomag típusa;
+- trial állapot;
+- megújulási, lejárati, visszatérítési, visszavonási és jogosultsági állapot;
+- csalásmegelőzéshez és restore funkcióhoz szükséges technikai eseményadatok.
+
+A bankkártyaadatokat a Solemi nem kezeli közvetlenül; a fizetés az Apple vagy
+a Google rendszerén keresztül történik.
+
+4.8. Technikai adatok és hibainformáció
+A szolgáltatás biztonsága és hibajavítása céljából korlátozott technikai
+naplóadatok keletkezhetnek. A V1 célja, hogy ezek ne tartalmazzanak szükségtelen
+gyermek- vagy naplótartalmat.
+
+5. MIÉRT KEZELJÜK AZ ADATOKAT?
+
+Az adatkezelés céljai:
+- az alkalmazás és a fiók működtetése;
+- a felhasználó által rögzített alvásnapló tárolása;
+- Family Sync biztosítása;
+- statisztikák és saját adatokból képzett minták megjelenítése;
+- előfizetés és jogosultság kezelése;
+- biztonság, visszaélésmegelőzés és hibakezelés;
+- felhasználói kérésre export és törlés;
+- jogszabályi kötelezettségek teljesítése.
+
+6. AZ ADATKEZELÉS JOGALAPJAI
+
+A konkrét művelettől függően az adatkezelés alapja lehet:
+- a felhasználóval kötött szerződés teljesítése vagy az ahhoz szükséges lépések;
+- az adatkezelő jogos érdeke a szolgáltatás biztonságos működtetésére,
+  visszaélés megelőzésére és hibák kivizsgálására, megfelelő érdekmérlegelés mellett;
+- jogi kötelezettség, például egyes számviteli/adózási dokumentumok megőrzése;
+- ahol a jogszabály azt megköveteli, a felhasználó hozzájárulása.
+
+A kiadás előtti végső jogi ellenőrzés során az egyes adatkezelési célokhoz
+hozzá kell rendelni a végleges jogalapot az alkalmazás tényleges működése alapján.
+
+7. GYERMEKEK ADATAI
+
+A Solemi Sleepet szülők és gondviselők használják gyermekük alvásának
+naplózására. Nem gyermekeknek szóló közvetlen online szolgáltatásként terveztük.
+
+Mivel a gyermekre vonatkozó név, születési dátum és alvásnapló személyes adat,
+ezeket fokozott körültekintéssel kezeljük, és csak a szolgáltatás működéséhez
+szükséges mértékben használjuk.
+
+A gyermek alvásadatait nem használjuk reklámprofil készítésére vagy
+harmadik fél hirdetési céljára.
+
+8. FAMILY SYNC ÉS KÖZÖS CSALÁDI ADATOK
+
+A Family Sync közös családi teret hoz létre. A csatlakozott családtagok az
+engedélyezett családi adatokat elérhetik és módosíthatják.
+
+Ha egy családtag törli saját fiókját vagy kilép:
+- saját hozzáférése megszűnik;
+- a közös gyermek- és alvásadatok megmaradhatnak, ha más aktív családtag marad;
+- a törlés előtt teljes export lehetőségét felajánljuk.
+
+Ha az utolsó családtag is megszünteti a családot/fiókot, a közös családi
+adatok a választott törlési folyamat szerint törlésre kerülnek.
+
+9. HELYI ÉS CSALÁDI TÖRLÉS
+
+A Solemi külön kezeli:
+- “Csak ezen az eszközön lévő adatok törlése”
+- “Családi adatok törlése”
+
+A családi törlés más családtagok adatait is érintheti, ezért külön,
+egyértelmű megerősítést kérünk, és a törlés előtt exportálási lehetőséget kínálunk.
+
+10. FIÓKTÖRLÉS ÉS HELYREÁLLÍTÁS
+
+A fióktörlés az alkalmazáson belül kezdeményezhető.
+A Google Play követelményeinek megfelelően külső webes útvonal is rendelkezésre áll:
+[FIÓKTÖRLÉSI WEBOLDAL]
+
+Törlés előtt felajánljuk a teljes Solemi-adatok exportját.
+
+A felhasználó választhat:
+A) azonnali végleges törlést; vagy
+B) legfeljebb 30 napos helyreállítási időszakot.
+
+A helyreállítási idő alatt a fiók normál használatra nem aktív, és az adatokat
+nem használjuk marketing- vagy új célra. A felhasználó a 30 nap alatt saját maga
+visszaállíthatja fiókját, vagy kérheti a végleges törlés azonnali befejezését.
+
+A helyreállítási idő végén a nem kötelezően megőrzendő személyes adatok
+véglegesen törlésre kerülnek.
+
+Bizonyos minimális adatok tovább őrizhetők, ha ezt jogszabály, számviteli/adózási
+kötelezettség, csalásmegelőzés vagy jogi igény indokolja. Ezeket az adatokat
+nem használjuk a Solemi normál szolgáltatására vagy marketingre.
+
+11. MENNYI IDEIG ŐRIZZÜK MEG AZ ADATOKAT?
+
+Általános szabály: csak addig, ameddig az adott célhoz szükséges.
+
+- aktív fiók és szolgáltatási adatok: a fiók/családi tér fennállásáig;
+- törlésre váró recovery adatok: legfeljebb 30 nap;
+- helyi profilkép: az adott eszközön a törlésig;
+- auth/session adatok: az adott session/jogosultság szükséges időtartamáig;
+- normál technikai logok: a V1 belső cél szerint legfeljebb 30 nap;
+- előfizetési/billing rekordok: a restore, jogosultság, fraud és jogi kötelezettség
+  által indokolt minimális idő;
+- számviteli bizonylathoz tartozó adatok: a vonatkozó jogszabály szerinti idő,
+  amely Magyarországon egyes bizonylatok esetén legalább 8 év lehet.
+
+A számviteli megőrzés nem jelenti azt, hogy a gyermekprofil vagy alvásnapló
+8 évig megmaradna.
+
+12. OFFLINE HOZZÁFÉRÉS
+
+Fizetős funkciókhoz a Solemi legfeljebb 30 napos, korábban szerveresen ellenőrzött
+offline jogosultsági cache-t használhat. Ez a cache kizárólag a csomaghoz való
+hozzáférés eldöntésére szolgál.
+
+13. ADATFELDOLGOZÓK ÉS KÜLSŐ SZOLGÁLTATÓK
+
+A szolgáltatás működéséhez az alábbi kategóriájú szolgáltatókat használhatjuk:
+
+Cloudflare
+A Solemi jelenlegi infrastruktúrája Cloudflare Pages/Workers/D1 szolgáltatásokat
+használhat webes kiszolgálásra, API-ra és adatbázisra. A Cloudflare a megfelelő
+szolgáltatásoknál adatfeldolgozóként járhat el, saját al-adatfeldolgozókkal.
+
+Google
+Google Identity Services használható Google-belépéshez. Androidon a Google Play
+kezeli az alkalmazás terjesztését és az előfizetési vásárlást.
+
+Apple
+iOS-en Sign in with Apple használható bejelentkezéshez. Az App Store / StoreKit
+kezeli az iOS előfizetési vásárlást.
+
+A szolgáltatók egyes adatok tekintetében saját jogon is adatkezelők lehetnek
+(pl. saját store-fiók, fizetés vagy platformbiztonság). Az ő adatkezelésükre
+a saját adatvédelmi szabályaik is vonatkoznak.
+
+14. NEMZETKÖZI ADATTOVÁBBÍTÁS
+
+Egyes technikai szolgáltatók globális infrastruktúrát és EU-n kívüli
+al-adatfeldolgozókat is használhatnak. Ilyen továbbítás esetén az alkalmazandó
+GDPR szerinti megfelelő garanciákat kell alkalmazni, például megfelelőségi
+határozatot vagy standard szerződéses feltételeket.
+
+A Cloudflare közzétett adatfeldolgozási feltételei többek között foglalkoznak
+az EGT-ből történő adattovábbítással és az EU standard szerződéses feltételeivel.
+
+15. BIZTONSÁG
+
+A Solemi célja a személyes adatok bizalmasságának, sértetlenségének és
+rendelkezésre állásának védelme. Ennek része többek között:
+- hitelesített bejelentkezés;
+- rövid élettartamú hozzáférési tokenek;
+- session visszavonás;
+- elkülönített staging és production környezet;
+- biztonságos sync- és konfliktuskezelés;
+- adatvesztés elleni mentési/restore folyamat;
+- jogosultságok szerveroldali ellenőrzése.
+
+A biztonsági intézkedések részletei a rendszer fejlődésével változhatnak.
+
+16. A FELHASZNÁLÓ JOGAI
+
+Az alkalmazandó jog alapján kérheted többek között:
+- tájékoztatást és hozzáférést személyes adataidhoz;
+- helyesbítést;
+- törlést;
+- adatkezelés korlátozását;
+- tiltakozást, ahol ez alkalmazható;
+- adathordozhatóságot, ahol ennek feltételei fennállnak;
+- hozzájárulás visszavonását, ha az adatkezelés hozzájáruláson alapul.
+
+Kapcsolat:
+[PRIVACY/SUPPORT E-MAIL]
+
+Jogosult lehetsz panaszt tenni az illetékes adatvédelmi felügyeleti hatóságnál is.
+
+17. EXPORT
+
+A Solemi géppel olvasható exportot biztosít a felhasználói adatokhoz.
+A törlés, családból kilépés és családmegszüntetés előtt az export lehetőségét
+külön felajánljuk.
+
+18. REKLÁM ÉS TRACKING
+
+A V1 termékdöntés szerint a Solemi nem épít gyermek- vagy alvásadatokra alapuló
+hirdetési profilt, és ezeket az adatokat nem értékesíti adatbrókereknek.
+
+Ha a jövőben analytics, marketing vagy hirdetési SDK kerülne bevezetésre,
+a bevezetés előtt ezt a tájékoztatót és a store adatvédelmi nyilatkozatokat
+frissíteni kell, és ahol szükséges, külön hozzájárulást kell kérni.
+
+19. ELŐFIZETÉS
+
+A Solemi Free, Family és Family+ csomagokat kínálhat.
+A fizetős csomagok havi és éves változatban is elérhetők lehetnek.
+A V1 termékdöntés szerint egy felhasználó egyetlen alkalommal jogosult
+7 napos próbaidőszakra, és ő döntheti el, hogy azt Family vagy Family+
+csomaghoz használja.
+
+Egy család működéséhez egy aktív előfizetés elegendő; a Solemi a vásárlási
+felületen erre külön felhívja a figyelmet, és nem ösztönöz párhuzamos második
+családi előfizetésre.
+
+Az előfizetés automatikus megújulását, lemondását, upgrade/downgrade folyamatát
+az adott App Store vagy Google Play rendszer kezeli a megjelenített feltételek szerint.
+
+20. A TÁJÉKOZTATÓ MÓDOSÍTÁSA
+
+A tájékoztatót frissíthetjük, ha a Solemi funkciói, szolgáltatói vagy jogi
+követelményei változnak. Jelentős, a felhasználók jogait vagy adatkezelést érintő
+változásról megfelelő módon tájékoztatást adunk.
+
+21. KAPCSOLAT
+
+Adatvédelmi és support kérdések:
+[PRIVACY/SUPPORT E-MAIL]
+
+Fióktörlés:
+[FIÓKTÖRLÉSI WEBOLDAL]
+
+HIVATALOS FORRÁSOK A SZÖVEG ÖSSZEÁLLÍTÁSÁHOZ
+- Európai Bizottság – Principles of the GDPR
+- Európai Bizottság – Information for individuals / GDPR rights
+- Apple Developer – Manage app privacy
+- Apple Developer – Offering account deletion in your app
+- Apple Human Interface Guidelines – Managing accounts
+- Google Play Console Help – Understanding app account deletion requirements
+- Google Play User Data policy
+- Cloudflare – Data Processing Addendum és Sub-Processors
+- Nemzeti Jogszabálytár – számviteli bizonylatok megőrzése
+
+KIADÁS ELŐTT KÖTELEZŐ ELLENŐRZÉS
+A szögletes zárójelben lévő adatokat ki kell tölteni.
+A production szolgáltatói listát, log retentiont, backup retentiont és
+számviteli megőrzésbe ténylegesen tartozó rekordokat a valós release
+infrastruktúrával össze kell vetni.

@@ -3,6 +3,10 @@
 Status: **LOCKED FOR ARCHITECTURE**  
 Date: 2026-08-24
 
+**V1 scope override — 2026-09-20:** see `OWNER_DECISIONS_REVIEW_2026-09-20.md` and its five owner-supplied sources. This matrix specifies the target product, not implementation readiness. Technical release gates remain open. Trial rules are superseded by `SOLEMI_V1_TRIAL_RULES_2026-10-01.md`. The 2026-10-07 implementation/promise inventory is in `PDF_EXPORT_CHECKPOINT_2026-10-07.md`.
+
+**Product decision update — 2026-09-17; staging accepted — 2026-09-19:** `PRODUCT_DIRECTION.md` is authoritative. Keep Free / Family (990 HUF/month) / Family+ (1490 HUF/month). Every active family member inherits the paid capabilities granted by any active member's valid subscription, regardless of creator/admin role. Family+ analytics are no longer subscriber-only. Worker and client implementation plus the two-account, two-phone staging matrix are accepted.
+
 This file records the agreed commercial/feature split for the three-plan model. Raw child/session data stays on one canonical schema; plans gate product capabilities, not data formats.
 
 ## Plans
@@ -13,16 +17,16 @@ This file records the agreed commercial/feature split for the three-plan model. 
 
 ## Core rules
 
-1. All plans require a Solemi account; V1 identity provider is Google.
-2. Login itself is free and is never a paid feature.
+1. Free can be used local-first without a Solemi account. V1 account-based features require Google and Sign in with Apple support with safe identity linking.
+2. Login itself is free but optional for the Free plan; account required only for sync/restoration/commerce.
 3. Free sleep history remains local-first; account does not imply automatic cloud backup.
-4. Family Sync is enabled for the whole family while at least one member supplies an active Family or Family+ entitlement.
-5. Family+ advanced Insights are personal entitlements; they are not gifted to other family members merely because shared sync is active.
-6. Raw synchronized family data may exist on a Free member's device while paid views remain locked by entitlement.
+4. One active family subscription enables whole-family sync for that family; at least one member must hold Family or Family+ entitlement for sync to be active.
+5. Family+ advanced Insights are available to every active family member when any active member holds a valid Family+ subscription.
+6. Raw synchronized family data and the corresponding paid capabilities are available to every active member; their own billing plan may remain Free.
 7. If the last Family/Family+ entitlement lapses, cloud data and family membership are retained but active cross-device sync pauses. Reactivation resumes via safe reconciliation.
 8. Server is entitlement authority; client may use a 30-day validated offline entitlement cache.
 9. One account: maximum 2 active devices in the current product decision. No family-wide hard-coded device cap in the architecture.
-10. One subscription applies to one family.
+10. A subscription belongs to its purchaser account and contributes paid capabilities through that account's active family membership. The family creator need not be the purchaser.
 
 ## Feature matrix
 
@@ -39,23 +43,23 @@ This file records the agreed commercial/feature split for the three-plan model. 
 | Compact time picker correction | ✅ | ✅ | ✅ |
 | Basic data-quality warnings | ✅ | ✅ | ✅ |
 | 12+ hour “Still sleeping?” guardrail | ✅ | ✅ | ✅ |
-| Fixed/manual reminder | ✅ | ✅ | ✅ |
+| Fixed/manual reminder (excluded from V1) | — | — | — |
 | Family / multi-device sync | — | ✅ | ✅ |
 | Shared family child profiles and raw history | — | ✅ | ✅ |
 | PDF export | — | ✅ | ✅ |
 | Personal Wake Window analytics | — | — | ✅ |
-| Age-reference Wake Window comparison | — | — | ✅ |
+| Age-reference Wake Window comparison (excluded from V1) | — | — | — |
 | Wake Window trend | — | — | ✅ |
 | Next-sleep prediction range + confidence | — | — | ✅ |
 | Routine/pattern recognition | — | — | ✅ |
 | Similar-day analysis | — | — | ✅ |
 | Custom date-range advanced trends | — | — | ✅ |
-| Adaptive reminder based on personal pattern | — | — | ✅ |
+| Adaptive reminder based on personal pattern (excluded from V1) | — | — | — |
 | Advanced Insights / Patterns | — | — | ✅ |
 
 ## Insights navigation
 
-The main app navigation is the same for every plan:
+The existing navigation may remain for V1; the following older layout is not a mandatory redesign:
 
 **Sleeps · History · Insights**
 
@@ -72,9 +76,9 @@ Family users see the same structure, with Family+ cards still locked where appli
 - Paywall is available from Settings.
 - Paywall also appears when a user intentionally opens a locked feature.
 - No random startup/interruption paywall.
-- 7-day trial targets **Family+**, so the user can evaluate the complete product.
+- One lifetime 7-day trial per Solemi account across both paid plans; the user chooses Family or Family+. A Family can use at most four distinct users' trials in total, with only one active family trial at a time. Activation records the account and, when present, Family. Starting without a Family still consumes the account's trial; first binding uses the remaining time and one family slot. A full/busy Family receives no additional shared trial access. Once bound, a trial cannot move to another Family. Joining a Family, changing families/devices, reinstalling or restoring data never resets usage or creates parallel access. A Family whose four slots are consumed cannot accept a new trial even from an unused account. Full rules: `SOLEMI_V1_TRIAL_RULES_2026-10-01.md`. Local server enforcement is implemented; migration, store reconciliation, paywall and activation remain release work. [A11 checkpoint](TRIAL_RULES_CHECKPOINT_2026-10-07.md).
 - Trial uses payment method / auto-renew where the platform flow supports it.
-- If trial ends without paid continuation, account returns to Free.
+- If trial ends without paid continuation, its personal grant expires; another active family member's valid subscription can still grant family access.
 - Monthly + annual options.
 - Annual target discount: roughly 2 months free.
 - No lifetime plan.
@@ -85,7 +89,7 @@ Family users see the same structure, with Family+ cards still locked where appli
 
 - create/activate Family entitlement;
 - make automatic local safety backup before first cloud bootstrap;
-- upload canonical local family dataset;
+- create a new family's canonical dataset only through the validated creation flow; when joining an existing family, show local/family diary review and require explicit selection before bootstrap (no automatic merge or upload of the local diary);
 - verify sync before marking bootstrap complete.
 
 ### Free/Family -> Family+
@@ -116,20 +120,18 @@ If another family member still has an active Family/Family+ entitlement, family 
 
 - family sync: **active**;
 - both devices receive the canonical shared raw data;
-- Parent B remains on Free feature visibility;
-- neither account gets Family+ Insights unless personally entitled.
+- both accounts get Family capabilities;
+- neither account gets Family+ Insights without an active Family+ contribution.
 
 ### Parent A = Family+, Parent B = Free
 
 - family sync: **active**;
-- Parent A gets Family+ Insights;
-- Parent B gets Free UI/features over the synchronized canonical data.
+- both accounts get Family+ Insights and other Family+ capabilities.
 
 ### Parent A = Family+, Parent B = Family
 
 - family sync: **active**;
-- Parent A gets Family+ Insights;
-- Parent B gets Family feature set.
+- both accounts get Family+ Insights and other Family+ capabilities.
 
 ## Architectural consequence
 
@@ -137,9 +139,9 @@ Entitlements must expose at least two separate decisions:
 
 ```text
 familyCanSync(familyId)
-accountCanUse(featureKey, accountId)
+memberCanUse(featureKey, accountId, activeFamilyId)
 ```
 
 Do not reduce the model to a single `plan` check on the current device.
 
-Raw data synchronization and personal feature visibility are intentionally separate.
+Raw data synchronization and capability visibility remain separate decisions, but both must reflect the valid contributions of all active members. Subscription ownership is not the same as effective family access.

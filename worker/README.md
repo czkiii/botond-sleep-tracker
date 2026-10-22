@@ -2,6 +2,34 @@
 
 Cloudflare Worker + D1 backend for Solemi Sleep Family Sync V1.
 
+## Development dependency security fix (2026-10-08)
+
+The Miniflare dependency of Wrangler 4.147.0 pins `sharp` 0.35.4, which is
+affected by [GHSA-wq5f-xc86-pv6w](https://github.com/advisories/GHSA-wq5f-xc86-pv6w).
+The Worker package's top-level npm override selects `sharp` 0.35.5 (prebuilt
+librsvg 2.63.2) and the lockfile includes the updated platform packages.
+Do not nest this override under `miniflare`: with the pinned prerelease
+Miniflare, npm 10.9.9 fails `ci` with missing sharp 0.35.4 entries, while
+npm 11.19.0 accepts the same files. The top-level sharp override works with
+the CI npm version and preserves the patched lockfile without adding old binaries.
+Keep the override until upstream Miniflare selects a patched version; remove
+it only after a clean install, audit and Worker checks pass without it.
+Do not use `npm audit fix --force` to downgrade Wrangler or disable the audit.
+
+Verified locally with CI's Node 22.23.3 and npm 10.9.9 after a clean Worker
+install: zero audit findings, Worker typecheck, `deploy:staging -- --dry-run`
+and the full 791/791 tests. The previous Node 24 check also covered native
+SVG-to-PNG processing. This does not confirm a remote Cloudflare deployment.
+
+Read-only staging schema inspection on 2026-10-08 initially found migrations
+007–010 missing. They were subsequently applied to `solemi-sleep-db-staging`
+after a full export and successful rehearsal against that export. Comparing
+before/after exports confirmed identical row counts and SHA-256 fingerprints
+for all 17 pre-existing tables. Remote foreign-key checks passed; the new view
+preserved all 9 existing grants and no trial was activated. Private SQL exports
+and the rehearsal report are in the git-ignored `.private-backups/` directory.
+This migration result applies only to staging, not production.
+
 ## What is already implemented
 
 - Create a family and first device
@@ -9,6 +37,8 @@ Cloudflare Worker + D1 backend for Solemi Sleep Family Sync V1.
 - Join a family with a code
 - Per-device bearer tokens (only hashes are stored in D1)
 - Incremental revision-based sync
+- Multiple child profiles per family, with optional birth dates
+- Child-scoped sleep history and one simultaneous active sleep per child
 - Start / end sleep lifecycle endpoints
 - Manual completed sleep creation
 - PATCH-based editing
@@ -18,6 +48,58 @@ Cloudflare Worker + D1 backend for Solemi Sleep Family Sync V1.
 - CORS for the current GitHub Pages frontend and local Vite development
 
 ## Cloudflare setup
+
+### Workers Free configuration (2026-10-08)
+
+The staging build log confirmed Cloudflare error 100328: this account uses
+Workers Free and rejects explicit `limits.cpu_ms`, including the former 50 ms
+setting. Both Worker configs omit that paid-only setting and use the platform's
+Free CPU limit (currently 10 ms per HTTP request). Rate-limit bindings remain.
+This fixes configuration compatibility; it does not prove that every workload
+fits the Free CPU budget. A later Paid-plan change must explicitly review and
+set a cost-control CPU limit before deployment.
+[Cloudflare CPU limits](https://developers.cloudflare.com/workers/platform/limits/#cpu-time).
+
+Remote verification completed on 2026-10-09 for
+`be1508332693a6774ce5e072617029ec4a438faa` (`Fix Worker Free-plan deployment configuration`).
+All five GitHub checks passed: Frontend, Worker, Cloudflare Pages, Workers Builds
+and [staging smoke](https://github.com/czkiii/botond-sleep-tracker/actions/runs/37835678581/job/113514384544).
+The previously cancelled smoke job passed after rerunning. A separate direct
+smoke on 2026-10-09 confirmed that every response came from this exact Worker
+commit, health/CORS worked, anonymous family creation/join were blocked and
+account/family/test-plan endpoints required a session. The old failed Cloudflare
+retry targeted `b79c54f`, which still contained the rejected CPU setting.
+Staging migrations 007–010 are applied; production migration, trial activation
+and authenticated two-account acceptance remain separate release gates.
+
+### A11 trial migration / release ordering (2026-10-07)
+
+Before deploying the trial-aware Worker, back up and apply
+`migrations/010_account_trials.sql` after migrations 003–009. Access queries now
+read `effective_entitlement_grants`, so this migration is required even while
+activation is disabled. Do not push to an automatically deploying Worker before
+its database is ready. The migration is additive; old Worker code can still read
+the original paid grants, but rollback to it does not recognize the new trials.
+
+`TRIAL_ENABLED=true` explicitly exposes the authenticated `GET /v1/auth/trial`,
+`POST /v1/auth/trial/activate` and `POST /v1/auth/trial/bind` routes. It is absent
+from checked-in runtime configs, so activation remains off. The flag disables
+new requests, not grants already recorded. Activation accepts only `product`
+(`FAMILY` / `FAMILY_PLUS`) and an account-scoped `operationId` (8–100 ASCII
+letters/digits/underscore/hyphen); account, Family and timestamps are server-owned.
+Bind retries cannot transfer an already bound trial or extend its deadline.
+
+Before rollout, inspect historical store trials, including active `TRIALING`
+subscriptions. Known store trial history is backfilled as consumed account usage,
+without guessing its Family or issuing new rights. Historical family allocation
+and existing active store-trial grants require reconciliation before activation.
+The store service rejects current store-trial snapshots with
+`STORE_TRIAL_REQUIRES_RECONCILIATION` until offer eligibility, acknowledgement and
+the ledger are integrated. Do not advertise an enabled native trial offer yet.
+
+See [trial checkpoint](../TRIAL_RULES_CHECKPOINT_2026-10-07.md) for tests, limits,
+deployment prerequisites and account-erasure retention work. No remote migration
+or activation was performed by the local implementation task.
 
 Run these commands from this `worker` directory.
 
@@ -41,11 +123,24 @@ npx wrangler secret put TOKEN_PEPPER
 
 Use a long random value and keep it private. Do not commit it to GitHub.
 
-Apply the database schema:
+For a brand-new empty database, apply the current schema:
 
 ```bash
 npm run db:apply:remote
 ```
+
+For an existing V3 database, do **not** reapply `schema.sql`. Back up D1 first,
+then apply `migrations/002_children_v4.sql`. The migration creates one stable
+legacy child per family, attaches every existing sleep to that child, and
+replaces the family-wide active-sleep constraint with a per-child constraint.
+
+Safe production order:
+
+1. Export/back up the remote D1 database.
+2. Apply `migrations/002_children_v4.sql` to D1.
+3. Deploy the Worker from the same commit.
+4. Verify `/health`, create/patch child, two-child active sleep, and `/v1/sync`.
+5. Only then release the matching frontend.
 
 Optional local database setup:
 
@@ -94,6 +189,8 @@ POST   /v1/invites
 GET    /v1/sync?after=<revision>
 GET    /v1/device
 POST   /v1/device/leave
+POST   /v1/children
+PATCH  /v1/children/:id
 POST   /v1/sessions
 POST   /v1/sessions/start
 POST   /v1/sessions/:id/end
@@ -103,7 +200,9 @@ DELETE /v1/sessions/:id
 
 ## Important V1 rules
 
-- A family can have at most one active sleep session.
+- A family can contain any number of active child profiles.
+- Each child can have at most one active sleep session; different children may sleep simultaneously.
+- Child names and optional birth dates sync. Profile photos stay device-local in this release.
 - Active sleeps must be created through `/v1/sessions/start`.
 - Active sleeps must be ended through `/v1/sessions/:id/end`.
 - Normal edits use PATCH semantics, so unrelated field edits naturally merge.
@@ -114,3 +213,184 @@ DELETE /v1/sessions/:id
 ## Before public release
 
 The V1 backend still needs production hardening before serving a large public user base, especially automated abuse/rate limiting for onboarding endpoints, observability, retention cleanup for old operation IDs/invites, and a recovery/device-management flow.
+
+## Account/session and Google authentication
+
+`migrations/003_accounts_and_sessions.sql` adds accounts, Google identities,
+account devices and account sessions. Migration 004 adds one-use login challenges
+and used refresh-token hashes for reuse detection. They do not modify the legacy tables,
+claim existing devices, grant subscriptions or change `/v1` authentication.
+The existing `schema.sql` remains the V4 sleep-sync baseline; an empty identity
+test database needs that baseline followed by migration 003. A V3 database must
+first complete the separate V4 migration 002. Never reapply the baseline to
+upgrade an existing database or apply migration 003 twice.
+
+`src/accountStore.ts` provides the persistence layer. `src/googleAuth.ts` verifies
+Google JWT signatures with the rotating Google JWKS and validates issuer,
+audience, expiry, issued-at age, authorized party, verified email and a one-use
+nonce. `src/authService.ts` resolves accounts by Google issuer + subject, manages
+the two-device boundary, issues five-minute Solemi access tokens, rotates hashed
+30-day refresh tokens and revokes a device's sessions when an old refresh token
+is reused. Account and device state are checked on every session use.
+
+The Worker exposes `/v1/auth/challenge`, `/v1/auth/google`, `/v1/auth/refresh`,
+`/v1/auth/me` and `/v1/auth/logout`. Cookie-changing requests require an allowed
+Origin. The refresh token is an HttpOnly, Secure, SameSite=None cookie scoped to
+`/v1/auth`; the short access token is returned to the client. The frontend account
+card is compiled only when `VITE_ACCOUNT_AUTH=true`.
+
+The database enforces two active devices per account on inserts, reactivation
+and account reassignment. A composite foreign key ensures each session's
+device belongs to the session's account. Device summaries contain no hashes.
+Account creation and device revocation use transactional D1 batches; see
+[Cloudflare's batch contract](https://developers.cloudflare.com/d1/worker-api/d1-database/#batch).
+D1 enforces foreign keys by default; see
+[D1 foreign keys](https://developers.cloudflare.com/d1/sql-api/foreign-keys/).
+
+### Local validation
+
+From the repository root, `npm test` includes `worker/tests/accountStore.test.ts`.
+Use Node 22.15+ (CI uses the latest Node 22). Tests use Node's built-in SQLite
+with foreign keys enabled and no network, credentials or persistent database.
+They execute the actual migration and repository SQL through a small adapter
+for D1's async methods and transactional batch interface. This validates SQL,
+constraints, rollback and legacy row/schema preservation; it does not replace
+a staging D1/runtime test.
+
+Before any separately authorized database migration, export the database and
+record migration history and legacy row/revision counts. Apply 003 once after
+the V4 baseline and 004 after 003, then check `PRAGMA foreign_key_check`, legacy
+counts/revisions, the new tables and a legacy sync smoke test. Record the result
+before any production rollout.
+
+The safe application rollback at this stage is the preceding Worker, since
+the existing routes ignore these additive tables. Leave the new tables in
+place; do not drop identity data to roll back application code. Once identity
+routes write data, database restore needs a separately tested backup/restore
+procedure. The compatible-scope isolated rehearsal is documented below; this
+does not establish rollback for the existing production user's migration.
+
+The authorized staging migration was completed on 2026-09-14 with before/after
+exports, foreign-key checks and full legacy content hashes. See
+`STAGING_AUTH_MIGRATION_2026-09-14.md`. The staging `AUTH_SECRET` and Google OAuth
+client ID are configured, and the auth Worker version is deployed to staging.
+The internal account UI and real Google-account smoke test are still pending;
+follow the repository-root `GOOGLE_AUTH_SETUP.md`.
+
+## Subscription and entitlement enforcement
+
+`migrations/006_subscriptions_and_entitlements.sql` adds provider-neutral
+subscriptions, idempotent provider events and account feature grants. Family
+Sync access is derived at request time: one active member with a current
+`FAMILY_SYNC` grant enables raw sync for every active member of that family.
+`FAMILY_PLUS_INSIGHTS` remains personal to the entitled account.
+
+When `ENTITLEMENT_ENFORCEMENT=true`, every family diary read and write requires
+both a current Solemi account session and the family device token mapped to
+that account device. The client sends the family token in
+`X-Solemi-Family-Token`; the account access token remains the Authorization
+bearer. A paid account creates a family atomically through
+`POST /v1/auth/family/create`. The unauthenticated `/v1/families` and `/v1/join`
+routes remain available only while enforcement is disabled.
+
+Existing legacy families are not rewritten or deleted. Their current device
+token can still be claimed once through `POST /v1/auth/family/claim`; after the
+claim, normal membership, device mapping and family entitlement checks apply.
+This allows a compatible account migration without retaining raw-token access
+to paid diary data.
+
+Staging enables `/v1/auth/test/plan` with a `MANUAL` provider so Free, Family,
+Family+, expiry and reactivation can be tested before Apple and Google Play
+adapters exist. Both `ENTITLEMENT_TEST_MODE` and `ENTITLEMENT_ENFORCEMENT` are
+explicit staging flags; the manual endpoint is unavailable without the former.
+See `STAGING_ENTITLEMENT_MIGRATION_2026-09-15.md` for the staging migration and
+verification record.
+
+### Shared staging infrastructure (2026-10-19)
+
+Shared staging now has migrations 011–013, a distinct `ERASURE_JOURNAL` database,
+the independent `TRIAL_IDENTITY_SECRET`/v1 programme, and five-minute maintenance
+scheduling. The tracked staging configuration matches this deployment. Public
+`ACCOUNT_DELETION_ENABLED` and `TRIAL_ENABLED` remain false; frontend activation,
+production provisioning, external key custody, actual backup/log expiry,
+alert delivery and legal review remain separate gates. Do not run the journal
+candidate generator against the already provisioned staging config, replay the
+applied migrations, or regenerate its identity key. See the
+[staging integration record](../A17_SHARED_STAGING_INTEGRATION_2026-10-19.md)
+for resource identities, backups, verification and remaining conditions.
+
+The following dated implementation notes describe earlier checkpoints; their
+"not deployed" statements do not override that current integration record.
+
+### Account deletion — local implementation and operations, disabled (2026-10-14)
+
+Migration `011_account_deletion.sql` adds guarded deletion/recovery requests,
+minimal receipts and inactive-account entitlement guards. Migration 012 adds
+persistent erase/restore decisions, retry state and a maintenance status row.
+Neither migration was applied remotely in this task. Checked-in activation
+flags and remote resources remain unchanged.
+
+Immediate deletion or at most 30-day recovery uses a separate D1 binding,
+`ERASURE_JOURNAL`, whose schema is in `erasure-journal/schema.sql`. Its identity
+must match `SOLEMI_ENVIRONMENT` and `DELETION_SOURCE_DATABASE_ID`. It records
+requests and irreversible ERASE/RESTORE decisions before erasure/reactivation;
+retries cannot reverse the chosen outcome. Explicit sequence numbers survive
+SQL export/import. Never restore this journal alongside an older diary backup.
+
+The scheduled handler processes at most one account and 50 expired sessions /
+50 challenges per invocation, with 15-minute retry backoff and aggregate status.
+`ACCOUNT_DELETION_MAINTENANCE=true` is independent of the new-request UI flag.
+New requests require both maintenance and `ACCOUNT_DELETION_ENABLED=true`;
+frontend activation still requires `VITE_ACCOUNT_DELETION=true`. Keep recovery
+available while accepted requests are pending. No remote cron is configured by
+this change. `scripts/prepare-deletion-config.mjs` generates a reviewable local
+candidate with a separate D1 binding and five-minute cron, both flags disabled.
+
+`scripts/prepare-deletion-restore.mjs` processes frozen SQL exports offline,
+replays journal decisions, revokes old credentials and produces a new SQL file
+plus hash report. It requires Node >=24.10 for SQLite authorization that denies
+attached databases, filesystem exports and unsafe pragmas. The full test job
+uses Node 24; the Worker typecheck/package job continues on Node 22.
+`RESTORE_MAINTENANCE=true` blocks HTTP and scheduled processing; operators must
+also freeze other writers and drain in-flight work before exporting the journal.
+The v2 tool requires hash-bound creation/capture metadata, rejects backups at least 30 days old and journal captures over five minutes old, and does not deploy anything. Metadata dates must come from trusted operator records. It sets a persistent business-reconciliation gate and removes stale grants; importing its SQL alone does not authorize reopening traffic.
+
+The owner approved retention rules on 2026-10-14. The local implementation is now in
+[the 2026-10-15 runbook](../A17_RETENTION_IMPLEMENTATION_2026-10-15.md): main DB migration 013, independent journal migration 002, a separate HMAC key/programme identity, conditional erasure-journal cleanup, calendar-based billing retention, managed-file expiry tools, and HU/EN/DE deletion copy. New deletion requests require RETENTION_MAINTENANCE as well as the existing deletion maintenance flag. The candidate generator keeps all flags off.
+
+Offline business reconciliation for a compatible account/family scope is now available in `scripts/prepare-business-restore.mjs` (2026-10-16). It takes an old backup, a current frozen full source export, the independent journal and hash-bound capture metadata. It replays erasures on both sides, copies current trial/billing/event/replacement/retention ledgers, requires fresh store proof for live store grants, and rejects scope/schema drift. It never reconstructs missing history from an old grant or from the trial marker alone. The output clears the business gate only after validation; `trafficMayResume:false` still requires operator verification with HTTP/cron frozen. Old account-device credentials are now revoked alongside sessions and family tokens.
+
+Run `npm run test:recovery` from the repository root for the repeatable local rehearsal. See [business restore checkpoint and staging runbook](../A17_BUSINESS_RESTORE_CHECKPOINT_2026-10-16.md) for the CLI, capture window, supported scope and failure handling. Shared staging/production key/DB/cron provisioning, actual provider/file retention schedules, client-state reconciliation and legal validation remain release gates. Do not deploy the synthetic-ID local rehearsal configuration. Apple token revocation and verified dispute-event wiring belong to the store integration.
+
+Before importing a reconciled business restore into an empty D1 target, adapt the verified output locally:
+
+```text
+node worker/scripts/prepare-d1-restore.mjs restored.sql restored.sql.report.json restored.d1.sql
+```
+
+This command requires Node 24.10+ and is run from the repository root. It creates new SQL/report files only; it never imports or deploys. The business report must match the input hash and confirm completed reconciliation with traffic still frozen. Independent journal exports, blocked business state and unsupported cross-table dependency cycles are refused. The adapter creates parent tables and unique indexes before rows, and triggers after rows, then verifies every table's data and foreign keys in a fresh local database. D1 import uses deferred checks without `foreign_keys=OFF`. Import only into the independently verified empty target; compare remote rows and the untouched journal, retain the original logical source identity, and keep HTTP/cron frozen until the documented acceptance checks pass.
+
+Raw Cloudflare exports may create referenced unique indexes after data. The offline loaders therefore temporarily disable foreign keys only in isolated memory and require them enabled, with no violations, before replay. Final erasure replay retains the journal's original request ID and deadline so scheduled retention can confirm the same request after restore. See the [isolated cloud rehearsal evidence](../A17_ISOLATED_REHEARSAL_RESULT_2026-10-18.md) for the tested runtime and boundaries.
+See [operations, activation and restore runbook](../ACCOUNT_DELETION_OPERATIONS_2026-10-13.md)
+and [earlier UI checkpoint](../ACCOUNT_DELETION_CHECKPOINT_2026-10-13.md).
+Validation: 841 tests, both typechecks, frontend build and staging dry-run passed;
+42 targeted tests cover journals, outage/race recovery, offline CLI and limits.
+No deployment or real account deletion performed.
+
+### Sleep reconciliation behavior
+
+When `RECONCILIATION_CONFLICTS=true`, sleep end, patch and delete requests must
+include the family revision last seen by the client as `baseRevision`. A write
+is rejected with `409 SYNC_CONFLICT` when that same sleep has a newer revision;
+the response includes the current server value. A newer family revision caused
+only by another sleep does not block the write.
+
+The client persists the conflict beside its pending operation and does not pull
+the server value over the local edit. The user explicitly chooses the local or
+family version in the Family sharing panel. Choosing local retries against the
+reported server revision; choosing family removes pending operations for that
+sleep and applies the returned server value. The flag is currently enabled only
+in staging while the flow is under two-device acceptance testing.
+
+
+A17 staging inventory and isolated provisioning preparation (2026-10-17): `scripts/prepare-retention-rehearsal.mjs` creates source/journal SQL, frozen source/restored Worker configs and a hashed plan from three verified resource identities. It refuses the known shared staging/production database IDs, duplicate IDs and wrong resource names; remote identity verification is still required. No network calls, deployment, secrets or activation. Both candidates have no public endpoint or cron. See [the concrete rehearsal runbook](../A17_STAGING_REHEARSAL_PREPARATION_2026-10-17.md). Do not use the shared `deploy:staging` command for the isolated Worker.

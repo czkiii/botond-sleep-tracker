@@ -1,8 +1,6 @@
 name: Deploy to GitHub Pages
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -16,6 +14,7 @@ concurrency:
 
 jobs:
   build:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -24,16 +23,36 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # Full restore tests require node:sqlite.setAuthorizer (Node >=24.10).
+          node-version: 24
+
+      - name: Check repository hygiene
+        run: npm run check:repository
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
+
+      - name: Install Worker test dependencies
+        run: npm --prefix worker ci
+
+      - name: Typecheck frontend
+        run: npm run typecheck
+
+      - name: Typecheck Worker
+        run: npm --prefix worker run typecheck
+
+      - name: Test
+        run: npm test
 
       - name: Build
         run: npm run build
+        env:
+          VITE_RELEASE_CHANNEL: production
+          VITE_HOSTING_PLATFORM: github-pages
+          VITE_BUILD_SHA: ${{ github.sha }}
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

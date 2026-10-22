@@ -1,0 +1,189 @@
+SOLEMI SLEEP V1 – ADATMEGŐRZÉSI ÉS TÖRLÉSI SZABÁLYZAT
+Belső termék- és fejlesztési specifikáció
+Dátum: 2026-09-20
+Státusz: V1 tulajdonosi döntések alapján kiadásra előkészített belső szabály
+
+FONTOS
+Ez a dokumentum a Solemi Sleep V1 termék- és adatkezelési működését rögzíti.
+A fejlesztés során ez legyen a forrás a retention, export, account deletion,
+Family Sync és recovery viselkedéshez. Jogszabály vagy áruházi szabály változása
+esetén felülvizsgálandó.
+
+1. ALAPELVEK
+
+1.1. Adatminimalizálás
+Csak olyan személyes adat kezelhető, amely a Solemi működéséhez, biztonságához,
+előfizetési jogosultságához, jogi kötelezettségéhez vagy a felhasználó által
+kért funkcióhoz szükséges.
+
+1.2. Célhoz kötöttség
+Az adatot csak arra a célra használjuk, amelyről a felhasználót előzetesen
+tájékoztattuk. Törlésre váró vagy recovery állapotban lévő adat nem használható
+marketingre vagy új célra.
+
+1.3. Korlátozott megőrzés
+Személyes adatot nem tartunk meg a szükségesnél hosszabb ideig. Minden fontos
+adatcsoporthoz törlési vagy felülvizsgálati szabály tartozik.
+
+1.4. Adathordozhatóság
+A felhasználó számára a törlés, családból kilépés vagy szolgáltatás elhagyása
+előtt jól láthatóan fel kell ajánlani a teljes export lehetőségét.
+
+2. ADATMEGŐRZÉSI MÁTRIX
+
+A) Fiókazonosító, e-mail, megjelenített név
+Cél: belépés, fiókkezelés, családi tagság azonosítása.
+Aktív állapot: a fiók fennállásáig.
+Törléskor: azonnali végleges törlés vagy a felhasználó által választott,
+legfeljebb 30 napos recovery. Recovery lejárta után törlendő, kivéve ha konkrét
+jogi kötelezettség másképp rendelkezik.
+
+B) Google / Apple bejelentkezési kapcsolat és auth tokenek
+Cél: biztonságos azonosítás és munkamenet-kezelés.
+Aktív állapot: a szükséges munkamenet idejéig.
+Törléskor: hozzáférési és refresh tokenek visszavonása; Sign in with Apple esetén
+az Apple-kapcsolat/tokenezés visszavonása a platformkövetelmények szerint.
+Tartós auth titok csak addig maradhat, ameddig a törlési/recovery folyamat
+biztonságos végrehajtásához feltétlenül szükséges.
+
+C) Gyermekprofil: név, születési dátum
+Cél: alvásnapló, gyermekenkénti adatok és életkorhoz kapcsolódó megjelenítés.
+Aktív állapot: amíg a családi profil létezik.
+Egy családtag fióktörlésekor: ha más aktív családtag marad, a közös családi térben
+megmarad.
+Utolsó családtag törlésekor: a családi adattal együtt törlendő a választott
+recovery folyamat után.
+Megjegyzés: a gyermekprofil a családi tér része, nem egyetlen felnőtt fiókjának
+kizárólagos adata.
+
+D) Alvásbejegyzések és jegyzetek
+Cél: naplózás, statisztikák, saját adatokon alapuló Insights.
+Aktív állapot: a családi napló fennállásáig.
+Egy családtag törlésekor: más jogosult családtag megléte esetén megmarad.
+Utolsó családtag törlésekor: törlendő a recovery időszak végén vagy azonnali
+végleges törlés választásakor.
+Törlés előtt: teljes export felajánlása kötelező.
+
+E) Profilkép
+Cél: helyi vizuális személyre szabás.
+Tárolás: kizárólag az adott eszközön, nem Family Sync adat.
+Törléskor: a helyi app-/webhelyadatok törlésével együtt törlendő.
+Szerveroldali retention nincs, ha a kiadott verzió is megtartja a jelenlegi
+device-local modellt.
+
+F) Family Sync tagság, szerepkör és családi kapcsolat
+Cél: közös családi napló és jogosultság.
+Aktív állapot: tagság alatt.
+Kilépéskor/fióktörléskor: a felhasználó tagsága megszűnik.
+A közös napló más tagoknál megmarad.
+Utolsó tag esetén külön “család megszüntetése” folyamat szükséges.
+
+G) Eszköz- és munkamenet-azonosítók
+Cél: biztonság, eszközlimit, session kezelés.
+Aktív állapot: amíg az adott eszköz/session érvényes.
+Kijelentkezés/törlés: visszavonandó.
+Régi, már nem szükséges session/device rekordokat rendszeresen felül kell vizsgálni
+és törölni vagy anonimizálni.
+
+H) Előfizetés, entitlement, store tranzakciós azonosítók
+Cél: Family/Family+ jogosultság, restore, refund, upgrade/downgrade,
+fraud/replay elleni védelem, elszámolás.
+Aktív állapot: az előfizetési életciklushoz szükséges ideig.
+Fióktörléskor: a felhasználói hozzáférés megszűnik. A jogilag, számvitelileg,
+adózási vagy csalásmegelőzési célból szükséges minimális rekord külön,
+korlátozott célra tovább őrizhető.
+Nem tartható meg emiatt automatikusan a teljes Solemi profil vagy alvásnapló.
+
+I) Számviteli bizonylatokhoz kapcsolódó adatok
+Cél: jogszabályi számviteli/adózási kötelezettség.
+Megőrzés: a ténylegesen alkalmazandó magyar számviteli/adózási szabály szerinti
+időtartam; a magyar számviteli szabályozás egyes bizonylatoknál legalább 8 éves
+megőrzést ír elő.
+Fontos: csak a jogilag szükséges dokumentum/adat tartozik ide, nem a teljes
+felhasználói profil és nem a gyermek alvásnaplója.
+Véglegesítés: könyvelővel ellenőrizendő, pontosan milyen Apple/Google
+elszámolási dokumentum kerül a Solemi adatkezelőhöz.
+
+J) Technikai és biztonsági naplók
+Cél: hibakeresés, szolgáltatásbiztonság, visszaélés-felismerés.
+Alapelv: rövid, előre meghatározott retention; érzékeny gyermek-/naplóadatot
+ne tartalmazzon.
+Javasolt V1 termékpolitika: normál technikai log legfeljebb 30 nap;
+biztonsági incidenshez kapcsolódó log csak dokumentált szükség esetén tovább,
+az adott célhoz szükséges minimális tartalommal.
+A végleges infrastruktúra logbeállításait release előtt ehhez kell igazítani.
+
+K) Backupok
+Cél: adatvesztés elleni helyreállítás.
+Nem használhatók normál felhasználói adatforrásként törölt fiók “visszaélesztésére”.
+A törlési rendszernek gondoskodnia kell arról, hogy backup restore után a korábban
+véglegesített törlések újra érvényesüljenek.
+Backup-retentiont a production backup/restore tervben kell konkrét idővel rögzíteni.
+Javasolt induló cél: a lehető legrövidebb, üzemeltetésileg indokolt idő.
+
+3. FIÓKTÖRLÉSI SZABÁLY
+
+3.1. A felhasználó az appon belül kezdeményezheti a fiók törlését.
+3.2. Weben is legyen közvetlen törlési/törléskérési útvonal.
+3.3. Törlés előtt mindig jelenjen meg:
+    - “Teljes adataim exportálása”
+    - mi törlődik;
+    - mi marad meg más családtagoknál;
+    - mely jogilag szükséges minimális adatok maradhatnak meg;
+    - a recovery választás.
+3.4. Két lehetőség:
+    A) Azonnali végleges törlés.
+    B) Legfeljebb 30 napos helyreállítási időszak.
+3.5. Recovery alatt:
+    - a fiók normál használatra ne legyen aktív;
+    - marketingre vagy új célra adat nem használható;
+    - a felhasználó saját maga visszaállíthassa a fiókot;
+    - kérhesse a recovery idő előtti végleges törlést is.
+3.6. A 30. nap végén a nem kötelezően őrzendő adatok végleges törlése automatikus.
+
+4. CSALÁDI ADATOK TÖRLÉSE
+
+Két külön, egyértelmű művelet legyen:
+- “Csak ezen az eszközön lévő adatok törlése”
+- “Családi adatok törlése”
+
+A családi törlés magas kockázatú művelet:
+- export felajánlása;
+- külön figyelmeztetés;
+- második megerősítés;
+- például a család nevének begépelése;
+- egyértelmű közlés arról, hogy más családtagokat is érint.
+
+5. CSALÁDBÓL KILÉPÉS
+
+- Normál tag bármikor kiléphet.
+- Admin kilépésekor új admin kiválasztása ajánlott; ha nem választ, egy aktív tag
+  automatikusan átveheti az admin szerepet a rögzített termékszabály szerint.
+- Utolsó családtag nem egyszerűen “kilép”: külön családmegszüntetési folyamat kell.
+- Utolsó fizető megszűnésekor a Family Sync szünetel, de az adatok nem törlődnek.
+- Kilépés előtt export lehetőséget kell felajánlani.
+
+6. OFFLINE JOGOSULTSÁG
+
+Family és Family+ fizetős jog legfeljebb 30 napig használható ellenőrzött offline
+cache alapján. Hálózati hiba nem azonos kijelentkezéssel.
+A cache lejáratának, óravisszaállításnak és szerveres visszavonásnak biztonságos
+technikai szabályait a megvalósításnak külön kezelnie kell.
+
+7. FELÜLVIZSGÁLAT
+
+Ezt a policy-t felül kell vizsgálni:
+- minden új adatgyűjtő SDK vagy analytics bevezetése előtt;
+- Apple/Google login vagy billing változáskor;
+- új cloud szolgáltató bevonásakor;
+- adatvédelmi vagy store szabály változásakor;
+- legalább évente egyszer a publikus Privacy Policy-val együtt.
+
+HIVATALOS FORRÁSOK A DÖNTÉSEKHEZ
+- Európai Bizottság: GDPR – storage limitation, purpose limitation, data minimisation
+- Európai Bizottság: GDPR – érintetti tájékoztatási és törlési jogok
+- Apple Developer: Offering account deletion in your app
+- Apple Developer: App privacy / Privacy Policy URL
+- Google Play Console Help: Account deletion requirements
+- Google Play User Data policy
+- Nemzeti Jogszabálytár: számviteli megőrzés

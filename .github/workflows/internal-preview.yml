@@ -1,0 +1,65 @@
+name: Build internal preview
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: internal-preview-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build isolated preview artifact
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout selected commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          # Full restore tests require node:sqlite.setAuthorizer (Node >=24.10).
+          node-version: 24
+
+      - name: Check repository hygiene
+        run: npm run check:repository
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Worker test dependencies
+        run: npm --prefix worker ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Typecheck Worker
+        run: npm --prefix worker run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build internal frontend
+        run: npm run build
+        env:
+          VITE_INTERNAL_PREVIEW: 'true'
+          VITE_ACCOUNT_AUTH: 'true'
+          VITE_ACCOUNT_API_BASE: /api
+          VITE_SYNC_API_BASE: https://solemi-sleep-sync-staging.czki-adam.workers.dev
+          VITE_BUILD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          VITE_BASE_PATH: /
+
+      - name: Upload exact-commit artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: solemi-sleep-internal-${{ github.event.pull_request.head.sha || github.sha }}
+          path: dist
+          if-no-files-found: error
+          retention-days: 14

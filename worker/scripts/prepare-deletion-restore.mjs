@@ -1,0 +1,170 @@
+// Offline only. Never executes against D1 or overwrites an input/output file.
+import { DatabaseSync, constants } from 'node:sqlite'
+import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { resolve, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { createHash } from 'node:crypto'
+import { createRequire } from 'node:module'
+const require = createRequire(import.meta.url)
+
+export function digest(text) { return createHash('sha256').update(text).digest('hex') }
+export function isolatedDatabase() {
+  if (typeof DatabaseSync.prototype.setAuthorizer !== 'function') throw new Error('RESTORE_REQUIRES_NODE_24_10_OR_NEWER')
+  const database = new DatabaseSync(':memory:', {allowExtension: false})
+  database.setAuthorizer((action, first, second) => {
+    if (action === constants.SQLITE_ATTACH || action === constants.SQLITE_DETACH) return constants.SQLITE_DENY
+    if (action === constants.SQLITE_PRAGMA && !['foreign_keys','defer_foreign_keys','integrity_check','quick_check','foreign_key_check','foreign_key_list'].includes(first))
+      return constants.SQLITE_DENY
+    if (action === constants.SQLITE_FUNCTION && second === 'load_extension') return constants.SQLITE_DENY
+    return constants.SQLITE_OK
+  })
+  return database
+}
+export function loadSqlExport(database, sql) {
+  // Cloudflare exports can create referenced unique indexes after table data.
+  // Only the isolated import has foreign keys off; validate before any replay.
+  database.exec('PRAGMA foreign_keys=OFF;')
+  try { database.exec(sql) } finally { database.exec('PRAGMA foreign_keys=ON;') }
+  if (database.prepare('PRAGMA foreign_keys').get().foreign_keys !== 1
+    || database.prepare('PRAGMA foreign_key_check').all().length) throw new Error('RESTORE_INTEGRITY_FAILED')
+}
+
+function binding(sqlite) {
+  const prepare = sql => {
+    let values = []
+    const statement = {
+      bind(...args) { values = args; return statement },
+      async first() { return sqlite.prepare(sql).get(...values) ?? null },
+      async all() { return {results: sqlite.prepare(sql).all(...values)} },
+      async run() { const result = sqlite.prepare(sql).run(...values); return {meta: {changes: Number(result.changes)}} }
+    }
+    return statement
+  }
+  return {prepare, async batch(statements) {
+    sqlite.exec('BEGIN')
+    try { const results = []; for (const statement of statements) results.push(await statement.run()); sqlite.exec('COMMIT'); return results }
+    catch (e) { sqlite.exec('ROLLBACK'); throw e }
+  }}
+}
+function literal(value) {
+  if (value === null) return 'NULL'
+  if (typeof value === 'number' || typeof value === 'bigint') return String(value)
+  if (typeof value === 'string') return value.includes('\0')
+    ? "CAST(X'" + Buffer.from(value, 'utf8').toString('hex') + "' AS TEXT)"
+    : "'" + value.replaceAll("'", "''") + "'"
+  if (value instanceof Uint8Array) return "X'" + Buffer.from(value).toString('hex') + "'"
+  throw new Error('UNSUPPORTED_SQL_VALUE')
+}
+export function dump(sqlite) {
+  const objects = sqlite.prepare("SELECT type,name,sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY type='table' DESC,name").all()
+  const output = ['PRAGMA foreign_keys=OFF;']
+  for (const object of objects.filter(x => x.type === 'table')) {
+    const name = '"' + object.name.replaceAll('"','""') + '"'
+    output.push(object.sql + ';')
+    for (const row of sqlite.prepare(`SELECT * FROM ${name}`).all())
+      output.push(`INSERT INTO ${name} VALUES (${Object.values(row).map(literal).join(',')});`)
+  }
+  for (const object of objects.filter(x => x.type !== 'table')) output.push(object.sql + ';')
+  output.push('PRAGMA foreign_keys=ON;')
+  return output.join('\n') + '\n'
+}
+
+export async function prepareDeletionRestore({backup, journal, environment, sourceDatabaseId, metadata, now = Date.now()}) {
+  if (!['staging','production'].includes(environment) || !sourceDatabaseId) throw new Error('RESTORE_IDENTITY_REQUIRED')
+  // Original creation time, not download/copy time. Old deletion evidence can
+  // expire only because accepted backups are bounded and the journal is fresh.
+  if (!metadata || metadata.environment !== environment || metadata.sourceDatabaseId !== sourceDatabaseId
+    || metadata.backupSha256 !== digest(backup) || metadata.journalSha256 !== digest(journal)
+    || !Number.isSafeInteger(metadata.backupCreatedAt) || metadata.backupCreatedAt < 0
+    || metadata.backupCreatedAt > now || metadata.backupCreatedAt + 2592000000 <= now
+    || !Number.isSafeInteger(metadata.journalCapturedAt) || metadata.journalCapturedAt > now
+    || metadata.journalCapturedAt < now - 300000) throw new Error('RESTORE_RETENTION_METADATA_INVALID')
+  const db = isolatedDatabase(), log = isolatedDatabase()
+  try {
+    loadSqlExport(db, backup); loadSqlExport(log, journal)
+    const identity = log.prepare('SELECT * FROM journal_identity WHERE id=1').get()
+    if (!identity || identity.environment !== environment || identity.source_database_id !== sourceDatabaseId)
+      throw new Error('RESTORE_IDENTITY_MISMATCH')
+    if (db.prepare("SELECT 1 FROM sqlite_master WHERE name='journal_identity'").get()) throw new Error('JOURNAL_NOT_INDEPENDENT')
+    // Require the current schema, rather than silently interpreting an older schema.
+    db.prepare('SELECT resolution,journaled_at,next_attempt_at FROM account_deletions LIMIT 0').all()
+    for (const database of [db,log]) {
+      if (database.prepare('PRAGMA integrity_check').get().integrity_check !== 'ok' || database.prepare('PRAGMA foreign_key_check').all().length)
+        throw new Error('RESTORE_INTEGRITY_FAILED')
+    }
+    const records = log.prepare('SELECT * FROM deletion_journal ORDER BY sequence').all()
+    const latest = new Map()
+    for (const row of records) {
+      if (!Number.isSafeInteger(row.sequence) || row.sequence < 1 || !row.request_id || !row.account_id || !Number.isSafeInteger(row.requested_at) || row.requested_at < 0
+        || row.requested_at > now || ![row.requested_at,row.requested_at + 2592000000].includes(row.purge_after)
+        || !['PENDING','ERASE','RESTORE'].includes(row.state)
+        || (row.state === 'PENDING' ? row.resolved_at !== null : !Number.isSafeInteger(row.resolved_at)
+          || row.resolved_at < row.requested_at || row.resolved_at > now)
+        || (row.state === 'RESTORE' && row.resolved_at >= row.purge_after)) throw new Error('RESTORE_JOURNAL_INVALID')
+      latest.set(row.account_id, row)
+    }
+    // A pending local request absent from the external log is unresolved. Never publish it as active.
+    for (const row of db.prepare("SELECT id,account_id FROM account_deletions WHERE state='PENDING'").all())
+      if (!latest.has(row.account_id)) throw new Error('RESTORE_JOURNAL_INCOMPLETE')
+    for (const row of db.prepare('SELECT account_id FROM erasure_receipts').all())
+      if (latest.get(row.account_id)?.state !== 'ERASE') throw new Error('RESTORE_JOURNAL_INCOMPLETE')
+    const {build} = require('esbuild')
+    const module = await build({entryPoints:[resolve(dirname(fileURLToPath(import.meta.url)), '../src/accountDeletion.ts')],
+      bundle:true, write:false, platform:'node', format:'esm', logLevel:'silent'})
+    const {AccountDeletionService} = await import('data:text/javascript;base64,' + Buffer.from(module.outputFiles[0].text).toString('base64'))
+    // Replay only modifies the isolated copy. The frozen external journal is never rewritten.
+    const service = new AccountDeletionService(binding(db), {async write() {}})
+    for (const row of latest.values()) {
+      const before = new Set(db.prepare('SELECT id FROM account_deletions WHERE account_id=?').all(row.account_id).map(x => x.id))
+      await service.replayJournal(row, now)
+      if (row.state !== 'ERASE' || !db.prepare("SELECT id FROM accounts WHERE id=? AND status='DELETED'").get(row.account_id)) continue
+      // Erasure replay can synthesize an immediate local request. Keep the
+      // authoritative request identity/timing so later retention can reconcile
+      // it with the independent journal. Never remove pre-existing history.
+      const collision = db.prepare('SELECT account_id FROM account_deletions WHERE id=?').get(row.request_id)
+      if (collision && collision.account_id !== row.account_id) throw new Error('RESTORE_JOURNAL_SCOPE_CHANGED')
+      for (const generated of db.prepare('SELECT id FROM account_deletions WHERE account_id=?').all(row.account_id)) {
+        if (!before.has(generated.id) && generated.id !== row.request_id)
+          db.prepare('DELETE FROM account_deletions WHERE id=?').run(generated.id)
+      }
+      db.prepare(`INSERT INTO account_deletions
+        (id,account_id,mode,requested_at,purge_after,held_family_id,state,finalized_at,resolution,resolution_at,journaled_at,next_attempt_at)
+        VALUES (?,?,?,?,?,?,'FINALIZED',?,'ERASE',?,?,0)
+        ON CONFLICT(id) DO UPDATE SET mode=excluded.mode,requested_at=excluded.requested_at,purge_after=excluded.purge_after,
+        held_family_id=excluded.held_family_id,state=excluded.state,finalized_at=excluded.finalized_at,
+        resolution=excluded.resolution,resolution_at=excluded.resolution_at,journaled_at=excluded.journaled_at,next_attempt_at=0`)
+        .run(row.request_id,row.account_id,row.purge_after === row.requested_at ? 'IMMEDIATE' : 'RECOVERY',
+          row.requested_at,row.purge_after,row.family_id,row.resolved_at,row.resolved_at,now)
+    }
+    // Backup credentials must not revive even for otherwise unaffected accounts.
+    db.exec(`UPDATE account_sessions SET revoked_at=COALESCE(revoked_at,${now});
+      UPDATE account_devices SET revoked_at=${now}, revoke_reason='SECURITY' WHERE revoked_at IS NULL;
+      UPDATE devices SET revoked_at=COALESCE(revoked_at,'${new Date(now).toISOString()}');
+      DELETE FROM invite_codes; DELETE FROM auth_challenges;`)
+    // Erasure replay alone cannot establish the latest family allowance or
+    // billing state. The prepared copy must pass business-ledger reconciliation.
+    db.exec('UPDATE retention_restore_gate SET blocked = 1 WHERE id = 1; DELETE FROM account_entitlements;')
+    if (db.prepare('PRAGMA foreign_key_check').all().length) throw new Error('RESTORE_INTEGRITY_FAILED')
+    const sql = dump(db)
+    return {sql, report: {format:'solemi-deletion-restore-v2', environment, sourceDatabaseId, preparedAt:now,
+      backupCreatedAt:metadata.backupCreatedAt, journalCapturedAt:metadata.journalCapturedAt,
+      backupSha256:digest(backup), journalSha256:digest(journal), outputSha256:digest(sql),
+      journalRecords:records.length, affectedAccounts:latest.size, businessReconciliationRequired:true, remoteApplied:false}}
+  } finally { db.close(); log.close() }
+}
+
+async function main() {
+  const [backup, journal, environment, sourceDatabaseId, output, metadata, acknowledgement] = process.argv.slice(2)
+  if (!backup || !journal || !output || !metadata || acknowledgement !== '--traffic-frozen')
+    throw new Error('Usage: prepare-deletion-restore.mjs backup.sql journal.sql staging|production source-db-id output.sql metadata.json --traffic-frozen')
+  const outputPath = resolve(output), reportPath = outputPath + '.report.json'
+  if ([resolve(backup),resolve(journal)].includes(outputPath) || existsSync(outputPath) || existsSync(reportPath)) throw new Error('OUTPUT_MUST_BE_NEW')
+  const result = await prepareDeletionRestore({backup:readFileSync(backup,'utf8'),journal:readFileSync(journal,'utf8'),environment,sourceDatabaseId,
+    metadata:JSON.parse(readFileSync(metadata,'utf8'))})
+  // Exclusive files: an interrupted report/output pair is never an approved artifact.
+  writeFileSync(outputPath,result.sql,{flag:'wx',mode:0o600})
+  writeFileSync(reportPath,JSON.stringify(result.report,null,2),{flag:'wx',mode:0o600})
+  console.log(JSON.stringify(result.report))
+}
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url))
+  main().catch(() => { console.error('Restore preparation failed. No remote changes. Keep traffic frozen and investigate locally.'); process.exitCode=1 })

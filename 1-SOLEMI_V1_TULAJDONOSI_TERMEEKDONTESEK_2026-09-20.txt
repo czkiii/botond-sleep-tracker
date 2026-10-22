@@ -1,0 +1,215 @@
+SOLEMI SLEEP — V1 TULAJDONOSI TERMÉKDÖNTÉSEK
+Dátum: 2026-09-20
+Cél: a Codex / fejlesztési folyamat számára egyértelmű, tulajdonos által jóváhagyott termékszabályok rögzítése a nyilvános V1 kiadás előtt.
+
+FONTOS
+- Ez a dokumentum termékdöntéseket rögzít.
+- A technikai megvalósítás módját nem ez a dokumentum írja elő.
+- Jogi/adatvédelmi részletek (pl. kötelező megőrzési idők) külön szakmai egyeztetést igényelnek.
+- A teljes release audit technikai hibajegyzéke továbbra is irányadó; ez a dokumentum csak az eldöntendő tulajdonosi kérdéseket zárja le.
+
+1. IMPORT ÉS TÖRLÉS — HELYI VS. CSALÁDI HATÁS
+
+A felhasználó számára külön kell választani a helyi és a családi törlést.
+
+Kötelezően két külön művelet legyen:
+- „Csak ezen az eszközön”
+- “Családi adatok törlése”
+
+A teljes családi napló törlését kizárólag az aktív ADMIN kezdeményezheti.
+A jogosultságot a szervernek is ellenőriznie kell.
+
+A „Családi adatok törlése” veszélyes műveletnek számít:
+- második, nagyon egyértelmű megerősítés szükséges;
+- elfogadott minta: a család nevének begépelése;
+- a végleges megerősítés előtt mindig legyen felajánlva a teljes adatexport.
+
+Import esetén a családi hatás legyen egyértelműen jelezve és megerősítve; a felhasználó ne tudjon „helyinek” hitt művelettel meglepetésszerű családi módosítást vagy törlést indítani.
+
+2. CSALÁDBÓL KILÉPÉS — HIBRID MODELL
+
+A hibrid modell a jóváhagyott irány.
+
+Szabályok:
+- normál családtag bármikor kiléphet;
+- ha admin lép ki és marad másik aktív tag, először fel kell ajánlani az adminjog átadását;
+- ha az admin nem választ új admint, a rendszer automatikusan kijelölhet egy másik aktív családtagot;
+- preferált automatikus szabály: a legrégebbi aktív családtag legyen az új admin;
+- ha az utolsó fizető lép ki / szűnik meg az előfizetése, a Family Sync szünetel, de az adatok nem törlődnek;
+- ha az utolsó családtag akar kilépni, ez ne sima „kilépés” legyen, hanem külön „Család megszüntetése” folyamat.
+
+3. OFFLINE FIZETŐS JOGOSULTSÁG
+
+A fizetős jogosultság offline használati ideje: maximum 30 nap az utolsó sikeres online jogosultság-ellenőrzéstől.
+
+Elv:
+- hálózati hiba nem egyenlő kijelentkezéssel;
+- a felhasználó a legutóbb igazolt Family / Family+ jogát legfeljebb 30 napig használhatja offline;
+- a 30 napos időkorlátot technikailag biztonságosan kell kezelni, beleértve az óra-visszaállítás elleni védelmet.
+
+4. V1 FUNKCIÓSCOPE — RÉGI ÍGÉRETEK
+
+A következő termékdöntések jóváhagyottak:
+
+PDF export:
+- BENNE LESZ a V1-ben.
+- A megfelelő Family jogosultsághoz kell kötni és tesztelni.
+
+Fix/adaptív emlékeztetők / push értesítések:
+- NEM részei a V1-nek.
+- Nem akarjuk feleslegesen zaklatni a felhasználókat.
+- A V1 marketingben/paywallban ne legyen ilyen ígéret.
+
+Életkorhoz viszonyított wake window összehasonlítás:
+- NEM része a V1-nek.
+- A V1-ben maradunk a gyermek saját múltbeli adatain alapuló elemzéseknél.
+- Kerülni kell a „így kellene aludnia” jellegű előíró kommunikációt.
+
+Navigáció:
+- V1 előtt NEM szervezzük át kötelezően Insights / Trends / Patterns rendszerre.
+- A jelenlegi működő navigáció marad, ha használható és érthető.
+
+5. IOS BELÉPÉS
+
+A V1-ben legyen:
+- Google Sign-In
+- Sign in with Apple
+
+Az iOS kiadás ne támaszkodjon kizárólag a jelenlegi webes Google loginra.
+A fiókegyesítés és az azonos Solemi-account kezelését tesztelni kell.
+
+6. FIÓKTÖRLÉS, CSALÁDI ADATOK ÉS EXPORT
+
+Alapelv:
+- a saját fiók törlése és a közös családi napló törlése külön fogalom.
+
+Ha más aktív családtagok maradnak:
+- a törlő felhasználó saját fiókja / belépése / személyes hozzáférése megszűnik;
+- a közös gyermek- és alvásadatok a családnál megmaradnak;
+- fióktörlés előtt mindig ajánljuk fel a teljes adatexportot.
+
+Ha az utolsó családtag törli a fiókját:
+- külön folyamat legyen;
+- a végleges törlés előtt mindig ajánljuk fel a teljes adatexportot;
+- legyen helyreállítási időszak;
+- a helyreállítási időszak maximum 30 nap;
+- erről a felhasználót egyértelműen tájékoztatni kell;
+- a helyreállítást a felhasználó saját maga tudja elindítani, ne csak supporton keresztül.
+
+Fontos jogi megjegyzés:
+- a pontos kötelező megőrzési idők, billing/bizonylati adatok kezelése és adatvédelmi kötelezettségek külön szakmai egyeztetést igényelnek;
+- a teljes adatexport felajánlása jó felhasználói és adathordozhatósági megoldás, de nem helyettesíti a jogi megfelelést.
+
+7. ELŐFIZETÉSI STRATÉGIA
+
+Jóváhagyott havi árak:
+- Family: 990 Ft / hó
+- Family+: 1490 Ft / hó
+
+Induláskor legyen:
+- havi előfizetés;
+- éves előfizetés;
+- 7 napos trial.
+
+Éves kedvezmény:
+- kb. 2 havi díjnak megfelelő kedvezmény;
+- kommunikációs elv: „10 hónapot fizetsz, 12-t kapsz”.
+
+A pontos store-árazást az Apple / Google támogatott árpontjaihoz kell igazítani.
+
+8. TRIAL SZABÁLY
+
+A 7 napos trial egy felhasználónak összesen egyszer jár.
+
+A felhasználó maga dönti el, hogy a trialt:
+- Family csomagra, vagy
+- Family+ csomagra
+használja fel.
+
+Nincs külön trial mindkét csomagra.
+Nincs trial-hopping.
+
+9. FAMILY → FAMILY+ / FAMILY+ → FAMILY VÁLTÁS
+
+Ha a felhasználó magasabb csomagra vált (pl. Family → Family+):
+- az új jogosultság azonnal legyen elérhető;
+- az arányos elszámolást / store-specifikus pénzügyi kezelést az Apple / Google store-rendszere kezelje a platform szabályai szerint.
+
+Downgrade esetén a platform szabályai és az előfizetési ciklus legyen az irányadó; a jogosultságváltás kommunikációja legyen egyértelmű.
+
+10. EGY CSALÁD = EGY ELŐFIZETÉS ELV
+
+A termék alapelve:
+- egy családnak csak egy aktív Solemi előfizetésre van szüksége a családi jogosultság biztosításához.
+
+Ha a családban már van aktív Family vagy Family+ előfizetés:
+- ezt az app jól láthatóan jelezze;
+- ne ösztönözze a második családtagot újabb előfizetés vásárlására;
+- az előfizetési képernyőn külön hívjuk fel a figyelmet arra, hogy egy családhoz egy előfizetés elegendő.
+
+Ha valamilyen okból mégis két előfizetés létezik, a rendszer ezt biztonságosan kezelje, de a normál UX ezt próbálja megelőzni.
+
+11. SUPPORT
+
+V1 induláskor elegendő egy egyszerű support e-mail cím.
+
+Követelmény:
+- az appban és a store-oldalakon is legyen elérhető;
+- ne legyen kötelező külön ticketing rendszer az első kiadáshoz;
+- a hibajelentés lehetőség szerint tartalmazzon adatminimalizált buildazonosítót / hibakódot, de ne szivárogtasson személyes vagy érzékeny adatot.
+
+12. TULAJDONOSI DÖNTÉSEK ÖSSZEFOGLALVA
+
+Jóváhagyott döntések:
+- külön helyi és családi törlés;
+- családi törlésnél extra megerősítés + exportfelajánlás;
+- hibrid családból kilépési modell;
+- utolsó fizető megszűnésekor Family Sync pause, adatmegőrzéssel;
+- utolsó tag esetén külön családmegszüntetési folyamat;
+- 30 napos offline fizetős jog;
+- PDF export benne lesz V1-ben;
+- push/fix/adaptív emlékeztetők nem lesznek V1-ben;
+- életkorhoz viszonyított wake window nem lesz V1-ben;
+- jelenlegi navigáció maradhat;
+- Sign in with Apple benne lesz V1-ben;
+- fióktörlés előtt exportfelajánlás;
+- más családtagok mellett a közös családi adatok megmaradnak;
+- utolsó tag törlésénél maximum 30 napos self-service helyreállítás;
+- Family 990 Ft/hó, Family+ 1490 Ft/hó;
+- havi + éves előfizetés induláskor;
+- éves kedvezmény kb. 2 havi díj;
+- 7 napos trial egyszer összesen / felhasználó;
+- a felhasználó választja, melyik csomagra használja a trialt;
+- upgrade azonnali jogosultsággal;
+- egy családnak egy előfizetés elegendő;
+- második vásárlást nem ösztönzünk;
+- V1 supporthoz egy e-mail cím elegendő.
+
+13. CODEX / FEJLESZTÉSI HASZNÁLAT
+
+A Codex ezt a dokumentumot tulajdonos által jóváhagyott V1 termékdöntési forrásként kezelje.
+
+Ha a kódban, roadmapben, FEATURE_ENTITLEMENT_MATRIX.md-ben, PRODUCT_DIRECTION.md-ben, RELEASE_CHECKLIST.md-ben vagy más dokumentumban ettől eltérő, régebbi termékígéret szerepel:
+- ne automatikusan a régi dokumentumot kövesse;
+- jelezze az ütközést;
+- a jelen dokumentum 2026-09-20-i döntéseit tekintse újabb tulajdonosi döntésnek;
+- a technikai / biztonsági release gate-eket továbbra is a teljes release audit szerint kell lezárni.
+
+Nem tulajdonosi döntésként, hanem technikai feladatként kezelendő példák:
+- billing race conditionök;
+- sandbox / production kerítés;
+- migrációs sorrend;
+- backup technikai megvalósítás;
+- proxy / CSRF védelem;
+- dependency lock / CI;
+- statisztikai számítások javítása;
+- store provider hitelesítés;
+- natív build és release engineering.
+
+KÜLÖN KÉSŐBBI DÖNTÉS / SZAKMAI EGYEZTETÉS
+- Privacy Policy végleges tartalma;
+- Terms / EULA szükségessége;
+- jogilag kötelező adatmegőrzési idők;
+- billing/bizonylati adatok törlési és megőrzési szabályai;
+- gyermekadatok adatvédelmi részletei;
+- store fiókok konkrét adminisztratív beállításai.

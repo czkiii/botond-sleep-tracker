@@ -1,0 +1,1645 @@
+{
+  "format": "solemi-sleep-backup",
+  "version": 4,
+  "exportedAt": "2026-10-01T00:00:00Z",
+  "data": {
+    "version": 4,
+    "settings": {
+      "locale": "hu",
+      "activeChildId": "a27-fixture",
+      "longSleepReminderEnabled": false
+    },
+    "children": [
+      {
+        "id": "a27-fixture",
+        "name": "A27 próbanapló",
+        "birthDate": null,
+        "photoRef": null,
+        "createdAt": "2026-07-31T22:00:00.000Z",
+        "updatedAt": "2026-07-31T22:00:00.000Z"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "8-1-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-01T10:00:00.000Z",
+        "endTime": "2026-08-01T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-01T10:00:00.000Z",
+        "updatedAt": "2026-08-01T11:00:00.000Z"
+      },
+      {
+        "id": "8-1-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-01T18:00:00.000Z",
+        "endTime": "2026-08-01T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-01T18:00:00.000Z",
+        "updatedAt": "2026-08-01T22:00:00.000Z"
+      },
+      {
+        "id": "8-1-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-01T22:15:00.000Z",
+        "endTime": "2026-08-02T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-01T22:15:00.000Z",
+        "updatedAt": "2026-08-02T01:00:00.000Z"
+      },
+      {
+        "id": "8-1-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-02T01:15:00.000Z",
+        "endTime": "2026-08-02T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-02T01:15:00.000Z",
+        "updatedAt": "2026-08-02T04:00:00.000Z"
+      },
+      {
+        "id": "8-2-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-02T10:00:00.000Z",
+        "endTime": "2026-08-02T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-02T10:00:00.000Z",
+        "updatedAt": "2026-08-02T11:00:00.000Z"
+      },
+      {
+        "id": "8-2-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-02T18:00:00.000Z",
+        "endTime": "2026-08-02T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-02T18:00:00.000Z",
+        "updatedAt": "2026-08-02T22:00:00.000Z"
+      },
+      {
+        "id": "8-2-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-02T22:15:00.000Z",
+        "endTime": "2026-08-03T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-02T22:15:00.000Z",
+        "updatedAt": "2026-08-03T01:00:00.000Z"
+      },
+      {
+        "id": "8-2-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-03T01:15:00.000Z",
+        "endTime": "2026-08-03T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-03T01:15:00.000Z",
+        "updatedAt": "2026-08-03T04:00:00.000Z"
+      },
+      {
+        "id": "8-3-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-03T10:00:00.000Z",
+        "endTime": "2026-08-03T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-03T10:00:00.000Z",
+        "updatedAt": "2026-08-03T11:00:00.000Z"
+      },
+      {
+        "id": "8-3-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-03T18:00:00.000Z",
+        "endTime": "2026-08-03T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-03T18:00:00.000Z",
+        "updatedAt": "2026-08-03T22:00:00.000Z"
+      },
+      {
+        "id": "8-3-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-03T22:15:00.000Z",
+        "endTime": "2026-08-04T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-03T22:15:00.000Z",
+        "updatedAt": "2026-08-04T01:00:00.000Z"
+      },
+      {
+        "id": "8-3-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-04T01:15:00.000Z",
+        "endTime": "2026-08-04T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-04T01:15:00.000Z",
+        "updatedAt": "2026-08-04T04:00:00.000Z"
+      },
+      {
+        "id": "8-4-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-04T10:00:00.000Z",
+        "endTime": "2026-08-04T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-04T10:00:00.000Z",
+        "updatedAt": "2026-08-04T11:00:00.000Z"
+      },
+      {
+        "id": "8-4-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-04T18:00:00.000Z",
+        "endTime": "2026-08-04T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-04T18:00:00.000Z",
+        "updatedAt": "2026-08-04T22:00:00.000Z"
+      },
+      {
+        "id": "8-4-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-04T22:15:00.000Z",
+        "endTime": "2026-08-05T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-04T22:15:00.000Z",
+        "updatedAt": "2026-08-05T01:00:00.000Z"
+      },
+      {
+        "id": "8-4-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-05T01:15:00.000Z",
+        "endTime": "2026-08-05T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-05T01:15:00.000Z",
+        "updatedAt": "2026-08-05T04:00:00.000Z"
+      },
+      {
+        "id": "8-5-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-05T10:00:00.000Z",
+        "endTime": "2026-08-05T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-05T10:00:00.000Z",
+        "updatedAt": "2026-08-05T11:00:00.000Z"
+      },
+      {
+        "id": "8-5-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-05T18:00:00.000Z",
+        "endTime": "2026-08-05T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-05T18:00:00.000Z",
+        "updatedAt": "2026-08-05T22:00:00.000Z"
+      },
+      {
+        "id": "8-5-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-05T22:15:00.000Z",
+        "endTime": "2026-08-06T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-05T22:15:00.000Z",
+        "updatedAt": "2026-08-06T01:00:00.000Z"
+      },
+      {
+        "id": "8-5-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-06T01:15:00.000Z",
+        "endTime": "2026-08-06T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-06T01:15:00.000Z",
+        "updatedAt": "2026-08-06T04:00:00.000Z"
+      },
+      {
+        "id": "8-6-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-06T10:00:00.000Z",
+        "endTime": "2026-08-06T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-06T10:00:00.000Z",
+        "updatedAt": "2026-08-06T11:00:00.000Z"
+      },
+      {
+        "id": "8-6-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-06T18:00:00.000Z",
+        "endTime": "2026-08-06T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-06T18:00:00.000Z",
+        "updatedAt": "2026-08-06T22:00:00.000Z"
+      },
+      {
+        "id": "8-6-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-06T22:15:00.000Z",
+        "endTime": "2026-08-07T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-06T22:15:00.000Z",
+        "updatedAt": "2026-08-07T01:00:00.000Z"
+      },
+      {
+        "id": "8-6-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-07T01:15:00.000Z",
+        "endTime": "2026-08-07T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-07T01:15:00.000Z",
+        "updatedAt": "2026-08-07T04:00:00.000Z"
+      },
+      {
+        "id": "8-7-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-07T10:00:00.000Z",
+        "endTime": "2026-08-07T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-07T10:00:00.000Z",
+        "updatedAt": "2026-08-07T11:00:00.000Z"
+      },
+      {
+        "id": "8-7-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-07T18:00:00.000Z",
+        "endTime": "2026-08-07T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-07T18:00:00.000Z",
+        "updatedAt": "2026-08-07T22:00:00.000Z"
+      },
+      {
+        "id": "8-7-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-07T22:15:00.000Z",
+        "endTime": "2026-08-08T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-07T22:15:00.000Z",
+        "updatedAt": "2026-08-08T01:00:00.000Z"
+      },
+      {
+        "id": "8-7-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-08T01:15:00.000Z",
+        "endTime": "2026-08-08T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-08T01:15:00.000Z",
+        "updatedAt": "2026-08-08T04:00:00.000Z"
+      },
+      {
+        "id": "8-8-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-08T10:00:00.000Z",
+        "endTime": "2026-08-08T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-08T10:00:00.000Z",
+        "updatedAt": "2026-08-08T11:00:00.000Z"
+      },
+      {
+        "id": "8-8-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-08T18:00:00.000Z",
+        "endTime": "2026-08-08T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-08T18:00:00.000Z",
+        "updatedAt": "2026-08-08T22:00:00.000Z"
+      },
+      {
+        "id": "8-8-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-08T22:15:00.000Z",
+        "endTime": "2026-08-09T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-08T22:15:00.000Z",
+        "updatedAt": "2026-08-09T01:00:00.000Z"
+      },
+      {
+        "id": "8-8-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-09T01:15:00.000Z",
+        "endTime": "2026-08-09T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-09T01:15:00.000Z",
+        "updatedAt": "2026-08-09T04:00:00.000Z"
+      },
+      {
+        "id": "8-9-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-09T10:00:00.000Z",
+        "endTime": "2026-08-09T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-09T10:00:00.000Z",
+        "updatedAt": "2026-08-09T11:00:00.000Z"
+      },
+      {
+        "id": "8-9-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-09T18:00:00.000Z",
+        "endTime": "2026-08-09T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-09T18:00:00.000Z",
+        "updatedAt": "2026-08-09T22:00:00.000Z"
+      },
+      {
+        "id": "8-9-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-09T22:15:00.000Z",
+        "endTime": "2026-08-10T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-09T22:15:00.000Z",
+        "updatedAt": "2026-08-10T01:00:00.000Z"
+      },
+      {
+        "id": "8-9-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-10T01:15:00.000Z",
+        "endTime": "2026-08-10T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-10T01:15:00.000Z",
+        "updatedAt": "2026-08-10T04:00:00.000Z"
+      },
+      {
+        "id": "8-10-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-10T10:00:00.000Z",
+        "endTime": "2026-08-10T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-10T10:00:00.000Z",
+        "updatedAt": "2026-08-10T11:00:00.000Z"
+      },
+      {
+        "id": "8-10-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-10T18:00:00.000Z",
+        "endTime": "2026-08-10T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-10T18:00:00.000Z",
+        "updatedAt": "2026-08-10T22:00:00.000Z"
+      },
+      {
+        "id": "8-10-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-10T22:15:00.000Z",
+        "endTime": "2026-08-11T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-10T22:15:00.000Z",
+        "updatedAt": "2026-08-11T01:00:00.000Z"
+      },
+      {
+        "id": "8-10-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-11T01:15:00.000Z",
+        "endTime": "2026-08-11T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-11T01:15:00.000Z",
+        "updatedAt": "2026-08-11T04:00:00.000Z"
+      },
+      {
+        "id": "8-11-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-11T10:00:00.000Z",
+        "endTime": "2026-08-11T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-11T10:00:00.000Z",
+        "updatedAt": "2026-08-11T11:00:00.000Z"
+      },
+      {
+        "id": "8-11-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-11T18:00:00.000Z",
+        "endTime": "2026-08-11T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-11T18:00:00.000Z",
+        "updatedAt": "2026-08-11T22:00:00.000Z"
+      },
+      {
+        "id": "8-11-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-11T22:15:00.000Z",
+        "endTime": "2026-08-12T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-11T22:15:00.000Z",
+        "updatedAt": "2026-08-12T01:00:00.000Z"
+      },
+      {
+        "id": "8-11-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-12T01:15:00.000Z",
+        "endTime": "2026-08-12T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-12T01:15:00.000Z",
+        "updatedAt": "2026-08-12T04:00:00.000Z"
+      },
+      {
+        "id": "8-12-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-12T10:00:00.000Z",
+        "endTime": "2026-08-12T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-12T10:00:00.000Z",
+        "updatedAt": "2026-08-12T11:00:00.000Z"
+      },
+      {
+        "id": "8-12-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-12T18:00:00.000Z",
+        "endTime": "2026-08-12T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-12T18:00:00.000Z",
+        "updatedAt": "2026-08-12T22:00:00.000Z"
+      },
+      {
+        "id": "8-12-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-12T22:15:00.000Z",
+        "endTime": "2026-08-13T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-12T22:15:00.000Z",
+        "updatedAt": "2026-08-13T01:00:00.000Z"
+      },
+      {
+        "id": "8-12-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-13T01:15:00.000Z",
+        "endTime": "2026-08-13T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-13T01:15:00.000Z",
+        "updatedAt": "2026-08-13T04:00:00.000Z"
+      },
+      {
+        "id": "8-13-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-13T10:00:00.000Z",
+        "endTime": "2026-08-13T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-13T10:00:00.000Z",
+        "updatedAt": "2026-08-13T11:00:00.000Z"
+      },
+      {
+        "id": "8-13-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-13T18:00:00.000Z",
+        "endTime": "2026-08-13T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-13T18:00:00.000Z",
+        "updatedAt": "2026-08-13T22:00:00.000Z"
+      },
+      {
+        "id": "8-13-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-13T22:15:00.000Z",
+        "endTime": "2026-08-14T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-13T22:15:00.000Z",
+        "updatedAt": "2026-08-14T01:00:00.000Z"
+      },
+      {
+        "id": "8-13-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-14T01:15:00.000Z",
+        "endTime": "2026-08-14T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-14T01:15:00.000Z",
+        "updatedAt": "2026-08-14T04:00:00.000Z"
+      },
+      {
+        "id": "8-14-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-14T10:00:00.000Z",
+        "endTime": "2026-08-14T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-14T10:00:00.000Z",
+        "updatedAt": "2026-08-14T11:00:00.000Z"
+      },
+      {
+        "id": "8-14-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-14T18:00:00.000Z",
+        "endTime": "2026-08-14T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-14T18:00:00.000Z",
+        "updatedAt": "2026-08-14T22:00:00.000Z"
+      },
+      {
+        "id": "8-14-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-14T22:15:00.000Z",
+        "endTime": "2026-08-15T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-14T22:15:00.000Z",
+        "updatedAt": "2026-08-15T01:00:00.000Z"
+      },
+      {
+        "id": "8-14-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-15T01:15:00.000Z",
+        "endTime": "2026-08-15T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-15T01:15:00.000Z",
+        "updatedAt": "2026-08-15T04:00:00.000Z"
+      },
+      {
+        "id": "8-15-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-15T10:00:00.000Z",
+        "endTime": "2026-08-15T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-15T10:00:00.000Z",
+        "updatedAt": "2026-08-15T11:00:00.000Z"
+      },
+      {
+        "id": "8-15-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-15T18:00:00.000Z",
+        "endTime": "2026-08-15T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-15T18:00:00.000Z",
+        "updatedAt": "2026-08-15T22:00:00.000Z"
+      },
+      {
+        "id": "8-15-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-15T22:15:00.000Z",
+        "endTime": "2026-08-16T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-15T22:15:00.000Z",
+        "updatedAt": "2026-08-16T01:00:00.000Z"
+      },
+      {
+        "id": "8-15-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-16T01:15:00.000Z",
+        "endTime": "2026-08-16T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-16T01:15:00.000Z",
+        "updatedAt": "2026-08-16T04:00:00.000Z"
+      },
+      {
+        "id": "8-16-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-16T10:00:00.000Z",
+        "endTime": "2026-08-16T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-16T10:00:00.000Z",
+        "updatedAt": "2026-08-16T11:00:00.000Z"
+      },
+      {
+        "id": "8-16-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-16T18:00:00.000Z",
+        "endTime": "2026-08-16T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-16T18:00:00.000Z",
+        "updatedAt": "2026-08-16T22:00:00.000Z"
+      },
+      {
+        "id": "8-16-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-16T22:15:00.000Z",
+        "endTime": "2026-08-17T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-16T22:15:00.000Z",
+        "updatedAt": "2026-08-17T01:00:00.000Z"
+      },
+      {
+        "id": "8-16-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-17T01:15:00.000Z",
+        "endTime": "2026-08-17T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-17T01:15:00.000Z",
+        "updatedAt": "2026-08-17T04:00:00.000Z"
+      },
+      {
+        "id": "8-17-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-17T10:00:00.000Z",
+        "endTime": "2026-08-17T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-17T10:00:00.000Z",
+        "updatedAt": "2026-08-17T11:00:00.000Z"
+      },
+      {
+        "id": "8-17-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-17T18:00:00.000Z",
+        "endTime": "2026-08-17T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-17T18:00:00.000Z",
+        "updatedAt": "2026-08-17T22:00:00.000Z"
+      },
+      {
+        "id": "8-17-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-17T22:15:00.000Z",
+        "endTime": "2026-08-18T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-17T22:15:00.000Z",
+        "updatedAt": "2026-08-18T01:00:00.000Z"
+      },
+      {
+        "id": "8-17-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-18T01:15:00.000Z",
+        "endTime": "2026-08-18T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-18T01:15:00.000Z",
+        "updatedAt": "2026-08-18T04:00:00.000Z"
+      },
+      {
+        "id": "8-18-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-18T10:00:00.000Z",
+        "endTime": "2026-08-18T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-18T10:00:00.000Z",
+        "updatedAt": "2026-08-18T11:00:00.000Z"
+      },
+      {
+        "id": "8-18-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-18T18:00:00.000Z",
+        "endTime": "2026-08-18T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-18T18:00:00.000Z",
+        "updatedAt": "2026-08-18T22:00:00.000Z"
+      },
+      {
+        "id": "8-18-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-18T22:15:00.000Z",
+        "endTime": "2026-08-19T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-18T22:15:00.000Z",
+        "updatedAt": "2026-08-19T01:00:00.000Z"
+      },
+      {
+        "id": "8-18-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-19T01:15:00.000Z",
+        "endTime": "2026-08-19T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-19T01:15:00.000Z",
+        "updatedAt": "2026-08-19T04:00:00.000Z"
+      },
+      {
+        "id": "8-19-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-19T10:00:00.000Z",
+        "endTime": "2026-08-19T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-19T10:00:00.000Z",
+        "updatedAt": "2026-08-19T11:00:00.000Z"
+      },
+      {
+        "id": "8-19-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-19T18:00:00.000Z",
+        "endTime": "2026-08-19T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-19T18:00:00.000Z",
+        "updatedAt": "2026-08-19T22:00:00.000Z"
+      },
+      {
+        "id": "8-19-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-19T22:15:00.000Z",
+        "endTime": "2026-08-20T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-19T22:15:00.000Z",
+        "updatedAt": "2026-08-20T01:00:00.000Z"
+      },
+      {
+        "id": "8-19-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-20T01:15:00.000Z",
+        "endTime": "2026-08-20T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-20T01:15:00.000Z",
+        "updatedAt": "2026-08-20T04:00:00.000Z"
+      },
+      {
+        "id": "8-20-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-20T10:00:00.000Z",
+        "endTime": "2026-08-20T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-20T10:00:00.000Z",
+        "updatedAt": "2026-08-20T11:00:00.000Z"
+      },
+      {
+        "id": "8-20-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-20T18:00:00.000Z",
+        "endTime": "2026-08-20T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-20T18:00:00.000Z",
+        "updatedAt": "2026-08-20T22:00:00.000Z"
+      },
+      {
+        "id": "8-20-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-20T22:15:00.000Z",
+        "endTime": "2026-08-21T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-20T22:15:00.000Z",
+        "updatedAt": "2026-08-21T01:00:00.000Z"
+      },
+      {
+        "id": "8-20-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-08-21T01:15:00.000Z",
+        "endTime": "2026-08-21T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-08-21T01:15:00.000Z",
+        "updatedAt": "2026-08-21T04:00:00.000Z"
+      },
+      {
+        "id": "9-10-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-10T10:00:00.000Z",
+        "endTime": "2026-09-10T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-10T10:00:00.000Z",
+        "updatedAt": "2026-09-10T11:00:00.000Z"
+      },
+      {
+        "id": "9-10-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-10T18:00:00.000Z",
+        "endTime": "2026-09-10T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-10T18:00:00.000Z",
+        "updatedAt": "2026-09-10T22:00:00.000Z"
+      },
+      {
+        "id": "9-10-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-10T22:15:00.000Z",
+        "endTime": "2026-09-11T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-10T22:15:00.000Z",
+        "updatedAt": "2026-09-11T01:00:00.000Z"
+      },
+      {
+        "id": "9-10-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-11T01:15:00.000Z",
+        "endTime": "2026-09-11T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-11T01:15:00.000Z",
+        "updatedAt": "2026-09-11T04:00:00.000Z"
+      },
+      {
+        "id": "9-11-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-11T10:00:00.000Z",
+        "endTime": "2026-09-11T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-11T10:00:00.000Z",
+        "updatedAt": "2026-09-11T11:00:00.000Z"
+      },
+      {
+        "id": "9-11-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-11T18:00:00.000Z",
+        "endTime": "2026-09-11T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-11T18:00:00.000Z",
+        "updatedAt": "2026-09-11T22:00:00.000Z"
+      },
+      {
+        "id": "9-11-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-11T22:15:00.000Z",
+        "endTime": "2026-09-12T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-11T22:15:00.000Z",
+        "updatedAt": "2026-09-12T01:00:00.000Z"
+      },
+      {
+        "id": "9-11-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-12T01:15:00.000Z",
+        "endTime": "2026-09-12T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-12T01:15:00.000Z",
+        "updatedAt": "2026-09-12T04:00:00.000Z"
+      },
+      {
+        "id": "9-12-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-12T10:00:00.000Z",
+        "endTime": "2026-09-12T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-12T10:00:00.000Z",
+        "updatedAt": "2026-09-12T11:00:00.000Z"
+      },
+      {
+        "id": "9-12-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-12T18:00:00.000Z",
+        "endTime": "2026-09-12T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-12T18:00:00.000Z",
+        "updatedAt": "2026-09-12T22:00:00.000Z"
+      },
+      {
+        "id": "9-12-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-12T22:15:00.000Z",
+        "endTime": "2026-09-13T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-12T22:15:00.000Z",
+        "updatedAt": "2026-09-13T01:00:00.000Z"
+      },
+      {
+        "id": "9-12-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-13T01:15:00.000Z",
+        "endTime": "2026-09-13T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-13T01:15:00.000Z",
+        "updatedAt": "2026-09-13T04:00:00.000Z"
+      },
+      {
+        "id": "9-13-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-13T10:00:00.000Z",
+        "endTime": "2026-09-13T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-13T10:00:00.000Z",
+        "updatedAt": "2026-09-13T11:00:00.000Z"
+      },
+      {
+        "id": "9-13-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-13T18:00:00.000Z",
+        "endTime": "2026-09-13T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-13T18:00:00.000Z",
+        "updatedAt": "2026-09-13T22:00:00.000Z"
+      },
+      {
+        "id": "9-13-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-13T22:15:00.000Z",
+        "endTime": "2026-09-14T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-13T22:15:00.000Z",
+        "updatedAt": "2026-09-14T01:00:00.000Z"
+      },
+      {
+        "id": "9-13-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-14T01:15:00.000Z",
+        "endTime": "2026-09-14T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-14T01:15:00.000Z",
+        "updatedAt": "2026-09-14T04:00:00.000Z"
+      },
+      {
+        "id": "9-14-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-14T10:00:00.000Z",
+        "endTime": "2026-09-14T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-14T10:00:00.000Z",
+        "updatedAt": "2026-09-14T11:00:00.000Z"
+      },
+      {
+        "id": "9-14-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-14T18:00:00.000Z",
+        "endTime": "2026-09-14T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-14T18:00:00.000Z",
+        "updatedAt": "2026-09-14T22:00:00.000Z"
+      },
+      {
+        "id": "9-14-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-14T22:15:00.000Z",
+        "endTime": "2026-09-15T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-14T22:15:00.000Z",
+        "updatedAt": "2026-09-15T01:00:00.000Z"
+      },
+      {
+        "id": "9-14-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-15T01:15:00.000Z",
+        "endTime": "2026-09-15T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-15T01:15:00.000Z",
+        "updatedAt": "2026-09-15T04:00:00.000Z"
+      },
+      {
+        "id": "9-15-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-15T10:00:00.000Z",
+        "endTime": "2026-09-15T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-15T10:00:00.000Z",
+        "updatedAt": "2026-09-15T11:00:00.000Z"
+      },
+      {
+        "id": "9-15-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-15T18:00:00.000Z",
+        "endTime": "2026-09-15T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-15T18:00:00.000Z",
+        "updatedAt": "2026-09-15T22:00:00.000Z"
+      },
+      {
+        "id": "9-15-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-15T22:15:00.000Z",
+        "endTime": "2026-09-16T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-15T22:15:00.000Z",
+        "updatedAt": "2026-09-16T01:00:00.000Z"
+      },
+      {
+        "id": "9-15-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-16T01:15:00.000Z",
+        "endTime": "2026-09-16T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-16T01:15:00.000Z",
+        "updatedAt": "2026-09-16T04:00:00.000Z"
+      },
+      {
+        "id": "9-16-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-16T10:00:00.000Z",
+        "endTime": "2026-09-16T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-16T10:00:00.000Z",
+        "updatedAt": "2026-09-16T11:00:00.000Z"
+      },
+      {
+        "id": "9-16-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-16T18:00:00.000Z",
+        "endTime": "2026-09-16T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-16T18:00:00.000Z",
+        "updatedAt": "2026-09-16T22:00:00.000Z"
+      },
+      {
+        "id": "9-16-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-16T22:15:00.000Z",
+        "endTime": "2026-09-17T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-16T22:15:00.000Z",
+        "updatedAt": "2026-09-17T01:00:00.000Z"
+      },
+      {
+        "id": "9-16-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-17T01:15:00.000Z",
+        "endTime": "2026-09-17T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-17T01:15:00.000Z",
+        "updatedAt": "2026-09-17T04:00:00.000Z"
+      },
+      {
+        "id": "9-17-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-17T10:00:00.000Z",
+        "endTime": "2026-09-17T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-17T10:00:00.000Z",
+        "updatedAt": "2026-09-17T11:00:00.000Z"
+      },
+      {
+        "id": "9-17-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-17T18:00:00.000Z",
+        "endTime": "2026-09-17T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-17T18:00:00.000Z",
+        "updatedAt": "2026-09-17T22:00:00.000Z"
+      },
+      {
+        "id": "9-17-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-17T22:15:00.000Z",
+        "endTime": "2026-09-18T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-17T22:15:00.000Z",
+        "updatedAt": "2026-09-18T01:00:00.000Z"
+      },
+      {
+        "id": "9-17-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-18T01:15:00.000Z",
+        "endTime": "2026-09-18T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-18T01:15:00.000Z",
+        "updatedAt": "2026-09-18T04:00:00.000Z"
+      },
+      {
+        "id": "9-18-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-18T10:00:00.000Z",
+        "endTime": "2026-09-18T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-18T10:00:00.000Z",
+        "updatedAt": "2026-09-18T11:00:00.000Z"
+      },
+      {
+        "id": "9-18-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-18T18:00:00.000Z",
+        "endTime": "2026-09-18T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-18T18:00:00.000Z",
+        "updatedAt": "2026-09-18T22:00:00.000Z"
+      },
+      {
+        "id": "9-18-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-18T22:15:00.000Z",
+        "endTime": "2026-09-19T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-18T22:15:00.000Z",
+        "updatedAt": "2026-09-19T01:00:00.000Z"
+      },
+      {
+        "id": "9-18-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-19T01:15:00.000Z",
+        "endTime": "2026-09-19T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-19T01:15:00.000Z",
+        "updatedAt": "2026-09-19T04:00:00.000Z"
+      },
+      {
+        "id": "9-19-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-19T10:00:00.000Z",
+        "endTime": "2026-09-19T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-19T10:00:00.000Z",
+        "updatedAt": "2026-09-19T11:00:00.000Z"
+      },
+      {
+        "id": "9-19-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-19T18:00:00.000Z",
+        "endTime": "2026-09-19T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-19T18:00:00.000Z",
+        "updatedAt": "2026-09-19T22:00:00.000Z"
+      },
+      {
+        "id": "9-19-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-19T22:15:00.000Z",
+        "endTime": "2026-09-20T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-19T22:15:00.000Z",
+        "updatedAt": "2026-09-20T01:00:00.000Z"
+      },
+      {
+        "id": "9-19-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-20T01:15:00.000Z",
+        "endTime": "2026-09-20T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-20T01:15:00.000Z",
+        "updatedAt": "2026-09-20T04:00:00.000Z"
+      },
+      {
+        "id": "9-20-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-20T10:00:00.000Z",
+        "endTime": "2026-09-20T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-20T10:00:00.000Z",
+        "updatedAt": "2026-09-20T11:00:00.000Z"
+      },
+      {
+        "id": "9-20-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-20T18:00:00.000Z",
+        "endTime": "2026-09-20T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-20T18:00:00.000Z",
+        "updatedAt": "2026-09-20T22:00:00.000Z"
+      },
+      {
+        "id": "9-20-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-20T22:15:00.000Z",
+        "endTime": "2026-09-21T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-20T22:15:00.000Z",
+        "updatedAt": "2026-09-21T01:00:00.000Z"
+      },
+      {
+        "id": "9-20-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-21T01:15:00.000Z",
+        "endTime": "2026-09-21T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-21T01:15:00.000Z",
+        "updatedAt": "2026-09-21T04:00:00.000Z"
+      },
+      {
+        "id": "9-21-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-21T10:00:00.000Z",
+        "endTime": "2026-09-21T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-21T10:00:00.000Z",
+        "updatedAt": "2026-09-21T11:00:00.000Z"
+      },
+      {
+        "id": "9-21-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-21T18:00:00.000Z",
+        "endTime": "2026-09-21T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-21T18:00:00.000Z",
+        "updatedAt": "2026-09-21T22:00:00.000Z"
+      },
+      {
+        "id": "9-21-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-21T22:15:00.000Z",
+        "endTime": "2026-09-22T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-21T22:15:00.000Z",
+        "updatedAt": "2026-09-22T01:00:00.000Z"
+      },
+      {
+        "id": "9-21-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-22T01:15:00.000Z",
+        "endTime": "2026-09-22T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-22T01:15:00.000Z",
+        "updatedAt": "2026-09-22T04:00:00.000Z"
+      },
+      {
+        "id": "9-22-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-22T10:00:00.000Z",
+        "endTime": "2026-09-22T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-22T10:00:00.000Z",
+        "updatedAt": "2026-09-22T11:00:00.000Z"
+      },
+      {
+        "id": "9-22-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-22T18:00:00.000Z",
+        "endTime": "2026-09-22T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-22T18:00:00.000Z",
+        "updatedAt": "2026-09-22T22:00:00.000Z"
+      },
+      {
+        "id": "9-22-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-22T22:15:00.000Z",
+        "endTime": "2026-09-23T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-22T22:15:00.000Z",
+        "updatedAt": "2026-09-23T01:00:00.000Z"
+      },
+      {
+        "id": "9-22-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-23T01:15:00.000Z",
+        "endTime": "2026-09-23T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-23T01:15:00.000Z",
+        "updatedAt": "2026-09-23T04:00:00.000Z"
+      },
+      {
+        "id": "9-23-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-23T10:00:00.000Z",
+        "endTime": "2026-09-23T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-23T10:00:00.000Z",
+        "updatedAt": "2026-09-23T11:00:00.000Z"
+      },
+      {
+        "id": "9-23-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-23T18:00:00.000Z",
+        "endTime": "2026-09-23T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-23T18:00:00.000Z",
+        "updatedAt": "2026-09-23T22:00:00.000Z"
+      },
+      {
+        "id": "9-23-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-23T22:15:00.000Z",
+        "endTime": "2026-09-24T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-23T22:15:00.000Z",
+        "updatedAt": "2026-09-24T01:00:00.000Z"
+      },
+      {
+        "id": "9-23-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-24T01:15:00.000Z",
+        "endTime": "2026-09-24T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-24T01:15:00.000Z",
+        "updatedAt": "2026-09-24T04:00:00.000Z"
+      },
+      {
+        "id": "9-24-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-24T10:00:00.000Z",
+        "endTime": "2026-09-24T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-24T10:00:00.000Z",
+        "updatedAt": "2026-09-24T11:00:00.000Z"
+      },
+      {
+        "id": "9-24-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-24T18:00:00.000Z",
+        "endTime": "2026-09-24T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-24T18:00:00.000Z",
+        "updatedAt": "2026-09-24T22:00:00.000Z"
+      },
+      {
+        "id": "9-24-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-24T22:15:00.000Z",
+        "endTime": "2026-09-25T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-24T22:15:00.000Z",
+        "updatedAt": "2026-09-25T01:00:00.000Z"
+      },
+      {
+        "id": "9-24-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-25T01:15:00.000Z",
+        "endTime": "2026-09-25T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-25T01:15:00.000Z",
+        "updatedAt": "2026-09-25T04:00:00.000Z"
+      },
+      {
+        "id": "9-25-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-25T10:00:00.000Z",
+        "endTime": "2026-09-25T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-25T10:00:00.000Z",
+        "updatedAt": "2026-09-25T11:00:00.000Z"
+      },
+      {
+        "id": "9-25-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-25T18:00:00.000Z",
+        "endTime": "2026-09-25T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-25T18:00:00.000Z",
+        "updatedAt": "2026-09-25T22:00:00.000Z"
+      },
+      {
+        "id": "9-25-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-25T22:15:00.000Z",
+        "endTime": "2026-09-26T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-25T22:15:00.000Z",
+        "updatedAt": "2026-09-26T01:00:00.000Z"
+      },
+      {
+        "id": "9-25-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-26T01:15:00.000Z",
+        "endTime": "2026-09-26T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-26T01:15:00.000Z",
+        "updatedAt": "2026-09-26T04:00:00.000Z"
+      },
+      {
+        "id": "9-26-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-26T10:00:00.000Z",
+        "endTime": "2026-09-26T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-26T10:00:00.000Z",
+        "updatedAt": "2026-09-26T11:00:00.000Z"
+      },
+      {
+        "id": "9-26-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-26T18:00:00.000Z",
+        "endTime": "2026-09-26T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-26T18:00:00.000Z",
+        "updatedAt": "2026-09-26T22:00:00.000Z"
+      },
+      {
+        "id": "9-26-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-26T22:15:00.000Z",
+        "endTime": "2026-09-27T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-26T22:15:00.000Z",
+        "updatedAt": "2026-09-27T01:00:00.000Z"
+      },
+      {
+        "id": "9-26-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-27T01:15:00.000Z",
+        "endTime": "2026-09-27T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-27T01:15:00.000Z",
+        "updatedAt": "2026-09-27T04:00:00.000Z"
+      },
+      {
+        "id": "9-27-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-27T10:00:00.000Z",
+        "endTime": "2026-09-27T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-27T10:00:00.000Z",
+        "updatedAt": "2026-09-27T11:00:00.000Z"
+      },
+      {
+        "id": "9-27-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-27T18:00:00.000Z",
+        "endTime": "2026-09-27T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-27T18:00:00.000Z",
+        "updatedAt": "2026-09-27T22:00:00.000Z"
+      },
+      {
+        "id": "9-27-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-27T22:15:00.000Z",
+        "endTime": "2026-09-28T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-27T22:15:00.000Z",
+        "updatedAt": "2026-09-28T01:00:00.000Z"
+      },
+      {
+        "id": "9-27-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-28T01:15:00.000Z",
+        "endTime": "2026-09-28T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-28T01:15:00.000Z",
+        "updatedAt": "2026-09-28T04:00:00.000Z"
+      },
+      {
+        "id": "9-28-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-28T10:00:00.000Z",
+        "endTime": "2026-09-28T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-28T10:00:00.000Z",
+        "updatedAt": "2026-09-28T11:00:00.000Z"
+      },
+      {
+        "id": "9-28-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-28T18:00:00.000Z",
+        "endTime": "2026-09-28T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-28T18:00:00.000Z",
+        "updatedAt": "2026-09-28T22:00:00.000Z"
+      },
+      {
+        "id": "9-28-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-28T22:15:00.000Z",
+        "endTime": "2026-09-29T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-28T22:15:00.000Z",
+        "updatedAt": "2026-09-29T01:00:00.000Z"
+      },
+      {
+        "id": "9-28-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-29T01:15:00.000Z",
+        "endTime": "2026-09-29T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-29T01:15:00.000Z",
+        "updatedAt": "2026-09-29T04:00:00.000Z"
+      },
+      {
+        "id": "9-29-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-29T10:00:00.000Z",
+        "endTime": "2026-09-29T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-29T10:00:00.000Z",
+        "updatedAt": "2026-09-29T11:00:00.000Z"
+      },
+      {
+        "id": "9-29-bed",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-29T18:00:00.000Z",
+        "endTime": "2026-09-29T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-29T18:00:00.000Z",
+        "updatedAt": "2026-09-29T22:00:00.000Z"
+      },
+      {
+        "id": "9-29-back1",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-29T22:15:00.000Z",
+        "endTime": "2026-09-30T01:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-29T22:15:00.000Z",
+        "updatedAt": "2026-09-30T01:00:00.000Z"
+      },
+      {
+        "id": "9-29-back2",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-30T01:15:00.000Z",
+        "endTime": "2026-09-30T04:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-30T01:15:00.000Z",
+        "updatedAt": "2026-09-30T04:00:00.000Z"
+      },
+      {
+        "id": "current-nap",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-30T10:00:00.000Z",
+        "endTime": "2026-09-30T11:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-30T10:00:00.000Z",
+        "updatedAt": "2026-09-30T11:00:00.000Z"
+      },
+      {
+        "id": "current-night",
+        "childId": "a27-fixture",
+        "startTime": "2026-09-30T18:00:00.000Z",
+        "endTime": "2026-09-30T22:00:00.000Z",
+        "note": "A27 synthetic acceptance fixture",
+        "dayNightOverride": null,
+        "createdAt": "2026-09-30T18:00:00.000Z",
+        "updatedAt": "2026-09-30T22:00:00.000Z"
+      }
+    ]
+  }
+}

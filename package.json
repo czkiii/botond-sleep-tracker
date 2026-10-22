@@ -4,12 +4,28 @@
   "version": "2.0.0",
   "type": "module",
   "scripts": {
+    "check:repository": "node scripts/check-repository-hygiene.mjs",
     "dev": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:pdf": "node scripts/check-pdf-export.mjs",
+    "test:pwa": "node scripts/check-pwa-lifecycle.mjs",
+    "test:account-access": "node scripts/check-account-access.mjs",
+    "test:account-deletion": "node scripts/check-account-deletion.mjs",
+    "test:recovery": "vitest run worker/tests/d1Restore.test.ts worker/tests/businessRestore.test.ts worker/tests/deletionRestore.test.ts worker/tests/retention.test.ts worker/tests/retainedFiles.test.ts worker/tests/accountDeletion.test.ts worker/tests/retentionRehearsal.test.ts",
+    "test:security": "node scripts/check-security-headers.mjs",
+    "test:family-join": "node scripts/check-family-bootstrap.mjs",
+    "test:child-deletion": "node scripts/check-child-deletion.mjs",
+    "test:settings": "node scripts/check-settings-accessibility.mjs",
+    "test:conflicts": "node scripts/check-conflict-accessibility.mjs",
+    "test:basic-statistics": "node scripts/check-basic-statistics.mjs",
+    "test:statistics": "node scripts/check-statistics-performance.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@pdf-lib/fontkit": "1.1.1",
+    "pdf-lib": "1.17.1",
     "react": "19.1.1",
     "react-dom": "19.1.1",
     "recharts": "3.1.2"
@@ -19,7 +35,8 @@
     "@types/react-dom": "19.1.7",
     "@vitejs/plugin-react": "5.0.2",
     "typescript": "5.9.2",
-    "vite": "7.1.7",
-    "vite-plugin-pwa": "1.0.3"
+    "vite": "7.3.7",
+    "vite-plugin-pwa": "1.0.3",
+    "vitest": "4.1.12"
   }
 }

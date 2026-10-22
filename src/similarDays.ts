@@ -1,0 +1,185 @@
+import type { SleepSession } from './types'
+import { getDataQualityReport, splitDayNight } from './utils'
+
+import { localCalendarDayDistance } from './statisticsCalendar'
+
+const HOUR_MS = 60 * 60 * 1000
+export const SIMILAR_DAYS_HISTORY_DAYS = 730
+
+export type DaySnapshot = {
+  dateKey: string
+  daytimeSleepCount: number
+  totalSleepMs: number
+  awakeMs: number | null
+  sourceSessionIds: string[]
+}
+
+export type SimilarDayMatch = {
+  dateKey: string
+  snapshot: DaySnapshot
+  differences: {
+    daytimeSleepCount: number
+    totalSleepMs: number
+    awakeMs: number
+  }
+  nextSleep: { startTime: string; durationMs: number; sessionId: string } | null
+}
+
+export type SimilarDaysInsight = {
+  status: 'ready' | 'collecting' | 'unavailable'
+  lookbackDays: 7 | 14 | 30
+  current: DaySnapshot | null
+  candidateCount: number
+  matches: SimilarDayMatch[]
+}
+
+function dateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function startOfLocalDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+}
+
+function cutoffForDay(date: Date, reference: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), reference.getHours(), reference.getMinutes(), reference.getSeconds(), reference.getMilliseconds()).getTime()
+}
+
+function overlapsDay(session: SleepSession, dayStart: number, dayEnd: number, now: number) {
+  const start = Date.parse(session.startTime)
+  const end = session.endTime ? Date.parse(session.endTime) : now
+  return start < dayEnd && end > dayStart
+}
+
+type IndexedDay = { date: Date; start: number; end: number; clean: SleepSession[]; issues: SleepSession[] }
+
+// Index only the bounded calendar search, in the current viewing timezone.
+// Preserve input order for stable equal-score/next-sleep ties. Inclusive bounds
+// retain midnight wakes and sleeps at the cutoff; snapshotForDay still applies
+// the original strict overlap and cutoff predicates. No cross-call cache.
+function indexHistoryDays(days: IndexedDay[], sessions: SleepSession[], excluded: Set<string>, now: number) {
+  const chronological = days.slice().sort((a, b) => a.start - b.start)
+  for (const session of sessions) {
+    const start = Date.parse(session.startTime), end = session.endTime ? Date.parse(session.endTime) : now
+    if (!Number.isFinite(start) || !Number.isFinite(end)) continue
+    let low = 0, high = chronological.length
+    while (low < high) {
+      const middle = Math.floor((low + high) / 2)
+      if (chronological[middle].end < start) low = middle + 1
+      else high = middle
+    }
+    for (let index = low; index < chronological.length && chronological[index].start <= end; index += 1) {
+      const day = chronological[index]
+      ;(excluded.has(session.id) ? day.issues : day.clean).push(session)
+    }
+  }
+}
+
+function snapshotForDay(sessions: SleepSession[], date: Date, reference: Date, now: number): DaySnapshot | null {
+  const dayStart = startOfLocalDay(date)
+  const dayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime()
+  const cutoff = Math.min(cutoffForDay(date, reference), dayEnd)
+  const relevant = sessions.filter((session) => overlapsDay(session, dayStart, cutoff, now))
+  if (!relevant.length) return null
+
+  let totalSleepMs = 0
+  const sourceSessionIds: string[] = []
+  relevant.forEach((session) => {
+    const start = Date.parse(session.startTime)
+    const end = session.endTime ? Date.parse(session.endTime) : now
+    const overlap = Math.max(0, Math.min(end, cutoff) - Math.max(start, dayStart))
+    if (overlap > 0) {
+      totalSleepMs += overlap
+      sourceSessionIds.push(session.id)
+    }
+  })
+
+  const daytimeSleepCount = sessions.filter((session) => {
+    const start = Date.parse(session.startTime)
+    if (start < dayStart || start >= cutoff) return false
+    const parts = splitDayNight(session, now)
+    return parts.day > parts.night
+  }).length
+  const sleepingAtCutoff = sessions.some((session) => {
+    const start = Date.parse(session.startTime)
+    const end = session.endTime ? Date.parse(session.endTime) : now
+    return start <= cutoff && end > cutoff
+  })
+  const lastWake = sessions
+    .filter((session) => {
+      if (!session.endTime) return false
+      const end = Date.parse(session.endTime)
+      return end >= dayStart && end <= cutoff
+    })
+    .sort((a, b) => Date.parse(b.endTime!) - Date.parse(a.endTime!))[0]
+  const awakeMs = sleepingAtCutoff || !lastWake ? null : Math.max(0, cutoff - Date.parse(lastWake.endTime!))
+  return { dateKey: dateKey(date), daytimeSleepCount, totalSleepMs, awakeMs, sourceSessionIds }
+}
+
+export function buildSimilarDaysInsight(sessions: SleepSession[], now = Date.now(), lookbackDays: 7 | 14 | 30 = 14): SimilarDaysInsight {
+  // An unfinished sleep cannot provide a reliable awake context. Check before
+  // quality filtering so even an invalid open record cannot expose an old waking.
+  if (sessions.some((session) => !session.endTime)) {
+    return { status: 'unavailable', lookbackDays, current: null, candidateCount: 0, matches: [] }
+  }
+  const reference = new Date(now)
+  const report = getDataQualityReport(sessions, now)
+  const excluded = new Set(report.excludedSessionIds)
+  const clean = sessions.filter((session) => !excluded.has(session.id))
+  const currentDayStart = startOfLocalDay(reference)
+  const currentDayEnd = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate() + 1).getTime()
+  const currentHasIssue = sessions.some((session) => excluded.has(session.id) && overlapsDay(session, currentDayStart, currentDayEnd, now))
+  const current = currentHasIssue ? null : snapshotForDay(clean, reference, reference, now)
+  if (!current || current.awakeMs === null) return { status: 'unavailable', lookbackDays, current, candidateCount: 0, matches: [] }
+
+  const candidates: Array<{ snapshot: DaySnapshot; distance: number; nextSleep: SimilarDayMatch['nextSleep'] }> = []
+  const earliestStart = clean.reduce((earliest, session) => Math.min(earliest, Date.parse(session.startTime)), now)
+  const availableHistoryDays = Math.max(1, localCalendarDayDistance(earliestStart, currentDayStart))
+  const searchDays = Math.min(SIMILAR_DAYS_HISTORY_DAYS, availableHistoryDays)
+  const seenDates = new Set<number>()
+  const days: IndexedDay[] = []
+  for (let offset = 1; offset <= searchDays; offset += 1) {
+    const date = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate() - offset)
+    const dayStart = startOfLocalDay(date)
+    if (dayStart >= currentDayStart || seenDates.has(dayStart)) continue
+    seenDates.add(dayStart)
+    const dayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime()
+    days.push({ date, start: dayStart, end: dayEnd, clean: [], issues: [] })
+  }
+  indexHistoryDays(days, sessions, excluded, now)
+  for (const { date, start: dayStart, end: dayEnd, clean: daySessions, issues } of days) {
+    if (issues.some((session) => overlapsDay(session, dayStart, dayEnd, now))) continue
+    const snapshot = snapshotForDay(daySessions, date, reference, now)
+    if (!snapshot || snapshot.awakeMs === null) continue
+    const cutoff = cutoffForDay(date, reference)
+    const next = daySessions
+      .filter((session) => Date.parse(session.startTime) >= cutoff && Date.parse(session.startTime) < dayEnd)
+      .sort((a, b) => Date.parse(a.startTime) - Date.parse(b.startTime))[0]
+    const nextSleep = next ? {
+      startTime: next.startTime,
+      durationMs: Math.max(0, (next.endTime ? Date.parse(next.endTime) : dayEnd) - Date.parse(next.startTime)),
+      sessionId: next.id
+    } : null
+    const differences = {
+      daytimeSleepCount: Math.abs(snapshot.daytimeSleepCount - current.daytimeSleepCount),
+      totalSleepMs: Math.abs(snapshot.totalSleepMs - current.totalSleepMs),
+      awakeMs: Math.abs(snapshot.awakeMs - current.awakeMs)
+    }
+    // Ranking heuristic only: even the closest available day can differ greatly.
+    // No validated similarity threshold or age adjustment is implied by this score.
+    const distance = differences.daytimeSleepCount * 2 + differences.totalSleepMs / (2 * HOUR_MS) + differences.awakeMs / HOUR_MS
+    candidates.push({ snapshot, distance, nextSleep })
+  }
+
+  const matches = candidates.sort((a, b) => a.distance - b.distance).slice(0, 3).map(({ snapshot, nextSleep }) => ({
+    dateKey: snapshot.dateKey,
+    snapshot,
+    differences: {
+      daytimeSleepCount: Math.abs(snapshot.daytimeSleepCount - current.daytimeSleepCount),
+      totalSleepMs: Math.abs(snapshot.totalSleepMs - current.totalSleepMs),
+      awakeMs: Math.abs(snapshot.awakeMs! - current.awakeMs!)
+    },
+    nextSleep
+  }))
+  return { status: candidates.length >= 3 ? 'ready' : 'collecting', lookbackDays, current, candidateCount: candidates.length, matches: candidates.length >= 3 ? matches : [] }
+}
