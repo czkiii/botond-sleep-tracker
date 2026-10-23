@@ -1,5 +1,7 @@
 # A27 — közös elfogadás és rövid telefonos folytatás
 
+**Aktuális folytatás, 2026-10-23:** a [négyblokkos közös elfogadási lap](MAIN_ACCEPTANCE_2026-10-23.md) tartalmazza az újra azonosított `1efa36f` tesztverziót, a mainnel igazolt funkcionális egyezést és az egyszeri indulási feltételeket. Az alábbi három A27 blokk ennek az első három blokkja; nem kétszer végrehajtandó. A `3197e0d` alatti ellenőrzések történetiek. Telefonos siker most sem lett rögzítve.
+
 Dátum: 2026-10-03. Feladatszint: GPT-6 Astra · erős.
 
 ## Mit zárunk le?

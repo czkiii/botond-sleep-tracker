@@ -1,5 +1,7 @@
 # Összevont kézi elfogadás — 2026-09-26
 
+**2026-10-23-i folytatás:** M1–M6 továbbra is lezárt. Az újabb funkciók megmaradt közös próbáihoz a [négyblokkos main-elfogadási lap](MAIN_ACCEPTANCE_2026-10-23.md) az irányadó; ez a régi menet nem indít újabb teljes tesztkört.
+
 Feladatszint: GPT-6 Astra · erős. Staging: `a83b39a`.
 
 **Legfrissebb megálló — 2026-10-01:** M6 funkcionális staging elfogadás kész; az összevont kör 6/6 lezárva kézi és meglévő gépi bizonyítékokkal. Chrome ae3dbac: a külön helyi Próbababa / 1 alvás napló áttekintése és elhalasztása után az Opo családi napló választása sikeres. Végül normál Edge 3acac04 és Chrome ae3dbac is Opo / Boti / 1799 alvás, bejelentkezve és friss szinkronnal. M1–M6 nem ismétlendő konkrét új ok nélkül. Következő önálló feladat A27/S02; ez nem a teljes kiadás lezárása.
