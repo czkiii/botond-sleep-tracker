@@ -1,5 +1,7 @@
 # Új éles Solemi-környezet — bekötési csomag
 
+**2026-10-22 — a végrehajtás levéve a soron következő feladatok közül.** A tulajdonos Android/iOS-kiadást kér, külön nyilvános webappot nem. Az alábbi Pages/app-aldomain terv történeti előkészítés, nem végrehajtandó kiadási feltétel. A háttérrendszerhez és a 90 napos hozzáféréshez készített eszközök megmaradnak későbbi felhasználásra; a mobilos belépés/API végleges megoldásához igazítandók. Most a mainre került funkciók összevont tesztje következik a meglévő tesztkörnyezetben, utána fizetés, mobilcsomagolás és kiadás. Ez a pontosítás felülírja a lap alján szereplő korábbi „Következő” lépést.
+
 2026-10-22. **Előkészítés, távoli módosítás nélkül.** A main-merge kész; az új éles környezet létrehozása és a család költöztetése külön végrehajtási lépés. A meglévő staging/helyreállítási főpróbát nem ismételjük.
 
 ## Jóváhagyott döntések

@@ -1,10 +1,14 @@
 # Solemi V1 — lezárási terv és tényleges készültség
 
+**Irányadó tulajdonosi pontosítás, 2026-10-22:** a kiadási cél kizárólag Android és iOS. A sorrend: **main-összevonás (kész) → összevont funkcionális teszt a meglévő tesztkörnyezetben, a mainre került verzió azonosításával → fizetés bekötése → mobilcsomagolás és szükséges készülék/store-ellenőrzések → kiadás.** Külön nyilvános webapp, új Pages-projekt és app-aldomain bekötése nem kiadási feltétel és nem következő feladat. A mobilapphoz szükséges éles háttérrendszer bekötése a későbbi kiadási munkába tartozik; nem előfeltétele a most következő funkcionális tesztnek. A fizetés készülékes ellenőrzéséhez szükséges fejlesztői mobilbuild a fizetési lépés része lehet, nem külön webes kiadás. A korábbi eltérő sorrendet ez felülírja; a már kész gépi próbákat nem kell újrakezdeni.
+
 **Lezárás, 2026-10-22:** [PR #3](https://github.com/czkiii/botond-sleep-tracker/pull/3) összevonva; main **`2462e27ec49073104cb48f0b2663087ee8fee91c`**, helyi és origin/main egyezik. A main-védelem aktív, a végleges feature öt ellenőrzése és a main saját Frontend/Worker CI-je sikeres. **65 fájl / 915 teszt PASS**, nulla audit-találat. A régi Pages HTML változatlan (HTTP 200, azonos hash), automatikus kiadása letiltva maradt; production deploy, adatátvitel vagy wipe nem történt. A feature ág megmaradt. Support-kérés nincs a tervben.
 
 **Új éles konfiguráció előkészítve, 2026-10-22:** [bekötési csomag és végrehajtási lap](PRODUCTION_V4_CONFIGURATION_2026-10-22.md). Jóváhagyott appcím: `app.solemi-sleep.app`; a bemutatkozó oldal marad. Az átálló család kiválasztott adminfiókja 90 nap Family+ hozzáférést kap majd a tényleges átállástól, trial és automatikus fizetés nélkül. Helyi csomaggenerátor, privát fiókhoz kötött egyszeri grant, 33/33 célzott próba, Worker dry-run és production frontend build PASS. A csomagolási próbában szintetikus ID/kulcs/SHA szerepelt; éles erőforrás, DNS, secret, adatátvitel és grant alkalmazás nem történt.
 
-**Következő:** az új éles Cloudflare-erőforrások létrehozása és a zárolt bekötés végrehajtása a kész csomaggal. **GPT-6 Astra · erős; kézi app-teszt nélkül indítható.** A tényleges létrehozást és telepítést külön előre jelezzük; a korábbi merge-et és főpróbát nem kezdjük újra.
+**Összevont teszt előkészítve, 2026-10-23:** [ellenőrzött tesztcím, négy rövid blokk és eredménylap](MAIN_ACCEPTANCE_2026-10-23.md). A meglévő `https://solemi-sleep-internal.pages.dev/` frontend és staging Worker egyaránt `1efa36f`; a GitHub main `2462e27`. Csak hat dokumentációs fájl tér el, a funkcionális forrás azonos. Health/CORS és a bejelentkezést kérő proxy ellenőrizve; a régi GitHub Pages HTML változatlan. Nincs új deploy vagy adatváltoztatás. A telefonok/fiók/Family+ indulási ellenőrzése és a négy kézi blokk még nyitott.
+
+**Következő:** a rövid közös teszt végrehajtása a fenti lappal, amikor a tulajdonos ráér; utána célzott hibajavítás, majd fizetési bekötés. **GPT-6 Astra · erős; a következő menethez már kell kézi közreműködés.** M1–M6 nem ismétlendő, új nyilvános webapp nem készül.
 
 **Az alábbi korábbi állapotok és lépések történeti előkészítés; a fenti lezárás az irányadó.**
 
