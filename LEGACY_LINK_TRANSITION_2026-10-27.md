@@ -20,6 +20,12 @@ A `deploy-pages.yml` kizárólag a `legacy-entry/` négy statikus fájlját csom
 A main kötelező Frontend/Worker CI-védelme és az új app release guardja változatlan.
 A workflow kézi indítású marad. A Cloudflare app/backend konfigurációja változatlan.
 
+A kötelező PR CI-ben időközben megjelent függőségi auditjelzések miatt célzott
+fejlesztői frissítés is szükséges: `fast-uri` 3.1.9, `serialize-javascript` 7.1.4;
+a jelenlegi Miniflare rögzített függőségére Worker-szintű `undici` 7.30.1 override.
+A Wrangler/Miniflare és az alkalmazás futásidejű függőségei nem változnak.
+Az undici javítás forrása: https://github.com/advisories/GHSA-4qv8-2p9j-2685.
+
 ## Bizonyíték és ismétlés
 
 `node scripts/check-legacy-entry.mjs` — elkülönített Edge, szintetikus napló,
