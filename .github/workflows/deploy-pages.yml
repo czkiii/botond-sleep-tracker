@@ -32,32 +32,16 @@ jobs:
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Worker test dependencies
-        run: npm --prefix worker ci
-
-      - name: Typecheck frontend
-        run: npm run typecheck
-
-      - name: Typecheck Worker
-        run: npm --prefix worker run typecheck
-
-      - name: Test
-        run: npm test
-
-      - name: Build
-        run: npm run build
-        env:
-          VITE_RELEASE_CHANNEL: production
-          VITE_HOSTING_PLATFORM: github-pages
-          VITE_BUILD_SHA: ${{ github.sha }}
+      # The account-enabled app runs on Cloudflare with its same-origin API.
+      # This workflow publishes only the legacy link and local-backup entry.
+      # Frontend/Worker checks still protect main in the separate CI workflow.
+      - name: Build legacy entry
+        run: node scripts/build-legacy-entry.mjs
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: legacy-entry-dist
 
   deploy:
     environment:

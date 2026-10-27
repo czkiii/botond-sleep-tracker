@@ -4,3 +4,4 @@ dist
 *.local
 .wrangler/
 .private-backups/
+legacy-entry-dist/
