@@ -4,8 +4,14 @@ import { createServer } from 'node:http'
 import { readFile, mkdir } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { extname, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { build } from 'esbuild'
 const require = createRequire(import.meta.url)
 const { chromium } = require(process.env.SOLEMI_PLAYWRIGHT_MODULE || 'playwright')
+await mkdir('.wrangler/legacy-entry-check', { recursive: true })
+const parserPath = resolve('.wrangler/legacy-entry-check/storage.mjs')
+await build({entryPoints:['src/storage.ts'],bundle:true,platform:'node',format:'esm',outfile:parserPath,logLevel:'silent'})
+const { inspectBackup } = await import(pathToFileURL(parserPath).href)
 const base = '/botond-sleep-tracker/'
 const destination = 'https://solemi-sleep-internal.pages.dev/'
 let legacy = false
@@ -34,8 +40,8 @@ async function context() {
   return ctx
 }
 const diary = { version:3, settings:{childName:'Synthetic child',locale:'hu'},sessions:[
-  {id:'test-done',start:'2026-10-26T19:00:00.000Z',end:'2026-10-27T05:00:00.000Z',note:'Keep exactly',createdAt:'2026-10-26T19:00:00.000Z',updatedAt:'2026-10-27T05:00:00.000Z'},
-  {id:'test-active',start:'2026-10-27T18:20:00.000Z',end:null,note:'',createdAt:'2026-10-27T18:20:00.000Z',updatedAt:'2026-10-27T18:20:00.000Z'}
+  {id:'test-done',startTime:'2026-10-26T19:00:00.000Z',endTime:'2026-10-27T05:00:00.000Z',note:'Keep exactly',createdAt:'2026-10-26T19:00:00.000Z',updatedAt:'2026-10-27T05:00:00.000Z'},
+  {id:'test-active',startTime:'2026-10-27T18:20:00.000Z',endTime:null,note:'',createdAt:'2026-10-27T18:20:00.000Z',updatedAt:'2026-10-27T18:20:00.000Z'}
 ] }
 try {
   const ctx = await context(); let page = await ctx.newPage()
@@ -46,6 +52,10 @@ try {
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', {name:'Régi napló letöltése (V3)',exact:true}).click()])
   const exported = JSON.parse(await readFile(await download.path(), 'utf8'))
   assert.equal(exported.format, 'solemi-sleep-backup');assert.deepEqual(exported.data,diary)
+  const inspected = inspectBackup(exported)
+  assert.equal(inspected.sourceVersion,3)
+  assert.equal(inspected.data.sessions.filter(s=>s.endTime===null).length,1)
+  assert.deepEqual(inspected.data.sessions.map(({childId,dayNightOverride,...session})=>session),diary.sessions)
   assert.equal(JSON.stringify(exported).includes('private-token'),false)
   assert.equal(await page.evaluate(()=>localStorage.getItem('solemiSleep:v3')),JSON.stringify(diary))
   await mkdir('worker/.private-backups/pages-transition-2026-10-27',{recursive:true})
@@ -58,6 +68,12 @@ try {
   await page.evaluate(()=>localStorage.setItem('solemiSleep:v3','{broken'))
   await page.reload();const recovery=page.getByRole('button',{name:'Sérült napló mentése helyreállításhoz (V3)',exact:true})
   const [raw]=await Promise.all([page.waitForEvent('download'),recovery.click()]);assert.equal(await readFile(await raw.path(),'utf8'),'{broken')
+  await page.evaluate(data=>localStorage.setItem('solemiSleep:v4',JSON.stringify({...data,__solemiLocal:{privateMetadata:'not-for-export'}})),inspected.data)
+  await page.reload()
+  const [v4]=await Promise.all([page.waitForEvent('download'),page.getByRole('button',{name:'Régi napló letöltése (V4)',exact:true}).click()])
+  const exportedV4=JSON.parse(await readFile(await v4.path(),'utf8'))
+  assert.deepEqual(inspectBackup(exportedV4).data,inspected.data)
+  assert.equal(JSON.stringify(exportedV4).includes('privateMetadata'),false)
   await ctx.close()
 
   const empty=await context();page=await empty.newPage();await page.goto(origin+base);await page.waitForURL(destination);await empty.close()
@@ -78,5 +94,5 @@ try {
   await swctx.setOffline(true);await page.reload();await page.getByRole('button',{name:'Régi napló letöltése (V3)',exact:true}).waitFor()
   await swctx.close()
   assert.deepEqual(errors,[])
-  console.log('PASS: V3 export incl. active sleep; no credentials; explicit transition; acknowledged redirect; backup return; changed/corrupt/blocked storage; empty redirect; waiting SW; storage/cache preservation; offline backup.')
+  console.log('PASS: V3/V4 export validated by production importer incl. active sleep; no credentials/local metadata; explicit transition; acknowledged redirect; backup return; changed/corrupt/blocked storage; empty redirect; waiting SW; storage/cache preservation; offline backup.')
 } finally { await browser.close();await new Promise(done=>server.close(done)) }
