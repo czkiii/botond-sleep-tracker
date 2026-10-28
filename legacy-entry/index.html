@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="hu">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07111f">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; worker-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+  <title>Solemi Sleep – az új alkalmazás</title>
+  <link rel="stylesheet" href="./entry.css">
+  <script type="module" src="./entry.js"></script>
+</head>
+<body>
+  <main>
+    <p class="brand">☾ SOLEMI SLEEP</p>
+    <h1>Elkészült az új verzió</h1>
+    <p id="status" role="status">Az új alkalmazás megnyitása…</p>
+    <section id="backup" hidden>
+      <h2>A régi naplód megmaradt</h2>
+      <p>Az ezen a böngészőn tárolt naplót itt letöltheted. Az új appba külön kell importálni: a belépés önmagában nem viszi át az adatokat.</p>
+      <div id="downloads"></div>
+      <p class="muted">Ha már megvan a friss mentésed, folytathatod. Ez az oldal nem törli vagy módosítja a régi naplódat.</p>
+    </section>
+    <a class="primary" id="continue" href="https://solemi-sleep-internal.pages.dev/" rel="noreferrer">Az új app megnyitása</a>
+    <p class="muted">Az új app egyelőre a közös tesztkörnyezetben nyílik meg.</p>
+    <p class="muted">Régi mentés letöltése később is: <a href="?backup=1">ezen az oldalon</a>.</p>
+    <noscript><p>A továbblépéshez használd a fenti gombot. A helyi napló letöltéséhez engedélyezd a JavaScriptet.</p></noscript>
+  </main>
+</body>
+</html>

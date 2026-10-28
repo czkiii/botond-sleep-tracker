@@ -1,5 +1,12 @@
 # Solemi Sleep — Codex projektállapot
 
+**Aktuális felülírás, 2026-10-27:** a main-merge már megtörtént (`2462e27`); az
+alábbi október 21-i merge-terv történeti. A tulajdonos jóváhagyta a régi GitHub
+Pages-link átvezetését a meglévő új Cloudflare appra, helyi mentési lehetőséggel.
+[Konkrét működés, gépi bizonyíték és folytatás](LEGACY_LINK_TRANSITION_2026-10-27.md).
+Az október 27-i valós napló importja még nincs igazolva. Külön nyilvános webapp
+építése nem cél; a végső kiadás Android/iOS. A korábbi teszteket nem kezdjük újra.
+
 **Utolsó frissítés:** 2026-10-21
 **Cloudflare képi leltár kiegészítése:** a tulajdonos igazolta, hogy a legacy `solemi-sleep-sync` Workerhez nincs Git repository csatlakoztatva; a staging Production ág `feat/child-profile-v4`, deploy `npm run deploy:staging`, root `/worker`, automatikus build engedélyezett. A staging **Builds for Preview branches** kapcsolója a további képen kikapcsolva. Ezzel a Workers Builds kapcsolóleltár kész. A korábbi API-403 helyett ezt a bizonyítékot használjuk; nincs új app-teszt vagy távoli módosítás. [Részletek](REPOSITORY_CLEANUP_CHECKPOINT_2026-10-20.md).
 **Elsőként olvasandó — teljes készültségi összegzés:** [hat lezárható munkablokk, main-átállás és a meglévő felhasználó migrációja](RELEASE_OVERVIEW_2026-10-16.md). Ez az aktuális sorrend; az alábbi korábbi checkpointok történetiek. A 874/874 helyi eredmény megmarad, de nem jelenti a teljes kiadás elfogadását.
