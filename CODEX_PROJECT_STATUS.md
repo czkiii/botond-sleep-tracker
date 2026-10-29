@@ -1,5 +1,21 @@
 # Solemi Sleep — Codex projektállapot
 
+**Legfrissebb lezárás, 2026-10-29:** Apple/Google értesítés-hitelesítés,
+megújulás/refund és kimaradt események egyeztetése helyben kész. 263 kapcsolódó
+gépi próba, Worker typecheck, csomagolás és repository-ellenőrzés PASS.
+014 migráció előkészítve; távoli migráció/aktiválás nem történt. A tulajdonos az
+előző verify/restore blokkot már commitolta/feltöltötte; az új munka ugyanazon
+`codex/store-purchase-verification` ágon, még commit nélkül van.
+[Pontos terjedelem és korlátok](worker/README.md#store-notifications-and-reconciliation-2026-10-29).
+
+**Következő:** Android/iOS alkalmazásváz és natív vásárlás/visszaállítás bekötése.
+**GPT-6 Astra · erős; az előkészítés kézi app-teszt nélkül indítható.** Valódi
+store-próbához a tulajdonosi fejlesztői fiókok még szükségesek. A kész backend
+próbákat nem indítjuk újra általános auditként.
+
+GitHub Desktop Summary: `Handle store notifications and reconcile missed subscription events`.
+Az alábbi korábbi „következő” pontok helyett ez a bejegyzés irányadó.
+
 **Lezárás, 2026-10-29:** a keretkorlát miatt elmaradt végső staging dry-run és
 repository-ellenőrzés sikeres. Csomagméret: 1157,00 KiB, gzip 211,12 KiB;
 `STORE_BILLING_ENABLED=false`, feltöltés/élesítés nélkül. A korábbi 958/958 sikeres

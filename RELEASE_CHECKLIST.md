@@ -1,5 +1,13 @@
 # Solemi Sleep — belső verziótól a kiadásig
 
+**Fizetési előrelépés, 2026-10-29:** helyben elkészült a hitelesített Apple V2 /
+Google Pub/Sub értesítés, a megújulás/visszatérítés és a kimaradt események
+ütemezett pótlása, tartós Google ack újrapróbával. 263 érintett teszt PASS.
+014 migráció és ütemezés előkészítve, távol nincs aktiválva.
+[Konkrét bekötés](worker/README.md#store-notifications-and-reconciliation-2026-10-29).
+Ezzel a helyi szerveroldali életciklus-blokk lezárt; a natív vásárlási felület,
+store-fiókok/termékek, valódi sandbox elfogadás és production bekötés marad.
+
 **Aktuális felülírás, 2026-10-28:** main-merge kész, legutóbbi main `2e3cb94`;
 a régi GitHub Pages-link átvezetése kiadva. A tulajdonos a naplóátvitelt félretette.
 A cél Android/iOS kiadás, új nyilvános webapp nem feladat. Fizetésen haladunk:

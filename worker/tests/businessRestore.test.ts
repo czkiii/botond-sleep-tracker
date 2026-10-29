@@ -45,7 +45,9 @@ function trial(id: string, start: number) {
 function paid(status = 'ACTIVE', eventId = 'event1') {
   return `INSERT INTO billing_account_links VALUES ('a','GOOGLE_PLAY','abcdefghijklmnopqrstuvwx',1,1);
   INSERT INTO subscriptions VALUES ('sub','a','GOOGLE_PLAY','purchase','FAMILY','${status}',0,NULL,${now+week},${now+week},1,${now-10},NULL);
-  INSERT INTO store_subscription_state VALUES ('sub','a','GOOGLE_PLAY','SANDBOX','transaction','abcdefghijklmnopqrstuvwx',
+  INSERT INTO store_subscription_state (subscription_id,account_id,provider,environment,provider_transaction_id,external_account_token,
+    last_verified_at,acknowledgement_state,acknowledged_at,replacement_provider_subscription_id,created_at,updated_at,last_applied_event_id,last_applied_status)
+    VALUES ('sub','a','GOOGLE_PLAY','SANDBOX','transaction','abcdefghijklmnopqrstuvwx',
     ${now-10},'ACKNOWLEDGED',${now-10},NULL,1,${now-10},'${eventId}','${status}');
   INSERT INTO subscription_events VALUES ('event','GOOGLE_PLAY','${eventId}','sub','VERIFIED',${now-10},${now-10},'payload',${now-10},NULL);
   INSERT INTO account_entitlements VALUES ('grant','a','PDF_EXPORT','SUBSCRIPTION','sub',1,${now+week},NULL,1,${now-10});`

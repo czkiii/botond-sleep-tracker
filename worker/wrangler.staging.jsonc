@@ -8,6 +8,8 @@
   "preview_urls": true,
   "vars": {
     "STORE_BILLING_ENABLED": "false",
+    "STORE_NOTIFICATIONS_ENABLED": "false",
+    "STORE_RECONCILIATION_ENABLED": "false",
     "SOLEMI_ENVIRONMENT": "staging",
     "ALLOWED_ORIGINS": "https://solemi-sleep-internal.pages.dev,http://localhost:5173",
     "GOOGLE_CLIENT_ID": "637253731977-hfds5vtk53nqlkc9vul67m78sckqpsc9.apps.googleusercontent.com",
@@ -62,6 +64,6 @@
     }
   ],
   "triggers": {
-    "crons": ["*/5 * * * *"]
+    "crons": ["*/5 * * * *", "2-59/5 * * * *"]
   }
 }

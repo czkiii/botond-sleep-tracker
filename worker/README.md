@@ -2,6 +2,95 @@
 
 Cloudflare Worker + D1 backend for Solemi Sleep Family Sync V1.
 
+## Store notifications and reconciliation (2026-10-29)
+
+Implemented locally and **off in both deployable configs**. The earlier purchase
+adapter section remains useful for credentials; this section supersedes its
+"remaining server notifications / durable acknowledgement retries" items.
+
+- `POST /v1/billing/notifications/apple`: App Store Server Notifications V2
+  `{ "signedPayload": "..." }`. The official SDK checks the outer signature,
+  app/environment and nested transaction signature. Subscription events then
+  trigger a fresh authenticated App Store status lookup; their claimed status
+  does not grant access. A newer authoritative Apple state can also reinstate a
+  reversed refund. Client-only snapshots still cannot undo revocation.
+- `POST /v1/billing/notifications/google`: authenticated Pub/Sub push envelope.
+  Google RS256/JWKS signature, issuer, expiry/age, exact audience and verified
+  service-account email are checked before body parsing or database access.
+  The subscription resource name and decoded package must match configuration.
+  RTDN, including subscription void/refund notices, triggers the existing V2
+  status lookup. A partial refund or pending refund review does not independently
+  revoke access while the store still reports a valid subscription.
+- Both endpoints go **directly to the Worker**, not through the browser Pages
+  proxy. Provider authentication replaces browser Origin/session authentication
+  only on these two exact routes. Body limits and a separate rate-limit key apply.
+- Successfully applied notification IDs and payload hashes reuse the existing
+  subscription event ledger. Duplicate delivery skips another store request;
+  ID reuse with different content is rejected. Failure before persistence is
+  returned as non-2xx for provider redelivery. Failure after persistence during
+  Google acknowledgement remains durable as `PENDING` for the scheduler.
+- Account ownership comes from the verified store alias and existing account
+  link. Unknown/deleted accounts are ignored, never created/relinked. A deletion
+  racing the atomic write cannot create a new active entitlement.
+
+Before activation, apply additive migration `014_store_reconciliation.sql` to
+the intended database **after a verified private backup**. It adds due time,
+attempt count and lease fields to existing store state; defaults schedule known
+subscriptions immediately, without changing their grants. Fresh installations
+apply schema and migrations 003–014. No remote migration has been performed here.
+Rollback: disable all three store flags first; the previous code tolerates the
+extra columns. Do not drop billing history or undo grants with a database wipe.
+
+Required activation configuration, in addition to the previous provider settings:
+
+| Setting | Purpose |
+| --- | --- |
+| `STORE_NOTIFICATIONS_ENABLED=true` | Provider notification routes; also requires reconciliation enabled |
+| `STORE_RECONCILIATION_ENABLED=true` | Periodic current-status checks and durable Google ack retry |
+| `GOOGLE_PLAY_PUSH_AUDIENCE` | Exact Pub/Sub OIDC audience, normally the HTTPS Worker Google endpoint URL |
+| `GOOGLE_PLAY_PUSH_EMAIL` | Dedicated Pub/Sub push authentication service-account email; not the end user's email |
+| `GOOGLE_PLAY_PUSH_SUBSCRIPTION` | Exact `projects/…/subscriptions/…` resource |
+
+Configure Apple V2 server URLs for the matching store environment. Configure Play
+RTDN to the chosen Pub/Sub topic, a push subscription with authentication and the
+exact audience/email above, normal redelivery and a monitored dead-letter policy.
+The push authentication account and Play API read/ack service account have separate
+roles; neither key/token is sent by the mobile app. Console resources, IAM roles
+and real delivery acceptance still require the owner's store/cloud accounts.
+
+The dedicated cron `2-59/5 * * * *` is distinct from existing A17 retention/deletion
+maintenance. It processes at most **two due subscriptions per invocation**, with
+two-minute leases, crash recovery, persisted fair scheduling and 5-minute to
+6-hour failure backoff. Active subscriptions are due again after 15 minutes;
+expired/revoked records after 24 hours. These are target intervals, not deadlines
+when a backlog exists. Counts `checked`, `failed`, `remaining` are logged without
+account IDs, proof bodies or purchase tokens; failures also fail the scheduled
+invocation. Monitor failures/backlog before enabling paid use and raise capacity
+deliberately if volume exceeds this initial budget. No outage extends access past
+the previously verified expiry. Missing initial purchases with no known store ID
+still need the authenticated purchase/restore path; periodic checks discover missed
+changes for already known subscriptions, not every purchase in an app store.
+
+`RESTORE_MAINTENANCE=true` blocks both callbacks and cron. Existing offline business
+restore copies the new state columns with the current ledger; a copied lease
+expires within two minutes. Account/subscription retention still removes the
+state and scheduling fields together. Existing restore inputs must have matching
+schemas; migrate copies of pre-014 backups before comparing to a 014 snapshot.
+
+Validation: **263 relevant tests** across provider verification, notification
+authentication, renewal/refund/duplicate delivery, durable ack retry, leasing,
+account deletion races, access/proxy boundaries, local workerd and restore/retention
+compatibility passed. Worker typecheck, repository hygiene and staging dry-run
+passed (1169.69 KiB / gzip 213.91 KiB). Existing manual family/statistics tests were
+not repeated. No live Apple/Google delivery, remote activation or paid purchase
+has occurred. References: [Apple V2](https://developer.apple.com/documentation/appstoreservernotifications/responsebodyv2decodedpayload),
+[Google push authentication](https://docs.cloud.google.com/pubsub/docs/authenticate-push-subscriptions),
+[Play RTDN](https://developer.android.com/google/play/billing/rtdn-reference).
+
+Next implementation block: the initial Android/iOS shell and native purchase /
+restore flow using the completed account aliases and server endpoints. Real
+sandbox acceptance and production activation remain later, account-dependent steps.
+
 ## Store purchase verification (2026-10-28)
 
 Implemented locally, **disabled by default**. No store accounts, production

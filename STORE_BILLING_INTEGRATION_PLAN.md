@@ -1,5 +1,25 @@
 # Solemi Sleep — App Store és Google Play vásárlási integráció
 
+**Aktuális felülírás, 2026-10-29:** a szerverértesítések és a kimaradt események
+egyeztetésének helyi implementációja is elkészült. Apple V2 aláírás és Google
+Pub/Sub OIDC hitelesítés után friss providerállapot frissíti a meglévő jogot;
+ismételt üzenet, visszatérítés, Apple refund-reversal, kimaradt megújulás és Google
+acknowledgement újrapróba kezelve. Törölt accountnak új jog nem adható.
+
+263 kapcsolódó próba sikeres, Worker typecheck és staging dry-run PASS.
+Az új `014_store_reconciliation.sql` migráció és a külön ütemezés elkészült,
+de **távol nem alkalmaztuk, minden store-kapcsoló kikapcsolva maradt**.
+A teljes A17/A27 és M1–M6 kézi köröket nem nyitottuk újra.
+[Konfiguráció, üzemeltetési korlátok és átállási lépések](worker/README.md#store-notifications-and-reconciliation-2026-10-29).
+
+**Következő:** az Android/iOS alkalmazásváz és a natív vásárlás/visszaállítás
+bekötése az elkészült szerverhez. **GPT-6 Astra · erős; az előkészítéshez kézi
+app-teszt nem kell.** A saját áruházi fiókok, termékazonosítók, kulcsok és a valódi
+sandbox vásárlási/értesítési próba továbbra is a kiadás feltételei.
+
+Az alábbi október 28-i bejegyzésben még hiányzóként szereplő szerverértesítés és
+periodikus egyeztetés most elkészült; a többi kiadási feltétel változatlan.
+
 **Aktuális állapot, 2026-10-28:** az Apple/Google vásárlásellenőrző adapterek és a
 bejelentkezett account vásárlási/visszaállítási HTTP-bekötése helyben elkészült.
 Ez a szerveroldali integráció lezárt része; nem éles fizetés. Saját Apple Developer,

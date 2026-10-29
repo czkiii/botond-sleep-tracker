@@ -16,6 +16,8 @@ import type { StoreBillingEnv } from './storeProviderConfig'
 import { StoreProviderError } from './storeProviderHttp'
 import { BillingContractError } from './billingContract'
 import { StoreBillingServiceError } from './storeBillingService'
+import { storeNotification } from './storeNotifications'
+import { StoreLifecycleService, BILLING_CRON } from './storeLifecycleService'
 
 interface Env extends LimitEnv, StoreBillingEnv {
   DB: D1Database
@@ -1783,6 +1785,9 @@ async function route(request: Request, env: Env) {
   }
 
   await limitRequest(request, env, path)
+  if (request.method === 'POST' && ['/v1/billing/notifications/apple', '/v1/billing/notifications/google'].includes(path)) {
+    return storeNotification(request, env, env.DB, path.endsWith('/apple') ? 'APPLE' : 'GOOGLE_PLAY', () => readJson(request))
+  }
   if (path.startsWith('/v1/auth/')) return accountAuthRoute(request, env, path)
 
   if (request.method === 'POST' && path === '/v1/families') {
@@ -1839,6 +1844,13 @@ async function route(request: Request, env: Env) {
 export default {
   async scheduled(_event: unknown, env: Env) {
     if (env.RESTORE_MAINTENANCE === 'true') return
+    if ((_event as { cron?: string } | null)?.cron === BILLING_CRON) {
+      if (env.STORE_RECONCILIATION_ENABLED !== 'true') return
+      const result = await new StoreLifecycleService(env.DB, env).maintain()
+      console.log(JSON.stringify({ event: 'store_reconciliation', ...result }))
+      if (result.failed) throw new Error('STORE_RECONCILIATION_FAILED')
+      return
+    }
     // Separate scheduler invocations keep combined SQL below the Free limit.
     if (env.RETENTION_MAINTENANCE === 'true' && Math.floor(Date.now() / 300000) % 3 !== 0) {
       if (!env.ERASURE_JOURNAL || !env.SOLEMI_ENVIRONMENT || !env.DELETION_SOURCE_DATABASE_ID) throw new Error('RETENTION_NOT_CONFIGURED')
@@ -1861,6 +1873,9 @@ export default {
         response.headers.set('Retry-After', '60')
         return response
       }
+      if (error instanceof StoreProviderError) return fail(request, env, new ApiError(error.status, error.code))
+      if (error instanceof BillingContractError) return fail(request, env, new ApiError(422, error.code))
+      if (error instanceof StoreBillingServiceError) return fail(request, env, new ApiError(409, error.code))
       if (error instanceof ApiError) return fail(request, env, error)
       if (error instanceof TrialIdentityError) return fail(request, env, new ApiError(503, error.message))
       // Provider/DB errors can contain SQL values or credentials.

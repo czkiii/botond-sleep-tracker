@@ -114,9 +114,15 @@ export class StoreBillingService {
     accountId: string
     event: VerifiedStoreEvent
     subscription: VerifiedStoreSubscription
+    // Only the server lifecycle reconciler may restore an Apple refund reversal,
+    // after retrieving current signed App Store state. Never a client receipt flag.
+    allowAppleReactivation?: boolean
   }, firstPurchaseRetry = true): Promise<StoreBillingApplyResult> {
     const event = validateVerifiedStoreEvent(input.event)
     const subscription = validateVerifiedStoreSubscription(input.subscription)
+    const appleReactivation = input.allowAppleReactivation === true && subscription.provider === 'APPLE'
+      && ['SERVER_NOTIFICATION', 'RECONCILIATION'].includes(event.source)
+      && ['ACTIVE', 'CANCELED', 'GRACE_PERIOD'].includes(subscription.status)
     // Store adapters must reconcile offer eligibility with the Solemi ledger
     // before enabling store trials. Fail closed rather than mint a second,
     // transferable or longer trial via an otherwise verified store snapshot.
@@ -226,7 +232,7 @@ export class StoreBillingService {
           updated_at = excluded.updated_at,
           canceled_at = excluded.canceled_at
         WHERE subscriptions.account_id = excluded.account_id
-          AND (subscriptions.status <> 'REVOKED' OR excluded.status = 'REVOKED')
+          AND (subscriptions.status <> 'REVOKED' OR excluded.status = 'REVOKED' OR ? = 1)
           AND (
             NOT EXISTS (SELECT 1 FROM store_subscription_state current_state
               WHERE current_state.subscription_id = subscriptions.id)
@@ -242,7 +248,7 @@ export class StoreBillingService {
           subscription.providerSubscriptionId, subscription.product, subscription.status,
           subscription.autoRenews ? 1 : 0, subscription.trialEndsAt,
           subscription.currentPeriodEndsAt, subscription.accessUntil, subscription.startedAt,
-          event.receivedAt, canceledAt, this.expectedEnvironment,
+          event.receivedAt, canceledAt, appleReactivation ? 1 : 0, this.expectedEnvironment,
           subscription.verifiedAt, subscription.verifiedAt),
       this.db.prepare(`INSERT INTO store_subscription_state
         (subscription_id, account_id, provider, environment, provider_transaction_id,
@@ -297,7 +303,8 @@ export class StoreBillingService {
           (id, account_id, feature_key, source_type, source_id, valid_from, valid_until,
            revoked_at, created_at, updated_at)
           SELECT ?, ?, ?, 'SUBSCRIPTION', ?, ?, ?, NULL, ?, ?
-          WHERE EXISTS (SELECT 1 FROM store_subscription_state current_state
+          WHERE EXISTS (SELECT 1 FROM accounts active_account WHERE active_account.id = ? AND active_account.status = 'ACTIVE')
+            AND EXISTS (SELECT 1 FROM store_subscription_state current_state
             WHERE current_state.subscription_id = ?
               AND current_state.last_verified_at = ?
               AND current_state.last_applied_event_id = ?)
@@ -309,7 +316,7 @@ export class StoreBillingService {
             updated_at = excluded.updated_at`)
           .bind(this.tokens.id('ent'), input.accountId, feature, subscriptionId,
             event.receivedAt, subscription.accessUntil, event.receivedAt, event.receivedAt,
-            subscriptionId, subscription.verifiedAt, event.providerEventId))
+            input.accountId, subscriptionId, subscription.verifiedAt, event.providerEventId))
       }
     }
 

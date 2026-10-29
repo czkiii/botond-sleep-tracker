@@ -4,6 +4,11 @@ import { StoreProviderError } from './storeProviderHttp'
 export interface StoreBillingEnv {
   SOLEMI_ENVIRONMENT?: string
   STORE_BILLING_ENABLED?: string
+  STORE_NOTIFICATIONS_ENABLED?: string
+  STORE_RECONCILIATION_ENABLED?: string
+  GOOGLE_PLAY_PUSH_AUDIENCE?: string
+  GOOGLE_PLAY_PUSH_EMAIL?: string
+  GOOGLE_PLAY_PUSH_SUBSCRIPTION?: string
   STORE_ENVIRONMENT?: string
   STORE_PRODUCT_CATALOG?: string
   APPLE_BUNDLE_ID?: string

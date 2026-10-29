@@ -7,7 +7,7 @@ import { validateVerifiedStoreSubscription, type StoreBillingAdapter, type Store
 import type { AppleConfig } from './storeProviderConfig'
 import { StoreHttp, StoreProviderError, record, requireStoreValue, storeString, storeTime } from './storeProviderHttp'
 
-type AppleVerifier = Pick<SignedDataVerifier, 'verifyAndDecodeTransaction' | 'verifyAndDecodeRenewalInfo'>
+type AppleVerifier = Pick<SignedDataVerifier, 'verifyAndDecodeTransaction' | 'verifyAndDecodeRenewalInfo' | 'verifyAndDecodeNotification'>
 
 export class AppleBillingAdapter implements StoreBillingAdapter {
   readonly provider = 'APPLE' as const
@@ -30,6 +30,24 @@ export class AppleBillingAdapter implements StoreBillingAdapter {
     const result = await this.refreshSubscription(storeString(transaction.originalTransactionId), now)
     requireStoreValue(result.externalAccountToken === expectedToken, 'STORE_ACCOUNT_MISMATCH')
     return result
+  }
+
+  async notification(signedPayload: string, now = Date.now()) {
+    let notice
+    try { notice = await (await this.signedDataVerifier()).verifyAndDecodeNotification(signedPayload) }
+    catch { throw new StoreProviderError('STORE_SIGNATURE_INVALID', 401) }
+    requireStoreValue(notice.version === '2.0' && storeTime(notice.signedDate) <= now + 60_000)
+    const id = storeString(notice.notificationUUID), eventType = storeString(notice.notificationType)
+    if (eventType === 'TEST') return null
+    // Summary/consumption/external-purchase messages do not themselves confer access.
+    if (!notice.data?.signedTransactionInfo) {
+      requireStoreValue(['RENEWAL_EXTENSION', 'EXTERNAL_PURCHASE_TOKEN', 'RESCIND_CONSENT'].includes(eventType), 'STORE_NOTIFICATION_UNSUPPORTED')
+      return null
+    }
+    const transaction = await this.decodeTransaction(storeString(notice.data.signedTransactionInfo, 65_536))
+    this.checkIdentity(transaction)
+    return { id, eventType, subscriptionId: storeString(transaction.originalTransactionId),
+      expectedAlias: storeString(transaction.appAccountToken).toLowerCase(), occurredAt: storeTime(notice.signedDate) }
   }
 
   async refreshSubscription(originalId: string, now = Date.now()): Promise<VerifiedStoreSubscription> {

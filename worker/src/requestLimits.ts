@@ -23,6 +23,9 @@ export async function limitRequest(request: Request, env: LimitEnv, path: string
     throw new RequestLimitError(503, 'RATE_LIMIT_NOT_CONFIGURED')
   }
   await consumeLimit(env.API_LIMITER, 'api')
+  if ((request.method === 'POST' && /^\/v1\/billing\/notifications\/(apple|google)$/.test(path))) {
+    await consumeLimit(env.AUTH_LIMITER, 'store-notification')
+  }
   if ((request.method === 'POST' && /^\/v1\/auth\/billing\/(apple|google)\/(prepare|verify|restore)$/.test(path))
     || (request.method === 'GET' && path === '/v1/auth/challenge')
     || (request.method === 'POST' && ['/v1/auth/google', '/v1/auth/refresh',
