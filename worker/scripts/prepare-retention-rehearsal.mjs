@@ -28,7 +28,7 @@ export function retentionRehearsal(resources) {
     .map(file=>readFileSync(resolve(workerRoot,file),'utf8')).join('\n')
     + `\nINSERT INTO journal_identity VALUES (1,'staging','${resources.source.id}');\n`
   const config = role => ({
-    name:workerName, main:resolve(workerRoot,'src/index.ts'), compatibility_date:'2026-08-22',
+    name:workerName, main:resolve(workerRoot,'src/index.ts'), compatibility_date:'2026-08-22', compatibility_flags:['nodejs_compat'],
     workers_dev:false, preview_urls:false,
     vars:{SOLEMI_ENVIRONMENT:'staging', ALLOWED_ORIGINS:'https://solemi-a17-rehearsal.invalid',
       ACCOUNT_FAMILY_BRIDGE:'true', ENTITLEMENT_ENFORCEMENT:'true', ENTITLEMENT_TEST_MODE:'false',

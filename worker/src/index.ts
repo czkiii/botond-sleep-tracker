@@ -11,8 +11,13 @@ import { buildSha } from './buildIdentity'
 import { offlineEntitlement } from './offlineEntitlement'
 import { consumeLimit, limitRequest, RequestLimitError } from './requestLimits'
 import type { LimitEnv } from './requestLimits'
+import { purchaseService } from './storePurchaseService'
+import type { StoreBillingEnv } from './storeProviderConfig'
+import { StoreProviderError } from './storeProviderHttp'
+import { BillingContractError } from './billingContract'
+import { StoreBillingServiceError } from './storeBillingService'
 
-interface Env extends LimitEnv {
+interface Env extends LimitEnv, StoreBillingEnv {
   DB: D1Database
   TOKEN_PEPPER: string
   ALLOWED_ORIGINS: string
@@ -1623,6 +1628,19 @@ async function accountAuthRoute(request: Request, env: Env, path: string) {
       return ok(request, env, { ...await entitlementService(env).accessState(access.account.id),
         offlineGrant: await offlineEntitlement(env.DB, env.OFFLINE_ENTITLEMENT_PRIVATE_JWK, access) })
     }
+    const billingRoute = /^\/v1\/auth\/billing\/(apple|google)\/(prepare|verify|restore)$/.exec(path)
+    if (request.method === 'POST' && billingRoute) {
+      requireAllowedAuthOrigin(request, env)
+      if (env.STORE_BILLING_ENABLED !== 'true') throw new ApiError(404, 'STORE_BILLING_DISABLED')
+      const access = await service.authenticate(accountBearer(request))
+      const body = await readJson(request)
+      const billing = purchaseService(env.DB, env, billingRoute[1] === 'apple' ? 'APPLE' : 'GOOGLE_PLAY')
+      if (billingRoute[2] === 'prepare') {
+        if (Object.keys(body).length) throw new ApiError(400, 'INVALID_PURCHASE_CLAIM')
+        return ok(request, env, await billing.prepare(access.account.id))
+      }
+      return ok(request, env, await billing.verify(access.account.id, body, billingRoute[2] === 'restore'))
+    }
     if (path.startsWith('/v1/auth/account/')) {
       if (request.method === 'POST') requireAllowedAuthOrigin(request, env)
       if (env.ACCOUNT_DELETION_ENABLED !== 'true') throw new ApiError(404, 'NOT_FOUND')
@@ -1741,6 +1759,9 @@ async function accountAuthRoute(request: Request, env: Env, path: string) {
     throw new ApiError(404, 'NOT_FOUND', 'Endpoint not found.')
   } catch (error) {
     if (error instanceof ApiError) throw error
+    if (error instanceof StoreProviderError) throw new ApiError(error.status, error.code)
+    if (error instanceof BillingContractError) throw new ApiError(400, error.code)
+    if (error instanceof StoreBillingServiceError) throw new ApiError(409, error.code)
     if (error instanceof TrialError) throw new ApiError(error.code === 'TRIAL_INVALID_REQUEST' ? 400 : 409, error.code)
     if (error instanceof DeletionError) throw new ApiError(error.status, error.code)
     if (error instanceof AuthError) throw new ApiError(error.status, error.code, error.code, error.data)

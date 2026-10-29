@@ -12,7 +12,8 @@ const app = 'https://solemi-sleep-internal.pages.dev'
 const api = 'https://solemi-sleep-sync-staging.czki-adam.workers.dev'
 const mutations = ['google', 'refresh', 'logout', 'test/plan', 'family/claim', 'family/create',
   'family/bootstrap', 'family/join', 'family/leave', 'family/dissolve', 'family/data/clear', 'trial/activate', 'trial/bind',
-  'account/delete', 'account/restore', 'account/finalize']
+  'account/delete', 'account/restore', 'account/finalize',
+  ...['apple', 'google'].flatMap(provider => ['prepare', 'verify', 'restore'].map(action => `billing/${provider}/${action}`))]
 let db: DatabaseSync, registry: DatabaseSync, env: Parameters<typeof worker.fetch>[1]
 let session: Awaited<ReturnType<AuthService['login']>>, service: AuthService
 let forwarded: ReturnType<typeof vi.fn>

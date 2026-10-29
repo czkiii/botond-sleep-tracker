@@ -1,5 +1,31 @@
 # Solemi Sleep — Codex projektállapot
 
+**Lezárás, 2026-10-29:** a keretkorlát miatt elmaradt végső staging dry-run és
+repository-ellenőrzés sikeres. Csomagméret: 1157,00 KiB, gzip 211,12 KiB;
+`STORE_BILLING_ENABLED=false`, feltöltés/élesítés nélkül. A korábbi 958/958 sikeres
+próbát nem ismételtük meg; azóta csak dokumentáció változott. GitHub Desktop
+Summary: `Add verified Apple and Google purchase and restore endpoints`.
+
+**Elsőként olvasandó, 2026-10-28:** main `2e3cb94` már tartalmazza a korábbi merge-et
+és a régi GitHub Pages-link átvezetését (PR #4, kiadva). A tulajdonos a naplóátvitelt
+egyelőre félretette; a fizetés és az Android/iOS kiadás a következő cél, külön
+nyilvános webappot nem készítünk. Apple/Google fejlesztői fiók és EV még nincs.
+
+**Most elkészült, helyi ág `codex/store-purchase-verification`:** valódi Apple/Google
+provider adapter és sessionhöz kötött prepare/verify/restore végpont, meglévő
+entitlement persistence használatával. Apple aláírás + friss szerverállapot;
+Google OAuth/V2 + tartós grant utáni acknowledge; a meglévő trial nem változott.
+958/958 gépi próba, két typecheck, Worker audit 0; valódi helyi workerd aláíráspróba
+sikeres. A kapcsolók kikapcsolva; nincs távoli aktiválás, commit/push vagy valódi
+sandbox vásárlás. [Bekötés és határok](STORE_BILLING_INTEGRATION_PLAN.md).
+
+**Következő: Apple/Google szerverértesítések és kimaradt előfizetési események
+egyeztetése a most elkészült adapterekkel. GPT-6 Astra · erős; kézi app-teszt nem
+szükséges.** A kész korábbi tesztblokkokat nem nyitjuk újra; új próba csak konkrét
+változáshoz vagy még nyitott kiadási feltételhez tartozhat.
+
+Az alábbi korábbi állapotok történetiek; eltérés esetén ez a bejegyzés irányadó.
+
 **Aktuális felülírás, 2026-10-27:** a main-merge már megtörtént (`2462e27`); az
 alábbi október 21-i merge-terv történeti. A tulajdonos jóváhagyta a régi GitHub
 Pages-link átvezetését a meglévő új Cloudflare appra, helyi mentési lehetőséggel.

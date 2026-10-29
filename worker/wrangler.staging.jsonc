@@ -3,9 +3,11 @@
   "name": "solemi-sleep-sync-staging",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-22",
+  "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "preview_urls": true,
   "vars": {
+    "STORE_BILLING_ENABLED": "false",
     "SOLEMI_ENVIRONMENT": "staging",
     "ALLOWED_ORIGINS": "https://solemi-sleep-internal.pages.dev,http://localhost:5173",
     "GOOGLE_CLIENT_ID": "637253731977-hfds5vtk53nqlkc9vul67m78sckqpsc9.apps.googleusercontent.com",

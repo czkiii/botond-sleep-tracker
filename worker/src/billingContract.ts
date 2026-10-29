@@ -174,7 +174,7 @@ export function validateVerifiedStoreSubscription(
     throw invalidSubscription('Unknown subscription status')
   }
 
-  requireSubscriptionString(value.providerSubscriptionId, 'providerSubscriptionId')
+  requireSubscriptionString(value.providerSubscriptionId, 'providerSubscriptionId', value.provider === 'GOOGLE_PLAY' ? 4096 : 512)
   requireSubscriptionString(value.providerTransactionId, 'providerTransactionId')
   requireSubscriptionString(value.externalAccountToken, 'externalAccountToken')
   if (value.replacementProviderSubscriptionId !== null) {
@@ -184,7 +184,7 @@ export function validateVerifiedStoreSubscription(
     }
     requireSubscriptionString(
       value.replacementProviderSubscriptionId,
-      'replacementProviderSubscriptionId'
+      'replacementProviderSubscriptionId', 4096
     )
   }
   if (typeof value.autoRenews !== 'boolean') {
@@ -214,7 +214,7 @@ export function validateVerifiedStoreEvent(value: VerifiedStoreEvent): VerifiedS
     throw invalidSubscription('Unknown event source')
   }
   requireSubscriptionString(value.providerEventId, 'providerEventId')
-  requireSubscriptionString(value.providerSubscriptionId, 'providerSubscriptionId')
+  requireSubscriptionString(value.providerSubscriptionId, 'providerSubscriptionId', value.provider === 'GOOGLE_PLAY' ? 4096 : 512)
   requireSubscriptionString(value.eventType, 'eventType')
   requireSubscriptionString(value.payloadHash, 'payloadHash')
   requireTimestamp(value.occurredAt, 'occurredAt')
@@ -247,9 +247,9 @@ function requireBoundedString(value: unknown, field: string, maxLength: number) 
   return value
 }
 
-function requireSubscriptionString(value: unknown, field: string) {
-  if (typeof value !== 'string' || value.length === 0 || value.length > 512) {
-    throw invalidSubscription(`${field} must be a non-empty string of at most 512 characters`)
+function requireSubscriptionString(value: unknown, field: string, maxLength = 512) {
+  if (typeof value !== 'string' || value.length === 0 || value.length > maxLength) {
+    throw invalidSubscription(`${field} must be a non-empty string of at most ${maxLength} characters`)
   }
 }
 

@@ -19,7 +19,8 @@ describe('request budgets before database/provider work', () => {
     expect(env.DB.prepare).not.toHaveBeenCalled()
   })
   it.each(['/v1/auth/challenge', '/v1/auth/google', '/v1/auth/refresh', '/v1/auth/family/join',
-    '/v1/auth/family/create', '/v1/auth/trial/activate', '/v1/auth/trial/bind', '/v1/join', '/v1/families'])('shares entry budget for %s, regardless of fake identity', async path => {
+    '/v1/auth/family/create', '/v1/auth/trial/activate', '/v1/auth/trial/bind', '/v1/join', '/v1/families',
+    ...['apple', 'google'].flatMap(provider => ['prepare', 'verify', 'restore'].map(action => `/v1/auth/billing/${provider}/${action}`))])('shares entry budget for %s, regardless of fake identity', async path => {
     const env = environment(); env.AUTH_LIMITER.limit.mockResolvedValue({ success: false })
     const response = await worker.fetch(new Request(`https://worker${path}`, {
       method: path.endsWith('challenge') ? 'GET' : 'POST',

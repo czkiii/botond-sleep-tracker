@@ -2,6 +2,80 @@
 
 Cloudflare Worker + D1 backend for Solemi Sleep Family Sync V1.
 
+## Store purchase verification (2026-10-28)
+
+Implemented locally, **disabled by default**. No store accounts, production
+credentials or remote activation were created. No new D1 migration is needed
+on a deployment already running migrations 003–013.
+
+Authenticated endpoints (through Pages prefix with `/api`):
+
+| POST route | Body | Result |
+| --- | --- | --- |
+| `/v1/auth/billing/apple/prepare` | `{}` | stable `externalAccountToken` for StoreKit `appAccountToken`, server catalog |
+| `/v1/auth/billing/google/prepare` | `{}` | stable `externalAccountToken` for Play `obfuscatedAccountId`, server catalog |
+| `/v1/auth/billing/apple/verify` or `/restore` | `{ "signedTransaction": "<StoreKit JWS>" }` | persistence outcome, internal subscription ID |
+| `/v1/auth/billing/google/verify` or `/restore` | `{ "purchaseToken": "<Play token>" }` | persistence outcome, acknowledgement result |
+
+Every request needs the existing active account bearer session and an allowed
+Origin. Native origin/login configuration is a later integration step. Client
+account/product/status/expiry assertions are rejected. `prepare` must precede
+the native purchase, so the store receives the server-generated account alias.
+Restore uses the same account binding; it cannot transfer another account's purchase.
+Read `/v1/auth/access` afterwards for current effective family permissions. A
+successful verification response alone is not proof of active paid access (the
+verified state can be expired, revoked, stale or on hold).
+
+Configuration, all server-owned:
+
+- `STORE_BILLING_ENABLED=true` (leave **false** until the remaining release work below is complete).
+- `STORE_ENVIRONMENT=SANDBOX` for staging; `PRODUCTION` for production. Opposite
+  combinations are refused. Xcode/local unsigned Apple receipts are never accepted.
+- `STORE_PRODUCT_CATALOG`: JSON array, for example with **illustrative** IDs only:
+  `[{"provider":"APPLE","productId":"family.monthly","product":"FAMILY"},{"provider":"GOOGLE_PLAY","productId":"family","basePlanId":"monthly","product":"FAMILY"}]`.
+  Add real Family+ identifiers mapping to `FAMILY_PLUS` when created in the stores.
+- Apple: `APPLE_BUNDLE_ID`, numeric `APPLE_APP_ID`, `APPLE_ISSUER_ID`, `APPLE_KEY_ID`;
+  secret `APPLE_PRIVATE_KEY` containing the PKCS#8 `.p8` key.
+- Google: `GOOGLE_PLAY_PACKAGE_NAME`, `GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL`;
+  secret `GOOGLE_PLAY_PRIVATE_KEY` containing its PKCS#8 key. Grant that service
+  account the relevant Play purchase read/acknowledgement permissions.
+
+Never put private keys in Wrangler JSON, browser builds, Git, screenshots or task
+messages. Provider URLs and OAuth scopes are fixed in code, not supplied by users.
+Only the selected provider's credentials are required. Store HTTP calls share a
+9-second network budget per operation, limit responses to 256 KiB, and disallow
+redirects. No client-supplied URLs or raw provider error bodies are used.
+
+Apple uses the official signed-data verifier with offline certificate-chain
+validation plus a **mandatory fresh authenticated Apple HTTPS status query**.
+OCSP is not requested; a client receipt alone cannot grant access. The pinned
+public root is from [Apple PKI](https://www.apple.com/certificateauthority/).
+The SDK loads inside a request because its transitive crypto library initializes
+random state, which workerd forbids during module initialization. `nodejs_compat`
+is required in every configuration bundling this Worker, including local rehearsals.
+
+Google reads [SubscriptionPurchaseV2](https://developers.google.com/android-publisher/api-ref/rest/v3/purchases.subscriptionsv2)
+and [acknowledges](https://developers.google.com/android-publisher/api-ref/rest/v3/purchases.subscriptions/acknowledge)
+only after the ownership-checked database transaction. `RETRY_REQUIRED` means
+the grant was stored but acknowledgement needs another verify/restore request;
+do not finish the native flow as if acknowledgement had succeeded. A stale
+snapshot does not acknowledge a retired/replaced purchase. Already acknowledged
+provider state is recorded without sending another acknowledgement.
+
+Remaining before paid release: native purchase/restore UI and store accounts;
+verified server notifications, periodic reconciliation and durable ack retries;
+real sandbox purchase/restore/refund acceptance; production secrets and configuration.
+Current adapters support normal auto-renewing products, not store trial/offers,
+prepaid, multi-line or deferred replacements. These fail closed; the existing
+Solemi trial ledger is unchanged. Do not enable store trial offers in the consoles
+as a substitute for the approved Solemi trial rules.
+
+Validation: 958 tests across 67 files, both TypeScript checks and Worker audit
+(0 findings). `storeWorkerRuntime.test.ts` runs the real SDK in local workerd with
+ephemeral synthetic certificates and rejects tampering. Its fixture Worker is
+test-only and never referenced by deployable configs. No live store transaction
+has been performed.
+
 ## Development dependency security fix (2026-10-08)
 
 The Miniflare dependency of Wrangler 4.147.0 pins `sharp` 0.35.4, which is

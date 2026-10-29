@@ -1,5 +1,15 @@
 # Solemi Sleep — belső verziótól a kiadásig
 
+**Aktuális felülírás, 2026-10-28:** main-merge kész, legutóbbi main `2e3cb94`;
+a régi GitHub Pages-link átvezetése kiadva. A tulajdonos a naplóátvitelt félretette.
+A cél Android/iOS kiadás, új nyilvános webapp nem feladat. Fizetésen haladunk:
+az Apple/Google provider verify/restore és account-jogosultsági bekötés helyben kész,
+alapból kikapcsolva, 958/958 gépi próba. [Pontos kész rész és maradék](STORE_BILLING_INTEGRATION_PLAN.md).
+Saját áruházi fiókok még nincsenek; natív vásárlás, szerverértesítés/egyeztetés,
+valódi sandbox próba és production bekötés még hátra van. A történeti A08–A12
+bejegyzésekből nem kezdünk új auditkört; a hiányzó konkrét bekötéseket zárjuk le.
+
+
 **Aktuális állapot, 2026-10-21 — előkészítés lezárva:** [main-merge végrehajtási lap](MAIN_MERGE_READY_2026-10-21.md). A main tiszta (`a529a64`), a Pages automatikus kiadása tiltva; a friss merge-előnézet feloldva pontosan a feature fájlfáját adja. A 907/907 próbához képest csak dokumentáció változott. **Tulajdonosi döntés: GitHub Support-kérést nem küldünk; a régi PR/cache esetleges elérhetősége ismert maradvány, nem merge-kapu.** Ág-védelem aktiválása, konfliktusfeloldó commit/feltöltés és külön jelzett main-merge következik; production bekötés utána. Most nincs távoli módosítás vagy kézi app-teszt.
 
 Utolsó frissítés: 2026-10-21

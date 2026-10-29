@@ -4,7 +4,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { trialRegistryFixture } from './trialRegistryFixture'
 import worker from '../src/index'
 import { sqliteBinding } from './sqliteD1'
-import { SignJWT } from 'jose'
+import { SignJWT, generateKeyPair, exportPKCS8 } from 'jose'
 
 const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8')
 const migrations = readdirSync(new URL('../migrations/', import.meta.url)).filter(x => x.endsWith('.sql') && x >= '003').sort()
@@ -22,7 +22,7 @@ beforeEach(async () => {
     AUTH_SECRET: 'test-secret-with-at-least-32-characters', ACCOUNT_FAMILY_BRIDGE: 'true' }
   const fixture = await trialRegistryFixture(); registry = fixture.db; Object.assign(env, fixture.env)
 })
-afterEach(() => { sqlite.close(); registry.close() })
+afterEach(() => { sqlite.close(); registry.close(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
 function fetch(path: string, init: RequestInit = {}) {
   return worker.fetch(new Request(`https://sync.example${path}`, init), env)
@@ -80,6 +80,73 @@ function setTestPlan(access: string, plan: 'free' | 'family' | 'familyPlus') {
     body: JSON.stringify({ plan })
   })
 }
+
+describe('authenticated store purchase/restore integration', () => {
+  const post = (token: string, action: string, body: unknown = {}) => fetch(`/v1/auth/billing/google/${action}`, {
+    method: 'POST', headers: { Origin: origin, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+  })
+  async function configure() {
+    const key = await generateKeyPair('RS256', { extractable: true })
+    Object.assign(env, { STORE_BILLING_ENABLED: 'true', STORE_ENVIRONMENT: 'SANDBOX',
+      STORE_PRODUCT_CATALOG: JSON.stringify([{ provider: 'GOOGLE_PLAY', productId: 'family', basePlanId: 'monthly', product: 'FAMILY' }]),
+      GOOGLE_PLAY_PACKAGE_NAME: 'app.solemi.test', GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL: 'synthetic@example.invalid',
+      GOOGLE_PLAY_PRIVATE_KEY: await exportPKCS8(key.privateKey) })
+  }
+  it('denies disabled, unauthenticated and incomplete configuration without a store call', async () => {
+    const outbound = vi.fn(); vi.stubGlobal('fetch', outbound)
+    expect((await post('bad', 'verify', { purchaseToken: 'secret' })).status).toBe(404)
+    env.STORE_BILLING_ENABLED = 'true'
+    expect((await post('bad', 'verify', { purchaseToken: 'secret' })).status).toBe(401)
+    const token = await accountAccess('billing', 'billing-dev', 'billing-session')
+    expect((await post(token, 'prepare')).status).toBe(503)
+    expect(outbound).not.toHaveBeenCalled()
+    expect(sqlite.prepare('SELECT * FROM billing_account_links').all()).toEqual([])
+  })
+  it('grants only verified ownership, persists before acknowledging, retries ack, restores without duplicate grants, and removes expired access', async () => {
+    await configure()
+    const token = await accountAccess('payer', 'payer-device', 'payer-session')
+    const other = await accountAccess('other', 'other-device', 'other-session')
+    const prepared = await (await post(token, 'prepare')).json() as any
+    const externalAccountToken = prepared.data.externalAccountToken
+    expect((await (await post(token, 'prepare')).json() as any).data.externalAccountToken).toBe(externalAccountToken)
+    const now = Date.now()
+    let state = 'SUBSCRIPTION_STATE_ACTIVE', failAck = true, acknowledged = false
+    const outbound = vi.fn(async (url: string) => {
+      if (url.includes('oauth2')) return Response.json({ token_type: 'Bearer', access_token: 'synthetic-access-token' })
+      if (url.endsWith(':acknowledge')) {
+        expect(sqlite.prepare('SELECT COUNT(*) AS n FROM subscriptions').get()).toEqual({ n: 1 })
+        if (failAck) return new Response('private detail', { status: 503 })
+        acknowledged = true; return new Response(null, { status: 204 })
+      }
+      return Response.json({ subscriptionState: state, startTime: new Date(now - 1000).toISOString(), testPurchase: {},
+        externalAccountIdentifiers: { obfuscatedExternalAccountId: externalAccountToken },
+        acknowledgementState: acknowledged ? 'ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED' : 'ACKNOWLEDGEMENT_STATE_PENDING',
+        lineItems: [{ productId: 'family', latestSuccessfulOrderId: 'GPA.synthetic', expiryTime: new Date(now + 86400000).toISOString(),
+          autoRenewingPlan: { autoRenewEnabled: true }, offerDetails: { basePlanId: 'monthly' } }] })
+    })
+    vi.stubGlobal('fetch', outbound)
+    expect((await post(token, 'verify', { purchaseToken: 'purchase', plan: 'FAMILY_PLUS' })).status).toBe(400)
+    expect(outbound).not.toHaveBeenCalled()
+    expect((await post(other, 'verify', { purchaseToken: 'purchase' })).status).toBe(422)
+    expect(sqlite.prepare('SELECT * FROM subscriptions').all()).toEqual([])
+    const first = await post(token, 'verify', { purchaseToken: 'purchase' })
+    expect(first.status).toBe(200)
+    expect(await first.json()).toMatchObject({ data: { outcome: 'APPLIED', acknowledgement: 'RETRY_REQUIRED' } })
+    expect(sqlite.prepare('SELECT feature_key FROM account_entitlements WHERE revoked_at IS NULL ORDER BY feature_key').all())
+      .toEqual([{ feature_key: 'FAMILY_SYNC' }, { feature_key: 'PDF_EXPORT' }])
+    failAck = false
+    const restored = await post(token, 'restore', { purchaseToken: 'purchase' })
+    expect(restored.status).toBe(200)
+    expect(await restored.json()).toMatchObject({ data: { acknowledgement: 'ACKNOWLEDGED' } })
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM subscriptions').get()).toEqual({ n: 1 })
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM account_entitlements').get()).toEqual({ n: 2 })
+    expect(sqlite.prepare('SELECT acknowledgement_state FROM store_subscription_state').get()).toEqual({ acknowledgement_state: 'ACKNOWLEDGED' })
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM account_trials').get()).toEqual({ n: 0 })
+    state = 'SUBSCRIPTION_STATE_EXPIRED'
+    expect((await post(token, 'restore', { purchaseToken: 'purchase' })).status).toBe(200)
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM account_entitlements WHERE revoked_at IS NULL').get()).toEqual({ n: 0 })
+  })
+})
 
 describe('A11 authenticated trial routes', () => {
   const headers = (token: string) => ({ Origin: origin, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' })

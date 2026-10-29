@@ -3,9 +3,11 @@
   "name": "solemi-sleep-sync",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-22",
+  "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "preview_urls": true,
   "vars": {
+    "STORE_BILLING_ENABLED": "false",
     "SOLEMI_ENVIRONMENT": "production",
     "ALLOWED_ORIGINS": "https://czkiii.github.io,http://localhost:5173"
   },

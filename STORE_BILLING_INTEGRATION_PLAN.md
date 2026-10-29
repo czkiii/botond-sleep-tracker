@@ -1,6 +1,56 @@
 # Solemi Sleep — App Store és Google Play vásárlási integráció
 
-**Állapot:** a közös contract és a helyi persistence első implementációja megvan; kiadás előtt auditjavítás szükséges
+**Aktuális állapot, 2026-10-28:** az Apple/Google vásárlásellenőrző adapterek és a
+bejelentkezett account vásárlási/visszaállítási HTTP-bekötése helyben elkészült.
+Ez a szerveroldali integráció lezárt része; nem éles fizetés. Saját Apple Developer,
+Google Play Console fiók és EV még nincs. A részletes bekötési szerződés a
+[Worker leírásában](worker/README.md#store-purchase-verification-2026-10-28) található.
+
+- Apple: hivatalos `@apple/app-store-server-library` 3.1.0, rögzített nyilvános Apple
+  Root CA G3, tanúsítványlánc/aláírás/app/környezet/account ellenőrzés. A kliens JWS
+  önmagában nem ad jogot: friss, hitelesített Apple subscription-status lekérés,
+  annak aláírt tranzakciója és megújítási adata alapján készül a jogosultság.
+- Google: szerveroldali RS256 OAuth, a saját package-hez tartozó
+  `purchases.subscriptionsv2.get`; account-alias, környezet, termék és base plan
+  ellenőrzés. Acknowledge csak a jogosultság tartós írása után; átmeneti hibánál
+  `RETRY_REQUIRED`, a kliens ugyanazt a verify/restore műveletet ismétli.
+- Közös: szerveroldali terméktérkép, lejárt/visszavont/fizetésre váró állapotból
+  nincs új hozzáférés, session/origin/kéréskorlát, méret- és időkorlátos áruházi
+  hívások, részletes providerhibák és titkok nem kerülnek a válaszba/naplóba.
+- V1-ben itt csak normál auto-renewing termék/base plan engedélyezett; store trial,
+  promóció, prepaid és többtermékes csomag nem aktiválható ezen az útvonalon.
+  A saját egyszeri 7 napos trial és a családonkénti négyes keret változatlan.
+- Nem kellett új migráció. A két követett Worker-konfigurációban a kapcsoló
+  `STORE_BILLING_ENABLED=false`. Távoli módosítás, kiadás, commit/push nem történt.
+
+**Gépi eredmény:** 67 fájl / **958 sikeres próba**; frontend és Worker typecheck,
+Worker függőségi audit (0 találat). Szintetikus PKI-val valódi JWS-aláírás és
+hamisítási negatív próba, ugyanez helyi Cloudflare/workerd alatt is sikeres.
+Google OAuth-aláírás és V2-válaszok szimuláltak; a teljes session → provider →
+SQLite jogosultság → acknowledge/restore út tesztelve. Ezek nem valódi sandbox
+vásárlások. A csomagolási ellenőrzés nem élesítés.
+
+**Lezárás, 2026-10-29:** a megszakítás után a végső staging dry-run és a repository
+higiéniai ellenőrzése is sikeres; 1157,00 KiB / gzip 211,12 KiB, fizetés kikapcsolva.
+A sikeres gépi teszteket nem futtattuk újra. A változások helyben, a
+`codex/store-purchase-verification` ágon vannak; commit/push nem történt.
+
+**Még a fizetés kiadásához tartozik:** natív vásárlás/visszaállítás és account-alias
+átadása; saját áruházi termékek/kulcsok; hitelesített szerverértesítések és időszakos
+egyeztetés (megújulás, refund, visszavonás, acknowledgement újrapróba); célzott
+valódi sandbox vásárlás, restore és lemondás/refund próba. Nem nyitjuk újra az A27,
+családi M1–M6 és A17 már elfogadott köreit.
+
+**Következő, fiókok nélkül is végezhető:** az Apple/Google szerverértesítések és a
+kimaradt előfizetési események egyeztetésének bekötése az elkészült adapterekhez.
+GPT-6 Astra · erős; kézi app-teszt ehhez még nem szükséges.
+
+---
+
+## Korábbi terv és történeti kiinduló állapot (2026-09-20)
+
+Az alábbi korábbi auditmegállapítások és sorrend történetiek; az aktuális állapotot
+a fenti bejegyzés és a release checklist dátumozott eredményei adják.
 
 **Dátum:** 2026-09-20
 
