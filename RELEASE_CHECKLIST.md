@@ -1,5 +1,13 @@
 # Solemi Sleep — belső verziótól a kiadásig
 
+**Mobilos előkészítés, 2026-10-30:** az Android/iOS keret és a szerverhez kötött
+natív vásárlás/visszaállítás kódja elkészült. 27 célzott próba, typecheck, webes és
+natív webcsomag, két platform konfigurációszinkronja sikeres.
+[Kész rész és korlátok](NATIVE_APP_PREPARATION.md).
+Ez nem aláírt APK/AAB/IPA és nem valódi áruházi fizetési elfogadás. Következő a
+natív belépés/munkamenet, utána a saját konzolfiókokkal és termékekkel végzett
+készülékes/sandbox elfogadás. Fizetés alapból kikapcsolva; távoli kiadás nem történt.
+
 **Fizetési előrelépés, 2026-10-29:** helyben elkészült a hitelesített Apple V2 /
 Google Pub/Sub értesítés, a megújulás/visszatérítés és a kimaradt események
 ütemezett pótlása, tartós Google ack újrapróbával. 263 érintett teszt PASS.

@@ -13,6 +13,14 @@ const EPOCH_KEY = 'solemiSleep:authEpoch:v1'
 export const ACCOUNT_STATE_EVENT = 'solemi-account-state'
 export const ACCOUNT_ACCESS_EVENT = 'solemi-account-access'
 
+// An async store sheet can outlive a logout/re-login, even to the same account.
+// Capture both account and epoch; never submit its proof under a new session.
+export function accountBillingContext(): string | null {
+  const access = readAccess()
+  const id = getActiveAccountWorkspaceId()
+  return access && id === access.account.id ? `${id}:${authEpoch()}` : null
+}
+
 export type SignedInAccount = { id: string; email: string | null; name: string | null }
 export type AccountDevice = { id: string; name: string | null; platform: 'WEB' | 'IOS' | 'ANDROID' | 'OTHER' | null; last_seen_at: number }
 export type AccountAccessState = {

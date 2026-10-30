@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Solemi Sleep</string>
+    <string name="title_activity_main">Solemi Sleep</string>
+    <string name="package_name">app.solemi.sleep</string>
+    <string name="custom_url_scheme">app.solemi.sleep</string>
+</resources>

@@ -50,6 +50,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Prepare bundled mobile assets (no signing or upload)
+        run: npm run native:sync
+
   worker:
     name: Worker checks
     runs-on: ubuntu-latest

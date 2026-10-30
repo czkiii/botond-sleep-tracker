@@ -1,5 +1,28 @@
 # Solemi Sleep — Codex projektállapot
 
+**Aktuális lezárás, 2026-10-30:** az Android/iOS alkalmazáskeret és a natív
+vásárlás/visszaállítás helyi előkészítése elkészült. Capacitor 8.6.0 projektek,
+StoreKit/Play vásárlási híd, szerveroldali alias/verify/restore bekötés, kizárólag
+szerveres jogosultságfrissítés. 27 célzott gépi próba PASS; frontend és Capacitor
+typecheck, natív webcsomag, két platform szinkronja, hagyományos webbuild és
+repository-ellenőrzés sikeres. A megszakítás után csak a hiányzó lezáró ellenőrzést
+pótoltuk; a régi A17/A27/M1–M6 köröket nem ismételtük.
+
+**Ez előkészítés, nem készüléken igazolt fizetés:** Android SDK/JDK és Xcode-fordítás
+még nincs, a natív belépés/munkamenet bekötése hátra van. Az előkészítő profilban
+a fizetés és a fiókbelépés kikapcsolt; production build tiltott. Távoli módosítás,
+aláírás, áruházi feltöltés nem történt. A korábbi szerverértesítési blokk már
+commitolva van; ez a mobilos munka helyben, még commit nélkül található a
+`codex/store-purchase-verification` ágon.
+[Pontos kész rész, korlátok és futtatás](NATIVE_APP_PREPARATION.md).
+
+**Következő:** natív Google-belépés, az iOS belépési lehetőségei és a mobilos
+munkamenet/API-kapcsolat bekötése. **GPT-6 Astra · erős; az előkészítéshez még
+nem kell kézi app-teszt.** Saját store-fiókok nélkül nem zárjuk le a valódi vásárlási elfogadást.
+
+GitHub Desktop Summary: `Add native mobile shells and server-verified purchase flows`.
+Az alábbi korábbi „következő” pontokat ez a bejegyzés felülírja.
+
 **Legfrissebb lezárás, 2026-10-29:** Apple/Google értesítés-hitelesítés,
 megújulás/refund és kimaradt események egyeztetése helyben kész. 263 kapcsolódó
 gépi próba, Worker typecheck, csomagolás és repository-ellenőrzés PASS.

@@ -1036,3 +1036,6 @@ dialog.child-editor-dialog:not([open]) { display: none; }
 .pdf-download { min-height: 48px; padding: 12px; border: 1px solid #41658b; border-radius: 12px; background: #2264a5; color: white; font: inherit; }
 .pdf-export-sheet [role="alert"] { color: #ffb5bf; }
 @media (max-width: 360px) { .pdf-date-fields { grid-template-columns: 1fr; } }
+/* Native subscription controls reuse the existing settings buttons. */
+.native-subscriptions { display: grid; gap: 12px; margin-top: 16px; }
+.native-subscriptions small { line-height: 1.5; }

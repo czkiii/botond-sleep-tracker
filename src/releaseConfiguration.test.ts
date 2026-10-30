@@ -8,6 +8,14 @@ const release = {
 }
 
 describe('production release build gate', () => {
+  it('allows an offline native preparation but blocks accidental production and unconfigured purchases', () => {
+    const native = { VITE_NATIVE_APP: 'true', VITE_BASE_PATH: '/', VITE_NATIVE_BILLING: 'false', VITE_RELEASE_CHANNEL: 'native-preparation' }
+    expect(() => assertProductionReleaseConfiguration(native)).not.toThrow()
+    expect(() => assertProductionReleaseConfiguration({ ...native, VITE_RELEASE_CHANNEL: 'production' })).toThrow(/Native production/)
+    expect(() => assertProductionReleaseConfiguration({ ...native, VITE_BASE_PATH: '/old/' })).toThrow(/root/)
+    expect(() => assertProductionReleaseConfiguration({ ...native, VITE_NATIVE_BILLING: 'true' })).toThrow(/account auth/)
+    expect(() => assertProductionReleaseConfiguration({ VITE_NATIVE_BILLING: 'true' })).toThrow(/native build/)
+  })
   it('requires the real account and first-party proxy configuration', () => {
     expect(() => assertProductionReleaseConfiguration(release)).not.toThrow()
     expect(() => assertProductionReleaseConfiguration({ ...release, VITE_ACCOUNT_AUTH: undefined }))

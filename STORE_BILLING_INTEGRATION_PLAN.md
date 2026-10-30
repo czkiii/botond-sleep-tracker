@@ -1,5 +1,15 @@
 # Solemi Sleep — App Store és Google Play vásárlási integráció
 
+**Aktuális felülírás, 2026-10-30:** az Android/iOS projektek és a natív vásárlási
+vezérlő helyben elkészültek. A meglévő szerver prepare/verify/restore útvonalaihoz
+kötött alias, havi áruházi ár, kézi tranzakciólezárás, megszakítás utáni helyreállítás
+és fiókváltási védelem 27 célzott próbán sikeres. Natív eszközös fordítás és valódi
+vásárlás nem történt; a mobilos belépési/munkamenet-bekötés a következő konkrét
+feladat. A kikapcsolt előkészítő profil nem adható ki az áruházakba.
+[Részletes állapot és parancsok](NATIVE_APP_PREPARATION.md).
+Webbuild, natív webbuild, Android/iOS projekt-szinkron és typecheck PASS.
+Kész backendteszteket nem futtattunk újra általános auditként.
+
 **Aktuális felülírás, 2026-10-29:** a szerverértesítések és a kimaradt események
 egyeztetésének helyi implementációja is elkészült. Apple V2 aláírás és Google
 Pub/Sub OIDC hitelesítés után friss providerállapot frissíti a meglévő jogot;

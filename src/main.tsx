@@ -29,7 +29,13 @@ const buildSha = import.meta.env.VITE_BUILD_SHA?.slice(0, 7) || 'local'
 installAssetCssVariables()
 recoverAccountWorkspaceSwitch()
 
-if (!internalPreview) void registerPwa(import.meta.env.BASE_URL, navigator.serviceWorker)
+if (import.meta.env.VITE_NATIVE_APP === 'true' && import.meta.env.VITE_NATIVE_BILLING === 'true') {
+  void import('./nativeBillingRuntime').then(module => module.startNativeBillingRecovery()).catch(() => {
+    // Explicit Restore remains available; never expose raw native/store failures.
+  })
+}
+
+if (!internalPreview && import.meta.env.VITE_NATIVE_APP !== 'true') void registerPwa(import.meta.env.BASE_URL, navigator.serviceWorker)
 
 function SolemiRoot() {
   const [accountReady, setAccountReady] = useState(!accountAuthEnabled)

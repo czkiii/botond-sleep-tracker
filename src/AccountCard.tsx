@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { nativeBillingEnabled } from './nativeBillingRuntime'
 import { AccountAuthError, beginGoogleSignIn, restoreAccount, signOutAccount } from './accountAuth'
 import type { AccountDevice, SignedInAccount } from './accountAuth'
 import { accountWorkspaceNeedsGuestChoice, activateInteractiveAccountWorkspace } from './accountWorkspace'
@@ -8,6 +9,8 @@ import { localeTag, t } from './i18n'
 import type { Locale } from './i18n'
 import AccountDataControls, { AccountRecovery } from './AccountDataControls'
 import type { RecoveryState } from './AccountDataControls'
+
+const NativeSubscriptions = lazy(() => import('./NativeSubscriptions'))
 
 export default function AccountCard({ locale }: { locale: Locale }) {
   const button = useRef<HTMLDivElement>(null)
@@ -71,6 +74,7 @@ export default function AccountCard({ locale }: { locale: Locale }) {
     {replacement && status === 'signedOut' && <small className="account-replace-confirm">{t(locale, 'accountReplaceConfirm', { device: replacement.name || t(locale, 'unknownDevice') })}</small>}
     {status === 'signedOut' && <div ref={button} className="google-signin-button" />}
     {status === 'ready' && <button type="button" className="account-signout" onClick={() => setStatus('signOutChoice')}>{t(locale, 'signOut')}</button>}
+    {status === 'ready' && account && nativeBillingEnabled() && <Suspense fallback={null}><NativeSubscriptions key={account.id} locale={locale} /></Suspense>}
     {status === 'ready' && account && import.meta.env.VITE_ACCOUNT_DELETION === 'true' && <AccountDataControls key={account.id} locale={locale} accountId={account.id} onDeleted={() => { setAccount(null); setStatus('signedOut') }} />}
     {recovery && <AccountRecovery locale={locale} recovery={recovery} onDone={() => { setRecovery(null); setStatus('signedOut') }} />}
     {status === 'signOutChoice' && <div className="account-signout-choice">

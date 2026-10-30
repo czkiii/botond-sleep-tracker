@@ -6,13 +6,16 @@ import { assertProductionReleaseConfiguration } from './src/releaseConfiguration
 export default defineConfig(({ mode }) => {
   const releaseEnv = loadEnv(mode, '.', 'VITE_')
   assertProductionReleaseConfiguration(releaseEnv)
+  const native = releaseEnv.VITE_NATIVE_APP === 'true'
   const base = releaseEnv.VITE_BASE_PATH || '/botond-sleep-tracker/'
   return {
     // Keep the current GitHub Pages path until the repository URL is intentionally migrated.
     base,
+    build: { outDir: native ? 'dist-native' : 'dist' },
     plugins: [
       react(),
       VitePWA({
+        disable: native,
         // Native registration waits for all old windows to close. Never take
         // over/reload an open diary while it may contain an unsaved draft.
         registerType: 'prompt',

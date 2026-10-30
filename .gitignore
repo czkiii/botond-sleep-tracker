@@ -5,3 +5,4 @@ dist
 .wrangler/
 .private-backups/
 legacy-entry-dist/
+dist-native/
