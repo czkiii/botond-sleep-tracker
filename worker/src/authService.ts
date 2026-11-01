@@ -8,6 +8,7 @@ import type { AppleIdentity } from './appleAuth'
 import { AccountDeletionService, recoveryProof } from './accountDeletion'
 import type { DeletionJournal } from './deletionJournal'
 import type { TrialIdentityGuard } from './trialIdentity'
+import type { AppleSignInLifecycle } from './appleSignInLifecycle'
 
 export const SESSION_MS = 30 * 24 * 60 * 60 * 1000
 export const CHALLENGE_MS = 10 * 60 * 1000
@@ -34,7 +35,7 @@ function publicAccount(account: AccountRow) {
 export class AuthService {
   private store: AccountStore
   constructor(private db: D1Database, private config: { clientId: string; secret: string; deletionJournal?: DeletionJournal; trialIdentity?: TrialIdentityGuard;
-    nativeGoogleClientId?: string; nativeGoogleAuthorizedParties?: string[]; appleClientId?: string },
+    nativeGoogleClientId?: string; nativeGoogleAuthorizedParties?: string[]; appleClientId?: string; appleLifecycle?: AppleSignInLifecycle },
     private verify: typeof verifyGoogleToken = verifyGoogleToken, private verifyApple: typeof verifyAppleToken = verifyAppleToken) {
     this.store = new AccountStore(db)
   }
@@ -49,7 +50,7 @@ export class AuthService {
     return nonce
   }
 
-  private async resolveAccount(identity: GoogleIdentity | AppleIdentity, now: number, provider: 'GOOGLE' | 'APPLE' = 'GOOGLE') {
+  private async resolveAccount(identity: GoogleIdentity | AppleIdentity, now: number, provider: 'GOOGLE' | 'APPLE' = 'GOOGLE', appleCredentialId?: string) {
     let account = await this.store.findIdentityAccount(provider, identity.issuer, identity.subject)
     if (!account) {
       try {
@@ -63,6 +64,7 @@ export class AuthService {
       }
       account = await this.store.findIdentityAccount(provider, identity.issuer, identity.subject)
     }
+    if (account && appleCredentialId) await this.config.appleLifecycle!.bind(appleCredentialId, account.id, now)
     if (account?.status === 'DELETION_PENDING') {
       const deletion = new AccountDeletionService(this.db, this.config.deletionJournal, this.config.trialIdentity)
       const pending = await deletion.pending(account.id)
@@ -98,25 +100,35 @@ export class AuthService {
   }
 
   async loginNative(input: { credential: string; nonce: string; installationSecret: string; deviceName: string;
-    replaceDeviceId?: string; provider: 'GOOGLE' | 'APPLE'; platform: 'IOS' | 'ANDROID' }, now = Date.now()) {
+    replaceDeviceId?: string; provider: 'GOOGLE' | 'APPLE'; platform: 'IOS' | 'ANDROID'; authorizationCode?: string }, now = Date.now()) {
     if (!/^[a-f0-9]{64}$/.test(input.nonce) || !/^[a-f0-9]{64}$/.test(input.installationSecret)) throw new AuthError('INVALID_REQUEST', 400)
     if (input.provider === 'APPLE' && input.platform !== 'IOS') throw new AuthError('INVALID_REQUEST', 400)
     const clientId = input.provider === 'APPLE' ? this.config.appleClientId : this.config.nativeGoogleClientId
     if (!clientId) throw new AuthError('NATIVE_AUTH_NOT_CONFIGURED', 503)
+    if (input.provider === 'APPLE' && (!this.config.appleLifecycle || !input.authorizationCode)) throw new AuthError('APPLE_AUTHORIZATION_CODE_REQUIRED', 400)
     let identity: GoogleIdentity | AppleIdentity
     try {
       identity = input.provider === 'APPLE' ? await this.verifyApple(input.credential, clientId, input.nonce, { now })
         : await this.verify(input.credential, clientId, input.nonce, { now, authorizedParties: this.config.nativeGoogleAuthorizedParties })
     } catch { throw new AuthError(input.provider === 'APPLE' ? 'APPLE_TOKEN_INVALID' : 'GOOGLE_TOKEN_INVALID') }
-    return this.loginIdentity(input, identity, now, `native:${input.provider}:${input.platform}`, input.platform, input.provider)
+    const scope = `native:${input.provider}:${input.platform}`
+    let appleCredentialId: string | undefined
+    if (input.provider === 'APPLE') {
+      await this.consumeChallenge(input.nonce, scope, now)
+      appleCredentialId = await this.config.appleLifecycle!.stage(input.authorizationCode!, input.nonce, identity as AppleIdentity, now)
+    }
+    return this.loginIdentity(input, identity, now, scope, input.platform, input.provider, appleCredentialId)
   }
 
-  private async loginIdentity(input: { nonce: string; installationSecret: string; deviceName: string; replaceDeviceId?: string },
-    identity: GoogleIdentity | AppleIdentity, now: number, scope = '', platform = 'WEB', provider: 'GOOGLE' | 'APPLE' = 'GOOGLE') {
+  private async consumeChallenge(nonce: string, scope: string, now: number) {
     const used = await this.db.prepare('DELETE FROM auth_challenges WHERE nonce_hash = ? AND expires_at > ?')
-      .bind(await secretHash(`nonce:${scope ? `${scope}:` : ''}${input.nonce}`, this.config.secret), now).run()
+      .bind(await secretHash(`nonce:${scope ? `${scope}:` : ''}${nonce}`, this.config.secret), now).run()
     if (used.meta.changes !== 1) throw new AuthError('LOGIN_CHALLENGE_INVALID')
-    const account = await this.resolveAccount(identity, now, provider)
+  }
+  private async loginIdentity(input: { nonce: string; installationSecret: string; deviceName: string; replaceDeviceId?: string },
+    identity: GoogleIdentity | AppleIdentity, now: number, scope = '', platform = 'WEB', provider: 'GOOGLE' | 'APPLE' = 'GOOGLE', appleCredentialId?: string) {
+    if (!appleCredentialId) await this.consumeChallenge(input.nonce, scope, now)
+    const account = await this.resolveAccount(identity, now, provider, appleCredentialId)
     // One browser installation can sign in to different accounts without ever
     // reassigning a device or inheriting another account's credentials.
     const installationHash = await secretHash(`installation:${account.id}:${input.installationSecret}`, this.config.secret)
@@ -156,10 +168,14 @@ export class AuthService {
     const refresh = randomSecret()
     const sessionId = id('ses')
     statements.push(this.db.prepare(`INSERT INTO account_sessions
-      (id, account_id, device_id, refresh_hash, created_at, last_used_at, expires_at)
-      SELECT ?, d.account_id, d.id, ?, ?, ?, ? FROM account_devices d JOIN accounts a ON a.id = d.account_id
-      WHERE d.id = ? AND d.account_id = ? AND d.revoked_at IS NULL AND a.status = 'ACTIVE'`)
-      .bind(sessionId, await secretHash(`refresh:${refresh}`, this.config.secret), now, now, now + SESSION_MS, deviceId, account.id))
+      (id, account_id, device_id, refresh_hash, created_at, last_used_at, expires_at${appleCredentialId ? ', apple_auth_time' : ''})
+      SELECT ?, d.account_id, d.id, ?, ?, ?, ?${appleCredentialId ? ', (SELECT issued_at FROM apple_signin_credentials WHERE id=?)' : ''}
+      FROM account_devices d JOIN accounts a ON a.id = d.account_id
+      WHERE d.id = ? AND d.account_id = ? AND d.revoked_at IS NULL AND a.status = 'ACTIVE'
+      ${appleCredentialId ? `AND EXISTS (SELECT 1 FROM apple_signin_credentials c WHERE c.id=? AND c.account_id=a.id AND c.state='ACTIVE'
+        AND NOT EXISTS (SELECT 1 FROM apple_signin_state s WHERE s.subject_key=c.subject_key AND (s.deleted=1 OR s.revoked_before>=c.issued_at)))` : ''}`)
+      .bind(sessionId, await secretHash(`refresh:${refresh}`, this.config.secret), now, now, now + SESSION_MS,
+        ...(appleCredentialId ? [appleCredentialId] : []), deviceId, account.id, ...(appleCredentialId ? [appleCredentialId] : [])))
     try {
       const result = await this.db.batch(statements)
       if (result[result.length - 1].meta.changes !== 1) throw new AuthError('ACCOUNT_UNAVAILABLE', 403)

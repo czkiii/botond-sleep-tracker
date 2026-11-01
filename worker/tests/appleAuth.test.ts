@@ -13,7 +13,7 @@ describe('Apple native proof', () => {
   it('accepts signed private relay email but does not trust client profile names', async () => {
     const s = await signed({ name: 'untrusted name' })
     await expect(verifyAppleToken(s.value, clientId, nonce, { key: s.key, now })).resolves.toEqual({
-      issuer: 'https://appleid.apple.com', subject: 'stable-apple-subject', email: 'relay@privaterelay.appleid.com', name: null, picture: null })
+      issuer: 'https://appleid.apple.com', subject: 'stable-apple-subject', email: 'relay@privaterelay.appleid.com', name: null, picture: null, authenticatedAt: now })
   })
   it('allows an omitted email; identity is the signed stable subject', async () => {
     const s = await signed({ email: undefined, email_verified: undefined })

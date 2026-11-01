@@ -1,4 +1,5 @@
-export interface NativeAuthEnv {
+import type { AppleSignInEnv } from './appleSignInProvider'
+export interface NativeAuthEnv extends AppleSignInEnv {
   NATIVE_APPLE_AUTH_ENABLED?: string
   NATIVE_AUTH_ENABLED?: string
   NATIVE_GOOGLE_WEB_CLIENT_ID?: string

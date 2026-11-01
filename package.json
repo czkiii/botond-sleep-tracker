@@ -28,7 +28,8 @@
     "native:android": "cap open android",
     "native:ios": "cap open ios",
     "test:native": "vitest run src/nativeBilling.test.ts src/nativeBillingRuntime.test.ts src/nativeSession.test.ts src/nativeAuth.test.ts src/releaseConfiguration.test.ts --exclude **/.private-backups/**",
-    "test:native-auth": "vitest run src/nativeSession.test.ts src/nativeAuth.test.ts src/releaseConfiguration.test.ts worker/tests/nativeAuth.test.ts worker/tests/appleAuth.test.ts worker/tests/googleAuth.test.ts worker/tests/authService.test.ts worker/tests/retention.test.ts worker/tests/accountProxyBoundary.test.ts --exclude **/.private-backups/**"
+    "test:native-auth": "vitest run src/nativeSession.test.ts src/nativeAuth.test.ts src/releaseConfiguration.test.ts worker/tests/nativeAuth.test.ts worker/tests/appleAuth.test.ts worker/tests/googleAuth.test.ts worker/tests/authService.test.ts worker/tests/retention.test.ts worker/tests/accountProxyBoundary.test.ts --exclude **/.private-backups/**",
+    "test:apple-signin": "vitest run worker/tests/appleSignInLifecycle.test.ts worker/tests/nativeAuth.test.ts worker/tests/accountDeletion.test.ts worker/tests/deletionRestore.test.ts worker/tests/businessRestore.test.ts src/nativeAuth.test.ts --exclude **/.private-backups/**"
   },
   "dependencies": {
     "@aparajita/capacitor-secure-storage": "8.0.1",

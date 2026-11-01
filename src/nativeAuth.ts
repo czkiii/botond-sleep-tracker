@@ -62,7 +62,7 @@ export async function nativeSignIn(provider: NativeProvider, check: () => void, 
   await SocialLogin.initialize(provider === 'GOOGLE' ? { google: {
     webClientId: challenge.googleWebClientId, iOSClientId: challenge.googleIosClientId,
     iOSServerClientId: challenge.googleWebClientId, mode: 'online'
-  } } : { apple: {} }); check()
+  } } : { apple: { useProperTokenExchange: true } }); check()
   const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(challenge.nonce)); check()
   const nonce = provider === 'APPLE' ? Array.from(new Uint8Array(hash), x => x.toString(16).padStart(2, '0')).join('') : challenge.nonce
   const response = provider === 'GOOGLE'
@@ -71,8 +71,14 @@ export async function nativeSignIn(provider: NativeProvider, check: () => void, 
   check()
   const credential = 'idToken' in response.result ? response.result.idToken : null
   if (!credential) throw new NativeSessionError('NATIVE_ID_TOKEN_MISSING')
+  // With proper-token mode, the iOS bridge returns the code separately and
+  // leaves accessToken null. Only our server exchanges it using the private key.
+  const authorizationCode = provider === 'APPLE' && 'authorizationCode' in response.result
+    ? response.result.authorizationCode : undefined
+  if (provider === 'APPLE' && (typeof authorizationCode !== 'string' || !authorizationCode)) throw new NativeSessionError('APPLE_AUTHORIZATION_CODE_REQUIRED')
   const installationSecret = await vault.installationSecret(); check()
   const data = await post<NativeSessionData>('/v1/auth/native/login', { provider, credential, nonce: challenge.nonce,
+    ...(provider === 'APPLE' ? { authorizationCode } : {}),
     installationSecret, deviceName: `Solemi · ${Capacitor.getPlatform()}`, ...(replaceDeviceId ? { replaceDeviceId } : {}) }); check()
   return vault.accept(data, check)
 }

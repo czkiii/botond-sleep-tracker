@@ -40,7 +40,7 @@ natív refresh csak POST-törzsből jöhet, natív kérés nem küld browser coo
 
 | Hely | Szükséges konfiguráció |
 | --- | --- |
-| Worker adatbázis | Meglévő migrációk után `015_native_apple_identity.sql`; kizárólag az identitástábla bővítése, Google-adatok megtartásával. Távol még nincs alkalmazva. |
+| Worker adatbázis | Meglévő migrációk után `015_native_apple_identity.sql`, majd `016_apple_signin_lifecycle.sql`; Apple-identitás és titkosított visszavonási sor, Google-adatok megtartásával. Távol még nincs alkalmazva. |
 | Worker | `NATIVE_AUTH_ENABLED=true`; `NATIVE_GOOGLE_WEB_CLIENT_ID`, `NATIVE_GOOGLE_IOS_CLIENT_ID`; szükség esetén `NATIVE_GOOGLE_AUTHORIZED_PARTIES` pontos natív kliensazonosítók vesszős listája. Nincs wildcard. |
 | Google Console | A végleges Android package + aláírás SHA-ujjlenyomata és iOS bundle ID OAuth-kliensei, megfelelő consent/beállítások. A meglévő webes Google-kliens változatlanul megmarad. |
 | iOS Xcode | `SOLEMI_GOOGLE_REVERSED_CLIENT_ID` build setting: a tényleges iOS Google-kliens megfordított URL-sémája. Jelenleg üres; nem helyettesítettük kitalált azonosítóval. |
@@ -57,13 +57,11 @@ Worker kihívásválasza adja vissza; szolgáltatói privát kulcs soha nem ker�
 
 ## Ami még nincs kész / igazolva
 
-**Apple teljes belépési életciklusa:** a jelenlegi előkészítés ID-token alapú.
-Az Apple authorization-code csere, a visszavonáshoz szükséges credential biztonságos
-kezelése, fióktörléskori `/auth/revoke` és szolgáltatói visszavonás kezelése még
-bekötendő. Ezért az Apple-kapcsolókat nem szabad éles használatra bekapcsolni.
-Az Apple ezt külön kezeli a Solemi saját munkamenetének visszavonásától:
-[Apple fióktörlési leírás](https://developer.apple.com/support/offering-account-deletion-in-your-app/),
-[TN3194](https://developer.apple.com/documentation/technotes/tn3194-handling-account-deletions-and-revoking-tokens-for-sign-in-with-apple).
+**2026-11-01: az Apple belépési életciklusának helyi kódja elkészült.**
+Szerveres authorization-code csere, titkosított token, végleges fióktörléshez kötött
+visszavonás és aláírt Apple-értesítések kezelése kész. A 016 migráció, külön kulcsok,
+webhook és cron bekötési sorrendje: [Apple-belépés visszavonása](APPLE_SIGN_IN_LIFECYCLE.md).
+Valódi Apple-kulcsok és készülékes elfogadás nélkül továbbra sem aktiváljuk.
 
 **Valódi mobilos elfogadás:** fejlesztői fiókok/azonosítók, Android SDK/JDK,
 Mac/Xcode, aláírás és készülékes Google/Apple-belépés még szükséges. A natív
@@ -88,8 +86,8 @@ Bekötési források: [Android](https://capgo.app/docs/plugins/social-login/goog
 [iOS](https://capgo.app/docs/plugins/social-login/google/ios/),
 [védett tároló](https://github.com/aparajita/capacitor-secure-storage).
 
-**Következő:** Apple-belépés törléskori és szolgáltatói visszavonásának bekötése,
-a meglévő fióktörléshez kapcsolva. GPT-6 Astra · erős; helyi gépi előkészítés,
-kézi app-teszt nélkül. Ez a konkrét fennmaradó iOS kiadási feltétel, nem új általános audit.
+**Következő:** fejlesztői fiókok és az első készülékre telepíthető mobilbuild
+konkrét beállítása. GPT-6 Astra · erős; tulajdonosi közreműködéssel.
+Az Apple-életciklus helyi lezárását és új bizonyítékait a fenti dokumentum tartalmazza.
 
 GitHub Desktop Summary: `Add native Google sign-in and protected mobile sessions`

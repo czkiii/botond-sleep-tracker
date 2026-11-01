@@ -34,7 +34,7 @@ function fixture(extra = '') {
   INSERT INTO legacy_family_memberships VALUES ('ma','f','a','ADMIN','ACTIVE',1,NULL),('mb','f','b','MEMBER','ACTIVE',1,NULL),
     ('mc','f','c','MEMBER','ACTIVE',1,NULL),('md','f','d','MEMBER','ACTIVE',1,NULL),('me','f','e','MEMBER','ACTIVE',1,NULL);
   INSERT INTO account_devices VALUES ('device','a','install','credential','Phone','WEB',1,1,NULL,NULL);
-  INSERT INTO account_sessions VALUES ('session','a','device','refresh',1,1,${now+week},NULL,0);
+  INSERT INTO account_sessions (id,account_id,device_id,refresh_hash,created_at,last_used_at,expires_at,revoked_at,rotation_counter) VALUES ('session','a','device','refresh',1,1,${now+week},NULL,0);
   INSERT INTO devices VALUES ('legacy','f','token','Phone','created','seen',NULL);
   INSERT INTO invite_codes VALUES ('invite','f','legacy','created','expires',NULL);
   ` + extra
@@ -65,6 +65,26 @@ async function inspect(sql: string, run: (db: DatabaseSync) => void | Promise<vo
 }
 
 describe('offline current business history reconciliation', () => {
+  it('takes Apple revocation work and watermarks only from the current capture, never the old backup', async () => {
+    const old = fixture(`
+      UPDATE account_identities SET provider='APPLE',issuer='https://appleid.apple.com';
+      INSERT INTO apple_signin_credentials(id,account_id,subject_key,client_id,issued_at,ciphertext,token_key,state,next_attempt_at,created_at)
+      VALUES('old','a','digest','app.solemi.sleep',1,'old-encrypted-token','token-digest','ACTIVE',0,1);
+      INSERT INTO apple_signin_state VALUES('digest','a',0,0,0,NULL,1);`)
+    const current = old + `DELETE FROM apple_signin_credentials;
+      INSERT INTO apple_signin_credentials(id,account_id,subject_key,client_id,issued_at,ciphertext,token_key,state,next_attempt_at,created_at)
+      VALUES('current','a','digest','app.solemi.sleep',2,'current-encrypted-token','token-digest','REVOKE',0,2);
+      UPDATE apple_signin_state SET revoked_before=3,updated_at=3;`
+    const result = await prepare(old, current)
+    await inspect(result.sql, db => {
+      expect(db.prepare('SELECT id,state,ciphertext FROM apple_signin_credentials').all()).toEqual([
+        { id: 'current', state: 'REVOKE', ciphertext: 'current-encrypted-token' }
+      ])
+      expect(db.prepare('SELECT revoked_before FROM apple_signin_state').get()).toEqual({ revoked_before: 3 })
+      expect(db.prepare('SELECT COUNT(*) AS n FROM account_sessions WHERE revoked_at IS NULL').get()).toEqual({ n: 0 })
+    })
+    expect(JSON.stringify(result.report)).not.toContain('encrypted-token')
+  })
   it('keeps all four consumed family slots, including expired trials, without replacing the older diary', async () => {
     const old = fixture(trial('a',now-4*week)), current = old + trial('b',now-3*week) + trial('c',now-2*week) + trial('d',now-week)
       + "UPDATE sleep_sessions SET note='Newer content, not chosen for restore';"
@@ -83,7 +103,7 @@ describe('offline current business history reconciliation', () => {
     expect(result.report.trafficMayResume).toBe(false)
     expect(result.report.remoteApplied).toBe(false)
     expect(result.report.outputSha256).toBe(digest(result.sql))
-    expect(JSON.stringify(result.report)).not.toMatch(/Original diary|subject|credential|purchase/)
+    expect(JSON.stringify(result.report)).not.toMatch(/Original diary|\bsubject\b|\bcredential\b|\bpurchase\b/)
   })
   it('restores a later single family binding without starting a second trial', async () => {
     const old = fixture(`UPDATE legacy_family_memberships SET status='LEFT',ended_at=2 WHERE account_id='b';

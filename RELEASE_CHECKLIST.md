@@ -1,10 +1,11 @@
 # Solemi Sleep — belső verziótól a kiadásig
 
-**Natív belépési előrelépés, 2026-10-30:** Google-belépés és védett mobilos
-munkamenet helyi kódja, Apple ID-token/identitás előkészítés és 015 migráció kész.
-200 célzott és kapcsolódó próba PASS. Az Apple törléskori/szolgáltatói visszavonása
-még hátra van; natív belépés kikapcsolva, nincs remote aktiválás.
-[Pontos állapot és következő feltétel](NATIVE_AUTH_PREPARATION.md).
+**Natív belépési lezárás, 2026-11-01:** a Google-belépés és védett mobilos
+munkamenet mellett az Apple kódcsere, titkosított kulcs, törléskori visszavonás
+és aláírt szolgáltatói értesítés kezelése helyben kész. 118/118 Apple/törlés/restore
+és 111/111 kapcsolódó belépési próba PASS (átfedő csomagok). 015–016 migráció
+és bekötési leírás előkészítve; kapcsolók false, nincs remote aktiválás.
+[Pontos állapot és készülékes bekötési feltétel](APPLE_SIGN_IN_LIFECYCLE.md).
 A lentebbi korábbi „natív belépés következik” pontok helyett ez az aktuális állapot.
 
 **Mobilos előkészítés, 2026-10-30:** az Android/iOS keret és a szerverhez kötött

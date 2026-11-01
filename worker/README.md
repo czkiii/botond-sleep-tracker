@@ -561,7 +561,11 @@ A17 staging inventory and isolated provisioning preparation (2026-10-17): `scrip
 ## Native authentication preparation — 2026-10-30
 
 Native Google sign-in and protected mobile refresh transport are implemented locally.
-Apple ID-token/identity support is prepared but **Apple provider revocation is not yet implemented**.
+Apple code exchange, encrypted refresh-token storage, deletion-triggered revocation
+and signed provider notifications are implemented locally (2026-11-01).
 Keep `NATIVE_AUTH_ENABLED=false` and `NATIVE_APPLE_AUTH_ENABLED=false` until the corresponding
-provisioning and acceptance steps are complete. Migration `015_native_apple_identity.sql` is local only.
+provisioning and acceptance steps are complete. Migrations `015_native_apple_identity.sql`
+and `016_apple_signin_lifecycle.sql` are local only. Keep `APPLE_SIGN_IN_LIFECYCLE_ENABLED=false`
+until its secrets, schema, webhook and separate cron are configured.
+See [Apple lifecycle operations and evidence](../APPLE_SIGN_IN_LIFECYCLE.md).
 Configuration, targeted evidence and remaining work: [native authentication preparation](../NATIVE_AUTH_PREPARATION.md).

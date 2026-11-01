@@ -4,14 +4,16 @@ import { readFileSync, readdirSync } from 'node:fs'
 import worker from '../src/index'
 import { AuthService } from '../src/authService'
 import { verifyGoogleToken } from '../src/googleAuth'
-import { verifyAppleToken } from '../src/appleAuth'
+import { verifyAppleToken, appleKeys } from '../src/appleAuth'
 import { sqliteBinding } from './sqliteD1'
 import { trialRegistryFixture } from './trialRegistryFixture'
 import { onRequest } from '../../functions/api/[[path]]'
+import { AppleSignInLifecycle, APPLE_SIGN_IN_CRON } from '../src/appleSignInLifecycle'
+import { generateKeyPair, exportPKCS8, SignJWT } from 'jose'
 vi.mock('../src/googleAuth', () => ({ verifyGoogleToken: vi.fn() }))
-vi.mock('../src/appleAuth', () => ({ verifyAppleToken: vi.fn() }))
+vi.mock('../src/appleAuth', () => ({ verifyAppleToken: vi.fn(), appleKeys: vi.fn() }))
 const google = { issuer: 'https://accounts.google.com', subject: 'stable-google', email: 'same@example.test', name: 'Parent', picture: null }
-const apple = { issuer: 'https://appleid.apple.com' as const, subject: 'stable-apple', email: 'same@example.test', name: null, picture: null }
+const apple = { issuer: 'https://appleid.apple.com' as const, subject: 'stable-apple', email: 'same@example.test', name: null, picture: null, authenticatedAt: Date.now() }
 let db: DatabaseSync, registry: DatabaseSync, env: Parameters<typeof worker.fetch>[1], service: AuthService
 beforeEach(async () => {
   vi.mocked(verifyGoogleToken).mockResolvedValue(google); vi.mocked(verifyAppleToken).mockResolvedValue(apple)
@@ -24,8 +26,12 @@ beforeEach(async () => {
   const fixture = await trialRegistryFixture(); registry = fixture.db
   env = { ...fixture.env, DB: sqliteBinding(db), TOKEN_PEPPER: 'test-pepper', AUTH_SECRET: 'secret-at-least-32-characters-for-test',
     ALLOWED_ORIGINS: 'https://solemi-sleep-internal.pages.dev', GOOGLE_CLIENT_ID: 'web', NATIVE_AUTH_ENABLED: 'true',
-    NATIVE_GOOGLE_WEB_CLIENT_ID: 'web', NATIVE_GOOGLE_IOS_CLIENT_ID: 'ios', NATIVE_APPLE_CLIENT_ID: 'app.solemi.sleep', NATIVE_APPLE_AUTH_ENABLED: 'true' }
-  service = new AuthService(env.DB, { clientId: 'web', secret: env.AUTH_SECRET!, nativeGoogleClientId: 'web', appleClientId: 'app.solemi.sleep' })
+    NATIVE_GOOGLE_WEB_CLIENT_ID: 'web', NATIVE_GOOGLE_IOS_CLIENT_ID: 'ios', NATIVE_APPLE_CLIENT_ID: 'app.solemi.sleep', NATIVE_APPLE_AUTH_ENABLED: 'true',
+    APPLE_SIGN_IN_LIFECYCLE_ENABLED: 'true', APPLE_SIGN_IN_TEAM_ID: 'TEAM123456', APPLE_SIGN_IN_KEY_ID: 'KEY1234567',
+    APPLE_SIGN_IN_TOKEN_KEY: 'a'.repeat(64), APPLE_SIGN_IN_PRIVATE_KEY: await exportPKCS8((await generateKeyPair('ES256', { extractable: true })).privateKey) }
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ id_token: 'exchanged', refresh_token: 'apple-refresh' })))
+  service = new AuthService(env.DB, { clientId: 'web', secret: env.AUTH_SECRET!, nativeGoogleClientId: 'web', appleClientId: 'app.solemi.sleep',
+    appleLifecycle: new AppleSignInLifecycle(env.DB, env) })
 })
 afterEach(() => { db.close(); registry.close(); vi.clearAllMocks(); vi.unstubAllGlobals() })
 function post(path: string, body: object = {}, origin: string | null = 'capacitor://localhost', extra: HeadersInit = {}) {
@@ -36,9 +42,43 @@ async function login(provider = 'GOOGLE', origin = 'capacitor://localhost', inst
   const challenge = await post('native/challenge', { provider }, origin)
   expect(challenge.status).toBe(200)
   const { data } = await challenge.json() as { data: { nonce: string } }
-  return post('native/login', { provider, nonce: data.nonce, credential: 'signed', installationSecret: installation.repeat(64) }, origin)
+  return post('native/login', { provider, nonce: data.nonce, credential: 'signed', authorizationCode: 'apple-code', installationSecret: installation.repeat(64) }, origin)
 }
 describe('native auth integration', () => {
+  const notify = (payload: string) => worker.fetch(new Request('https://api.example/v1/apple-signin/notifications', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payload }) }), env)
+  it('accepts an Apple-signed provider notification without a browser origin and revokes the session', async () => {
+    const { data } = await (await login('APPLE')).json() as any
+    const key = await generateKeyPair('RS256'); vi.mocked(appleKeys).mockResolvedValue(key.publicKey)
+    const at = Math.ceil(Date.now() / 1000)
+    const token = await new SignJWT({ events: { type: 'consent-revoked', sub: apple.subject, event_time: at } })
+      .setProtectedHeader({ alg: 'RS256' }).setIssuer('https://appleid.apple.com').setAudience('app.solemi.sleep')
+      .setIssuedAt(at).setJti('provider-notice').sign(key.privateKey)
+    const response = await notify(token)
+    expect(response.status).toBe(200); expect(response.headers.get('Cache-Control')).toBe('no-store')
+    await expect(service.authenticate(data.accessToken)).rejects.toMatchObject({ code: 'SESSION_INVALID' })
+  })
+  it('rejects invalid notifications and honors the lifecycle, rate and restoration switches before mutation', async () => {
+    expect((await notify('invalid')).status).toBe(401)
+    env.APPLE_SIGN_IN_LIFECYCLE_ENABLED = 'false'
+    expect((await notify('invalid')).status).toBe(503)
+    env.APPLE_SIGN_IN_LIFECYCLE_ENABLED = 'true'
+    env.AUTH_LIMITER = { limit: vi.fn(async () => ({ success: false })) }
+    expect((await notify('invalid')).status).toBe(429)
+    env.RESTORE_MAINTENANCE = 'true'
+    expect((await notify('invalid')).status).toBe(503)
+    expect(db.prepare('SELECT COUNT(*) AS n FROM apple_signin_notices').get()).toEqual({ n: 0 })
+  })
+  it('dispatches the Apple cron independently and leaves it idle during restoration or while disabled', async () => {
+    env.APPLE_SIGN_IN_LIFECYCLE_ENABLED = 'false'
+    await worker.scheduled({ cron: APPLE_SIGN_IN_CRON }, env)
+    env.APPLE_SIGN_IN_LIFECYCLE_ENABLED = 'true'; env.RESTORE_MAINTENANCE = 'true'
+    await worker.scheduled({ cron: APPLE_SIGN_IN_CRON }, env)
+    expect(db.prepare('SELECT COUNT(*) AS n FROM apple_signin_maintenance').get()).toEqual({ n: 0 })
+    env.RESTORE_MAINTENANCE = 'false'
+    await worker.scheduled({ cron: APPLE_SIGN_IN_CRON }, env)
+    expect(db.prepare('SELECT processed,failed,pending FROM apple_signin_maintenance').get()).toEqual({ processed: 0, failed: 0, pending: 0 })
+  })
   it('preserves the existing Google account and records the native platform', async () => {
     const web = await service.login({ credential: 'signed', nonce: await service.challenge(), installationSecret: 'b'.repeat(64), deviceName: 'Web' })
     const response = await login()
@@ -88,7 +128,7 @@ describe('native auth integration', () => {
   })
   it('scopes single-use challenges to provider, platform and web/native transport', async () => {
     const nonce = await service.challenge(Date.now(), 'native:GOOGLE:IOS')
-    const input = { nonce, credential: 'signed', installationSecret: 'a'.repeat(64), deviceName: 'Phone' }
+    const input = { nonce, credential: 'signed', authorizationCode: 'apple-code', installationSecret: 'a'.repeat(64), deviceName: 'Phone' }
     await expect(service.login(input)).rejects.toMatchObject({ code: 'LOGIN_CHALLENGE_INVALID' })
     await expect(service.loginNative({ ...input, provider: 'APPLE', platform: 'IOS' })).rejects.toMatchObject({ code: 'LOGIN_CHALLENGE_INVALID' })
     await expect(service.loginNative({ ...input, provider: 'GOOGLE', platform: 'ANDROID' })).rejects.toMatchObject({ code: 'LOGIN_CHALLENGE_INVALID' })

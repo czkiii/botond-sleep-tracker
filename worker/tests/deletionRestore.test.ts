@@ -25,7 +25,7 @@ function backup() {
     INSERT INTO children VALUES ('child','f','Baby','2026-01-01','date','date',NULL,1);
     INSERT INTO sleep_sessions VALUES ('sleep','f','child','date',NULL,'Private note',NULL,'date','date',NULL,2);
     INSERT INTO account_devices VALUES ('ad','a','install','credential','Phone','WEB',1,1,NULL,NULL);
-    INSERT INTO account_sessions VALUES ('session','a','ad','refresh',1,1,${now+duration},NULL,0);`
+    INSERT INTO account_sessions (id,account_id,device_id,refresh_hash,created_at,last_used_at,expires_at,revoked_at,rotation_counter) VALUES ('session','a','ad','refresh',1,1,${now+duration},NULL,0);`
 }
 function journal(state = 'ERASE', family: string | null = 'f') {
   return readFileSync(new URL('../erasure-journal/schema.sql',import.meta.url),'utf8') + `
@@ -181,7 +181,8 @@ describe('offline erasure-aware restore preparation',()=>{
     expect(config.vars.RESTORE_MAINTENANCE).toBe('false')
     expect(config.vars.ACCOUNT_DELETION_MAINTENANCE).toBe('true')
     expect(config.vars.RETENTION_MAINTENANCE).toBe('true')
-    expect(config.triggers.crons).toEqual(['*/5 * * * *', '2-59/5 * * * *'])
+    expect(config.triggers.crons).toEqual(['*/5 * * * *', '2-59/5 * * * *', '4-59/5 * * * *'])
+    expect(config.vars.APPLE_SIGN_IN_LIFECYCLE_ENABLED).toBe('false')
     expect(config.vars.STORE_NOTIFICATIONS_ENABLED).toBe('false')
     expect(config.vars.STORE_RECONCILIATION_ENABLED).toBe('false')
   })

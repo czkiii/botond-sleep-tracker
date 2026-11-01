@@ -31,7 +31,7 @@ function family(two = false) {
 }
 function device() {
   db.prepare(`INSERT INTO account_devices VALUES ('ad','a','install','credential','Phone','WEB',?,?,NULL,NULL)`).run(now,now)
-  db.prepare(`INSERT INTO account_sessions VALUES ('s','a','ad','refresh',?,?,?,NULL,0)`).run(now,now,now+RECOVERY_MS)
+  db.prepare(`INSERT INTO account_sessions (id,account_id,device_id,refresh_hash,created_at,last_used_at,expires_at,revoked_at,rotation_counter) VALUES ('s','a','ad','refresh',?,?,?,NULL,0)`).run(now,now,now+RECOVERY_MS)
   db.exec(`INSERT INTO account_family_devices VALUES ('ad','a','f','d',1,1);
     INSERT INTO invite_codes VALUES ('invite','f','d','date','z',NULL);`)
 }

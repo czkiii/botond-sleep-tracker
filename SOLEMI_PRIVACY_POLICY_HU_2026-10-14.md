@@ -1,7 +1,7 @@
 # Solemi Sleep — adatkezelési tájékoztató
 
 Kiadásra előkészített V1 tervezet — MÉG NEM PUBLIKÁLHATÓ VÉGLEGESKÉNT
-Utolsó frissítés: 2026-10-15
+Utolsó frissítés: 2026-11-01
 
 Belső kiadási megjegyzés: a megőrzési és trialtermékszabályokat a tulajdonos jóváhagyta. A szöveg a kiadási célállapotot írja le; az újraregisztrációs trialvédelem és retention helyi gépi próbái sikeresek, de a távoli üzemeltetés és a teljes helyreállítás még nem igazolt. Lásd a [helyi technikai checkpoint](A17_RETENTION_IMPLEMENTATION_2026-10-15.md) dokumentumot. A jogalapok, a szükségességi vizsgálat, a kötelező bizonylatmegőrzés és az adatkezelő adatai még véglegesítendők. [Döntések és megvalósítási határ](A17_RETENTION_DECISIONS_2026-10-14.md).
 
@@ -60,6 +60,18 @@ A szolgáltatás működéséhez kezelhetünk:
 - eszközazonosítókat és eszköznevet;
 - biztonsági és telepítési azonosítókat;
 - belépési, kijelentkezési és tokenfrissítési technikai adatokat.
+
+Apple-belépésnél a kapcsolat visszavonásához szükséges szolgáltatói tokent
+titkosítva tároljuk. A Solemi-fiók végleges törlésekor kezdeményezzük az
+Apple-kapcsolat visszavonását; átmeneti szolgáltatói hiba esetén újrapróbáljuk.
+A szükséges titkosított token csak a kapcsolat fennállásáig, illetve a visszavonás
+befejezéséig marad meg, majd töröljük. A félbehagyott belépési cseréket is takarítjuk.
+A visszavonás nem törli az Apple-fiókodat, és nem mondja le az áruházi előfizetésedet.
+A 30 napos helyreállítás választásakor a visszavonás a végleges törléshez kapcsolódik.
+Az Apple-től érkező aláírt visszavonási értesítéseket a Solemi-hozzáférés
+megszüntetéséhez kezeljük. Az értesítések lenyomatait legfeljebb 30 napig, az
+ismételt belépést védő állapotot az aktív kapcsolat vagy függő visszavonás idejéig,
+majd további legfeljebb 30 napig őrizzük.
 
 4.3. Gyermekprofil adatai
 A felhasználó megadhat:

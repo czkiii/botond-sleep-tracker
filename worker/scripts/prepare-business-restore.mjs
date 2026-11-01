@@ -5,7 +5,7 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { prepareDeletionRestore, isolatedDatabase, loadSqlExport, digest, dump } from './prepare-deletion-restore.mjs'
 
-const tables = ['accounts', 'account_identities', 'legacy_family_memberships', 'account_trials',
+const baseTables = ['accounts', 'account_identities', 'legacy_family_memberships', 'account_trials',
   'subscriptions', 'subscription_events', 'billing_account_links', 'store_subscription_state',
   'google_token_replacements', 'billing_retention', 'billing_legal_holds', 'account_entitlements']
 const scopes = {
@@ -74,6 +74,10 @@ export async function prepareBusinessRestore({backup, current, journal, metadata
     if (!program || log.prepare('SELECT digest FROM used_trial_identities WHERE key_version<>?').get(program.key_version)
       || (program.active === 0 && rows(log, 'used_trial_identities').length)) throw new Error('BUSINESS_TRIAL_REGISTRY_INVALID')
     if (schema(db) !== schema(source) || schema(source) !== schema(raw)) throw new Error('BUSINESS_SCHEMA_MISMATCH')
+    // Provider revocation state and pending encrypted work must come from the
+    // latest frozen source, never from a diary backup. Older schemas remain valid.
+    const tables = [...baseTables, ...['apple_signin_credentials', 'apple_signin_state', 'apple_signin_notices']
+      .filter(name => source.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name))]
     for (const [name, sql] of Object.entries(scopes)) {
       if (canonical(db.prepare(sql).all()) !== canonical(source.prepare(sql).all()))
         throw new Error(`BUSINESS_SCOPE_CHANGED:${name}`)

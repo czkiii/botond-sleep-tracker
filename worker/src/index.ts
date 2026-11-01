@@ -2,6 +2,8 @@ import { AuthError, AuthService, SESSION_MS } from './authService'
 import { EntitlementService } from './entitlementService'
 import { TrialService, TrialError } from './trialService'
 import { AccountDeletionService, DeletionError, verifyRecoveryProof } from './accountDeletion'
+import { AppleSignInLifecycle, APPLE_SIGN_IN_CRON, verifyAppleNotice } from './appleSignInLifecycle'
+import { AppleSignInError, appleSignInConfig } from './appleSignInProvider'
 import type { DeletionPreview } from './accountDeletion'
 import { deletionJournal } from './deletionJournal'
 import { trialIdentity, TrialIdentityError } from './trialIdentity'
@@ -1070,6 +1072,7 @@ function accountAuth(env: Env) {
   return new AuthService(env.DB, { clientId: env.GOOGLE_CLIENT_ID, secret: env.AUTH_SECRET,
     deletionJournal: deletionJournal(env), trialIdentity: identityGuard(env),
     nativeGoogleClientId: env.NATIVE_GOOGLE_WEB_CLIENT_ID, appleClientId: env.NATIVE_APPLE_CLIENT_ID,
+    appleLifecycle: env.NATIVE_APPLE_AUTH_ENABLED === 'true' ? new AppleSignInLifecycle(env.DB, env) : undefined,
     nativeGoogleAuthorizedParties: [env.NATIVE_GOOGLE_IOS_CLIENT_ID, ...(env.NATIVE_GOOGLE_AUTHORIZED_PARTIES || '').split(',')].filter((v): v is string => Boolean(v?.trim())).map(v => v.trim()) })
 }
 
@@ -1620,6 +1623,7 @@ async function accountAuthRoute(request: Request, env: Env, path: string) {
         const { refresh, ...data } = await service.loginNative({ provider: provider as 'APPLE' | 'GOOGLE', platform,
           credential: requireString(body.credential, 'credential', 10_000), nonce: requireString(body.nonce, 'nonce', 64),
           installationSecret: requireString(body.installationSecret, 'installationSecret', 64),
+          authorizationCode: provider === 'APPLE' ? requireString(body.authorizationCode, 'authorizationCode', 4096) : undefined,
           deviceName: typeof body.deviceName === 'string' ? body.deviceName : platform,
           replaceDeviceId: typeof body.replaceDeviceId === 'string' ? body.replaceDeviceId : undefined })
         return ok(request, env, { ...data, refreshToken: refresh })
@@ -1821,6 +1825,13 @@ async function route(request: Request, env: Env) {
   }
 
   await limitRequest(request, env, path)
+  if (request.method === 'POST' && path === '/v1/apple-signin/notifications') {
+    const config = appleSignInConfig(env)
+    const body = await readJson(request)
+    const notice = await verifyAppleNotice(requireString(body.payload, 'payload', 16_384), config.clientId)
+    await new AppleSignInLifecycle(env.DB, env).notification(notice)
+    return new Response(null, { status: 200, headers: { 'Cache-Control': 'no-store' } })
+  }
   if (request.method === 'POST' && ['/v1/billing/notifications/apple', '/v1/billing/notifications/google'].includes(path)) {
     return storeNotification(request, env, env.DB, path.endsWith('/apple') ? 'APPLE' : 'GOOGLE_PLAY', () => readJson(request))
   }
@@ -1880,6 +1891,13 @@ async function route(request: Request, env: Env) {
 export default {
   async scheduled(_event: unknown, env: Env) {
     if (env.RESTORE_MAINTENANCE === 'true') return
+    if ((_event as { cron?: string } | null)?.cron === APPLE_SIGN_IN_CRON) {
+      if (env.APPLE_SIGN_IN_LIFECYCLE_ENABLED !== 'true') return
+      const result = await new AppleSignInLifecycle(env.DB, env).maintain()
+      console.log(JSON.stringify({ event: 'apple_signin_maintenance', ...result }))
+      if (result.failed) throw new Error('APPLE_SIGN_IN_MAINTENANCE_FAILED')
+      return
+    }
     if ((_event as { cron?: string } | null)?.cron === BILLING_CRON) {
       if (env.STORE_RECONCILIATION_ENABLED !== 'true') return
       const result = await new StoreLifecycleService(env.DB, env).maintain()
@@ -1909,6 +1927,7 @@ export default {
         response.headers.set('Retry-After', '60')
         return response
       }
+      if (error instanceof AppleSignInError) return fail(request, env, new ApiError(error.status, error.code))
       if (error instanceof StoreProviderError) return fail(request, env, new ApiError(error.status, error.code))
       if (error instanceof BillingContractError) return fail(request, env, new ApiError(422, error.code))
       if (error instanceof StoreBillingServiceError) return fail(request, env, new ApiError(409, error.code))

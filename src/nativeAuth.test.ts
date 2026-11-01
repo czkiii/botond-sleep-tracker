@@ -16,7 +16,7 @@ beforeEach(() => {
   const local = new Map<string, string>()
   vi.stubGlobal('localStorage', { getItem: (key: string) => local.get(key) ?? null, setItem: (key: string, value: string) => local.set(key, value) })
   for (const [key, value] of Object.entries({ VITE_NATIVE_APP: 'true', VITE_NATIVE_AUTH: 'true', VITE_NATIVE_APPLE_AUTH: 'true', VITE_ACCOUNT_API_BASE: 'https://api.example' })) vi.stubEnv(key, value)
-  mocks.login.mockResolvedValue({ result: { idToken: 'provider-proof' } })
+  mocks.login.mockResolvedValue({ result: { idToken: 'provider-proof', accessToken: null, authorizationCode: 'apple-authorization-code' } })
   mocks.fetch.mockImplementation(async (url: string) => ({ response: { ok: true, status: 200 },
     body: { ok: true, data: url.endsWith('/challenge') ? challenge : loggedIn } }))
 })
@@ -45,9 +45,10 @@ describe('native login bridge', () => {
   })
   it('sends Apple the nonce digest while the server receives the original challenge', async () => {
     const auth = await import('./nativeAuth'); await auth.nativeSignIn('APPLE', () => {})
+    expect(mocks.initialize).toHaveBeenCalledWith({ apple: { useProperTokenExchange: true } })
     const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(challenge.nonce))), x => x.toString(16).padStart(2, '0')).join('')
     expect(mocks.login).toHaveBeenCalledWith({ provider: 'apple', options: { nonce: digest, scopes: ['email'] } })
-    expect(JSON.parse(mocks.fetch.mock.calls[1][1].body)).toMatchObject({ provider: 'APPLE', nonce: challenge.nonce })
+    expect(JSON.parse(mocks.fetch.mock.calls[1][1].body)).toMatchObject({ provider: 'APPLE', nonce: challenge.nonce, authorizationCode: 'apple-authorization-code' })
   })
   it('does not complete login after a cancelled provider sheet or account change', async () => {
     const auth = await import('./nativeAuth'); mocks.login.mockRejectedValueOnce({ code: 'USER_CANCELLED' })

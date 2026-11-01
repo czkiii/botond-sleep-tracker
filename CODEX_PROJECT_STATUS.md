@@ -1,30 +1,26 @@
 # Solemi Sleep — Codex projektállapot
 
-**Folytatás, 2026-11-01:** a megszakítás utáni lezárás a lent dokumentált,
-már sikeres 200 próbára épül; új általános tesztkör nem indult. A végleges
-feliratozást tartalmazó natív webcsomag és platformszinkron frissítve.
-Továbbra is helyi, commit előtti munka; távoli kiadás nem történt.
+**Aktuális lezárás, 2026-11-01:** az Apple-belépés szerveres kódcseréje,
+titkosított kulcstárolása, végleges fióktörléshez kötött visszavonási sora és
+az Apple aláírt visszavonási értesítéseinek kezelése helyben kész.
+Apple-kiesés nem állítja meg a Solemi-törlést; a visszavonás újrapróbálható.
+A késői esemény, félbehagyott belépés, újraregisztráció és régi mentés kezelve.
+[Megvalósítás, konfiguráció és bizonyíték](APPLE_SIGN_IN_LIFECYCLE.md).
 
-**Aktuális állapot, 2026-10-30:** a natív Google-belépés és a mobilos munkamenet
-helyi bekötése elkészült. A meglévő Google-fiók megmarad, a frissítőkulcs védett
-natív tárolóban van. iOS Apple-belépéshez a natív hívás, tokenellenőrzés,
-identitásmigráció és trialjelölés előkészítve; külön kapcsolóval kikapcsolva.
-**Az Apple törléskori/szolgáltatói visszavonása még hátra van**, ezért ez nem
-lezárt, éles Apple-belépés. [Pontos kész rész és bekötés](NATIVE_AUTH_PREPARATION.md).
+118/118 Apple/törlés/helyreállítás próba és 111/111 belépési próba PASS
+(részben átfedő csomagok). Két typecheck, webbuild, natív webbuild,
+Android/iOS cap sync és Worker dry-run PASS. A régi általános tesztköröket
+nem nyitottuk újra. 016 migráció előkészítve; minden új kapcsoló false.
+Nincs távoli migráció, kulcsbeállítás, deploy vagy készülékes Apple-próba.
+A korábbi natív belépési munka már commitolva volt; ez a folytatás még helyi
+módosítás a `codex/store-purchase-verification` ágon.
 
-108 új/érintett belépési próba + 92 kapcsolódó regressziós próba PASS; mindkét
-typecheck, natív webbuild, Android/iOS cap sync, auth-bekapcsolt külön próbabuild,
-webbuild, Worker dry-run és repository-ellenőrzés PASS. Nincs APK/IPA-fordítás,
-készülékes OAuth-próba, remote migráció/deploy vagy store-aktiválás.
-A 015 migráció és a konfiguráció a mostani helyi csomag része; kapcsolók false.
-A korábbi mobilos vásárlási keret már commitolva volt; a mostani belépési munka
-még helyi módosítás a `codex/store-purchase-verification` ágon.
+**Következő:** fejlesztői fiókok és az első készülékre telepíthető mobilbuild
+konkrét beállítása. **GPT-6 Astra · erős; tulajdonosi közreműködéssel.**
+Valódi store-belépéshez/vásárláshoz a fiókok, aláírás és készülékes próba szükséges;
+új általános audit nem előfeltétel.
 
-**Következő:** Apple-belépés törléskori és szolgáltatói visszavonásának bekötése
-a meglévő fióktörléshez. **GPT-6 Astra · erős; gépi előkészítés, kézi app-teszt
-nélkül.** Saját store-fiókok nélkül nem zárjuk le a valódi vásárlási elfogadást.
-
-GitHub Desktop Summary: `Add native Google sign-in and protected mobile sessions`.
+GitHub Desktop Summary: `Handle Apple sign-in revocation and account deletion`.
 Az alábbi korábbi „következő” pontokat ez a bejegyzés felülírja.
 
 **Legfrissebb lezárás, 2026-10-29:** Apple/Google értesítés-hitelesítés,
