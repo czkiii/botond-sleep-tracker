@@ -8,6 +8,16 @@ const release = {
 }
 
 describe('production release build gate', () => {
+  it('requires explicit native auth and HTTPS root endpoints before enabling billing', () => {
+    const native = { VITE_NATIVE_APP: 'true', VITE_BASE_PATH: '/', VITE_ACCOUNT_AUTH: 'true', VITE_NATIVE_AUTH: 'true',
+      VITE_ACCOUNT_API_BASE: 'https://api.example', VITE_SYNC_API_BASE: 'https://api.example', VITE_NATIVE_BILLING: 'true' }
+    expect(() => assertProductionReleaseConfiguration(native)).not.toThrow()
+    expect(() => assertProductionReleaseConfiguration({ ...native, VITE_NATIVE_AUTH: 'false' })).toThrow(/native auth/)
+    expect(() => assertProductionReleaseConfiguration({ VITE_NATIVE_AUTH: 'true' })).toThrow(/native build/)
+    for (const url of ['http://localhost', 'https://api.example/path', 'https://api.example?secret=x']) {
+      expect(() => assertProductionReleaseConfiguration({ ...native, VITE_ACCOUNT_API_BASE: url })).toThrow(/HTTPS endpoints/)
+    }
+  })
   it('allows an offline native preparation but blocks accidental production and unconfigured purchases', () => {
     const native = { VITE_NATIVE_APP: 'true', VITE_BASE_PATH: '/', VITE_NATIVE_BILLING: 'false', VITE_RELEASE_CHANNEL: 'native-preparation' }
     expect(() => assertProductionReleaseConfiguration(native)).not.toThrow()

@@ -10,6 +10,7 @@ const config: CapacitorConfig = {
   ios: { webContentsDebuggingEnabled: false },
   loggingBehavior: 'none',
   plugins: {
+    SocialLogin: { providers: { google: true, apple: true, facebook: false, twitter: false } },
     // Must apply BEFORE the plugin starts listening for unfinished transactions.
     NativePurchases: { autoFinishTransactions: false, debugLogging: false }
   }

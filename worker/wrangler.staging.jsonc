@@ -7,6 +7,8 @@
   "workers_dev": true,
   "preview_urls": true,
   "vars": {
+    "NATIVE_AUTH_ENABLED": "false",
+    "NATIVE_APPLE_AUTH_ENABLED": "false",
     "STORE_BILLING_ENABLED": "false",
     "STORE_NOTIFICATIONS_ENABLED": "false",
     "STORE_RECONCILIATION_ENABLED": "false",

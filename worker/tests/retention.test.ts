@@ -43,6 +43,21 @@ beforeEach(async () => {
 afterEach(() => { db.close(); registry.close() })
 
 describe('A17 independent trial-use identity', () => {
+  it('preserves Apple trial use across deletion and re-registration without colliding with Google', async () => {
+    const createApple = (id: string) => new AccountStore(binding).createGoogleAccount({ accountId: id,
+      identityId: 'identity-' + id, provider: 'APPLE', issuer: 'https://appleid.apple.com', subject: 'a',
+      email: 'relay@privaterelay.appleid.com', displayName: null, avatarUrl: null, locale: 'hu', now })
+    await createApple('apple-old')
+    await trial.activate('apple-old', 'FAMILY', 'apple-operation', now)
+    await erase('apple-old')
+    await createApple('apple-new')
+    expect(await identity.used('apple-new')).toBe(true)
+    expect(await identity.used('a')).toBe(false)
+    await expect(trial.activate('apple-new', 'FAMILY', 'new-operation', now + 2)).rejects.toThrow('TRIAL_ACCOUNT_USED')
+    expect(registry.prepare('SELECT * FROM used_trial_identities').all()).toEqual([
+      { digest: await trialDigest(secret, JSON.stringify(['solemi:used-trial:v1', 'APPLE', 'a'])), key_version: 'v1' }
+    ])
+  })
   it('prepares a key check compatible with the Worker without outputting the secret', async () => {
     const sql = trialProgramSql({ secret, version: 'v1', reviewedAt: 1 })
     expect(sql).not.toContain(secret)

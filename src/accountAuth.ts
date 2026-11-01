@@ -1,6 +1,8 @@
 import { fetchJson } from './apiTransport'
 import { activateRestoredAccountWorkspace, activateSignedOutWorkspace, getActiveAccountWorkspaceId } from './accountWorkspace'
 import { bindOfflineDevice, clearOfflineEntitlement, readOfflineEntitlement, saveOfflineEntitlement } from './offlineEntitlement'
+import { isNativeApp, nativeSession, nativeSignIn, mountNativeSignIn, invalidateNativeSession } from './nativeAuth'
+import { NativeSessionError } from './nativeSession'
 
 const internalAccountProxy = import.meta.env.VITE_INTERNAL_PREVIEW === 'true'
   && import.meta.env.VITE_ACCOUNT_AUTH === 'true' ? '/api' : ''
@@ -42,7 +44,7 @@ export class AccountAuthError extends Error {
 
 async function request<T>(path: string, options: RequestInit = {}) {
   const { response, body: envelope } = await fetchJson<ApiEnvelope<T>>(`${API_BASE}${path}`, {
-    ...options, credentials: 'include', cache: 'no-store'
+    ...options, credentials: isNativeApp() ? 'omit' : 'include', cache: 'no-store'
   })
   if (!response.ok || !envelope.ok) {
     const failure = envelope as Extract<ApiEnvelope<T>, { ok: false }>
@@ -147,8 +149,28 @@ async function deferAccountRestore() {
 
 export async function beginGoogleSignIn(
   target: HTMLElement, onSuccess: (account: SignedInAccount) => void | Promise<void>,
-  onError: (error: AccountAuthError) => void, replaceDeviceId?: string
+  onError: (error: AccountAuthError) => void, replaceDeviceId?: string, locale: 'hu' | 'en' | 'de' = 'en'
 ) {
+  if (isNativeApp()) {
+    mountNativeSignIn(target, locale, async provider => {
+      const epoch = beginAuthChange()
+      try {
+        const data = await nativeOperation(() => nativeSignIn(provider, () => assertEpoch(epoch), replaceDeviceId))
+        assertEpoch(epoch)
+        const account = saveAccess(data)
+        await onSuccess(account); assertEpoch(epoch)
+        restoredAccount = account; restoreCompleted = true; announceAccount(account)
+      } catch (error) {
+        if ((error as { code?: string })?.code === 'USER_CANCELLED') return
+        if (error instanceof AccountAuthError && error.code === 'ACCOUNT_RECOVERY_REQUIRED') {
+          const id = (error.data as { accountId?: string })?.accountId
+          if (id && getActiveAccountWorkspaceId() === id) finishAccountDeletion(id, false)
+        }
+        onError(error instanceof AccountAuthError ? error : new AccountAuthError('NATIVE_SIGN_IN_FAILED'))
+      }
+    })
+    return
+  }
   const { nonce, clientId } = await request<{ nonce: string; clientId: string }>('/v1/auth/challenge')
   await loadGoogleIdentity()
   target.replaceChildren()
@@ -201,7 +223,9 @@ function browserDeviceName() {
 
 export async function signOutAccount(deleteLocalData = false) {
   const epoch = beginAuthChange()
-  await sessionLock(() => request('/v1/auth/logout', { method: 'POST' }))
+  await sessionLock(() => isNativeApp()
+    ? nativeOperation(async () => (await nativeSession()).logout(() => assertEpoch(epoch)))
+    : request('/v1/auth/logout', { method: 'POST' }))
   assertEpoch(epoch)
   sessionStorage.removeItem(ACCESS_KEY)
   restoredAccount = null
@@ -231,6 +255,7 @@ function assertEpoch(epoch: string) {
 export function finishAccountDeletion(accountId: string, deleteLocalData: boolean) {
   if (getActiveAccountWorkspaceId() !== accountId) throw new AccountAuthError('ACCOUNT_CONTEXT_CHANGED')
   beginAuthChange()
+  invalidateNativeSession()
   sessionStorage.removeItem(ACCESS_KEY)
   restoredAccount = null
   restoreCompleted = true
@@ -252,6 +277,7 @@ function beginAuthChange() {
   return epoch
 }
 function rejectSession() {
+  invalidateNativeSession()
   sessionStorage.removeItem(ACCESS_KEY)
   clearOfflineEntitlement()
   activateSignedOutWorkspace()
@@ -269,12 +295,21 @@ async function sessionLock<T>(action: () => Promise<T>): Promise<T> {
 }
 
 let refreshPromise: Promise<AccessResponse> | null = null
+async function nativeOperation<T>(action: () => Promise<T>) {
+  try { return await action() }
+  catch (error) {
+    if (error instanceof NativeSessionError) throw new AccountAuthError(error.code, error.data, error.status)
+    throw error
+  }
+}
 function refreshAccess() {
   if (!refreshPromise) {
     const epoch = authEpoch()
     refreshPromise = sessionLock(async () => {
       assertEpoch(epoch)
-      const data = await request<AccessResponse>('/v1/auth/refresh', { method: 'POST' })
+      const data = isNativeApp()
+        ? await nativeOperation(async () => (await nativeSession()).refresh(() => assertEpoch(epoch)))
+        : await request<AccessResponse>('/v1/auth/refresh', { method: 'POST' })
       assertEpoch(epoch)
       saveAccess(data)
       activateRestoredAccountWorkspace(data.account.id)

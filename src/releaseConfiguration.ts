@@ -8,16 +8,17 @@ export function assertProductionReleaseConfiguration(vars: ReleaseVariables) {
     // Native sign-in/session transport and store credentials are a separate release
     // prerequisite. Do not accidentally distribute this preparation profile.
     if (vars.VITE_RELEASE_CHANNEL === 'production') throw new Error('Native production release is not configured yet')
-    if (vars.VITE_NATIVE_BILLING === 'true') {
+    if (vars.VITE_NATIVE_BILLING === 'true' || vars.VITE_NATIVE_AUTH === 'true') {
       if (vars.VITE_ACCOUNT_AUTH !== 'true') throw new Error('Native billing requires account auth')
+      if (vars.VITE_NATIVE_BILLING === 'true' && vars.VITE_NATIVE_AUTH !== 'true') throw new Error('Native billing requires native auth')
       for (const key of ['VITE_ACCOUNT_API_BASE', 'VITE_SYNC_API_BASE']) {
         const url = new URL(vars[key] || '')
-        if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) {
+        if (url.protocol !== 'https:' || url.username || url.password || url.pathname !== '/' || url.search || url.hash) {
           throw new Error('Native billing requires explicit HTTPS endpoints')
         }
       }
     }
-  } else if (vars.VITE_NATIVE_BILLING === 'true') throw new Error('Store billing requires a native build')
+  } else if (vars.VITE_NATIVE_BILLING === 'true' || vars.VITE_NATIVE_AUTH === 'true') throw new Error('Native auth and store billing require a native build')
   if (vars.VITE_RELEASE_CHANNEL !== 'production') return
   const required = ['VITE_ACCOUNT_AUTH', 'VITE_INTERNAL_PREVIEW', 'VITE_SYNC_API_BASE',
     'VITE_ACCOUNT_API_BASE', 'VITE_HOSTING_PLATFORM', 'VITE_BASE_PATH'] as const

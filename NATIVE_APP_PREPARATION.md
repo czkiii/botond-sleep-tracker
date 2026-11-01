@@ -75,14 +75,12 @@ nem ellenőrzött. iOS-hoz Mac/Xcode, Androidhoz Android Studio/SDK/JDK kell.
 
 ## A következő konkrét bekötés
 
-**Natív bejelentkezés és munkamenet.** A jelenlegi Google Identity Services
-böngészős belépést nem szabad működő natív belépésnek tekinteni. A natív Google
-azonosítás, az iOS belépési lehetőségei és az API-kérés/munkamenet-kezelés még
-bekötendők. A natív eredet (`capacitor://localhost`, Androidon `https://localhost`)
-nincs automatikusan hozzáadva a szerver engedélyezett eredeteihez. A cookie-kat,
-frissítést és visszavonást a natív bekötéssel együtt kell rendezni, az eddigi
-böngészős védelem fellazítása nélkül. Erre saját áruházi fizetési fiók nélkül is
-előkészíthető kód, de a tényleges Google/iOS azonosítók kellenek a készülékes próbához.
+**2026-10-30-as folytatás:** a natív Google-belépés és védett mobilos munkamenet
+helyi kódja elkészült; az iOS Apple ID-token/identitás része előkészítve.
+Az Apple törléskori és szolgáltatói visszavonása a következő konkrét kiadási feltétel.
+[Konfiguráció, 015 migráció, bizonyíték és maradék](NATIVE_AUTH_PREPARATION.md).
+A natív belépés külön kapcsoló mögött kezeli a két mobilos eredetet; alapból
+kikapcsolt. Böngészős cookie-ból nem készítünk natív munkamenetet.
 
 A vásárlási vezérlő már a meglévő `accountRequest`/`getAccountAccess` felületet
 használja, így ehhez a belépési bekötéshez nem kell új fizetési szervert építeni.

@@ -28,11 +28,13 @@ export class TrialIdentityRegistry implements TrialIdentityGuard {
   }
   private async identity(accountId: string) {
     const row = await this.source.prepare(`SELECT provider, issuer, subject FROM account_identities
-      WHERE account_id = ? AND provider = 'GOOGLE'`).bind(accountId).first<{ provider: string; issuer: string; subject: string }>()
-    if (!row || !['accounts.google.com', 'https://accounts.google.com'].includes(row.issuer) || !row.subject)
+      WHERE account_id = ? AND provider IN ('GOOGLE', 'APPLE')`).bind(accountId).first<{ provider: string; issuer: string; subject: string }>()
+    if (!row || !row.subject || !(row.provider === 'GOOGLE'
+      ? ['accounts.google.com', 'https://accounts.google.com'].includes(row.issuer)
+      : row.provider === 'APPLE' && row.issuer === 'https://appleid.apple.com'))
       throw new TrialIdentityError('TRIAL_IDENTITY_UNAVAILABLE')
     // Google permits two issuer spellings; both represent the same stable subject.
-    return trialDigest(this.secret, JSON.stringify(['solemi:used-trial:v1', 'GOOGLE', row.subject]))
+    return trialDigest(this.secret, JSON.stringify(['solemi:used-trial:v1', row.provider, row.subject]))
   }
   async used(accountId: string) {
     if (!(await this.program()).active) throw new TrialIdentityError('TRIAL_PROGRAM_ENDED')

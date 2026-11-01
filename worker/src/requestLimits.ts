@@ -27,6 +27,7 @@ export async function limitRequest(request: Request, env: LimitEnv, path: string
     await consumeLimit(env.AUTH_LIMITER, 'store-notification')
   }
   if ((request.method === 'POST' && /^\/v1\/auth\/billing\/(apple|google)\/(prepare|verify|restore)$/.test(path))
+    || (request.method === 'POST' && /^\/v1\/auth\/native\/(challenge|login|refresh|logout)$/.test(path))
     || (request.method === 'GET' && path === '/v1/auth/challenge')
     || (request.method === 'POST' && ['/v1/auth/google', '/v1/auth/refresh',
       '/v1/auth/trial/activate', '/v1/auth/trial/bind', '/v1/auth/account/delete', '/v1/auth/account/restore',

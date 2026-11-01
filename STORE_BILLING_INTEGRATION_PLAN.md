@@ -1,5 +1,12 @@
 # Solemi Sleep — App Store és Google Play vásárlási integráció
 
+**Natív belépési előrelépés, 2026-10-30:** Google-belépés és védett mobilos
+munkamenet helyi kódja, Apple ID-token/identitás előkészítés és 015 migráció kész.
+200 célzott és kapcsolódó próba PASS. Az Apple törléskori/szolgáltatói visszavonása
+még hátra van; natív belépés kikapcsolva, nincs remote aktiválás.
+[Pontos állapot és következő feltétel](NATIVE_AUTH_PREPARATION.md).
+A lentebbi korábbi „natív belépés következik” pontok helyett ez az aktuális állapot.
+
 **Aktuális felülírás, 2026-10-30:** az Android/iOS projektek és a natív vásárlási
 vezérlő helyben elkészültek. A meglévő szerver prepare/verify/restore útvonalaihoz
 kötött alias, havi áruházi ár, kézi tranzakciólezárás, megszakítás utáni helyreállítás

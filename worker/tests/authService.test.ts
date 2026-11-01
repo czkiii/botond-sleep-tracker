@@ -34,6 +34,17 @@ async function login(installation = 'a'.repeat(64), overrides: { replaceDeviceId
 }
 
 describe('account authentication service', () => {
+  it('migration 015 preserves existing Google identities, sessions and account IDs', async () => {
+    const first = await login()
+    const identities = sqlite.prepare('SELECT * FROM account_identities').all()
+    const sessions = sqlite.prepare('SELECT * FROM account_sessions').all()
+    sqlite.exec(readFileSync(new URL('../migrations/015_native_apple_identity.sql', import.meta.url), 'utf8'))
+    expect(sqlite.prepare('SELECT * FROM account_identities').all()).toEqual(identities)
+    expect(sqlite.prepare('SELECT * FROM account_sessions').all()).toEqual(sessions)
+    expect(sqlite.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+    expect((await service.authenticate(first.accessToken, now)).account.id).toBe(first.account.id)
+    expect((await login()).account.id).toBe(first.account.id)
+  })
   it('consumes a challenge once and stores only keyed hashes of browser secrets', async () => {
     const nonce = await service.challenge(now)
     const input = { credential: 'signed-google-token', nonce, installationSecret: 'a'.repeat(64), deviceName: 'Phone' }

@@ -3,6 +3,8 @@ import { AccountStore } from './accountStore'
 import type { AccountRow, SessionAccess } from './accountStore'
 import { verifyGoogleToken } from './googleAuth'
 import type { GoogleIdentity } from './googleAuth'
+import { verifyAppleToken } from './appleAuth'
+import type { AppleIdentity } from './appleAuth'
 import { AccountDeletionService, recoveryProof } from './accountDeletion'
 import type { DeletionJournal } from './deletionJournal'
 import type { TrialIdentityGuard } from './trialIdentity'
@@ -31,34 +33,35 @@ function publicAccount(account: AccountRow) {
 
 export class AuthService {
   private store: AccountStore
-  constructor(private db: D1Database, private config: { clientId: string; secret: string; deletionJournal?: DeletionJournal; trialIdentity?: TrialIdentityGuard },
-    private verify: typeof verifyGoogleToken = verifyGoogleToken) {
+  constructor(private db: D1Database, private config: { clientId: string; secret: string; deletionJournal?: DeletionJournal; trialIdentity?: TrialIdentityGuard;
+    nativeGoogleClientId?: string; nativeGoogleAuthorizedParties?: string[]; appleClientId?: string },
+    private verify: typeof verifyGoogleToken = verifyGoogleToken, private verifyApple: typeof verifyAppleToken = verifyAppleToken) {
     this.store = new AccountStore(db)
   }
 
-  async challenge(now = Date.now()) {
+  async challenge(now = Date.now(), scope = '') {
     const nonce = randomSecret()
     await this.db.batch([
       this.db.prepare('DELETE FROM auth_challenges WHERE expires_at <= ?').bind(now),
       this.db.prepare('INSERT INTO auth_challenges VALUES (?, ?, ?)')
-        .bind(await secretHash(`nonce:${nonce}`, this.config.secret), now, now + CHALLENGE_MS)
+        .bind(await secretHash(`nonce:${scope ? `${scope}:` : ''}${nonce}`, this.config.secret), now, now + CHALLENGE_MS)
     ])
     return nonce
   }
 
-  private async resolveAccount(identity: GoogleIdentity, now: number) {
-    let account = await this.store.findGoogleAccount(identity.issuer, identity.subject)
+  private async resolveAccount(identity: GoogleIdentity | AppleIdentity, now: number, provider: 'GOOGLE' | 'APPLE' = 'GOOGLE') {
+    let account = await this.store.findIdentityAccount(provider, identity.issuer, identity.subject)
     if (!account) {
       try {
         await this.store.createGoogleAccount({ accountId: id('acc'), identityId: id('identity'),
           issuer: identity.issuer, subject: identity.subject, email: identity.email,
-          displayName: identity.name, avatarUrl: identity.picture, locale: null, now })
+          displayName: identity.name, avatarUrl: identity.picture, locale: null, now, provider })
       } catch (error) {
         // A concurrent first login may have created this exact Google identity.
-        account = await this.store.findGoogleAccount(identity.issuer, identity.subject)
+        account = await this.store.findIdentityAccount(provider, identity.issuer, identity.subject)
         if (!account) throw error
       }
-      account = await this.store.findGoogleAccount(identity.issuer, identity.subject)
+      account = await this.store.findIdentityAccount(provider, identity.issuer, identity.subject)
     }
     if (account?.status === 'DELETION_PENDING') {
       const deletion = new AccountDeletionService(this.db, this.config.deletionJournal, this.config.trialIdentity)
@@ -78,7 +81,7 @@ export class AuthService {
         updated_at = ?, last_login_at = ? WHERE id = ? AND status = 'ACTIVE'`)
         .bind(identity.email, identity.name, identity.picture, now, now, account.id),
       this.db.prepare(`UPDATE account_identities SET email_at_login = ?, last_verified_at = ?
-        WHERE account_id = ? AND provider = 'GOOGLE'`).bind(identity.email, now, account.id)
+        WHERE account_id = ? AND provider = ?`).bind(identity.email, now, account.id, provider)
     ])
     return { ...account, email: identity.email, display_name: identity.name }
   }
@@ -91,10 +94,29 @@ export class AuthService {
     let identity: GoogleIdentity
     try { identity = await this.verify(input.credential, this.config.clientId, input.nonce, { now }) }
     catch { throw new AuthError('GOOGLE_TOKEN_INVALID') }
+    return this.loginIdentity(input, identity, now)
+  }
+
+  async loginNative(input: { credential: string; nonce: string; installationSecret: string; deviceName: string;
+    replaceDeviceId?: string; provider: 'GOOGLE' | 'APPLE'; platform: 'IOS' | 'ANDROID' }, now = Date.now()) {
+    if (!/^[a-f0-9]{64}$/.test(input.nonce) || !/^[a-f0-9]{64}$/.test(input.installationSecret)) throw new AuthError('INVALID_REQUEST', 400)
+    if (input.provider === 'APPLE' && input.platform !== 'IOS') throw new AuthError('INVALID_REQUEST', 400)
+    const clientId = input.provider === 'APPLE' ? this.config.appleClientId : this.config.nativeGoogleClientId
+    if (!clientId) throw new AuthError('NATIVE_AUTH_NOT_CONFIGURED', 503)
+    let identity: GoogleIdentity | AppleIdentity
+    try {
+      identity = input.provider === 'APPLE' ? await this.verifyApple(input.credential, clientId, input.nonce, { now })
+        : await this.verify(input.credential, clientId, input.nonce, { now, authorizedParties: this.config.nativeGoogleAuthorizedParties })
+    } catch { throw new AuthError(input.provider === 'APPLE' ? 'APPLE_TOKEN_INVALID' : 'GOOGLE_TOKEN_INVALID') }
+    return this.loginIdentity(input, identity, now, `native:${input.provider}:${input.platform}`, input.platform, input.provider)
+  }
+
+  private async loginIdentity(input: { nonce: string; installationSecret: string; deviceName: string; replaceDeviceId?: string },
+    identity: GoogleIdentity | AppleIdentity, now: number, scope = '', platform = 'WEB', provider: 'GOOGLE' | 'APPLE' = 'GOOGLE') {
     const used = await this.db.prepare('DELETE FROM auth_challenges WHERE nonce_hash = ? AND expires_at > ?')
-      .bind(await secretHash(`nonce:${input.nonce}`, this.config.secret), now).run()
+      .bind(await secretHash(`nonce:${scope ? `${scope}:` : ''}${input.nonce}`, this.config.secret), now).run()
     if (used.meta.changes !== 1) throw new AuthError('LOGIN_CHALLENGE_INVALID')
-    const account = await this.resolveAccount(identity, now)
+    const account = await this.resolveAccount(identity, now, provider)
     // One browser installation can sign in to different accounts without ever
     // reassigning a device or inheriting another account's credentials.
     const installationHash = await secretHash(`installation:${account.id}:${input.installationSecret}`, this.config.secret)
@@ -121,13 +143,13 @@ export class AuthService {
     const credentialHash = await secretHash(`device:${randomSecret()}`, this.config.secret)
     if (existing) {
       statements.push(this.db.prepare(`UPDATE account_devices SET revoked_at = NULL, revoke_reason = NULL,
-        credential_hash = ?, name = ?, last_seen_at = ? WHERE id = ? AND account_id = ?`)
-        .bind(credentialHash, input.deviceName.slice(0, 80), now, deviceId, account.id))
+        credential_hash = ?, name = ?, last_seen_at = ?, platform = ? WHERE id = ? AND account_id = ?`)
+        .bind(credentialHash, input.deviceName.slice(0, 80), now, platform, deviceId, account.id))
     } else {
       statements.push(this.db.prepare(`INSERT INTO account_devices
         (id, account_id, installation_hash, credential_hash, name, platform, created_at, last_seen_at)
-        VALUES (?, ?, ?, ?, ?, 'WEB', ?, ?)`)
-        .bind(deviceId, account.id, installationHash, credentialHash, input.deviceName.slice(0, 80), now, now))
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+        .bind(deviceId, account.id, installationHash, credentialHash, input.deviceName.slice(0, 80), platform, now, now))
     }
     // Fresh Google proof replaces this device's old sessions as a single batch.
     statements.push(this.db.prepare('UPDATE account_sessions SET revoked_at = ? WHERE device_id = ? AND revoked_at IS NULL').bind(now, deviceId))

@@ -46,17 +46,21 @@ export class AccountStore {
   constructor(private readonly db: D1Database) {}
 
   findGoogleAccount(issuer: string, subject: string) {
+    return this.findIdentityAccount('GOOGLE', issuer, subject)
+  }
+
+  findIdentityAccount(provider: 'GOOGLE' | 'APPLE', issuer: string, subject: string) {
     // Email is deliberately not an identity key.
     return this.db.prepare(`SELECT a.* FROM accounts a
       JOIN account_identities i ON i.account_id = a.id
-      WHERE i.provider = 'GOOGLE' AND i.issuer = ? AND i.subject = ?`)
-      .bind(issuer, subject).first<AccountRow>()
+      WHERE i.provider = ? AND i.issuer = ? AND i.subject = ?`)
+      .bind(provider, issuer, subject).first<AccountRow>()
   }
 
   async createGoogleAccount(input: {
     accountId: string; identityId: string; issuer: string; subject: string
     email: string | null; displayName: string | null; avatarUrl: string | null
-    locale: string | null; now: number
+    locale: string | null; now: number; provider?: 'GOOGLE' | 'APPLE'
   }) {
     // Only call with server-verified claims and server-generated IDs/timestamps.
     await this.db.batch([
@@ -66,8 +70,8 @@ export class AccountStore {
         input.displayName, input.avatarUrl, input.locale, input.now, input.now, input.now),
       this.db.prepare(`INSERT INTO account_identities
         (id, account_id, provider, issuer, subject, email_at_login, email_verified, created_at, last_verified_at)
-        VALUES (?, ?, 'GOOGLE', ?, ?, ?, 1, ?, ?)`).bind(input.identityId,
-        input.accountId, input.issuer, input.subject, input.email, input.now, input.now)
+        VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`).bind(input.identityId,
+        input.accountId, input.provider ?? 'GOOGLE', input.issuer, input.subject, input.email, input.now, input.now)
     ])
   }
 

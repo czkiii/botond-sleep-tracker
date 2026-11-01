@@ -21,6 +21,14 @@ async function token(overrides: Record<string, unknown> = {}) {
 }
 
 describe('Google ID token verification', () => {
+  it('allows only explicitly configured native presenters, without weakening web verification', async () => {
+    const signed = await token({ azp: 'ios.apps.googleusercontent.com' })
+    await expect(verifyGoogleToken(signed.value, clientId, nonce, { key: signed.key, now })).rejects.toThrow()
+    await expect(verifyGoogleToken(signed.value, clientId, nonce, { key: signed.key, now,
+      authorizedParties: ['ios.apps.googleusercontent.com'] })).resolves.toMatchObject({ subject: 'google-subject' })
+    await expect(verifyGoogleToken(signed.value, clientId, nonce, { key: signed.key, now,
+      authorizedParties: ['other.apps.googleusercontent.com'] })).rejects.toThrow()
+  })
   it('accepts a signed token with the configured audience and nonce', async () => {
     const signed = await token({ name: 'Parent', picture: 'https://example.test/avatar.png' })
     await expect(verifyGoogleToken(signed.value, clientId, nonce, { key: signed.key, now })).resolves.toEqual({

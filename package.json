@@ -27,12 +27,15 @@
     "native:sync": "node scripts/patch-native-purchases.mjs && npm run build:native && cap sync",
     "native:android": "cap open android",
     "native:ios": "cap open ios",
-    "test:native": "vitest run src/nativeBilling.test.ts src/nativeBillingRuntime.test.ts src/releaseConfiguration.test.ts --exclude **/.private-backups/**"
+    "test:native": "vitest run src/nativeBilling.test.ts src/nativeBillingRuntime.test.ts src/nativeSession.test.ts src/nativeAuth.test.ts src/releaseConfiguration.test.ts --exclude **/.private-backups/**",
+    "test:native-auth": "vitest run src/nativeSession.test.ts src/nativeAuth.test.ts src/releaseConfiguration.test.ts worker/tests/nativeAuth.test.ts worker/tests/appleAuth.test.ts worker/tests/googleAuth.test.ts worker/tests/authService.test.ts worker/tests/retention.test.ts worker/tests/accountProxyBoundary.test.ts --exclude **/.private-backups/**"
   },
   "dependencies": {
+    "@aparajita/capacitor-secure-storage": "8.0.1",
     "@capacitor/android": "8.6.0",
     "@capacitor/core": "8.6.0",
     "@capacitor/ios": "8.6.0",
+    "@capgo/capacitor-social-login": "8.7.5",
     "@capgo/native-purchases": "8.9.6",
     "@pdf-lib/fontkit": "1.1.1",
     "pdf-lib": "1.17.1",

@@ -15,7 +15,7 @@ export type GoogleIdentity = {
 
 export async function verifyGoogleToken(
   token: string, clientId: string, nonce: string,
-  options: { key?: JWTVerifyGetKey; now?: number } = {}
+  options: { key?: JWTVerifyGetKey; now?: number; authorizedParties?: string[] } = {}
 ): Promise<GoogleIdentity> {
   const { payload } = await jwtVerify(token, options.key ?? googleKeys, {
     algorithms: ['RS256'], audience: clientId,
@@ -27,7 +27,7 @@ export async function verifyGoogleToken(
   if (payload.nonce !== nonce || payload.email_verified !== true
     || !payload.sub || payload.sub.length > 255 || typeof payload.email !== 'string'
     || payload.email.length > 320
-    || (payload.azp !== undefined && payload.azp !== clientId)) {
+    || (payload.azp !== undefined && ![clientId, ...(options.authorizedParties ?? [])].includes(payload.azp as string))) {
     throw new Error('GOOGLE_TOKEN_INVALID')
   }
   return {

@@ -557,3 +557,11 @@ in staging while the flow is under two-device acceptance testing.
 
 
 A17 staging inventory and isolated provisioning preparation (2026-10-17): `scripts/prepare-retention-rehearsal.mjs` creates source/journal SQL, frozen source/restored Worker configs and a hashed plan from three verified resource identities. It refuses the known shared staging/production database IDs, duplicate IDs and wrong resource names; remote identity verification is still required. No network calls, deployment, secrets or activation. Both candidates have no public endpoint or cron. See [the concrete rehearsal runbook](../A17_STAGING_REHEARSAL_PREPARATION_2026-10-17.md). Do not use the shared `deploy:staging` command for the isolated Worker.
+
+## Native authentication preparation — 2026-10-30
+
+Native Google sign-in and protected mobile refresh transport are implemented locally.
+Apple ID-token/identity support is prepared but **Apple provider revocation is not yet implemented**.
+Keep `NATIVE_AUTH_ENABLED=false` and `NATIVE_APPLE_AUTH_ENABLED=false` until the corresponding
+provisioning and acceptance steps are complete. Migration `015_native_apple_identity.sql` is local only.
+Configuration, targeted evidence and remaining work: [native authentication preparation](../NATIVE_AUTH_PREPARATION.md).

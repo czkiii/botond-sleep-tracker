@@ -51,7 +51,7 @@ export default function AccountCard({ locale }: { locale: Locale }) {
       const choices = deviceChoices(failure)
       if (choices.length) { setDevices(choices); setReplacement(null); setStatus('deviceLimit'); setError('') }
       else { setStatus('error'); setError(failure.code === 'DEVICE_LIMIT_REACHED' ? t(locale, 'accountNetworkError') : authError(locale, failure)) }
-    }, replacement?.id).catch((failure) => {
+    }, replacement?.id, locale).catch((failure) => {
       if (!cancelled) { setStatus('error'); setError(authError(locale, failure)) }
     })
     return () => { cancelled = true; target.replaceChildren() }
@@ -69,7 +69,7 @@ export default function AccountCard({ locale }: { locale: Locale }) {
   }
 
   return <div className="settings-card account-card">
-    <div className="account-card-head"><span>G</span><div><strong>{t(locale, 'solemiAccount')}</strong><small>{account ? t(locale, 'signedInAs', { email: account.email || account.name || '' }) : t(locale, 'accountHint')}</small></div></div>
+    <div className="account-card-head"><span aria-hidden="true">S</span><div><strong>{t(locale, 'solemiAccount')}</strong><small>{account ? t(locale, 'signedInAs', { email: account.email || account.name || '' }) : t(locale, 'accountHint')}</small></div></div>
     {status === 'loading' && <small className="account-state">{t(locale, 'accountLoading')}</small>}
     {replacement && status === 'signedOut' && <small className="account-replace-confirm">{t(locale, 'accountReplaceConfirm', { device: replacement.name || t(locale, 'unknownDevice') })}</small>}
     {status === 'signedOut' && <div ref={button} className="google-signin-button" />}
@@ -119,9 +119,9 @@ function formatLastSeen(locale: Locale, value: number) {
 
 function authError(locale: Locale, error: unknown) {
   const code = error instanceof AccountAuthError ? error.code : 'ACCOUNT_AUTH_FAILED'
-  if (code === 'AUTH_NOT_CONFIGURED') return t(locale, 'accountNotConfigured')
+  if (code === 'AUTH_NOT_CONFIGURED' || code === 'NATIVE_AUTH_NOT_CONFIGURED') return t(locale, 'accountNotConfigured')
   if (code === 'DEVICE_LIMIT_REACHED') return t(locale, 'accountDeviceLimit')
-  if (code === 'GOOGLE_TOKEN_INVALID' || code === 'LOGIN_CHALLENGE_INVALID') return t(locale, 'googleSignInExpired')
+  if (code === 'GOOGLE_TOKEN_INVALID' || code === 'APPLE_TOKEN_INVALID' || code === 'LOGIN_CHALLENGE_INVALID') return t(locale, 'googleSignInExpired')
   if (code === 'LOCAL_WORKSPACE_FAILED') return t(locale, 'accountLocalStorageError')
   return t(locale, 'accountNetworkError')
 }

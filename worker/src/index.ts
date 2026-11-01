@@ -18,8 +18,10 @@ import { BillingContractError } from './billingContract'
 import { StoreBillingServiceError } from './storeBillingService'
 import { storeNotification } from './storeNotifications'
 import { StoreLifecycleService, BILLING_CRON } from './storeLifecycleService'
+import { nativePlatform } from './nativeAuthConfig'
+import type { NativeAuthEnv } from './nativeAuthConfig'
 
-interface Env extends LimitEnv, StoreBillingEnv {
+interface Env extends LimitEnv, StoreBillingEnv, NativeAuthEnv {
   DB: D1Database
   TOKEN_PEPPER: string
   ALLOWED_ORIGINS: string
@@ -124,7 +126,7 @@ function corsHeaders(request: Request, env: Env) {
     'Vary': 'Origin'
   })
 
-  if (origin && allowed.includes(origin)) {
+  if (origin && (allowed.includes(origin) || nativePlatform(origin, env))) {
     headers.set('Access-Control-Allow-Origin', origin)
     headers.set('Access-Control-Allow-Credentials', 'true')
     headers.set('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Solemi-Family-Token')
@@ -1066,13 +1068,15 @@ function accountAuth(env: Env) {
     throw new ApiError(503, 'AUTH_NOT_CONFIGURED', 'Account sign-in is not configured.')
   }
   return new AuthService(env.DB, { clientId: env.GOOGLE_CLIENT_ID, secret: env.AUTH_SECRET,
-    deletionJournal: deletionJournal(env), trialIdentity: identityGuard(env) })
+    deletionJournal: deletionJournal(env), trialIdentity: identityGuard(env),
+    nativeGoogleClientId: env.NATIVE_GOOGLE_WEB_CLIENT_ID, appleClientId: env.NATIVE_APPLE_CLIENT_ID,
+    nativeGoogleAuthorizedParties: [env.NATIVE_GOOGLE_IOS_CLIENT_ID, ...(env.NATIVE_GOOGLE_AUTHORIZED_PARTIES || '').split(',')].filter((v): v is string => Boolean(v?.trim())).map(v => v.trim()) })
 }
 
 function requireAllowedAuthOrigin(request: Request, env: Env) {
   const origin = request.headers.get('Origin')
   const allowed = env.ALLOWED_ORIGINS.split(',').map((item) => item.trim()).filter(Boolean)
-  if (!origin || !allowed.includes(origin)) throw new ApiError(403, 'ORIGIN_NOT_ALLOWED')
+  if (!origin || (!allowed.includes(origin) && !nativePlatform(origin, env))) throw new ApiError(403, 'ORIGIN_NOT_ALLOWED')
 }
 
 function cookieValue(request: Request, name: string) {
@@ -1597,6 +1601,38 @@ async function clearAccountFamilyData(request: Request, env: Env, access: Accoun
 async function accountAuthRoute(request: Request, env: Env, path: string) {
   const service = accountAuth(env)
   try {
+    if (path.startsWith('/v1/auth/native/')) {
+      if (env.NATIVE_AUTH_ENABLED !== 'true') throw new ApiError(404, 'NOT_FOUND')
+      const platform = nativePlatform(request.headers.get('Origin'), env)
+      if (!platform) throw new ApiError(403, 'ORIGIN_NOT_ALLOWED')
+      if (request.method !== 'POST') throw new ApiError(405, 'METHOD_NOT_ALLOWED')
+      const body = await readJson(request)
+      if (path === '/v1/auth/native/challenge' || path === '/v1/auth/native/login') {
+        const provider = body.provider
+        if (!['GOOGLE', 'APPLE'].includes(provider as string) || (provider === 'APPLE' && platform !== 'IOS')) throw new ApiError(400, 'INVALID_REQUEST')
+        if (provider === 'APPLE' && env.NATIVE_APPLE_AUTH_ENABLED !== 'true') throw new ApiError(503, 'NATIVE_AUTH_NOT_CONFIGURED')
+        if (provider === 'APPLE' ? !env.NATIVE_APPLE_CLIENT_ID : !env.NATIVE_GOOGLE_WEB_CLIENT_ID
+          || (platform === 'IOS' && !env.NATIVE_GOOGLE_IOS_CLIENT_ID)) throw new ApiError(503, 'NATIVE_AUTH_NOT_CONFIGURED')
+        if (path.endsWith('/challenge')) return ok(request, env, {
+          nonce: await service.challenge(Date.now(), `native:${provider}:${platform}`),
+          googleWebClientId: env.NATIVE_GOOGLE_WEB_CLIENT_ID, googleIosClientId: env.NATIVE_GOOGLE_IOS_CLIENT_ID
+        })
+        const { refresh, ...data } = await service.loginNative({ provider: provider as 'APPLE' | 'GOOGLE', platform,
+          credential: requireString(body.credential, 'credential', 10_000), nonce: requireString(body.nonce, 'nonce', 64),
+          installationSecret: requireString(body.installationSecret, 'installationSecret', 64),
+          deviceName: typeof body.deviceName === 'string' ? body.deviceName : platform,
+          replaceDeviceId: typeof body.replaceDeviceId === 'string' ? body.replaceDeviceId : undefined })
+        return ok(request, env, { ...data, refreshToken: refresh })
+      }
+      if (path === '/v1/auth/native/refresh' || path === '/v1/auth/native/logout') {
+        const token = requireString(body.refreshToken, 'refreshToken', 64)
+        if (!/^[a-f0-9]{64}$/.test(token)) throw new ApiError(401, 'SESSION_INVALID')
+        if (path.endsWith('/logout')) { await service.logout(token); return ok(request, env, { signedOut: true }) }
+        const { refresh, ...data } = await service.refresh(token)
+        return ok(request, env, { ...data, refreshToken: refresh })
+      }
+      throw new ApiError(404, 'NOT_FOUND')
+    }
     if (request.method === 'GET' && path === '/v1/auth/challenge') {
       return ok(request, env, { nonce: await service.challenge(), clientId: env.GOOGLE_CLIENT_ID })
     }

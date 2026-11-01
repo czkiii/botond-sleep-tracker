@@ -1,26 +1,30 @@
 # Solemi Sleep — Codex projektállapot
 
-**Aktuális lezárás, 2026-10-30:** az Android/iOS alkalmazáskeret és a natív
-vásárlás/visszaállítás helyi előkészítése elkészült. Capacitor 8.6.0 projektek,
-StoreKit/Play vásárlási híd, szerveroldali alias/verify/restore bekötés, kizárólag
-szerveres jogosultságfrissítés. 27 célzott gépi próba PASS; frontend és Capacitor
-typecheck, natív webcsomag, két platform szinkronja, hagyományos webbuild és
-repository-ellenőrzés sikeres. A megszakítás után csak a hiányzó lezáró ellenőrzést
-pótoltuk; a régi A17/A27/M1–M6 köröket nem ismételtük.
+**Folytatás, 2026-11-01:** a megszakítás utáni lezárás a lent dokumentált,
+már sikeres 200 próbára épül; új általános tesztkör nem indult. A végleges
+feliratozást tartalmazó natív webcsomag és platformszinkron frissítve.
+Továbbra is helyi, commit előtti munka; távoli kiadás nem történt.
 
-**Ez előkészítés, nem készüléken igazolt fizetés:** Android SDK/JDK és Xcode-fordítás
-még nincs, a natív belépés/munkamenet bekötése hátra van. Az előkészítő profilban
-a fizetés és a fiókbelépés kikapcsolt; production build tiltott. Távoli módosítás,
-aláírás, áruházi feltöltés nem történt. A korábbi szerverértesítési blokk már
-commitolva van; ez a mobilos munka helyben, még commit nélkül található a
-`codex/store-purchase-verification` ágon.
-[Pontos kész rész, korlátok és futtatás](NATIVE_APP_PREPARATION.md).
+**Aktuális állapot, 2026-10-30:** a natív Google-belépés és a mobilos munkamenet
+helyi bekötése elkészült. A meglévő Google-fiók megmarad, a frissítőkulcs védett
+natív tárolóban van. iOS Apple-belépéshez a natív hívás, tokenellenőrzés,
+identitásmigráció és trialjelölés előkészítve; külön kapcsolóval kikapcsolva.
+**Az Apple törléskori/szolgáltatói visszavonása még hátra van**, ezért ez nem
+lezárt, éles Apple-belépés. [Pontos kész rész és bekötés](NATIVE_AUTH_PREPARATION.md).
 
-**Következő:** natív Google-belépés, az iOS belépési lehetőségei és a mobilos
-munkamenet/API-kapcsolat bekötése. **GPT-6 Astra · erős; az előkészítéshez még
-nem kell kézi app-teszt.** Saját store-fiókok nélkül nem zárjuk le a valódi vásárlási elfogadást.
+108 új/érintett belépési próba + 92 kapcsolódó regressziós próba PASS; mindkét
+typecheck, natív webbuild, Android/iOS cap sync, auth-bekapcsolt külön próbabuild,
+webbuild, Worker dry-run és repository-ellenőrzés PASS. Nincs APK/IPA-fordítás,
+készülékes OAuth-próba, remote migráció/deploy vagy store-aktiválás.
+A 015 migráció és a konfiguráció a mostani helyi csomag része; kapcsolók false.
+A korábbi mobilos vásárlási keret már commitolva volt; a mostani belépési munka
+még helyi módosítás a `codex/store-purchase-verification` ágon.
 
-GitHub Desktop Summary: `Add native mobile shells and server-verified purchase flows`.
+**Következő:** Apple-belépés törléskori és szolgáltatói visszavonásának bekötése
+a meglévő fióktörléshez. **GPT-6 Astra · erős; gépi előkészítés, kézi app-teszt
+nélkül.** Saját store-fiókok nélkül nem zárjuk le a valódi vásárlási elfogadást.
+
+GitHub Desktop Summary: `Add native Google sign-in and protected mobile sessions`.
 Az alábbi korábbi „következő” pontokat ez a bejegyzés felülírja.
 
 **Legfrissebb lezárás, 2026-10-29:** Apple/Google értesítés-hitelesítés,
