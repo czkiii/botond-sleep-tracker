@@ -8,11 +8,12 @@ telepítette. A Solemi megnyílt a Medium Phone API 37 emulátoron. A képen
 üres naplóval. Ez az első valódi Android-fordítás, nem store-elfogadás.
 Az Android Studio által létrehozott személyes `.idea` beállításokat nem követjük Gitben.
 
-**iOS-fordítás következő lépése:** a `.github/workflows/ios-simulator.yml` a
-`codex/store-purchase-verification` ág következő feltöltésekor macOS 15 gépen
-az iOS-szimulátorhoz fordítja a meglévő alkalmazást, aláírás és feltöltés nélkül.
-Az első távoli eredmény még hiányzik. A sikeres szimulátoros fordítás önmagában
-nem telepíthető iPhone-ra, és nem igazolja a valódi Apple-belépést vagy vásárlást.
+**iOS-fordítás sikeres, 2026-11-03:** a `.github/workflows/ios-simulator.yml`
+macOS-futása a `3900a50dfd3246cb8ea19645601c54d31ebae768` commiton sikeres.
+[Ellenőrzött futás](https://github.com/czkiii/botond-sleep-tracker/actions/runs/41714840733):
+a natív `Compile for iOS Simulator` lépés is success. Aláírás és store-feltöltés
+nem történt. Ez a csomag nem telepíthető iPhone-ra, és a fordítás nem igazolja
+a valódi Apple-belépést vagy vásárlást; az első készülékes próba még hátra van.
 
 **2026-10-29–30 — helyi előkészítés, nem áruházi kiadás.**
 
@@ -85,8 +86,8 @@ A régi napló a meglévő export/import folyamattal vihető át.
 
 Az eredeti, 2026-10-30-i előkészítéskor ezen a gépen nem volt Android SDK/JDK;
 azóta az Android Studio telepítése és az első emulátoros indítás sikerült.
-iOS-fordítás még nem történt; ehhez Mac/Xcode környezet vagy megfelelő távoli
-macOS-fordítás szükséges. Valódi telefonos működés még nem ellenőrzött.
+iOS-szimulátoros fordítás azóta a GitHub távoli macOS-környezetében sikerült.
+Valódi telefonos működés még nem ellenőrzött.
 
 ## A következő konkrét bekötés
 

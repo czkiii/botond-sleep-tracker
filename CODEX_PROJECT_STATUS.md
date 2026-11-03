@@ -6,21 +6,22 @@ megnyílt a Medium Phone API 37 emulátoron. Ez a kikapcsolt fiók-/fizetési
 kapcsolókat használó `native-preparation` profil, helyi, üres naplóval.
 Valódi áruházi belépést vagy fizetést ez az indítás még nem bizonyít.
 A gépen nincs Mac, Androidos telefon sem; iPhone/iPad rendelkezésre áll.
-Következő: saját fejlesztői fiókok és iOS távoli fordítási út előkészítése,
+Következő: saját fejlesztői fiókok és az aláírt mobilcsomag előkészítése,
 majd a valódi azonosítókkal végzett mobilos belépési/fizetési próba.
 **GPT-6 Astra · erős; tulajdonosi közreműködéssel.**
 
 GitHub Desktop Summary: `Record first Android emulator launch`
 
-**2026-11-03, következő helyi előkészítés:** az első iOS-szimulátoros fordításhoz
-külön GitHub Actions macOS ellenőrzés készült a `codex/store-purchase-verification`
-ágra és mainbe tartó PR-re. A forrásból épít és `CODE_SIGNING_ALLOWED=NO`
-beállítással fordít; nincs Apple-kulcs, aláírt IPA vagy store-feltöltés.
-A tényleges macOS-futás a következő ág-feltöltés után ellenőrizhető; addig
-**nem állítjuk, hogy az iOS-fordítás sikeres**. Ez a meglévő iOS-kiadási kapu
-célzott próbája, nem új általános audit.
+**2026-11-03, iOS-fordítás igazolva:** a `3900a50dfd3246cb8ea19645601c54d31ebae768`
+commit első macOS-futása sikeres. [GitHub-futás 41714840733](https://github.com/czkiii/botond-sleep-tracker/actions/runs/41714840733),
+job `126192026651`: npm telepítés, natív webcsomag, iOS-szinkron és a tényleges
+`Compile for iOS Simulator` lépés is success. Nem indítottunk újrafuttatást.
+Ez aláírás nélküli szimulátoros fordítás (`CODE_SIGNING_ALLOWED=NO`); iPhone-on
+futtatás, aláírt IPA, TestFlight-feltöltés és valódi belépés/vásárlás még nincs.
+Következő: Apple Developer-regisztráció a tulajdonossal, majd aláírás/TestFlight.
+**GPT-6 Astra · erős; tulajdonosi közreműködés szükséges.**
 
-GitHub Desktop Summary: `Add first iOS simulator build check`
+GitHub Desktop Summary: `Record successful iOS simulator build`
 
 **Aktuális lezárás, 2026-11-01:** az Apple-belépés szerveres kódcseréje,
 titkosított kulcstárolása, végleges fióktörléshez kötött visszavonási sora és
