@@ -2,14 +2,14 @@
 
 ## Android Google-bekötés, 2026-11-03
 
-A tulajdonos Google Console projektje `Solemi-Sleep`; jelenleg csak Web application
-kliens van benne. A meglévő webes klienst megtartjuk, ugyanebbe a projektbe kerül
-az Android debug kliens. A helyi APK tanúsítványát `apksigner verify --print-certs`
+A tulajdonos Google Console projektje `Solemi-Sleep`; a meglévő Web application
+kliens mellé létrehozta az Android debug klienst. A helyi APK tanúsítványát `apksigner verify --print-certs`
 ellenőrizte, egyezik a gép debug.keystore tanúsítványával.
 
 - Kliensnév: `Solemi Android Debug`
 - Típus: `Android`
 - Package name: `app.solemi.sleep`
+- Android client ID: `637253731977-mvjhjlscv6t4se4bt5455i35cslbv5gr.apps.googleusercontent.com`
 - SHA-1: `41:E4:47:94:8C:7E:B6:B6:E0:C9:F7:16:36:90:4A:B2:D4:95:15:3C`
 - Ez kizárólag a jelenlegi gép debug aláírása; a kiadási/Play-aláírást később
   külön regisztráljuk. A privát kulcsot nem exportáltuk.
@@ -20,11 +20,16 @@ közvetlen staging API-címet; Apple és fizetés kikapcsolva marad. A
 változatlan. Androidra másolás csak a szerver bekötése után:
 `npm run native:android:staging`, majd Android Studio Run.
 
-**Függő:** az Android OAuth-kliens létrehozása és publikus client ID-ja;
-Workerben `NATIVE_GOOGLE_WEB_CLIENT_ID` = meglévő Web client ID,
-`NATIVE_GOOGLE_AUTHORIZED_PARTIES` = az új Android client ID, valamint
-`NATIVE_AUTH_ENABLED=true`. A távoli Worker aktuális verzióját/sémáját aktiválás
-előtt ellenőrizzük; ezen lépésben nem volt deploy, migráció vagy távoli változás.
+**Bekötés előkészítve:** Workerben `NATIVE_GOOGLE_WEB_CLIENT_ID` = meglévő Web
+client ID, `NATIVE_GOOGLE_AUTHORIZED_PARTIES` = az új Android client ID,
+`NATIVE_AUTH_ENABLED=true`. A korábbi staging Worker build `21f1595`, Cloudflare
+verzió `700cd051-c271-4477-b590-960740b95cb3` (visszaállítási pont).
+A távoli séma olvasása alapján 013-ig kész. A kifejezetten ezen sémára írt
+egyetlen célzott próba igazolta: meglévő webes Google-fiókhoz natív Android-belépés,
+frissítés és kijelentkezés működik 014–016 nélkül is. Worker typecheck és dry-run PASS.
+Ezért ezen Google-bekötéshez nem alkalmazunk migrációt. Apple/store kapcsolók
+false; az ezekhez szükséges 014–016 migráció továbbra is a későbbi aktiválás része.
+Az új staging kiadás és az emulátoros valódi belépés eredményét külön rögzítjük.
 A Google-kliensekhez client secret nem szükséges ebben a folyamatban.
 A belépést még nem próbáltuk; a sikeres build nem OAuth-bizonyíték.
 

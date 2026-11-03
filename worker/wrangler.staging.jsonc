@@ -7,7 +7,9 @@
   "workers_dev": true,
   "preview_urls": true,
   "vars": {
-    "NATIVE_AUTH_ENABLED": "false",
+    "NATIVE_AUTH_ENABLED": "true",
+    "NATIVE_GOOGLE_WEB_CLIENT_ID": "637253731977-hfds5vtk53nqlkc9vul67m78sckqpsc9.apps.googleusercontent.com",
+    "NATIVE_GOOGLE_AUTHORIZED_PARTIES": "637253731977-mvjhjlscv6t4se4bt5455i35cslbv5gr.apps.googleusercontent.com",
     "NATIVE_APPLE_AUTH_ENABLED": "false",
     "APPLE_SIGN_IN_LIFECYCLE_ENABLED": "false",
     "STORE_BILLING_ENABLED": "false",

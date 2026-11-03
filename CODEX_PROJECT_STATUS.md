@@ -1,5 +1,14 @@
 # Solemi Sleep — Codex projektállapot
 
+**2026-11-03, Android Google-kliens elkészült:** a tulajdonos létrehozta a
+`Solemi Android Debug` OAuth-klienst. A staging-konfiguráció most tartalmazza
+a pontos Android engedélyezett klienst, a meglévő Web audience-ot és a natív
+belépés kapcsolóját. Apple/store kikapcsolva. A távoli 013-as séma olvasva;
+egy célzott meglévő-fiók/belépés/refresh/logout próba PASS ezen a sémán is,
+így a Google-bekötéshez nem kell migráció. Worker typecheck és dry-run PASS.
+Következő: ennek a commitnak staging kiadása és első emulátoros Google-belépés.
+GitHub Desktop Summary: `Enable staging Android Google sign-in`
+
 **2026-11-03, aktuális folytatás:** az Apple-regisztráció az automatikus
 okmánybeolvasás hibás neve miatt javításra vár; tagság/aláírás/TestFlight még nincs.
 Közben az Android Google-belépést kötjük be. A tulajdonos a `Solemi-Sleep`

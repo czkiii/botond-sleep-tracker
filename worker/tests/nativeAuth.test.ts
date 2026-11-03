@@ -45,6 +45,36 @@ async function login(provider = 'GOOGLE', origin = 'capacitor://localhost', inst
   return post('native/login', { provider, nonce: data.nonce, credential: 'signed', authorizationCode: 'apple-code', installationSecret: installation.repeat(64) }, origin)
 }
 describe('native auth integration', () => {
+  it('supports Android Google login and refresh on the current staging schema through 013', async () => {
+    // Staging has no Apple/store reconciliation migrations yet. Google-only
+    // activation must preserve existing web identities without requiring them.
+    db.close()
+    db = new DatabaseSync(':memory:')
+    db.exec('PRAGMA foreign_keys=ON')
+    db.exec(readFileSync(new URL('../schema.sql', import.meta.url), 'utf8'))
+    for (const file of readdirSync(new URL('../migrations/', import.meta.url))
+      .filter(x => x.endsWith('.sql') && x >= '003' && x < '014').sort()) {
+      db.exec(readFileSync(new URL('../migrations/' + file, import.meta.url), 'utf8'))
+    }
+    env.DB = sqliteBinding(db)
+    env.NATIVE_APPLE_AUTH_ENABLED = 'false'
+    env.APPLE_SIGN_IN_LIFECYCLE_ENABLED = 'false'
+    service = new AuthService(env.DB, { clientId: 'web', secret: env.AUTH_SECRET!, nativeGoogleClientId: 'web' })
+    const web = await service.login({ credential: 'signed', nonce: await service.challenge(),
+      installationSecret: 'b'.repeat(64), deviceName: 'Existing web device' })
+    const response = await login('GOOGLE', 'https://localhost')
+    expect(response.status).toBe(200)
+    const { data } = await response.json() as any
+    expect(data.account.id).toBe(web.account.id)
+    expect(db.prepare('SELECT COUNT(*) AS n FROM accounts').get()).toMatchObject({ n: 1 })
+    expect(db.prepare('SELECT platform FROM account_devices WHERE id=?').get(data.deviceId)).toMatchObject({ platform: 'ANDROID' })
+    const refreshed = await post('native/refresh', { refreshToken: data.refreshToken }, 'https://localhost')
+    expect(refreshed.status).toBe(200)
+    const next = await refreshed.json() as any
+    expect(next.data.account.id).toBe(web.account.id)
+    expect((await post('native/logout', { refreshToken: next.data.refreshToken }, 'https://localhost')).status).toBe(200)
+    await expect(service.authenticate(next.data.accessToken)).rejects.toMatchObject({ code: 'SESSION_INVALID' })
+  })
   const notify = (payload: string) => worker.fetch(new Request('https://api.example/v1/apple-signin/notifications', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payload }) }), env)
   it('accepts an Apple-signed provider notification without a browser origin and revokes the session', async () => {
