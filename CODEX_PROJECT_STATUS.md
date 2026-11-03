@@ -1,5 +1,17 @@
 # Solemi Sleep — Codex projektállapot
 
+**2026-11-03, első Android-indítás:** Android Studio Rabbit 2 alatt a meglévő
+`android` projekt Gradle-szinkronja, fordítása és telepítése sikerült; a Solemi
+megnyílt a Medium Phone API 37 emulátoron. Ez a kikapcsolt fiók-/fizetési
+kapcsolókat használó `native-preparation` profil, helyi, üres naplóval.
+Valódi áruházi belépést vagy fizetést ez az indítás még nem bizonyít.
+A gépen nincs Mac, Androidos telefon sem; iPhone/iPad rendelkezésre áll.
+Következő: saját fejlesztői fiókok és iOS távoli fordítási út előkészítése,
+majd a valódi azonosítókkal végzett mobilos belépési/fizetési próba.
+**GPT-6 Astra · erős; tulajdonosi közreműködéssel.**
+
+GitHub Desktop Summary: `Record first Android emulator launch`
+
 **Aktuális lezárás, 2026-11-01:** az Apple-belépés szerveres kódcseréje,
 titkosított kulcstárolása, végleges fióktörléshez kötött visszavonási sora és
 az Apple aláírt visszavonási értesítéseinek kezelése helyben kész.

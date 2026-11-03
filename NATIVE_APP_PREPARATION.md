@@ -1,5 +1,13 @@
 # Solemi — Android/iOS keret és áruházi vásárlás
 
+**Első Android-főpróba, 2026-11-03:** a tulajdonos Windows gépén az Android
+Studio Rabbit 2 a meglévő projektet sikeresen szinkronizálta, lefordította és
+telepítette. A Solemi megnyílt a Medium Phone API 37 emulátoron. A képen
+„Install successfully finished” látható. A használt `.env.native` továbbra is
+`native-preparation`: a fiók, családi szinkron és fizetés kikapcsolva, helyi
+üres naplóval. Ez az első valódi Android-fordítás, nem store-elfogadás.
+Az Android Studio által létrehozott személyes `.idea` beállításokat nem követjük Gitben.
+
 **2026-10-29–30 — helyi előkészítés, nem áruházi kiadás.**
 
 Az Android Studio- és Xcode-projekt létrejött. A meglévő React-alkalmazás helyi
@@ -69,9 +77,10 @@ fizetés, fiókbelépés és családi szinkron kikapcsolva, helyi naplóval. Ez 
 staging webes fiók automatikus átvitele: a külön alkalmazás saját tárhelyet használ.
 A régi napló a meglévő export/import folyamattal vihető át.
 
-Ezen a gépen nincs elérhető Android SDK/JDK; Xcode macOS-t igényel.
-A platformprojektek tényleges natív fordítása és telefonos futtatása ezért még
-nem ellenőrzött. iOS-hoz Mac/Xcode, Androidhoz Android Studio/SDK/JDK kell.
+Az eredeti, 2026-10-30-i előkészítéskor ezen a gépen nem volt Android SDK/JDK;
+azóta az Android Studio telepítése és az első emulátoros indítás sikerült.
+iOS-fordítás még nem történt; ehhez Mac/Xcode környezet vagy megfelelő távoli
+macOS-fordítás szükséges. Valódi telefonos működés még nem ellenőrzött.
 
 ## A következő konkrét bekötés
 
