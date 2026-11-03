@@ -24,6 +24,8 @@
     "preview": "vite preview",
     "postinstall": "node scripts/patch-native-purchases.mjs",
     "build:native": "vite build --mode native",
+    "build:native:staging": "vite build --mode native-staging",
+    "native:android:staging": "node scripts/patch-native-purchases.mjs && npm run build:native:staging && cap sync android",
     "native:sync": "node scripts/patch-native-purchases.mjs && npm run build:native && cap sync",
     "native:android": "cap open android",
     "native:ios": "cap open ios",

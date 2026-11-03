@@ -1,5 +1,18 @@
 # Solemi Sleep — Codex projektállapot
 
+**2026-11-03, aktuális folytatás:** az Apple-regisztráció az automatikus
+okmánybeolvasás hibás neve miatt javításra vár; tagság/aláírás/TestFlight még nincs.
+Közben az Android Google-belépést kötjük be. A tulajdonos a `Solemi-Sleep`
+Google-projektben csak Web application klienst talált. A debug APK aláírása
+ellenőrizve; az Android kliens pontos adatai a
+[natív belépés dokumentumában](NATIVE_AUTH_PREPARATION.md).
+Új, explicit `.env.native-staging` profil és Android-szinkronparancs elkészült;
+`npm run build:native:staging` PASS. Távoli aktiválás és valós belépés még nincs.
+Következő: Android OAuth-kliens létrehozása, staging Worker bekötése, majd első
+Google-belépés az emulátoron. A kész korábbi tesztköröket nem indítjuk újra.
+
+GitHub Desktop Summary: `Prepare Android Google sign-in staging profile`
+
 **2026-11-03, első Android-indítás:** Android Studio Rabbit 2 alatt a meglévő
 `android` projekt Gradle-szinkronja, fordítása és telepítése sikerült; a Solemi
 megnyílt a Medium Phone API 37 emulátoron. Ez a kikapcsolt fiók-/fizetési

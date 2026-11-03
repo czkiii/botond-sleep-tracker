@@ -1,5 +1,37 @@
 # Solemi — natív belépés és mobilos munkamenet
 
+## Android Google-bekötés, 2026-11-03
+
+A tulajdonos Google Console projektje `Solemi-Sleep`; jelenleg csak Web application
+kliens van benne. A meglévő webes klienst megtartjuk, ugyanebbe a projektbe kerül
+az Android debug kliens. A helyi APK tanúsítványát `apksigner verify --print-certs`
+ellenőrizte, egyezik a gép debug.keystore tanúsítványával.
+
+- Kliensnév: `Solemi Android Debug`
+- Típus: `Android`
+- Package name: `app.solemi.sleep`
+- SHA-1: `41:E4:47:94:8C:7E:B6:B6:E0:C9:F7:16:36:90:4A:B2:D4:95:15:3C`
+- Ez kizárólag a jelenlegi gép debug aláírása; a kiadási/Play-aláírást később
+  külön regisztráljuk. A privát kulcsot nem exportáltuk.
+
+Az új `.env.native-staging` profil bekapcsolja a natív Google-belépést és a
+közvetlen staging API-címet; Apple és fizetés kikapcsolva marad. A
+`npm run build:native:staging` sikeres. A korábbi `.env.native` előkészítő profil
+változatlan. Androidra másolás csak a szerver bekötése után:
+`npm run native:android:staging`, majd Android Studio Run.
+
+**Függő:** az Android OAuth-kliens létrehozása és publikus client ID-ja;
+Workerben `NATIVE_GOOGLE_WEB_CLIENT_ID` = meglévő Web client ID,
+`NATIVE_GOOGLE_AUTHORIZED_PARTIES` = az új Android client ID, valamint
+`NATIVE_AUTH_ENABLED=true`. A távoli Worker aktuális verzióját/sémáját aktiválás
+előtt ellenőrizzük; ezen lépésben nem volt deploy, migráció vagy távoli változás.
+A Google-kliensekhez client secret nem szükséges ebben a folyamatban.
+A belépést még nem próbáltuk; a sikeres build nem OAuth-bizonyíték.
+
+Forrás: [a használt híd Android-bekötése](https://capgo.app/docs/plugins/social-login/google/android/).
+
+---
+
 **2026-10-30: helyi implementáció és gépi ellenőrzés; nincs kiadás vagy távoli aktiválás.**
 
 **Lezáró folytatás, 2026-11-01:** a megszakítás után a végleges feliratokat is
