@@ -1,0 +1,71 @@
+name: iOS simulator build
+
+on:
+  push:
+    branches:
+      - codex/store-purchase-verification
+    paths:
+      - .github/workflows/ios-simulator.yml
+      - ios/**
+      - src/**
+      - package.json
+      - package-lock.json
+      - capacitor.config.ts
+      - scripts/patch-native-purchases.mjs
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/ios-simulator.yml
+      - ios/**
+      - src/**
+      - package.json
+      - package-lock.json
+      - capacitor.config.ts
+      - scripts/patch-native-purchases.mjs
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-simulator-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Compile iOS simulator app without signing
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Build bundled mobile assets
+        run: npm run build:native
+
+      - name: Sync iOS project and plugins
+        run: npx cap sync ios
+
+      - name: Record Xcode version
+        run: xcodebuild -version
+
+      - name: Compile for iOS Simulator
+        run: |
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/solemi-ios-derived" \
+            CODE_SIGNING_ALLOWED=NO \
+            build

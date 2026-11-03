@@ -8,6 +8,12 @@ telepítette. A Solemi megnyílt a Medium Phone API 37 emulátoron. A képen
 üres naplóval. Ez az első valódi Android-fordítás, nem store-elfogadás.
 Az Android Studio által létrehozott személyes `.idea` beállításokat nem követjük Gitben.
 
+**iOS-fordítás következő lépése:** a `.github/workflows/ios-simulator.yml` a
+`codex/store-purchase-verification` ág következő feltöltésekor macOS 15 gépen
+az iOS-szimulátorhoz fordítja a meglévő alkalmazást, aláírás és feltöltés nélkül.
+Az első távoli eredmény még hiányzik. A sikeres szimulátoros fordítás önmagában
+nem telepíthető iPhone-ra, és nem igazolja a valódi Apple-belépést vagy vásárlást.
+
 **2026-10-29–30 — helyi előkészítés, nem áruházi kiadás.**
 
 Az Android Studio- és Xcode-projekt létrejött. A meglévő React-alkalmazás helyi

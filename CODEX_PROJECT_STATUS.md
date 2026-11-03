@@ -12,6 +12,16 @@ majd a valódi azonosítókkal végzett mobilos belépési/fizetési próba.
 
 GitHub Desktop Summary: `Record first Android emulator launch`
 
+**2026-11-03, következő helyi előkészítés:** az első iOS-szimulátoros fordításhoz
+külön GitHub Actions macOS ellenőrzés készült a `codex/store-purchase-verification`
+ágra és mainbe tartó PR-re. A forrásból épít és `CODE_SIGNING_ALLOWED=NO`
+beállítással fordít; nincs Apple-kulcs, aláírt IPA vagy store-feltöltés.
+A tényleges macOS-futás a következő ág-feltöltés után ellenőrizhető; addig
+**nem állítjuk, hogy az iOS-fordítás sikeres**. Ez a meglévő iOS-kiadási kapu
+célzott próbája, nem új általános audit.
+
+GitHub Desktop Summary: `Add first iOS simulator build check`
+
 **Aktuális lezárás, 2026-11-01:** az Apple-belépés szerveres kódcseréje,
 titkosított kulcstárolása, végleges fióktörléshez kötött visszavonási sora és
 az Apple aláírt visszavonási értesítéseinek kezelése helyben kész.
