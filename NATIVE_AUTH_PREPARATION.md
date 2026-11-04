@@ -47,7 +47,18 @@ az `intermediates/apk/debug/app-debug.apk` telepítése `adb install -r -t`
 paranccsal sikeres, MainActivity elindítva. A telepített csomag az új staging
 assets indexét tartalmazza. A valódi Google-belépést továbbra is a tulajdonos végzi.
 A Google-kliensekhez client secret nem szükséges ebben a folyamatban.
-A belépést még nem próbáltuk; a sikeres build nem OAuth-bizonyíték.
+A fenti gépi ellenőrzések önmagukban nem igazolják a valódi Google-belépést.
+
+**Tulajdonosi próba, 2026-11-04:** valódi Google-belépés sikeres, a képen a
+Solemi-fiók és a meglévő családi napló megjelent. A tulajdonos három belépési
+lépésről számolt be; a szűrt log három natív Google-login hívást igazol, az
+okukat nem. A tulajdonos szerint újra kellett kattintania a Solemi Google-gombjára,
+majd pontosította, hogy az utolsó lépés valószínűleg napló/mentés-választás volt.
+A naplóválasztást nem számítjuk önmagában új hitelesítésnek. Az első belépés
+pontos megszakadási oka nem bizonyított; nincs találomra végzett kódmódosítás.
+Az újranyitás utáni session ellenőrzését a tulajdonos ezt követően sikeresnek
+jelezte: belépve maradt, a napló megjelent. Ez az alappróba lezárva.
+Jelszót/tokent nem gyűjtöttünk vagy írtunk ki.
 
 Forrás: [a használt híd Android-bekötése](https://capgo.app/docs/plugins/social-login/google/android/).
 

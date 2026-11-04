@@ -1,5 +1,26 @@
 # Solemi Sleep — Codex projektállapot
 
+**2026-11-04, újranyitási próba elfogadva és Android-ikon javítva:** a tulajdonos
+visszajelzése szerint az app bezárása/újranyitása után megmaradt a belépés.
+Az első Google-belépés és a munkamenet-visszaállítás alappróbája lezárva;
+a kezdeti ismételt belépési kattintások oka továbbra sem bizonyított.
+A túl kicsi, fehér körbe foglalt indítóikon oka a manifest sima drawable-hivatkozása
+volt. Most mipmap adaptive ikon, sötét háttér és a meglévő Solemi-grafika szerepel;
+API 24/25 fallback is a Solemi-képet használja. Android assembleDebug PASS,
+adatmegőrző emulátoros frissítés sikeres, az új ikon képernyőképen ellenőrizve.
+
+GitHub Desktop Summary: `Fix Android launcher icon and record sign-in persistence`
+
+**2026-11-04, első valódi Android Google-belépés sikeres:** a tulajdonos képe
+bejelentkezett Solemi-fiókot, meglévő családi kapcsolatot és szinkronizált naplót
+mutat. Az első jelszómegadás után még két belépési lépést jelzett; a szűrt natív
+napló három Google-login hívást mutat, de ebből az ok nem állapítható meg.
+A tulajdonos pontosítása: újra a Solemi Google-gombjára kellett kattintania,
+de az utolsó lépés valószínűleg napló/mentés-választás volt. Ez utóbbi nem
+önmagában új hitelesítés; a három natív hívás pontos oka nincs bizonyítva.
+Nem módosítjuk találomra a hitelesítést. Következő az app újranyitása utáni
+munkamenet-megmaradás ellenőrzése, kijelentkezés/adattörlés nélkül.
+
 **2026-11-04, Android Google staging-bekötés kiadva:** a `0cc5333` commit
 fut a staging Workeren (Cloudflare `d9f3be9e-1394-4abd-920a-3cbeab97df4d`).
 Android Google challenge 200, helyes publikus Web client ID és nonce,

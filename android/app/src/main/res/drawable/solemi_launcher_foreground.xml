@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The existing artwork includes its dark background. Fit its central motif
+     inside the adaptive viewport; Android supplies the final launcher mask. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:inset="12dp">
+    <bitmap android:src="@drawable/solemi_icon"
+        android:gravity="fill" android:filter="true" />
+</inset>
