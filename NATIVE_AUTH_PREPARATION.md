@@ -38,6 +38,14 @@ A közvetlen Android-originű Google challenge HTTP 200, helyes Web client ID,
 rövid életű belépési kihívást hozott létre. A `native:android:staging` build
 és Android cap sync már sikeresen elkészült; az Android assetsben az új csomag van.
 Következő: Android Studio Run, Beállítások, Google-belépés a tulajdonossal.
+**Emulátor-helyreállítás, 2026-11-04:** Android Studio 300 másodperces
+időtúllépésekor az ADB `authorizing`, majd `offline` állapotot jelzett.
+ADB-újraindítás után a meglévő `Medium_Phone_API_37.0` AVD indítása
+`-no-snapshot-load -no-snapshot-save` kapcsolóval helyreállította a kapcsolatot.
+Nem történt wipe vagy appadattörlés. JDK 21 `:app:assembleDebug` PASS;
+az `intermediates/apk/debug/app-debug.apk` telepítése `adb install -r -t`
+paranccsal sikeres, MainActivity elindítva. A telepített csomag az új staging
+assets indexét tartalmazza. A valódi Google-belépést továbbra is a tulajdonos végzi.
 A Google-kliensekhez client secret nem szükséges ebben a folyamatban.
 A belépést még nem próbáltuk; a sikeres build nem OAuth-bizonyíték.
 
