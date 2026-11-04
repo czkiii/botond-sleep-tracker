@@ -1,5 +1,16 @@
 # Solemi Sleep — Codex projektállapot
 
+**2026-11-04, Android Google staging-bekötés kiadva:** a `0cc5333` commit
+fut a staging Workeren (Cloudflare `d9f3be9e-1394-4abd-920a-3cbeab97df4d`).
+Android Google challenge 200, helyes publikus Web client ID és nonce,
+no-store/cookie nélkül; idegen origin 403. Android staging build + cap sync kész.
+Nem volt adatbázis-migráció vagy production kiadás. Apple és store kikapcsolva.
+**Most következő:** Android Studio Run → Beállítások → Google-belépés.
+A valódi OAuth-belépés és a mobilos munkamenet még nincs kézzel igazolva.
+A korábbi sikeres gépi köröket nem indítjuk újra.
+
+GitHub Desktop Summary: `Record Android Google staging deployment`
+
 **2026-11-03, Android Google-kliens elkészült:** a tulajdonos létrehozta a
 `Solemi Android Debug` OAuth-klienst. A staging-konfiguráció most tartalmazza
 a pontos Android engedélyezett klienst, a meglévő Web audience-ot és a natív

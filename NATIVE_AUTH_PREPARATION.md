@@ -29,7 +29,15 @@ egyetlen célzott próba igazolta: meglévő webes Google-fiókhoz natív Androi
 frissítés és kijelentkezés működik 014–016 nélkül is. Worker typecheck és dry-run PASS.
 Ezért ezen Google-bekötéshez nem alkalmazunk migrációt. Apple/store kapcsolók
 false; az ezekhez szükséges 014–016 migráció továbbra is a későbbi aktiválás része.
-Az új staging kiadás és az emulátoros valódi belépés eredményét külön rögzítjük.
+**Kiadva és ellenőrizve, 2026-11-04:** a staging Worker a
+`0cc53331454135d38f96245613e031f0d8e273f0` commitot futtatja;
+Cloudflare verzió: `d9f3be9e-1394-4abd-920a-3cbeab97df4d`.
+A közvetlen Android-originű Google challenge HTTP 200, helyes Web client ID,
+érvényes nonce, `no-store`, cookie nélkül. Idegen origin HTTP 403
+`ORIGIN_NOT_ALLOWED`. Távoli séma és naplóadat nem változott; a próba csak
+rövid életű belépési kihívást hozott létre. A `native:android:staging` build
+és Android cap sync már sikeresen elkészült; az Android assetsben az új csomag van.
+Következő: Android Studio Run, Beállítások, Google-belépés a tulajdonossal.
 A Google-kliensekhez client secret nem szükséges ebben a folyamatban.
 A belépést még nem próbáltuk; a sikeres build nem OAuth-bizonyíték.
 
