@@ -5,13 +5,20 @@ import { assertProductionReleaseConfiguration } from './src/releaseConfiguration
 
 export default defineConfig(({ mode }) => {
   const releaseEnv = loadEnv(mode, '.', 'VITE_')
+  // A process/.env.local override must not silently turn a named release build into staging.
+  const releasePlatform = /^native-(android|ios)-release$/.exec(mode)?.[1]
+  if (releasePlatform && (releaseEnv.VITE_NATIVE_APP !== 'true'
+    || releaseEnv.VITE_RELEASE_CHANNEL !== 'production' || releaseEnv.VITE_NATIVE_PLATFORM !== releasePlatform)) {
+    throw new Error('Native release mode requires its matching production platform configuration')
+  }
   assertProductionReleaseConfiguration(releaseEnv)
   const native = releaseEnv.VITE_NATIVE_APP === 'true'
+  const nativeRelease = native && releaseEnv.VITE_RELEASE_CHANNEL === 'production'
   const base = releaseEnv.VITE_BASE_PATH || '/botond-sleep-tracker/'
   return {
     // Keep the current GitHub Pages path until the repository URL is intentionally migrated.
     base,
-    build: { outDir: native ? 'dist-native' : 'dist' },
+    build: { outDir: nativeRelease ? `dist-native-release/${releaseEnv.VITE_NATIVE_PLATFORM}` : native ? 'dist-native' : 'dist' },
     plugins: [
       react(),
       VitePWA({

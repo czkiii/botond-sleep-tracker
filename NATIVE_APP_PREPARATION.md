@@ -1,5 +1,81 @@
 # Solemi — Android/iOS keret és áruházi vásárlás
 
+## Aktuális: mobilos kiadási konfiguráció előkészítve — 2026-11-05
+
+Ez az aktuális folytatás; a lentebbi októberi „következő” bejegyzések történetiek.
+Az Android Google-belépés és a bezárás utáni munkamenet-megmaradás tulajdonosi
+próbája már sikeres. Az ikonjavítást is elfogadta a tulajdonos. Ezeket nem ismételjük.
+
+Külön `.env.native-android-release` és `.env.native-ios-release` profil készült.
+A mobilos kiadás közvetlenül a Workerhez kapcsolódik a meglévő natív munkamenettel;
+nem követeli meg egy új nyilvános webapp vagy Cloudflare Pages proxy létrehozását.
+A webes kiadás korábbi ellenőrzése külön megmaradt.
+
+- Kiadásban fiókbelépés, fióktörlés és natív vásárlás bekapcsolva; iOS-en Apple-belépés is.
+- Belső sáv, tesztadat-gomb és manuális csomagteszt kikapcsolva.
+- A build megköveteli a megfelelő platformot, a közös éles HTTPS fiók/szinkron
+  végpontot és a nyilvános P-256 offline jogosultság-ellenőrző kulcsot.
+  Staging/helyi/példa cím, privát aláírókulcs, hiányzó bekötés vagy tesztmód esetén leáll.
+- A két kiadási mód kimenete `dist-native-release/android`, illetve
+  `dist-native-release/ios`; nem írja felül a mostani `dist-native` tesztcsomagot.
+- A változatlan natív keret helyi fájlokat csomagol, naplózás és WebView-debug nélkül.
+  Az appazonosító továbbra is `app.solemi.sleep`, a név `Solemi Sleep`;
+  Android `versionName=1.0` / `versionCode=1`, iOS `MARKETING_VERSION=1.0` /
+  `CURRENT_PROJECT_VERSION=1`. Az első store-feltöltéskor az azonosítók regisztrációja
+  és az aláírás még szükséges; a következő feltöltéseknél a buildszám növelendő.
+
+### Bekötéskor kitöltendő három érték
+
+A megfelelő `.env.native-android-release.local` vagy `.env.native-ios-release.local`
+fájlban: `VITE_ACCOUNT_API_BASE`, `VITE_SYNC_API_BASE` (ugyanaz az éles Worker-origin),
+`VITE_OFFLINE_ENTITLEMENT_PUBLIC_JWK` (annak nyilvános ellenőrző kulcsa).
+A `.local` fájlok Gitből kizártak. Ezek a VITE-értékek a csomagban olvashatóak;
+privát kulcsot, jelszót vagy store-hitelesítő adatot nem szabad ide írni.
+A bejelentkezési kliensazonosítókat a meglévő szerveres challenge szolgáltatja.
+
+Az értékeket szándékosan nem töltöttük ki a régi production vagy a staging címével.
+A jelenlegi repositoryprofilok ezért még nem készítenek felhasználónak kiadható buildet.
+A kapu a konfigurációt ellenőrzi, nem bizonyítja a távoli szerver/migrációk/kulcsok
+készültségét, a kulcspár egyezését vagy a valódi fizetés működését.
+
+```text
+npm run build:native:release:android
+npm run build:native:release:ios
+```
+
+Ezek csak helyi webes csomagot fordítanak. A későbbi explicit
+`npm run native:android:release` / `npm run native:ios:release` előbb újra fordít,
+és csak siker esetén másolja a megfelelő csomagot a natív projektbe (`cap sync`).
+Nem ír alá, nem telepít, nem kapcsol át szervert és nem tölt fel áruházba.
+A sima `cap sync` továbbra is a teszt/preparation `dist-native` mappát használja;
+kiadáshoz a fenti release parancs szükséges. Android Studio/Xcode aláírás előtt
+ennek eredményét kell használni: az aláíró eszköz önmagában nem különbözteti meg
+a korábban bemásolt staging és release webes csomagot.
+
+### Ennek a blokknak a lezáró bizonyítéka
+
+26 célzott konfigurációteszt és frontend typecheck PASS. Mindkét valódi Vite
+release mód lefordult kizárólag helyi próbaértékekkel, a Gitből kizárt
+`.wrangler/native-release-check/` alá; a próbacímhez nem történt hálózati kérés.
+A kész JavaScriptben nincs belső sáv vagy tesztadat-gomb; nincs service worker,
+PWA-manifest vagy régi GitHub Pages alapútvonal. Üres bekötésnél mindkét release
+parancs elutasít; a release mód staginggé felülírása szintén elutasít.
+A meglévő tesztcsomag és platformok bemásolt indexfájljainak hash-e változatlan.
+Ez nem APK/IPA-fordítás vagy telefonos fizetési próba. Nem történt cap sync,
+emulátoros telepítés, távoli módosítás, migráció, aláírás vagy publikálás.
+
+**A konfiguráció-előkészítési blokk lezárva. Következő:** fejlesztői fiókok
+(Apple névjavítás/tagság, Google Play Console), majd aláírás és áruházi tesztbuild.
+A bekötéskor még az éles Worker, a meglévő migrációk/kulcsok, az Android kiadási
+aláíráshoz tartozó Google-kliens, iOS Google-kliens/URL-séma és Apple Team szükséges.
+A valódi termékek/fizetés és a végleges tájékoztatók az elfogadott későbbi blokkok.
+Az éles átállást külön jelezzük előre. A korábbi sikeres apppróbák nem nyílnak újra.
+
+Technikai alap: [Vite környezeti profilok](https://vite.dev/guide/env-and-mode),
+[Capacitor webDir és natív konfiguráció](https://capacitorjs.com/docs/config).
+
+GitHub Desktop Summary: `Prepare separate Android and iOS release configurations`
+
 **Első Android-főpróba, 2026-11-03:** a tulajdonos Windows gépén az Android
 Studio Rabbit 2 a meglévő projektet sikeresen szinkronizálta, lefordította és
 telepítette. A Solemi megnyílt a Medium Phone API 37 emulátoron. A képen
@@ -100,8 +176,8 @@ kikapcsolt. Böngészős cookie-ból nem készítünk natív munkamenetet.
 
 A vásárlási vezérlő már a meglévő `accountRequest`/`getAccountAccess` felületet
 használja, így ehhez a belépési bekötéshez nem kell új fizetési szervert építeni.
-A natív production build jelenleg szándékosan megáll; ezt a korlátot a natív
-belépés és kiadási konfiguráció elkészültekor kell tényleges feltételekre cserélni.
+A natív production build eredeti feltétlen tiltását 2026-11-05-én a dokumentum
+elején felsorolt konkrét kiadási feltételekre cseréltük.
 
 Utána: saját store-fiókok, végleges app-/termékazonosítók és kulcsok, megfelelő
 Worker-konfiguráció/migrációk, majd célzott valódi sandbox vásárlás, függő vásárlás,

@@ -1,5 +1,21 @@
 # Solemi Sleep — Codex projektállapot
 
+**2026-11-05, mobilos kiadási konfiguráció előkészítése lezárva:** külön Android/iOS
+release profil és fordítás/szinkron parancsok, a tesztcsomagtól elkülönített kimenet.
+A feltétlen mobilos production-tiltás helyett konkrét konfigurációs feltételek:
+natív auth/fizetés/fióktörlés, iOS Apple-belépés, tesztmód nélkül, közös éles HTTPS
+API és nyilvános offline ellenőrző kulcs. Új webapp/Pages proxy nem feltétel.
+26 célzott próba, typecheck és két elkülönített próbaértékes release build PASS;
+belső sáv/tesztadat-gomb/PWA kizárása és hiányos bekötés elutasítása igazolva.
+Az éles cím és kulcs még nincs kitöltve: nem állítjuk késznek a távoli bekötést.
+Nem történt szerverátállás, migráció, natív telepítés, aláírás vagy áruházi feltöltés.
+[Konkrét használat és a maradó bekötési adatok](NATIVE_APP_PREPARATION.md).
+**Következő:** fejlesztői fiókok rendezése (Apple névjavítás/tagság, Google Play
+Console), majd aláírás és áruházi tesztbuild. **GPT-6 Astra · erős;
+tulajdonosi közreműködés szükséges.** A korábbi sikeres köröket nem ismételjük.
+
+GitHub Desktop Summary: `Prepare separate Android and iOS release configurations`
+
 **2026-11-04, újranyitási próba elfogadva és Android-ikon javítva:** a tulajdonos
 visszajelzése szerint az app bezárása/újranyitása után megmaradt a belépés.
 Az első Google-belépés és a munkamenet-visszaállítás alappróbája lezárva;

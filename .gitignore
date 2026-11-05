@@ -6,3 +6,4 @@ dist
 .private-backups/
 legacy-entry-dist/
 dist-native/
+dist-native-release/
